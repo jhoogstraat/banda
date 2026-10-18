@@ -1,0 +1,19 @@
+- Banda: Application for Teams to develop a software system together
+  - Actions and State machine first (for api)
+  - Kubernetes based (agent substrate, kagent, etc.)
+  - SvelteKit 3 with high fidelity UI (https://github.com/sikandarjodd/ai-elements)
+    - UI inspired by amp / t3 code and the like (3 pane split with left navigation sidebar, main chat window, right pane for stuff like diff, files, browser, etc.)
+  - Users log in with sso oidc
+  - Integration with Claude Code / Codex / ACP
+  - Work happens in threads with the coding agent with the common configuration options (harness, model, effort)
+  - A threads starts a remote isolated environment (agent substrate, kagent and the like)
+  - Deeply integrated with git
+  - MCP server that allows agents to see and interact with other threads
+  - People can @mention anyone to switch into chat mode and discuss right inside the chat. The agent only reacts on @mentions in this mode. Otherwise its reacts always like normal.
+  - Left navigation bar has list of threads for the user
+    - Threads that wait for user input are visible up top
+    - Threads that the agents currently work on are hidden in a section "working" and moved to the bottom. Can be opened
+    - Threads that the user has "snoozed" for a defined amount of time on are hidden in a section "snoozed" and moved to the bottom. Can be opened
+    - Threads that the user has "settled" are hidden in a section "settled" and moved to the bottom. Can be opened
+    - At the bttom shows user account / mentions / settings
+    - Mentions switches the sidebars threads to only shows the threads you have been mentioned in and are waiting the users input.
