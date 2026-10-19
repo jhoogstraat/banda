@@ -28,8 +28,11 @@ var (
 
 	secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 	// Harness credentials and what the environment itself relies on.
-	reserved = []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN",
-		"CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CONFIG_DIR", "OPENAI_API_KEY", "CODEX_HOME", "HOME", "PATH"}
+	reserved         = []string{"OPENAI_API_KEY", "CODEX_HOME", "HOME", "PATH"}
+	reservedPrefixes = []string{"ANTHROPIC_", "CLAUDE_", "BANDA_"}
+	// Claude subscription OAuth tokens (access, refresh). Banda must never
+	// store them; see PLAN.md, "Constraint: Claude subscriptions".
+	oauthToken = regexp.MustCompile(`sk-ant-o[ar]t`)
 )
 
 // loginIdle is how long a login environment runs without a terminal.
@@ -39,8 +42,15 @@ func checkSecretName(name string) error {
 	if !secretName.MatchString(name) {
 		return connect.NewError(connect.CodeInvalidArgument, "a secret name is an environment variable name: A-Z, 0-9 and _, not starting with a digit")
 	}
-	if slices.Contains(reserved, name) || strings.HasPrefix(name, "BANDA_") {
+	if slices.Contains(reserved, name) || slices.ContainsFunc(reservedPrefixes, func(p string) bool { return strings.HasPrefix(name, p) }) {
 		return connect.NewError(connect.CodeInvalidArgument, name+" is reserved")
+	}
+	return nil
+}
+
+func checkNotOAuth(value string) error {
+	if oauthToken.MatchString(value) {
+		return connect.NewError(connect.CodeInvalidArgument, "This looks like a Claude subscription token, which Banda must not store. Connect your subscription under Accounts instead, or use an API key (sk-ant-api…).")
 	}
 	return nil
 }
@@ -77,6 +87,9 @@ func (s *Service) SetAuthMethod(ctx context.Context, req *bandav1.SetAuthMethodR
 	if err != nil {
 		return nil, err
 	}
+	if err := checkNotOAuth(key); err != nil {
+		return nil, err
+	}
 	if method == "api_key" && key == "" && !st.APIKeySet {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "an API key is required")
 	}
@@ -92,16 +105,21 @@ func (s *Service) SetSecret(ctx context.Context, req *bandav1.SetSecretRequest) 
 	if err := checkSecretName(req.Name); err != nil {
 		return nil, err
 	}
-	if err := s.sandboxes.SetSecret(ctx, user(ctx), req.Name, []byte(req.Value)); err != nil {
+	if err := checkNotOAuth(req.Value); err != nil {
 		return nil, err
 	}
-	return &bandav1.SetSecretResponse{}, s.store.PutSecret(ctx, user(ctx), req.Name)
+	// The name first: environments started meanwhile must know to redact it.
+	if err := s.store.PutSecret(ctx, user(ctx), req.Name); err != nil {
+		return nil, err
+	}
+	return &bandav1.SetSecretResponse{}, s.sandboxes.SetSecret(ctx, user(ctx), req.Name, []byte(req.Value))
 }
 
 func (s *Service) DeleteSecret(ctx context.Context, req *bandav1.DeleteSecretRequest) (*bandav1.DeleteSecretResponse, error) {
-	if err := checkSecretName(req.Name); err != nil {
-		return nil, err
+	if !secretName.MatchString(req.Name) { // reserved names are fine: none exist
+		return nil, connect.NewError(connect.CodeInvalidArgument, "invalid secret name")
 	}
+	// The value first, so environments keep redacting it until it is gone.
 	if err := s.sandboxes.SetSecret(ctx, user(ctx), req.Name, nil); err != nil {
 		return nil, err
 	}

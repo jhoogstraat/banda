@@ -19,7 +19,7 @@ rules:
     verbs: [get, create, patch]
   - apiGroups: [""]
     resources: [pods]
-    verbs: [delete]
+    verbs: [get, delete]
   - apiGroups: [""]
     resources: [persistentvolumeclaims]
     verbs: [create]

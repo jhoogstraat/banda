@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { ConnectError } from '@connectrpc/connect';
 	import { FitAddon } from '@xterm/addon-fit';
 	import { Terminal } from '@xterm/xterm';
 	import '@xterm/xterm/css/xterm.css';
@@ -37,7 +38,7 @@
 				if (r.exited) break;
 			}
 		} catch (e) {
-			if (!mine.signal.aborted) error = (e as Error).message;
+			if (!mine.signal.aborted) error = ConnectError.from(e).rawMessage;
 		}
 		if (!mine.signal.aborted) ended = true;
 	}

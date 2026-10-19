@@ -33,12 +33,15 @@ WORKDIR /home/banda
 ENTRYPOINT ["/usr/local/bin/runner"]
 
 # Test image: a fake claude that needs no login (see deploy/fake-claude), and
-# a repo whose .banda/setup.sh fails (file:///opt/e2e/setup-fails.git).
+# repos for e2e at file:///opt/e2e/<name>.git: setup-fails (its .banda/setup.sh
+# fails) and setup-bg (it succeeds, leaving a background process).
 FROM sandbox AS fake
 COPY deploy/fake-claude /usr/local/bin/claude
 USER root
-RUN git init -q -b main /tmp/r && mkdir /tmp/r/.banda \
- && printf 'echo "setup sees $E2E_SECRET"\nexit 7\n' > /tmp/r/.banda/setup.sh \
- && git -C /tmp/r add -A && git -C /tmp/r -c user.name=e2e -c user.email=e2e@localhost commit -qm init \
- && git clone -q --bare /tmp/r /opt/e2e/setup-fails.git && rm -rf /tmp/r && chown -R 1000:1000 /opt/e2e
+RUN repo() { git init -q -b main /tmp/$1 && mkdir /tmp/$1/.banda && printf "$2" > /tmp/$1/.banda/setup.sh \
+   && git -C /tmp/$1 add -A && git -C /tmp/$1 -c user.name=e2e -c user.email=e2e@localhost commit -qm init \
+   && git clone -q --bare /tmp/$1 /opt/e2e/$1.git && rm -rf /tmp/$1; } \
+ && repo setup-fails 'echo "setup sees $E2E_SECRET"\nexit 7\n' \
+ && repo setup-bg 'sleep 600 &\necho setup-bg-done\n' \
+ && chown -R 1000:1000 /opt/e2e
 USER 1000

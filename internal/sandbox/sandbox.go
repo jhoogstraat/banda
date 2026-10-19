@@ -13,6 +13,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
+	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,9 +32,6 @@ import (
 const (
 	home      = "/home/banda"
 	claudeDir = home + "/.claude"
-	// secretsDir holds the user's secrets as files too, so the runner knows
-	// which values to redact (cmd/runner/redact.go).
-	secretsDir = "/etc/banda/secrets"
 )
 
 type Config struct {
@@ -65,20 +64,27 @@ func New(cfg Config) (*Client, error) {
 }
 
 // Ensure gives the thread a freshly started pod. authMethod is the owner's:
-// "subscription" or "api_key".
-func (c *Client) Ensure(ctx context.Context, t store.Thread, authMethod string) error {
+// "subscription" or "api_key"; secrets are the names of the owner's secrets,
+// which the runner redacts.
+func (c *Client) Ensure(ctx context.Context, t store.Thread, authMethod string, secrets []string) error {
 	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID)
 	if err != nil {
 		return err
 	}
-	return c.start(ctx, c.sandbox("t-"+t.ID, claim, t, authMethod))
+	return c.start(ctx, c.sandbox("t-"+t.ID, claim, t, authMethod, secrets))
 }
 
 // EnsureLogin gives the user's login environment a freshly started pod.
+// A pod that is still starting is kept, so opening the terminal twice
+// doesn't restart it.
 func (c *Client) EnsureLogin(ctx context.Context, owner, token string) error {
 	claim, err := c.ensureClaudeVolume(ctx, owner)
 	if err != nil {
 		return err
+	}
+	pod, err := c.kube.CoreV1().Pods(c.cfg.Namespace).Get(ctx, "login-"+hash(owner), metav1.GetOptions{})
+	if err == nil && pod.DeletionTimestamp == nil && time.Since(pod.CreationTimestamp.Time) < time.Minute {
+		return nil
 	}
 	return c.start(ctx, c.loginSandbox(owner, claim, token))
 }
@@ -143,6 +149,9 @@ func (c *Client) patchSecret(ctx context.Context, name string, data map[string][
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"banda.dev/user-secret": "true"}},
 		Data:       data,
 	}, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) { // a concurrent first write won
+		_, err = secrets.Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+	}
 	return err
 }
 
@@ -184,7 +193,7 @@ func (c *Client) suspend(ctx context.Context, name string) error {
 	return err
 }
 
-func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod string) *sbv1.Sandbox {
+func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod string, secrets []string) *sbv1.Sandbox {
 	env := map[string]string{
 		"HOME":                         home,
 		"CLAUDE_CONFIG_DIR":            claudeDir,
@@ -198,6 +207,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_MODEL":                  t.Model,
 		"BANDA_EFFORT":                 t.Effort,
 		"BANDA_AUTH_METHOD":            authMethod,
+		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
 	}
 	var vars []corev1.EnvVar
 	for k, v := range env {
@@ -226,16 +236,14 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 					Spec: corev1.PodSpec{
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
-						Volumes: []corev1.Volume{claudeVolume(claudeClaim), {Name: "secrets", VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: envSecret(t.OwnerID), Optional: &optional}}}},
+						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim)},
 						Containers: []corev1.Container{{
 							Name:            "runner",
 							Image:           c.cfg.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             vars,
 							EnvFrom:         envFrom,
-							VolumeMounts: []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir},
-								{Name: "secrets", MountPath: secretsDir, ReadOnly: true}},
+							VolumeMounts:    []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
 						}},
 					},
 				},

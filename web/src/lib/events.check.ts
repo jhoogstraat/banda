@@ -32,7 +32,12 @@ if (setup.steps.map((s) => `${s.id}:${s.state}`).join() !== 'checkout:2,tools:3'
 	throw new Error('a setup step should replace the earlier one with its id');
 apply(chat, ev({ case: 'notice', value: { text: 'later' } }));
 apply(chat, step('tools', 2));
-apply(chat, step('login', 1));
-if (count() !== 6 || setup.steps[1].state !== 2 || chat.items[5].kind !== 'setup')
-	throw new Error('a known id updates its checklist, a new one after other items starts a new checklist');
+const rerun = chat.items[5];
+if (count() !== 6 || setup.steps[1].state !== 3 || rerun.kind !== 'setup' || rerun.steps[0].state !== 2)
+	throw new Error('a step after other items should start a new checklist, leaving the old one alone');
+apply(chat, step('setup', 1));
+apply(chat, step('setup', 3));
+apply(chat, step('setup', 1)); // retry: only status changes in between, which add no item
+if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== 3)
+	throw new Error('a finished step running again should start a new checklist');
 console.log('ok');

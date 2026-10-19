@@ -16,7 +16,7 @@ import (
 // new one closes the old one. Terminal data is never logged.
 type terminal struct {
 	send   func(*bandav1.ConnectRequest) error
-	exited func() // optional, called after each process exits
+	exited func() // optional, called after each process exits, before Exited is sent
 
 	mu  sync.Mutex
 	cmd *exec.Cmd
@@ -65,7 +65,7 @@ func (t *terminal) open(o *bandav1.TerminalOpen) {
 		}
 		cmd.Wait()
 		if t.exited != nil {
-			go t.exited()
+			t.exited()
 		}
 		t.mu.Lock()
 		defer t.mu.Unlock()

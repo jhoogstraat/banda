@@ -20,6 +20,7 @@ import (
 const (
 	maxOutput    = 64 << 10
 	setupTimeout = 15 * time.Minute
+	killGrace    = 30 * time.Second
 )
 
 // setup reports the steps that prepare the environment as SetupStep events.
@@ -88,13 +89,15 @@ func (s setup) once(ctx context.Context, id, title string, content []byte, comma
 	if b, _ := os.ReadFile(marker); string(b) == sum {
 		return nil
 	}
-	if err := s.run(id, title, func() (string, error) { return runGroup(ctx, command) }); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(marker, []byte(sum), 0o644)
+	return s.run(id, title, func() (string, error) {
+		out, err := runGroup(ctx, command)
+		if err == nil { // part of the step: a failure to save it fails the step
+			if err = os.MkdirAll(filepath.Dir(marker), 0o755); err == nil {
+				err = os.WriteFile(marker, []byte(sum), 0o644)
+			}
+		}
+		return out, err
+	})
 }
 
 // run reports a step as running, runs fn and reports the result.
@@ -120,8 +123,10 @@ func (s setup) report(id, title string, state bandav1.SetupState, out string) {
 	s.send(&bandav1.Event{Kind: &bandav1.Event_SetupStep{SetupStep: &bandav1.SetupStep{Id: id, Title: title, State: state, Output: out}}})
 }
 
-// runGroup runs a bash command in the checkout in its own process group, and
-// kills only that group on timeout or shutdown. Claude is never in it.
+// runGroup runs a bash command in the checkout in its own process group. On
+// timeout or shutdown only that group is stopped: SIGTERM, then SIGKILL after
+// a grace period (a claude the script started may be refreshing a token).
+// The runner's own claude is never in it.
 func runGroup(ctx context.Context, command string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, setupTimeout)
 	defer cancel()
@@ -130,9 +135,16 @@ func runGroup(ctx context.Context, command string) (string, error) {
 	cmd.Dir = work
 	cmd.Stdout, cmd.Stderr = &out, &out
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.Cancel = func() error {
+		pgid := -cmd.Process.Pid
+		time.AfterFunc(killGrace, func() { syscall.Kill(pgid, syscall.SIGKILL) })
+		return syscall.Kill(pgid, syscall.SIGTERM)
+	}
 	cmd.WaitDelay = 5 * time.Second // background processes may keep the output open
 	err := cmd.Run()
+	if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState.Success() {
+		err = nil // the script succeeded and left a background process running
+	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		err = fmt.Errorf("timed out after %s", setupTimeout)
 	}

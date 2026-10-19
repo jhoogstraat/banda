@@ -47,13 +47,16 @@ export function apply(chat: Chat, e: Event) {
 			chat.items.push({ kind: 'turn', turn: k.value });
 			break;
 		case 'setupStep': {
-			// A checklist: a step replaces the one with its id in the latest checklist, or joins it while nothing came after it.
+			// A checklist: a step joins the last item's checklist, or replaces its running step with the same id.
+			// A step that already finished there means setup runs again (resume, retry): a new checklist starts.
 			const step = k.value;
-			const last = chat.items.findLast((i): i is Extract<Item, { kind: 'setup' }> => i.kind === 'setup');
-			const at = last?.steps.findIndex((s) => s.id === step.id) ?? -1;
-			if (last && at >= 0) last.steps[at] = step;
-			else if (last && chat.items.at(-1) === last) last.steps.push(step);
-			else chat.items.push({ kind: 'setup', steps: [step] });
+			const last = chat.items.at(-1);
+			const at = last?.kind === 'setup' ? last.steps.findIndex((s) => s.id === step.id) : -1;
+			// 1 is SetupState.RUNNING (node's type stripping, used by events.check.ts, can't import enums).
+			if (last?.kind !== 'setup' || (at >= 0 && last.steps[at].state !== 1))
+				chat.items.push({ kind: 'setup', steps: [step] });
+			else if (at >= 0) last.steps[at] = step;
+			else last.steps.push(step);
 			break;
 		}
 		case 'modeChanged':

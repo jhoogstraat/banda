@@ -53,7 +53,6 @@ func main() {
 func run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	userSecrets = loadSecrets(secretsDir)
 
 	tr := &http.Transport{Protocols: new(http.Protocols)}
 	tr.Protocols.SetUnencryptedHTTP2(true)
@@ -116,7 +115,9 @@ func run(ctx context.Context) error {
 			case *bandav1.ConnectResponse_TerminalClose:
 				term.close()
 			case *bandav1.ConnectResponse_FileRequest:
-				go files(ctx, k.FileRequest, sendReq)
+				if loginUser == "" { // a login environment has no checkout
+					go files(ctx, k.FileRequest, sendReq)
+				}
 			}
 		}
 	}()

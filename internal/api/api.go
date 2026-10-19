@@ -448,8 +448,16 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	delete(s.runners, t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)
+	var secrets []store.Secret
 	if err == nil {
-		err = s.sandboxes.Ensure(ctx, t, st.AuthMethod)
+		secrets, err = s.store.Secrets(ctx, t.OwnerID)
+	}
+	if err == nil {
+		var names []string
+		for _, sec := range secrets {
+			names = append(names, sec.Name)
+		}
+		err = s.sandboxes.Ensure(ctx, t, st.AuthMethod, names)
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)

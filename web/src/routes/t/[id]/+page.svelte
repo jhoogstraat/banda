@@ -70,6 +70,8 @@
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	let loginOpen = $state(false);
 	let error = $state('');
+	// The reason of the latest status change, e.g. why the environment failed.
+	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
 
@@ -102,6 +104,7 @@
 					offline = false;
 					if (event.seq) seq = event.seq;
 					apply(chat, event);
+					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
@@ -276,7 +279,7 @@
 				{:else if thread?.status === Status.ERRORED}
 					<div class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
 						<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
-						<span class="flex-1">The environment failed or was lost.</span>
+						<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
 						{#if owner}
 							<Button size="sm" onclick={() => act(api.retry({ threadId: id }))}><RotateCcwIcon /> Retry</Button>
 						{/if}

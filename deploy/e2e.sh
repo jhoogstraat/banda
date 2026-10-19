@@ -38,13 +38,15 @@ ok "login environment: logout and login in its terminal update the login state; 
 
 SECRET="e2e-secret-$RANDOM$RANDOM"
 call SettingsService/SetSecret "{\"name\":\"E2E_SECRET\",\"value\":\"$SECRET\"}" >/dev/null
-for name in ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN BANDA_THREAD_ID PATH lower 1X; do
+for name in ANTHROPIC_API_KEY ANTHROPIC_MODEL CLAUDE_CODE_OAUTH_TOKEN CLAUDE_X BANDA_THREAD_ID PATH lower 1X; do
 	call SettingsService/SetSecret "{\"name\":\"$name\",\"value\":\"x\"}" >/dev/null 2>&1 && fail "secret name $name accepted"
 done
+call SettingsService/SetSecret '{"name":"E2E_OAUTH","value":"sk-ant-oat01-e2e"}' >/dev/null 2>&1 && fail "a subscription token was accepted as a secret"
+call SettingsService/SetAuthMethod '{"harness":"claude","authMethod":"AUTH_METHOD_API_KEY","apiKey":"sk-ant-ort01-e2e"}' >/dev/null 2>&1 && fail "a subscription token was accepted as an API key"
 S=$(call SettingsService/GetSettings '{}')
 echo "$S" | jq -e '(.secrets | map(.name) | index("E2E_SECRET")) and .accounts[0].harness == "claude"' >/dev/null
 echo "$S" | grep -q "$SECRET" && fail "settings return a secret value"
-ok "secrets: set, reserved and invalid names refused, values never returned"
+ok "secrets: set, reserved and invalid names and subscription tokens refused, values never returned"
 
 ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}" | jq -r .thread.id)
 wait_for STATUS_AWAITING_INPUT
@@ -111,6 +113,11 @@ sleep 5
 [ "$(thread status)" = STATUS_ERRORED ] && [ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo still-up\"}" | grep -q still-up
 ok "a failing .banda/setup.sh errors the thread with its redacted output; the runner stays up for the terminal"
+
+ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}' | jq -r .thread.id)
+wait_for STATUS_AWAITING_INPUT
+[ "$(steps setup DONE)" = 1 ]
+ok "a .banda/setup.sh that leaves a background process running succeeds"
 
 U=e2e-$RANDOM$RANDOM
 call SettingsService/SetAuthMethod '{"harness":"claude","authMethod":"AUTH_METHOD_API_KEY"}' "$U" >/dev/null 2>&1 && fail "API key mode without a key"

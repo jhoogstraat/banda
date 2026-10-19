@@ -4,6 +4,7 @@
 	import PageHeader from '#lib/components/page-header.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { ConnectError } from '@connectrpc/connect';
 	import { settingsApi } from '#lib/api.js';
 	import {
 		AuthMethod,
@@ -21,12 +22,15 @@
 	let error = $state('');
 	let errorAt = $state<'accounts' | 'secrets'>('accounts');
 
+	const message = (e: unknown) => ConnectError.from(e).rawMessage;
+
 	async function load() {
 		try {
 			({ accounts, secrets } = await settingsApi.getSettings({}));
 			loaded = true;
+			error = '';
 		} catch (e) {
-			error = (e as Error).message;
+			error = message(e);
 		}
 	}
 	$effect(() => {
@@ -38,13 +42,12 @@
 		errorAt = at;
 		try {
 			await call;
-			error = '';
-			await load();
-			return true;
 		} catch (e) {
-			error = (e as Error).message;
+			error = message(e);
 			return false;
 		}
+		await load();
+		return true;
 	}
 
 	const since = (t?: Timestamp) => {
@@ -60,14 +63,17 @@
 		return ['border border-muted-foreground', 'Not checked yet'];
 	}
 
-	// The login dialog, and an API key method picked but not saved yet (no key stored), per harness.
+	// The login dialog, and per harness the method picked but not saved yet: being saved, or API key waiting for a key.
+	// Dropping the pick (also when saving fails) shows the server's method again.
 	let login = $state({ open: false, action: LoginAction.LOGIN, harness: '', name: '' });
-	let pendingKey = $state<Record<string, boolean>>({});
+	let chosen = $state<Record<string, AuthMethod>>({});
 	let keys = $state<Record<string, string>>({});
 
-	function pick(a: HarnessAccount, method: AuthMethod) {
-		pendingKey[a.harness] = method === AuthMethod.API_KEY && !a.apiKeySet;
-		if (!pendingKey[a.harness] && method !== a.authMethod) act('accounts', settingsApi.setAuthMethod({ harness: a.harness, authMethod: method }));
+	async function pick(a: HarnessAccount, method: AuthMethod) {
+		chosen[a.harness] = method;
+		if (method === AuthMethod.API_KEY && !a.apiKeySet) return;
+		if (method !== a.authMethod) await act('accounts', settingsApi.setAuthMethod({ harness: a.harness, authMethod: method }));
+		delete chosen[a.harness];
 	}
 
 	async function saveKey(a: HarnessAccount) {
@@ -75,7 +81,7 @@
 		if (!apiKey) return;
 		if (await act('accounts', settingsApi.setAuthMethod({ harness: a.harness, authMethod: AuthMethod.API_KEY, apiKey }))) {
 			keys[a.harness] = '';
-			pendingKey[a.harness] = false;
+			delete chosen[a.harness];
 		}
 	}
 
@@ -124,7 +130,7 @@
 				<div class="divide-y rounded-lg border">
 					{#each accounts as a (a.harness)}
 						{@const [dot, label] = status(a)}
-						{@const method = pendingKey[a.harness] ? AuthMethod.API_KEY : a.authMethod}
+						{@const method = chosen[a.harness] ?? a.authMethod}
 						<div class="space-y-3 p-4">
 							<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
 								<span class="font-medium">{a.displayName || a.harness}</span>

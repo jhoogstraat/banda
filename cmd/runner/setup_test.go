@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -51,5 +53,28 @@ func TestSetupReportSkipsQuietly(t *testing.T) {
 	s.report("setup", "x", bandav1.SetupState_SETUP_STATE_DONE, big)
 	if n != 1 || len(out) > maxOutput+len("…") {
 		t.Errorf("n=%d len=%d", n, len(out))
+	}
+}
+
+func TestRunGroupBackgroundChild(t *testing.T) {
+	work = t.TempDir()
+	out, err := runGroup(context.Background(), "sleep 30 & echo started")
+	if err != nil || strings.TrimSpace(out) != "started" {
+		t.Errorf("got %q, %v", out, err)
+	}
+	if _, err := runGroup(context.Background(), "sleep 30 & exit 2"); err == nil {
+		t.Error("a failing script with a background child succeeded")
+	}
+}
+
+func TestSetupMarkerFailureFailsStep(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	work = t.TempDir()
+	os.WriteFile(filepath.Join(home, ".banda"), nil, 0o644) // a file where the marker dir should be
+	var last bandav1.SetupState
+	s := setup{send: func(e *bandav1.Event) error { last = e.GetSetupStep().State; return nil }}
+	if err := s.once(context.Background(), "setup", "x", []byte("v1"), "true"); err == nil || last != bandav1.SetupState_SETUP_STATE_FAILED {
+		t.Errorf("got %v, last state %v", err, last)
 	}
 }

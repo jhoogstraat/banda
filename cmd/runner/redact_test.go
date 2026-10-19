@@ -1,10 +1,6 @@
 package main
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 func TestRedact(t *testing.T) {
 	t.Setenv("GIT_TOKEN", "ghp_secretsecret")
@@ -16,17 +12,15 @@ func TestRedact(t *testing.T) {
 }
 
 func TestRedactUserSecrets(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "DB_PASSWORD"), []byte("hunter2hunter2\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "DB_URL"), []byte("postgres://u:hunter2hunter2@db"), 0o644)
-	os.WriteFile(filepath.Join(dir, "SHORT"), []byte("abc"), 0o644)
-	os.Mkdir(filepath.Join(dir, "..data"), 0o755)
-	t.Cleanup(func() { userSecrets = nil })
-	userSecrets = loadSecrets(dir)
+	t.Setenv("BANDA_SECRET_NAMES", "DB_PASSWORD,DB_URL,SHORT,MULTILINE,UNSET")
+	t.Setenv("DB_PASSWORD", "hunter2hunter2")
+	t.Setenv("DB_URL", "postgres://u:hunter2hunter2@db")
+	t.Setenv("SHORT", "abc")
+	t.Setenv("MULTILINE", "line1\n\"quoted\"\tx")
 	t.Setenv("ANTHROPIC_API_KEY", "proxy-key-123")
 
-	in := "url=postgres://u:hunter2hunter2@db pw=hunter2hunter2 key=proxy-key-123 abc"
-	want := "url=[redacted] pw=[redacted] key=[redacted] abc"
+	in := `url=postgres://u:hunter2hunter2@db pw=hunter2hunter2 key=proxy-key-123 abc {"value":"line1\n\"quoted\"\tx"}`
+	want := `url=[redacted] pw=[redacted] key=[redacted] abc {"value":"[redacted]"}`
 	if got := redact(in); got != want {
 		t.Errorf("got %q\nwant %q", got, want)
 	}

@@ -2,8 +2,8 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -14,42 +14,34 @@ import (
 // Anthropic keys and OAuth tokens (sk-ant-api…, sk-ant-oat…, sk-ant-ort…).
 var anthropicToken = regexp.MustCompile(`sk-ant-[A-Za-z0-9_-]{8,}`)
 
-// secretsDir mirrors the owner's secrets as files (internal/sandbox): the
-// runner can't tell them apart from other variables in its environment.
-const secretsDir = "/etc/banda/secrets"
-
-// userSecrets are the values of the owner's secrets, read at start like the
-// environment.
-var userSecrets []string
-
-func loadSecrets(dir string) []string {
-	var out []string
-	entries, _ := os.ReadDir(dir)
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".") { // the Secret volume's own ..data links
-			continue
-		}
-		if b, err := os.ReadFile(filepath.Join(dir, e.Name())); err == nil {
-			out = append(out, strings.TrimSpace(string(b)))
-		}
-	}
-	return out
-}
-
 // redact removes credentials the agent can reach in its sandbox (the owner's
 // Claude login, API key and secrets, the git and runner tokens) from text that
 // leaves the pod, so they never end up in Banda's database or in front of
-// teammates.
+// teammates. The owner's secrets are the variables named in
+// BANDA_SECRET_NAMES; the pod's environment is fixed at start.
 func redact(s string) string {
 	s = anthropicToken.ReplaceAllString(s, "[redacted]")
-	values := append([]string{os.Getenv("GIT_TOKEN"), os.Getenv("BANDA_RUNNER_TOKEN"), os.Getenv("ANTHROPIC_API_KEY")}, userSecrets...)
-	slices.SortFunc(values, func(a, b string) int { return cmp.Compare(len(b), len(a)) }) // a value may contain another
-	for _, v := range values {
-		if len(v) >= 4 { // shorter ones would redact ordinary text
-			s = strings.ReplaceAll(s, v, "[redacted]")
+	var values []string
+	for _, name := range append([]string{"GIT_TOKEN", "BANDA_RUNNER_TOKEN", "ANTHROPIC_API_KEY"}, strings.Split(os.Getenv("BANDA_SECRET_NAMES"), ",")...) {
+		if v := os.Getenv(name); len(v) >= 4 { // shorter ones would redact ordinary text
+			values = append(values, v, jsonEscaped(v)) // tool inputs are raw JSON
 		}
 	}
+	slices.SortFunc(values, func(a, b string) int { return cmp.Compare(len(b), len(a)) }) // a value may contain another
+	for _, v := range values {
+		s = strings.ReplaceAll(s, v, "[redacted]")
+	}
 	return strings.ToValidUTF8(s, "�") // protobuf strings must be UTF-8
+}
+
+// jsonEscaped is v as it appears inside a JSON string.
+func jsonEscaped(v string) string {
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	enc.Encode(v)
+	out := strings.TrimSpace(b.String())
+	return out[1 : len(out)-1]
 }
 
 func scrub(e *bandav1.Event) {
