@@ -30,6 +30,10 @@ service ThreadService {
   rpc OpenTerminal(OpenTerminalRequest) returns (stream OpenTerminalResponse);
   rpc WriteTerminal(WriteTerminalRequest) returns (WriteTerminalResponse);
   rpc ResizeTerminal(ResizeTerminalRequest) returns (ResizeTerminalResponse);
+  // The tracked and unignored files of the thread's checkout, read from the
+  // running environment. Fails while it is not running.
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
 }
 
 service UserService {
@@ -272,6 +276,30 @@ message ResizeTerminalRequest {
 
 message ResizeTerminalResponse {}
 
+message ListFilesRequest {
+  string thread_id = 1;
+}
+
+message ListFilesResponse {
+  repeated string paths = 1;
+  // The checkout has more files than were listed.
+  bool truncated = 2;
+}
+
+message ReadFileRequest {
+  string thread_id = 1;
+  // Relative to the checkout.
+  string path = 2;
+}
+
+message ReadFileResponse {
+  // Empty for binary files.
+  string content = 1;
+  bool binary = 2;
+  // The file is longer than the part in `content`.
+  bool truncated = 3;
+}
+
 message MeRequest {}
 
 message MeResponse {
@@ -304,6 +332,7 @@ message ConnectRequest {
     Event event = 2;
     Diff diff = 3;
     TerminalOutput terminal_output = 5;
+    FileResponse file_response = 6;
   }
 }
 
@@ -323,6 +352,17 @@ message Diff {
   string diff = 1;
 }
 
+// The answer to a FileRequest.
+message FileResponse {
+  string request_id = 1;
+  repeated string paths = 2;
+  bool truncated = 3;
+  string content = 4;
+  bool binary = 5;
+  // Set if the request failed.
+  string error = 6;
+}
+
 // API -> runner.
 message ConnectResponse {
   oneof kind {
@@ -333,6 +373,7 @@ message ConnectResponse {
     TerminalInput terminal_input = 5;
     TerminalResize terminal_resize = 6;
     TerminalClose terminal_close = 7;
+    FileRequest file_request = 8;
   }
 }
 
@@ -362,3 +403,10 @@ message TerminalResize {
 }
 
 message TerminalClose {}
+
+// Lists the checkout's files, or reads `path` from it.
+message FileRequest {
+  string request_id = 1;
+  string path = 2;
+  bool list = 3;
+}

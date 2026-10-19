@@ -61,6 +61,10 @@ const (
 	// ThreadServiceResizeTerminalProcedure is the procedure name of the ThreadService's ResizeTerminal
 	// RPC.
 	ThreadServiceResizeTerminalProcedure = "/banda.v1.ThreadService/ResizeTerminal"
+	// ThreadServiceListFilesProcedure is the procedure name of the ThreadService's ListFiles RPC.
+	ThreadServiceListFilesProcedure = "/banda.v1.ThreadService/ListFiles"
+	// ThreadServiceReadFileProcedure is the procedure name of the ThreadService's ReadFile RPC.
+	ThreadServiceReadFileProcedure = "/banda.v1.ThreadService/ReadFile"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -175,6 +179,20 @@ var (
 			Procedure:  ThreadServiceResizeTerminalProcedure,
 		}
 	})
+	threadServiceListFilesSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ListFiles"),
+			Procedure:  ThreadServiceListFilesProcedure,
+		}
+	})
+	threadServiceReadFileSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ReadFile"),
+			Procedure:  ThreadServiceReadFileProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -203,6 +221,10 @@ type ThreadServiceClient interface {
 	OpenTerminal(context.Context, *v1.OpenTerminalRequest) (ThreadServiceOpenTerminalClientStream, error)
 	WriteTerminal(context.Context, *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error)
 	ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error)
+	// The tracked and unignored files of the thread's checkout, read from the
+	// running environment. Fails while it is not running.
+	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
+	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -279,6 +301,10 @@ type ThreadServiceHandler interface {
 	OpenTerminal(context.Context, *v1.OpenTerminalRequest, ThreadServiceOpenTerminalServerStream) error
 	WriteTerminal(context.Context, *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error)
 	ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error)
+	// The tracked and unignored files of the thread's checkout, read from the
+	// running environment. Fails while it is not running.
+	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
+	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -301,6 +327,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceOpenTerminalSpec(), Handler: adapter.openTerminal},
 		connect.Method{Spec: threadServiceWriteTerminalSpec(), Handler: adapter.writeTerminal},
 		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
+		connect.Method{Spec: threadServiceListFilesSpec(), Handler: adapter.listFiles},
+		connect.Method{Spec: threadServiceReadFileSpec(), Handler: adapter.readFile},
 	)
 }
 
@@ -397,6 +425,14 @@ func (UnimplementedThreadServiceHandler) WriteTerminal(context.Context, *v1.Writ
 
 func (UnimplementedThreadServiceHandler) ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ResizeTerminal is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ListFiles is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ReadFile is not implemented")
 }
 
 type threadServiceClient struct {
@@ -518,6 +554,22 @@ func (c *threadServiceClient) WriteTerminal(ctx context.Context, req *v1.WriteTe
 func (c *threadServiceClient) ResizeTerminal(ctx context.Context, req *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error) {
 	var res v1.ResizeTerminalResponse
 	if err := c.client.CallUnary(ctx, threadServiceResizeTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ListFiles(ctx context.Context, req *v1.ListFilesRequest) (*v1.ListFilesResponse, error) {
+	var res v1.ListFilesResponse
+	if err := c.client.CallUnary(ctx, threadServiceListFilesSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ReadFile(ctx context.Context, req *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
+	var res v1.ReadFileResponse
+	if err := c.client.CallUnary(ctx, threadServiceReadFileSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -691,6 +743,30 @@ func (h threadServiceHandler) resizeTerminal(ctx context.Context, _ connect.Spec
 		return err
 	}
 	res, err := h.svc.ResizeTerminal(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) listFiles(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListFilesRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListFiles(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) readFile(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ReadFileRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ReadFile(ctx, &req)
 	if err != nil {
 		return err
 	}

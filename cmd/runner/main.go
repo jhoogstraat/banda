@@ -103,6 +103,8 @@ func run(ctx context.Context) error {
 				term.resize(k.TerminalResize.Cols, k.TerminalResize.Rows)
 			case *bandav1.ConnectResponse_TerminalClose:
 				term.close()
+			case *bandav1.ConnectResponse_FileRequest:
+				go files(ctx, k.FileRequest, sendReq)
 			}
 		}
 	}()
