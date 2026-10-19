@@ -4,9 +4,8 @@
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import { threads } from '#lib/threads.svelte.js';
 
-	// `picked` collects the people chosen from the popup; the caller keeps those still in the text.
 	type Option = { id?: string; name: string };
-	let { picked = $bindable([]), placeholder }: { picked?: { id: string; name: string }[]; placeholder?: string } = $props();
+	let { placeholder }: { placeholder?: string } = $props();
 
 	let value = $state('');
 	let ta = $state<HTMLTextAreaElement | null>(null);
@@ -33,7 +32,6 @@
 		const at = ta!.selectionStart - query!.length - 1;
 		const end = at + o.name.length + 2;
 		value = `${value.slice(0, at)}@${o.name} ${value.slice(ta!.selectionStart)}`;
-		if (o.id && !picked.some((u) => u.id === o.id)) picked.push({ id: o.id, name: o.name });
 		query = undefined;
 		await tick();
 		ta!.setSelectionRange(end, end);

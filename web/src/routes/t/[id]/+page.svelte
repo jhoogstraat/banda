@@ -59,7 +59,6 @@
 	}
 	let error = $state('');
 	let offline = $state(false);
-	let picked = $state<{ id: string; name: string }[]>([]);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
 
 	const modeName = (m: Mode) => Mode[m].toLowerCase();
@@ -144,7 +143,8 @@
 		const message = {
 			text,
 			mentionsAgent: /@agent\b/.test(text),
-			mentionedUserIds: picked.filter((u) => text.includes('@' + u.name)).map((u) => u.id)
+			// Typed or picked from the popup: anyone whose @name is in the text.
+			mentionedUserIds: threads.users.filter((u) => u.id !== threads.me?.id && text.includes('@' + u.name)).map((u) => u.id)
 		};
 		// Throwing keeps the text in the prompt box so it can be retried.
 		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
@@ -272,7 +272,7 @@
 		<PromptInput.Root onSubmit={send}>
 			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
 				<PromptInput.Body>
-					<MentionInput bind:picked placeholder="Message the agent. Use @agent to mention it in chat mode." />
+					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar class="justify-end"><PromptInput.Submit /></PromptInput.Toolbar>
 			</fieldset>
