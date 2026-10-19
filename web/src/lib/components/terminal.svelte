@@ -39,7 +39,9 @@
 			cursorBlink: true,
 			fontSize: 13,
 			fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-			theme: { background: '#0a0a0a', foreground: '#fafafa', cursor: '#fafafa' }
+			theme: { background: '#0a0a0a', foreground: '#fafafa', cursor: '#fafafa' },
+			// `claude auth login` prints its sign-in URL as an OSC 8 link.
+			linkHandler: { activate: (_e, uri) => window.open(uri, '_blank', 'noopener') }
 		});
 		const fit = new FitAddon();
 		term.loadAddon(fit);
