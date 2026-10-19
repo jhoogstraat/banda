@@ -15,6 +15,6 @@ export default defineConfig({
 			adapter: adapter({ fallback: 'index.html' })
 		})
 	],
-	// Connect paths look like /banda.v1.ThreadService/WatchThread -> the Go API.
-	server: { proxy: { '/banda.v1.': 'http://localhost:8787' } }
+	// Connect paths look like /banda.v1.ThreadService/WatchThread -> the Go API, as does the OIDC login flow.
+	server: { proxy: { '/banda.v1.': 'http://localhost:8787', '/auth': 'http://localhost:8787' } }
 });

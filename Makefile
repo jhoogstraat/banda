@@ -9,6 +9,13 @@ RUNNER_API_URL ?= http://host.docker.internal:8787
 endif
 TARGET ?= sandbox
 IMAGE ?= localhost/banda-sandbox:dev
+# `make api AUTH=dev` skips sign-in. Otherwise the API signs in against Dex (set OIDC_* to use another provider).
+ifneq ($(AUTH),dev)
+export OIDC_ISSUER ?= http://localhost:5556/dex
+export OIDC_CLIENT_ID ?= banda
+export OIDC_CLIENT_SECRET ?= banda-dev-secret
+export PUBLIC_URL ?= http://localhost:5173
+endif
 
 .PHONY: gen test cluster image api web login
 
@@ -23,6 +30,8 @@ cluster:
 	$(X) kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
 	$(X) kubectl --context kind-banda apply -f deploy/postgres.yaml
 	$(X) kubectl --context kind-banda rollout status statefulset/postgres -n banda --timeout=300s
+	$(X) kubectl --context kind-banda apply -f deploy/dex.yaml
+	$(X) kubectl --context kind-banda rollout status deployment/dex -n banda --timeout=300s
 
 image:
 	$(CONTAINER) build -f deploy/sandbox.Dockerfile --target $(TARGET) -t $(IMAGE) .
