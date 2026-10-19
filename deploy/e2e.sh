@@ -44,6 +44,10 @@ mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: dev" \
 	"$API/banda.v1.ThreadService/OpenTerminal" | jq -r '.data // empty' | base64 -d | grep -q e2e-terminal-42
 ok "terminal runs commands in the sandbox"
 
+call ThreadService/ListFiles "{\"threadId\":\"$ID\"}" | jq -e '.paths | index("README")' >/dev/null
+call ThreadService/ReadFile "{\"threadId\":\"$ID\",\"path\":\"../.claude/.credentials.json\"}" >/dev/null 2>&1 && { echo "not ok - read outside the checkout"; exit 1; }
+ok "files are listed; paths outside the checkout are refused"
+
 call ThreadService/Push "{\"threadId\":\"$ID\"}" >/dev/null
 for _ in $(seq 20); do [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ] && break; sleep 1; done
 [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ]
