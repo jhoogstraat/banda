@@ -9,7 +9,7 @@
 
 	let value = $state('');
 	let ta = $state<HTMLTextAreaElement | null>(null);
-	let query = $state<string>(); // text after the "@" before the caret; undefined when closed
+	let query = $state<string>(); // text after the "@" before the caret (names may contain spaces); undefined when closed
 	let sel = $state(0);
 	let pos = $state({ left: 0, bottom: 0 });
 
@@ -23,7 +23,7 @@
 
 	function sync() {
 		if (!ta) return;
-		query = /(?:^|\s)@([^\s@]*)$/.exec(ta.value.slice(0, ta.selectionStart))?.[1];
+		query = /(?:^|\s)@([^@\n]*)$/.exec(ta.value.slice(0, ta.selectionStart))?.[1];
 		const r = ta.getBoundingClientRect(); // fixed: the prompt box clips overflow
 		pos = { left: r.left, bottom: innerHeight - r.top + 4 };
 	}

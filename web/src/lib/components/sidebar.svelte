@@ -5,12 +5,13 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import StatusDot from '#lib/components/status-dot.svelte';
+	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { threads, userName, view } from '#lib/threads.svelte.js';
+	import { ago } from '#lib/utils.js';
 
 	// Precedence: settled > snoozed > status.
 	const sectionOf = (t: Thread) =>
@@ -30,45 +31,40 @@
 	const others = $derived(threads.users.filter((u) => u.id !== threads.me?.id));
 	const viewed = $derived(others.find((u) => u.id === threads.viewing));
 	const name = $derived(threads.me?.name ?? '');
-	const initials = $derived(
-		name
-			.split(/\s+/)
-			.map((w) => w[0])
-			.slice(0, 2)
-			.join('')
-			.toUpperCase()
-	);
 </script>
 
 {#snippet title(text: string, n: number)}
-	{text} <span class="ml-auto">{n}</span>
+	{text}
+	<span class="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[10px] tabular-nums">{n}</span>
 {/snippet}
 
 {#snippet row(t: Thread, byline = false)}
 	<a
 		href="/t/{t.id}"
-		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent {page.params.id === t.id
-			? 'bg-sidebar-accent'
+		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {page.params.id === t.id
+			? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
 			: ''}"
 	>
-		<StatusDot status={t.status} />
+		{#if byline}<UserAvatar name={userName(t.ownerId)} class="size-5" />{:else}<StatusDot status={t.status} />{/if}
 		<span class="truncate">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
-		{#if byline}<span class="ml-auto shrink-0 text-xs text-muted-foreground">{userName(t.ownerId)}</span>{/if}
+		<span class="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums">{ago(t.updatedAt)}</span>
 	</a>
 {/snippet}
 
 {#snippet section(text: string, list: Thread[], fold = false, byline = false)}
 	{#if list.length && fold}
-		<details class="group">
-			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground">
+		<details class="group space-y-0.5">
+			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
 				<ChevronRightIcon class="size-3 transition-transform group-open:rotate-90" />
 				{@render title(text, list.length)}
 			</summary>
 			{#each list as t (t.id)}{@render row(t)}{/each}
 		</details>
 	{:else if list.length}
-		<h2 class="flex px-2 py-1 text-xs font-medium text-muted-foreground">{@render title(text, list.length)}</h2>
-		{#each list as t (t.id)}{@render row(t, byline)}{/each}
+		<div class="space-y-0.5">
+			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, list.length)}</h2>
+			{#each list as t (t.id)}{@render row(t, byline)}{/each}
+		</div>
 	{/if}
 {/snippet}
 
@@ -83,7 +79,7 @@
 			</NativeSelectOptGroup>
 		</NativeSelect>
 	</div>
-	<nav class="flex-1 space-y-0.5 overflow-y-auto px-2">
+	<nav class="flex-1 space-y-3 overflow-y-auto px-2 pb-3">
 		{#if threads.viewing}
 			<div class="flex items-center justify-between px-2 pb-1 text-sm font-medium">
 				<span class="truncate">{viewed?.name ?? threads.viewing}'s threads</span>
@@ -102,7 +98,7 @@
 		{/if}
 	</nav>
 	<div class="flex items-center gap-2 border-t p-3">
-		<Avatar class="size-7"><AvatarFallback>{initials}</AvatarFallback></Avatar>
+		<UserAvatar {name} class="size-7" />
 		<div class="min-w-0 flex-1 leading-tight">
 			<div class="truncate text-sm">{name}</div>
 			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
