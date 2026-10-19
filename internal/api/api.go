@@ -83,7 +83,7 @@ func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsReque
 }
 
 func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) (*bandav1.GetThreadResponse, error) {
-	t, err := s.store.Get(ctx, req.ThreadId)
+	t, err := s.store.GetFor(ctx, req.ThreadId, user(ctx))
 	if err != nil {
 		return nil, cerr(err)
 	}

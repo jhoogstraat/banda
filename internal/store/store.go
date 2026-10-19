@@ -89,6 +89,15 @@ func (s *Store) List(ctx context.Context, ownerID, viewerID string) ([]Thread, e
 	return s.listWithView(ctx, `t.owner_id = $2`, viewerID, ownerID)
 }
 
+// GetFor returns a thread with viewerID's snooze/settle state.
+func (s *Store) GetFor(ctx context.Context, id, viewerID string) (Thread, error) {
+	threads, err := s.listWithView(ctx, `t.id = $2`, viewerID, id)
+	if err != nil || len(threads) == 0 {
+		return Thread{}, errors.Join(err, ErrNotFound)
+	}
+	return threads[0], nil
+}
+
 // ListMentioned returns other users' threads in which the viewer has an
 // unanswered mention.
 func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, error) {
