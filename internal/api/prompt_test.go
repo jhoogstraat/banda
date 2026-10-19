@@ -19,6 +19,9 @@ func TestAgentPrompt(t *testing.T) {
 	if got := agentPrompt("u1", names, nil, "u2", "@agent fix it"); got != "Bob: @agent fix it" {
 		t.Errorf("teammate prompt: %q", got)
 	}
+	if got := agentPrompt("u1", names, nil, "agent:t9", "ping"); got != "agent in thread t9: ping" {
+		t.Errorf("agent prompt: %q", got)
+	}
 	want := "Messages posted in this thread since your last turn:\nBob: looks off\nAnn: agreed\n\nAnn: @agent fix it"
 	if got := agentPrompt("u1", names, []*bandav1.Event{agent, msg("u2", "looks off"), msg("u1", "agreed")}, "u1", "@agent fix it"); got != want {
 		t.Errorf("with chat:\n%q\nwant\n%q", got, want)

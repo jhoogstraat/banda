@@ -89,6 +89,13 @@ func (s *Store) List(ctx context.Context, ownerID, viewerID string) ([]Thread, e
 	return s.listWithView(ctx, `t.owner_id = $2`, viewerID, ownerID)
 }
 
+// Recent returns the n most recently updated threads of ownerID (of all
+// owners if empty) with viewerID's snooze/settle state.
+func (s *Store) Recent(ctx context.Context, ownerID, viewerID string, n int) ([]Thread, error) {
+	return s.listWithView(ctx, `t.id IN (SELECT id FROM threads WHERE $2 = '' OR owner_id = $2
+		ORDER BY updated_at DESC LIMIT $3)`, viewerID, ownerID, n)
+}
+
 // GetFor returns a thread with viewerID's snooze/settle state.
 func (s *Store) GetFor(ctx context.Context, id, viewerID string) (Thread, error) {
 	threads, err := s.listWithView(ctx, `t.id = $2`, viewerID, id)

@@ -46,6 +46,7 @@ func main() {
 	go svc.SuspendIdle(ctx, idle)
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
+	mux.Handle("/mcp", svc.MCPHandler())
 	if dir := os.Getenv("WEB_DIR"); dir != "" {
 		mux.Handle("/", spa(dir))
 	}
