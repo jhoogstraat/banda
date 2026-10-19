@@ -3,6 +3,7 @@
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import IconButton from '#lib/components/icon-button.svelte';
 	import {
 		DropdownMenu,
 		DropdownMenuContent,
@@ -46,15 +47,12 @@
 <DropdownMenu bind:open>
 	<DropdownMenuTrigger>
 		{#snippet child({ props })}
-			<Button
+			<IconButton
 				{...props}
-				variant={snoozed ? 'secondary' : 'outline'}
-				size="icon"
-				aria-label="Snooze"
-				title={snoozed ? `Snoozed until ${when(until!)}` : 'Snooze'}
-			>
-				<BellOffIcon />
-			</Button>
+				icon={BellOffIcon}
+				variant={snoozed ? 'secondary' : 'ghost'}
+				label={snoozed ? `Snoozed until ${when(until!)}` : 'Snooze'}
+			/>
 		{/snippet}
 	</DropdownMenuTrigger>
 	<DropdownMenuContent align="end" class="w-56">
@@ -72,12 +70,9 @@
 		{/if}
 	</DropdownMenuContent>
 </DropdownMenu>
-<Button
-	variant={thread.settled ? 'secondary' : 'outline'}
-	size="icon"
-	aria-label={thread.settled ? 'Unsettle' : 'Settle'}
-	title={thread.settled ? 'Unsettle' : 'Settle'}
+<IconButton
+	icon={CheckIcon}
+	variant={thread.settled ? 'secondary' : 'ghost'}
+	label={thread.settled ? 'Unsettle' : 'Settle'}
 	onclick={() => act(api.settle({ threadId: thread.id, settled: !thread.settled }))}
->
-	<CheckIcon />
-</Button>
+/>

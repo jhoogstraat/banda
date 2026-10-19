@@ -6,10 +6,11 @@
 	import { NativeSelect, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
-	import { loadThreads } from '#lib/threads.svelte.js';
+	import { loadThreads, threads } from '#lib/threads.svelte.js';
 
-	let repoUrl = $state('');
-	let baseBranch = $state('main');
+	// The last repository is remembered (the app is a client-only SPA, so localStorage is always there).
+	let repoUrl = $state(localStorage.getItem('banda.repoUrl') ?? '');
+	let baseBranch = $state(localStorage.getItem('banda.baseBranch') ?? 'main');
 	let model = $state('claude-opus-5-5');
 	let effort = $state('high');
 	let prompt = $state('');
@@ -20,6 +21,8 @@
 		e.preventDefault();
 		busy = true;
 		error = '';
+		localStorage.setItem('banda.repoUrl', repoUrl);
+		localStorage.setItem('banda.baseBranch', baseBranch);
 		try {
 			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt });
 			loadThreads().catch(() => {});
@@ -31,16 +34,34 @@
 	}
 </script>
 
-<div class="flex-1 overflow-y-auto p-8">
-	<form onsubmit={submit} class="mx-auto flex max-w-xl flex-col gap-4">
-		<h1 class="text-xl font-semibold tracking-tight">New thread</h1>
-		<div class="flex flex-col gap-1.5">
-			<Label for="repo">Repository URL</Label>
-			<Input id="repo" bind:value={repoUrl} placeholder="https://github.com/org/repo.git" required />
+<div class="flex flex-1 items-center justify-center overflow-y-auto p-8">
+	<form onsubmit={submit} class="flex w-full max-w-xl flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+		<div>
+			<h1 class="text-xl font-semibold tracking-tight">New thread</h1>
+			<p class="text-sm text-muted-foreground">
+				{#if threads.me && !threads.list.length && !threads.viewing}
+					You have no threads yet. Point the agent at a repository and describe the task to start your first one.
+				{:else}
+					A coding agent works on your task in its own sandbox, on its own branch.
+				{/if}
+			</p>
 		</div>
 		<div class="flex flex-col gap-1.5">
-			<Label for="base">Base branch</Label>
-			<Input id="base" bind:value={baseBranch} required />
+			<Label for="harness">Harness</Label>
+			<NativeSelect id="harness" value="claude-code" class="w-full">
+				<NativeSelectOption value="claude-code">Claude Code</NativeSelectOption>
+				<NativeSelectOption value="codex" disabled>Codex — soon</NativeSelectOption>
+			</NativeSelect>
+		</div>
+		<div class="grid grid-cols-[2fr_1fr] gap-4">
+			<div class="flex flex-col gap-1.5">
+				<Label for="repo">Repository URL</Label>
+				<Input id="repo" bind:value={repoUrl} placeholder="https://github.com/org/repo.git" required />
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="base">Base branch</Label>
+				<Input id="base" bind:value={baseBranch} required />
+			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-4">
 			<div class="flex flex-col gap-1.5">
@@ -62,9 +83,19 @@
 		</div>
 		<div class="flex flex-col gap-1.5">
 			<Label for="prompt">Prompt</Label>
-			<Textarea id="prompt" bind:value={prompt} rows={6} placeholder="What should the agent do?" required />
+			<Textarea
+				id="prompt"
+				bind:value={prompt}
+				rows={6}
+				placeholder="What should the agent do?"
+				required
+				onkeydown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.currentTarget.form?.requestSubmit()}
+			/>
 		</div>
 		{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
-		<Button type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create thread'}</Button>
+		<Button type="submit" disabled={busy}>
+			{busy ? 'Creating…' : 'Create thread'}
+			<span class="text-xs opacity-60">⌘/Ctrl + Enter</span>
+		</Button>
 	</form>
 </div>

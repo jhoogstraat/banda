@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
+	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
@@ -17,17 +22,16 @@
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
-	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
-	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
-	import ToolHeader from '#lib/components/ai-elements/tool/tool-header.svelte';
-	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
-	import ToolOutput from '#lib/components/ai-elements/tool/tool-output.svelte';
+	import DiffView from '#lib/components/diff-view.svelte';
+	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
-	import StatusDot, { statusLabel } from '#lib/components/status-dot.svelte';
+	import StatusDot from '#lib/components/status-dot.svelte';
 	import ThreadActions from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
+	import ToolCall from '#lib/components/tool-call.svelte';
+	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
@@ -61,24 +65,8 @@
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
 
-	const modeName = (m: Mode) => Mode[m].toLowerCase();
-	const json = (s: string) => {
-		try {
-			return JSON.parse(s);
-		} catch {
-			return s;
-		}
-	};
-	const diffClass = (l: string) =>
-		/^(@@)/.test(l)
-			? 'hunk'
-			: /^(\+\+\+|---|diff |index )/.test(l)
-				? 'meta'
-				: l[0] === '+'
-					? 'add'
-					: l[0] === '-'
-						? 'del'
-						: '';
+	const clock = (t?: Timestamp) =>
+		t ? timestampDate(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
 
 	async function load() {
 		try {
@@ -151,42 +139,43 @@
 	}
 </script>
 
+{#snippet divider(text: string, tone = 'text-muted-foreground')}
+	<div class="flex items-center gap-3 text-xs {tone}">
+		<div class="h-px flex-1 bg-border"></div>
+		{text}
+		<div class="h-px flex-1 bg-border"></div>
+	</div>
+{/snippet}
+
+{#snippet agentText(text: string)}
+	<Message from="assistant" class="max-w-full">
+		<MessageContent class="w-full"><MessageResponse content={text} /></MessageContent>
+	</Message>
+{/snippet}
+
 <div class="flex min-w-0 flex-1 flex-col">
-	<header class="flex h-14 shrink-0 items-center gap-3 border-b px-4">
-		<h1 class="truncate font-medium">{thread?.title || 'Untitled thread'}</h1>
-		{#if thread}
-			<StatusDot status={thread.status} label />
-			<Button
-				variant="outline"
-				size="sm"
-				title="Toggle agent / chat mode"
-				disabled={!owner}
-				onclick={() =>
-					act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }))}
-			>
-				{modeName(thread.mode)} <ArrowLeftRightIcon />
-			</Button>
-			<Badge variant="secondary">{thread.model}</Badge>
-			<Badge variant="outline">{thread.effort}</Badge>
-		{/if}
-		{#if offline}<span class="text-xs text-muted-foreground">reconnecting…</span>{/if}
-		<div class="ml-auto flex items-center gap-2">
-			{#if thread}<ThreadActions {thread} {act} />{/if}
-			{#if owner}
-				<Button variant="outline" size="sm" title="Push the branch to origin" onclick={() => act(api.push({ threadId: id }))}>
-					<UploadIcon /> Push
-				</Button>
-			{/if}
+	<header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+		<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
+		{#if thread}<StatusDot status={thread.status} label />{/if}
+		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
+		<div class="ml-auto flex shrink-0 items-center gap-0.5">
 			{#if thread?.status === Status.WORKING}
-				<Button variant="destructive" size="sm" onclick={() => act(api.interrupt({ threadId: id }))}>
-					<SquareIcon /> Interrupt
-				</Button>
-			{:else if thread?.status === Status.ERRORED}
-				<Button size="sm" onclick={() => act(api.retry({ threadId: id }))}><RotateCcwIcon /> Retry</Button>
+				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={() => act(api.interrupt({ threadId: id }))} />
 			{/if}
-			<Button variant="ghost" size="icon" aria-label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)}>
-				<PanelRightIcon />
-			</Button>
+			{#if thread}
+				<IconButton
+					icon={thread.mode === Mode.CHAT ? MessagesSquareIcon : BotIcon}
+					label={thread.mode === Mode.CHAT ? 'Chat mode: switch to agent mode' : 'Agent mode: switch to chat mode'}
+					variant={thread.mode === Mode.CHAT ? 'secondary' : 'ghost'}
+					disabled={!owner}
+					onclick={() => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }))}
+				/>
+				<ThreadActions {thread} {act} />
+			{/if}
+			{#if owner}
+				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={() => act(api.push({ threadId: id }))} />
+			{/if}
+			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
 		</div>
 	</header>
 
@@ -195,71 +184,63 @@
 			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 				{#each chat.items as item, i (i)}
 					{#if item.kind === 'message'}
-						<Message from="user">
-							<span class="ml-auto text-xs text-muted-foreground">{userName(item.actor)}</span>
-							<MessageContent class="whitespace-pre-wrap"><MentionText text={item.text} /></MessageContent>
-						</Message>
+						{@const name = userName(item.actor)}
+						<div class="flex gap-3">
+							<UserAvatar {name} class="mt-0.5 size-7" />
+							<div class="min-w-0 flex-1 space-y-1">
+								<div class="flex items-baseline gap-2">
+									<span class="text-sm font-medium">{name}</span>
+									<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+								</div>
+								<Message from="user" class="ml-0 max-w-full">
+									<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+								</Message>
+							</div>
+						</div>
 					{:else if item.kind === 'text'}
-						<Message from="assistant">
-							<MessageContent><MessageResponse content={item.text} /></MessageContent>
-						</Message>
+						{@render agentText(item.text)}
 					{:else if item.kind === 'thinking'}
 						<Reasoning defaultOpen={false} class="mb-0">
 							<ReasoningTrigger><BrainIcon class="size-4" /> Thinking</ReasoningTrigger>
 							<ReasoningContent content={item.text} />
 						</Reasoning>
 					{:else if item.kind === 'tool'}
-						{@const r = item.result}
-						<Tool class="mb-0">
-							<ToolHeader
-								type={item.call.name}
-								state={r ? (r.isError ? 'output-error' : 'output-available') : 'input-available'}
-							/>
-							<ToolContent>
-								<ToolInput input={json(item.call.inputJson)} />
-								{#if r}
-									<ToolOutput
-										output={r.isError ? undefined : r.output}
-										errorText={r.isError ? r.output || 'Error' : undefined}
-									/>
-								{/if}
-							</ToolContent>
-						</Tool>
+						<ToolCall call={item.call} result={item.result} />
 					{:else if item.kind === 'turn'}
-						<p class="text-center text-xs {item.turn.isError ? 'text-destructive' : 'text-muted-foreground'}">
-							{#if item.turn.isError}
-								Turn failed: {item.turn.error}
-							{:else}
-								Turn finished in {(Number(item.turn.durationMs) / 1000).toFixed(1)}s · ${item.turn.costUsd.toFixed(4)}
-							{/if}
-						</p>
+						{#if item.turn.isError}
+							{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
+						{:else}
+							{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`)}
+						{/if}
 					{:else if item.kind === 'notice'}
-						<div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+						<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 							<Response content={item.text} />
 							{#if owner && loginNeeded(item.text)}
 								<Button size="sm" class="mt-2" onclick={login}>Log in to Claude Code</Button>
 							{/if}
 						</div>
-					{:else if item.kind === 'status'}
-						<p class="text-center text-xs text-muted-foreground/70">
-							status: {statusLabel(item.status)}{item.reason ? ` (${item.reason})` : ''}
-						</p>
 					{:else if item.kind === 'mode'}
-						<p class="text-center text-xs text-muted-foreground/70">mode: {modeName(item.mode)}</p>
+						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
 					{/if}
 				{/each}
 
-				{#if chat.streaming}
-					<Message from="assistant">
-						<MessageContent><MessageResponse content={chat.streaming} /></MessageContent>
-					</Message>
+				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
+				{#if thread?.status === Status.STARTING}
+					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
 				{:else if thread?.status === Status.WORKING}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Working…</div>
+					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> <span class="animate-pulse">Working…</span></div>
+				{:else if thread?.status === Status.SUSPENDED}
+					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
+				{:else if thread?.status === Status.ERRORED}
+					<div class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+						<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
+						<span class="flex-1">The environment failed or was lost.</span>
+						{#if owner}
+							<Button size="sm" onclick={() => act(api.retry({ threadId: id }))}><RotateCcwIcon /> Retry</Button>
+						{/if}
+					</div>
 				{:else if !chat.items.length}
-					<ConversationEmptyState
-						title={thread?.status === Status.STARTING ? 'Starting environment…' : 'No messages yet'}
-						description=""
-					/>
+					<ConversationEmptyState title="No messages yet" description="" />
 				{/if}
 			</div>
 		</ConversationContent>
@@ -274,7 +255,15 @@
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>
-				<PromptInput.Toolbar class="justify-end"><PromptInput.Submit /></PromptInput.Toolbar>
+				<PromptInput.Toolbar>
+					<div class="flex items-center gap-1.5 pl-2">
+						{#if thread}
+							<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
+							<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
+						{/if}
+					</div>
+					<PromptInput.Submit />
+				</PromptInput.Toolbar>
 			</fieldset>
 		</PromptInput.Root>
 	</div>
@@ -283,16 +272,12 @@
 <!-- Hidden rather than removed, so closing the pane keeps the terminal running. -->
 <aside class="{diffOpen ? 'flex' : 'hidden'} w-[32rem] max-w-[45%] shrink-0 flex-col border-l">
 	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
-		<TabsList variant="line" class="group-data-horizontal/tabs:h-14 w-full shrink-0 justify-start border-b px-2">
+		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
 			<TabsTrigger value="diff">Diff</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
 		</TabsList>
 		<TabsContent value="diff" class="min-h-0 overflow-auto">
-			{#if thread?.diff}
-				<pre class="diff">{#each thread.diff.split('\n') as line}<span class={diffClass(line)}>{line || ' '}</span>{/each}</pre>
-			{:else}
-				<p class="p-4 text-sm text-muted-foreground">No changes yet.</p>
-			{/if}
+			<DiffView diff={thread?.diff ?? ''} />
 		</TabsContent>
 		{#if owner && termOpened}
 			<div class="min-h-0 flex-1 {tab === 'terminal' ? '' : 'hidden'}">
@@ -303,31 +288,3 @@
 		{/if}
 	</Tabs>
 </aside>
-
-<style>
-	.diff {
-		min-width: max-content;
-		padding: 0.5rem 0;
-		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-	}
-	.diff span {
-		display: block;
-		padding: 0 1rem;
-	}
-	.add {
-		background: rgb(46 160 67 / 0.15);
-		color: #7ee787;
-	}
-	.del {
-		background: rgb(248 81 73 / 0.15);
-		color: #ffa198;
-	}
-	.hunk {
-		background: rgb(56 139 253 / 0.12);
-		color: #79c0ff;
-	}
-	.meta {
-		color: var(--muted-foreground);
-		font-weight: 600;
-	}
-</style>
