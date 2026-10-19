@@ -27,31 +27,36 @@ func (s *Service) OpenTerminal(ctx context.Context, req *bandav1.OpenTerminalReq
 		}
 		s.do(ctx, id, effect)
 	}
-	if !s.waitRunner(ctx, id) {
+	return s.terminal(ctx, id, &bandav1.TerminalOpen{Cols: req.Cols, Rows: req.Rows, Command: req.Command}, stream.Send)
+}
+
+// terminal opens a terminal on the runner connected as key and streams its
+// output until it exits or the client goes away.
+func (s *Service) terminal(ctx context.Context, key string, open *bandav1.TerminalOpen, send func(*bandav1.OpenTerminalResponse) error) error {
+	if !s.waitRunner(ctx, key) {
 		return connect.NewError(connect.CodeUnavailable, "the environment is not running")
 	}
 
 	// A new terminal replaces the previous one, whose stream then ends.
 	ch := make(chan *bandav1.TerminalOutput, 64)
 	s.mu.Lock()
-	if old := s.terminals[id]; old != nil {
+	if old := s.terminals[key]; old != nil {
 		close(old)
 	}
-	s.terminals[id] = ch
+	s.terminals[key] = ch
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
-		mine := s.terminals[id] == ch
+		mine := s.terminals[key] == ch
 		if mine {
-			delete(s.terminals, id)
+			delete(s.terminals, key)
 		}
 		s.mu.Unlock()
 		if mine { // the client went away or the terminal ended
-			s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalClose{TerminalClose: &bandav1.TerminalClose{}}})
+			s.sendRunner(key, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalClose{TerminalClose: &bandav1.TerminalClose{}}})
 		}
 	}()
-	if !s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalOpen{
-		TerminalOpen: &bandav1.TerminalOpen{Cols: req.Cols, Rows: req.Rows, Command: req.Command}}}) {
+	if !s.sendRunner(key, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalOpen{TerminalOpen: open}}) {
 		return connect.NewError(connect.CodeUnavailable, "the environment is not running")
 	}
 
@@ -63,7 +68,7 @@ func (s *Service) OpenTerminal(ctx context.Context, req *bandav1.OpenTerminalReq
 			if !ok {
 				return nil
 			}
-			if err := stream.Send(&bandav1.OpenTerminalResponse{Data: o.Data, Exited: o.Exited}); err != nil || o.Exited {
+			if err := send(&bandav1.OpenTerminalResponse{Data: o.Data, Exited: o.Exited}); err != nil || o.Exited {
 				return err
 			}
 		}
@@ -71,20 +76,29 @@ func (s *Service) OpenTerminal(ctx context.Context, req *bandav1.OpenTerminalReq
 }
 
 func (s *Service) WriteTerminal(ctx context.Context, req *bandav1.WriteTerminalRequest) (*bandav1.WriteTerminalResponse, error) {
-	return &bandav1.WriteTerminalResponse{}, s.toTerminal(ctx, req.ThreadId,
-		&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalInput{TerminalInput: &bandav1.TerminalInput{Data: req.Data}}})
+	if _, err := s.owned(ctx, req.ThreadId); err != nil {
+		return nil, err
+	}
+	return &bandav1.WriteTerminalResponse{}, s.toTerminal(req.ThreadId, terminalInput(req.Data))
 }
 
 func (s *Service) ResizeTerminal(ctx context.Context, req *bandav1.ResizeTerminalRequest) (*bandav1.ResizeTerminalResponse, error) {
-	return &bandav1.ResizeTerminalResponse{}, s.toTerminal(ctx, req.ThreadId,
-		&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalResize{TerminalResize: &bandav1.TerminalResize{Cols: req.Cols, Rows: req.Rows}}})
+	if _, err := s.owned(ctx, req.ThreadId); err != nil {
+		return nil, err
+	}
+	return &bandav1.ResizeTerminalResponse{}, s.toTerminal(req.ThreadId, terminalResize(req.Cols, req.Rows))
 }
 
-func (s *Service) toTerminal(ctx context.Context, id string, msg *bandav1.ConnectResponse) error {
-	if _, err := s.owned(ctx, id); err != nil {
-		return err
-	}
-	if !s.sendRunner(id, msg) {
+func terminalInput(data []byte) *bandav1.ConnectResponse {
+	return &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalInput{TerminalInput: &bandav1.TerminalInput{Data: data}}}
+}
+
+func terminalResize(cols, rows uint32) *bandav1.ConnectResponse {
+	return &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalResize{TerminalResize: &bandav1.TerminalResize{Cols: cols, Rows: rows}}}
+}
+
+func (s *Service) toTerminal(key string, msg *bandav1.ConnectResponse) error {
+	if !s.sendRunner(key, msg) {
 		return connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
 	}
 	return nil
@@ -102,12 +116,12 @@ func (s *Service) owned(ctx context.Context, id string) (store.Thread, error) {
 	return t, nil
 }
 
-// waitRunner waits for the thread's runner to connect, up to 90 s: enough
+// waitRunner waits for the runner connected as key to connect, up to 90 s: enough
 // for a suspended environment to resume.
-func (s *Service) waitRunner(ctx context.Context, id string) bool {
+func (s *Service) waitRunner(ctx context.Context, key string) bool {
 	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); {
 		s.mu.Lock()
-		_, ok := s.runners[id]
+		_, ok := s.runners[key]
 		s.mu.Unlock()
 		if ok {
 			return true

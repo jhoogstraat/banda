@@ -1,7 +1,10 @@
 // Command runner runs inside each thread's sandbox pod. It dials the API,
-// prepares the checkout, waits for a Claude Code login and then drives one
-// long-lived `claude` process in stream-json mode.
+// prepares the environment (setup.go), waits for a Claude Code login and then
+// drives one long-lived `claude` process in stream-json mode.
 // See docs/research/claude-headless.md.
+//
+// With BANDA_LOGIN_USER_ID set it runs a user's login environment instead:
+// only the terminal, plus the login status after each command.
 package main
 
 import (
@@ -32,9 +35,11 @@ import (
 )
 
 var (
-	threadID = os.Getenv("BANDA_THREAD_ID")
-	work     = filepath.Join(os.Getenv("HOME"), "work")
-	base     = "origin/" + os.Getenv("BANDA_BASE_BRANCH")
+	threadID  = os.Getenv("BANDA_THREAD_ID")
+	loginUser = os.Getenv("BANDA_LOGIN_USER_ID")
+	apiKey    = os.Getenv("BANDA_AUTH_METHOD") == "api_key" // the user chose an API key over their subscription
+	work      = filepath.Join(os.Getenv("HOME"), "work")
+	base      = "origin/" + os.Getenv("BANDA_BASE_BRANCH")
 )
 
 func main() {
@@ -48,6 +53,7 @@ func main() {
 func run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	userSecrets = loadSecrets(secretsDir)
 
 	tr := &http.Transport{Protocols: new(http.Protocols)}
 	tr.Protocols.SetUnencryptedHTTP2(true)
@@ -71,8 +77,11 @@ func run(ctx context.Context) error {
 	notice := func(text string) error {
 		return send(&bandav1.Event{Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
 	}
+	loginStatus := func(ok bool) error {
+		return sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_LoginStatus{LoginStatus: &bandav1.LoginStatus{Harness: "claude", LoggedIn: ok}}})
+	}
 	if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Hello{Hello: &bandav1.Hello{
-		ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN")}}}); err != nil {
+		ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN"), LoginUserId: loginUser}}}); err != nil {
 		return err
 	}
 
@@ -82,6 +91,9 @@ func run(ctx context.Context) error {
 	// ponytail: no reconnect loop, the container restart is the reconnect.
 	cmds := make(chan *bandav1.ConnectResponse, 16)
 	term := &terminal{send: sendReq}
+	if loginUser != "" {
+		term.exited = func() { loginStatus(loggedIn(ctx)) }
+	}
 	defer term.close()
 	go func() {
 		defer cancel()
@@ -109,12 +121,17 @@ func run(ctx context.Context) error {
 		}
 	}()
 
-	if err := checkout(ctx); err != nil {
-		notice("Could not prepare the checkout: " + err.Error())
-		return err
+	if loginUser != "" {
+		loginStatus(loggedIn(ctx))
+		<-ctx.Done()
+		return nil
 	}
-	if err := waitForLogin(ctx, notice); err != nil {
-		return err
+	if err := prepare(ctx, send, notice, loginStatus); err != nil {
+		// Reported as a failed step. Stay connected without the agent so the
+		// owner can debug in the terminal; exiting would only crash-loop.
+		log.Print(err)
+		<-ctx.Done()
+		return nil
 	}
 	claude, err := startClaude(ctx)
 	if err != nil {
@@ -168,7 +185,12 @@ func run(ctx context.Context) error {
 		if authFailed && !authNoticed {
 			authNoticed = true
 			claude.interrupt()
-			notice(loginHint("Claude Code rejected the login."))
+			if apiKey {
+				notice("Claude Code rejected the API key. Set a new one in Settings, then retry.")
+			} else {
+				loginStatus(false)
+				notice(loginHint("Claude Code rejected the login."))
+			}
 		}
 		if turnEnded {
 			authNoticed = false
@@ -217,14 +239,22 @@ func checkout(ctx context.Context) error {
 	return nil
 }
 
-func waitForLogin(ctx context.Context, notice func(string) error) error {
+// waitForLogin waits for a subscription login, reported as the login step
+// only if there is something to wait for.
+func (s setup) waitForLogin(ctx context.Context, notice func(string) error, loginStatus func(bool) error) error {
+	const title = "Log in to Claude Code"
 	told := false
 	for {
-		if claudeCmd(ctx, "auth", "status", "--json").Run() == nil {
-			return nil
+		if loggedIn(ctx) {
+			if told {
+				s.report("login", title, bandav1.SetupState_SETUP_STATE_DONE, "")
+			}
+			return loginStatus(true)
 		}
 		if !told {
 			told = true
+			loginStatus(false)
+			s.report("login", title, bandav1.SetupState_SETUP_STATE_RUNNING, "")
 			if err := notice(loginHint("Claude Code is not logged in.")); err != nil {
 				return err
 			}
@@ -235,6 +265,10 @@ func waitForLogin(ctx context.Context, notice func(string) error) error {
 		case <-time.After(5 * time.Second):
 		}
 	}
+}
+
+func loggedIn(ctx context.Context) bool {
+	return claudeCmd(ctx, "auth", "status", "--json").Run() == nil
 }
 
 func loginHint(problem string) string {

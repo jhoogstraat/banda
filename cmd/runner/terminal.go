@@ -15,7 +15,8 @@ import (
 // terminal is the web terminal: one shell (or one command) in a PTY. Opening a
 // new one closes the old one. Terminal data is never logged.
 type terminal struct {
-	send func(*bandav1.ConnectRequest) error
+	send   func(*bandav1.ConnectRequest) error
+	exited func() // optional, called after each process exits
 
 	mu  sync.Mutex
 	cmd *exec.Cmd
@@ -63,6 +64,9 @@ func (t *terminal) open(o *bandav1.TerminalOpen) {
 			}
 		}
 		cmd.Wait()
+		if t.exited != nil {
+			go t.exited()
+		}
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		if t.cmd == cmd { // not closed or replaced meanwhile

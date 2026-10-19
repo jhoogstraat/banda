@@ -4,12 +4,16 @@
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import PlugIcon from '@lucide/svelte/icons/plug';
 	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import OptionMenu from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import RepoPicker from '#lib/components/repo-picker.svelte';
-	import { api } from '#lib/api.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { api, settingsApi } from '#lib/api.js';
+	import { AuthMethod, LoginState } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads, projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
@@ -27,6 +31,23 @@
 	$effect(() => {
 		const repo = page.url.searchParams.get('repo');
 		if (repo) repoUrl = repo;
+	});
+	// A hint, not a gate: threads can still be started without a usable Claude account.
+	// Why the account isn't usable: no subscription login, or the API key method without a key.
+	let connect = $state<'' | 'login' | 'key'>('');
+	let loginOpen = $state(false);
+	const checkAccount = () =>
+		settingsApi
+			.getSettings({})
+			.then(({ accounts }) => {
+				const a = accounts.find((a) => a.harness === 'claude');
+				if (!a) connect = '';
+				else if (a.authMethod === AuthMethod.API_KEY) connect = a.apiKeySet ? '' : 'key';
+				else connect = a.loginState === LoginState.LOGGED_IN ? '' : 'login';
+			})
+			.catch(() => {});
+	$effect(() => {
+		checkAccount();
 	});
 	let busy = $state(false);
 	let error = $state('');
@@ -65,6 +86,18 @@
 	</div>
 
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+		{#if connect}
+			<div class="mb-2 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3 text-sm">
+				<PlugIcon class="size-4 shrink-0 text-muted-foreground" />
+				<span class="flex-1">Connect Claude Code to start a thread.</span>
+				{#if connect === 'key'}
+					<Button size="sm" href="/settings">Add an API key</Button>
+				{:else}
+					<Button size="sm" variant="ghost" href="/settings">Settings</Button>
+					<Button size="sm" onclick={() => (loginOpen = true)}>Connect</Button>
+				{/if}
+			</div>
+		{/if}
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		<PromptInput.Root onSubmit={submit}>
 			<fieldset disabled={busy} class="contents">
@@ -88,3 +121,5 @@
 		</PromptInput.Root>
 	</div>
 </div>
+
+<LoginDialog bind:open={loginOpen} onclose={checkAccount} />

@@ -1,7 +1,15 @@
 #!/bin/bash
-# Fake Claude Code for tests: answers `auth status` and emits stream-json
-# turns like the real CLI, creating one file per prompt.
-[ "$1" = auth ] && exit 0
+# Fake Claude Code for tests: logged in unless `auth logout` ran, and emits
+# stream-json turns like the real CLI, creating one file per prompt.
+if [ "$1" = auth ]; then
+  out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
+  case "$2" in
+    status) [ ! -e "$out" ] ;;
+    login) echo "Open https://claude.ai/fake-login to sign in."; rm -f "$out"; echo "Login successful." ;;
+    logout) touch "$out" && echo "Successfully logged out." ;;
+  esac
+  exit
+fi
 while IFS= read -r line; do
   case "$line" in
     *control_request*) echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}' ;;

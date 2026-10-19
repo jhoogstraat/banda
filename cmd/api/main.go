@@ -56,6 +56,7 @@ func main() {
 	bandav1connect.RegisterThreadServiceHandler(server, svc)
 	bandav1connect.RegisterRunnerServiceHandler(server, svc)
 	bandav1connect.RegisterUserServiceHandler(server, svc)
+	bandav1connect.RegisterSettingsServiceHandler(server, svc)
 	idle, err := time.ParseDuration(env("IDLE_SUSPEND_AFTER", "30m"))
 	if err != nil {
 		log.Fatalf("IDLE_SUSPEND_AFTER: %v", err)

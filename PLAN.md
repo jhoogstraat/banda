@@ -25,7 +25,10 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Posting | Anyone can post in any thread at any time. |
 | Chat mode | A post by someone other than the owner, or any post that mentions a person, switches the thread to chat mode, unless the post mentions the agent. Only the owner can switch chat mode off; it never ends by itself. In agent mode the owner doesn't need to mention the agent. In chat mode everyone, the owner included, must mention the agent to start a turn. |
 | Sandboxes | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) v1.0.7, core `Sandbox` CRD only. See [research](docs/research/sandbox-lifecycle.md). |
-| Claude login | A per-user volume mounted as `CLAUDE_CONFIG_DIR` into that user's pods. Only the `claude` binary reads or writes it. Users log in from the browser through the thread's terminal (`claude auth login`). See [research](docs/research/claude-login.md). |
+| Claude login | A per-user volume mounted as `CLAUDE_CONFIG_DIR` into that user's pods. Only the `claude` binary reads or writes it. Users log in from Settings, in a terminal on their **login environment** (`login-<hash>`: the runner image in login mode, mounting only that volume, no secrets; it runs only `claude auth login` or `logout` and is suspended after 10 min without a terminal), or from a thread's terminal. Runners report the login state; Settings shows it. See [research](docs/research/claude-login.md). |
+| API key mode | Per user and harness, the user may choose an Anthropic API key instead of the subscription. The key goes to the Secret `banda-auth-<hash>`, which thread pods load only in that mode; the runner then skips the login wait. Never returned by the API. |
+| Secrets | Per-user environment variables, set in Settings. Values live only in the Secret `banda-env-<hash>` (Postgres keeps names and dates), loaded into all the user's thread pods after the shared `banda-git`, and redacted by the runner like tokens. Harness credentials, `HOME`, `PATH` and `BANDA_*` are reserved. Settings apply when an environment next starts. |
+| Environment setup | Before the agent starts, the runner reports setup steps as events: checkout, `mise install` for the repo's `mise.toml`/`.tool-versions` (tools on the home volume), `.banda/setup.sh` (once per thread, rerun when it changes, 15 min timeout), login. A failed step errors the thread with the step's output; the runner stays up for the terminal and files, and Retry reruns setup. |
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
@@ -43,7 +46,7 @@ What this means for Banda:
 
 1. The runner drives the real `claude` binary. It does not use the Agent SDK or the ACP adapter.
 2. Banda's code never sees a token. Users run `claude auth login` inside a sandbox: in M1 via `kubectl exec`, from M2 in a terminal pane. The binary writes the login to the user's config volume, which every one of their sandboxes mounts. This is the pattern [Anthropic's devcontainer](https://code.claude.com/docs/en/devcontainer) uses.
-3. Never set `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in a pod. Each of them overrides the user's login.
+3. Never set `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN` in a pod, and `ANTHROPIC_API_KEY` only when the user chose API key mode. Each of them overrides the user's login. Secrets can't use these names.
 4. Refresh tokens rotate, and killing `claude` in the middle of a refresh logs the user out of every pod. To avoid that, the runner stops `claude` gracefully (pods get a 90 s grace period) and the image pins Claude Code ≥ 2.1.301.
 5. **Open risk:** the terms assume "ordinary, individual usage" by the subscriber. Our chat-mode rule lets a teammate start a turn on the owner's subscription by mentioning the agent. And since turns run without permission prompts in a pod that holds the owner's Claude login (and the optional git token), a teammate could ask the agent to reveal or send them. The runner redacts Anthropic tokens and the git/runner tokens from everything it reports, so they don't reach Banda's database or the UI, but an agent told to exfiltrate them over the network could. Options: keep it (a team that trusts each other), or have the owner approve each teammate request before it runs. Ask Anthropic before open-sourcing. Same for the persistent login volume.
 
@@ -64,8 +67,8 @@ Kubernetes (agent-sandbox) ── one Sandbox pod per thread:
 - **banda-api** (`cmd/api`): the Connect API for the web client (`ThreadService`) and the runners (`RunnerService`). Also serves the web build when `WEB_DIR` is set.
 - **runner** (`cmd/runner`): baked into the sandbox image. It does the following:
   - dials the API and authenticates with a per-thread token;
+  - clones the repo and creates the branch, installs the repo's mise tools and runs `.banda/setup.sh`, reporting each step;
   - checks `claude auth status`, and if needed posts a notice asking the user to log in;
-  - clones the repo and creates the branch;
   - keeps one `claude` process running and maps its stream-json output to Banda events;
   - sends the diff after each turn.
 - **web** (`web/`): SvelteKit, `adapter-static`, with [ai-elements for Svelte](https://github.com/sikandarjodd/ai-elements). 3 panes: sidebar, chat, and a right pane (diff for now).
@@ -126,6 +129,8 @@ Only the owner's own actions drive the environment. Implemented as below, except
 | owner settles | suspend (later: `shutdownTime` = now + 7 days with `shutdownPolicy: Delete`, once branches are pushed by default) |
 | `errored` → Retry | delete the pod; the controller recreates it on the same PVC |
 
+Every start (create, resume, retry) applies the current pod template, so settings changes (secrets, auth method) take effect then. A user's login environment starts when they open its terminal and is suspended after 10 min without one.
+
 Expected resume time on kind: about 3–10 s. A suspended thread costs only disk. Deferred: warm pools, memory snapshots (upstream has none), gVisor/Kata, [agent-substrate](https://github.com/agent-substrate/substrate) (pre-1.0, no shared login volume, freezes `claude` instead of stopping it; see [docs/research/agent-substrate.md](docs/research/agent-substrate.md)).
 
 ## Status
@@ -142,6 +147,8 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
+- Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
+- Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`make deploy`, `deploy/banda.yaml`).

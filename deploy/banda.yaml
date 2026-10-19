@@ -23,6 +23,9 @@ rules:
   - apiGroups: [""]
     resources: [persistentvolumeclaims]
     verbs: [create]
+  - apiGroups: [""]
+    resources: [secrets] # users' banda-env-* and banda-auth-*
+    verbs: [create, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

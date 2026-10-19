@@ -20,7 +20,7 @@ A web app where a team builds software together with coding agents. Each thread 
 1. `make cluster image` creates the kind cluster (agent-sandbox, Postgres on `localhost:5432`, Dex on `localhost:5556`) and loads the sandbox image.
 2. `make api` in one terminal, `make web` in another.
 3. Open http://localhost:5173, sign in, create a thread.
-4. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads.
+4. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code** (or log in from Settings), open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. Settings also offers an Anthropic API key instead of the subscription.
 
 To use it from other machines on your network, pass your LAN address to `dex`, `web` and `api` and open `http://<address>:5173` everywhere, this machine included (the sign-in cookie belongs to that address):
 
@@ -31,11 +31,15 @@ make web PUBLIC_HOST=$H   # listens on all interfaces, proxies Dex at /dex
 make api PUBLIC_HOST=$H
 ```
 
-For private repos, create the secret before creating the thread:
+For private repos, add a `GIT_TOKEN` secret in Settings. Secrets are environment variables in all your threads, applied when a thread's environment next starts, and redacted from everything the agent reports. A shared fallback for everyone:
 
 ```sh
 kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 ```
+
+## Preparing a repo
+
+Before the agent starts, a thread installs the tools from the repo's `mise.toml`, `.mise.toml` or `.tool-versions` with [mise](https://mise.jdx.dev), then runs `.banda/setup.sh` with bash in the checkout (once per thread; again when the script changes; 15 min timeout). The chat shows each step. If one fails, the thread stops with its output; the terminal still works, and **Retry** runs the setup again.
 
 ## Sign in
 
@@ -54,7 +58,7 @@ Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1` (what `make api AUTH
 
 ## Tests
 
-- `make test`: Go unit tests (state machine, agent prompt, Claude stream mapping, sessions, MCP transcript, push URLs). `node web/src/lib/events.check.ts` checks the web event reducer.
+- `make test`: Go unit tests (state machine, agent prompt, Claude stream mapping, sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer.
 - `make e2e`: drives a running system through the whole thread lifecycle with a fake agent that needs no Claude login. Run it against the fake image with dev auth:
 
   ```sh

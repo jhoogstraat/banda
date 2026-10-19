@@ -1,5 +1,5 @@
-// Package api implements the ThreadService for the web client and the
-// RunnerService the sandbox runners dial into.
+// Package api implements the ThreadService, UserService and SettingsService
+// for the web client and the RunnerService the sandbox runners dial into.
 package api
 
 import (
@@ -28,9 +28,13 @@ type Service struct {
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
-	runners  map[string]*runner
-	// terminals holds each thread's single terminal subscriber (see OpenTerminal).
+	// runners and terminals are keyed by thread id, or loginKey for login
+	// environments.
+	runners map[string]*runner
+	// terminals holds each runner's single terminal subscriber (see terminal).
 	terminals map[string]chan *bandav1.TerminalOutput
+	// loginLastUsed is when each user last had a login terminal.
+	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
 	files map[string]chan *bandav1.FileResponse
 }
@@ -49,6 +53,8 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
+
+		loginLastUsed: map[string]time.Time{},
 	}
 }
 
@@ -244,10 +250,19 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 	if hello == nil {
 		return connect.NewError(connect.CodeInvalidArgument, "first message must be hello")
 	}
-	id := hello.ThreadId
-	t, err := s.store.Get(ctx, id)
-	if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(hello.Token)) != 1 {
-		return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
+	// id is the thread, or for a login environment its loginKey.
+	id, owner, login := hello.ThreadId, hello.LoginUserId, hello.LoginUserId != ""
+	if login {
+		if !s.store.CheckLoginToken(ctx, owner, hello.Token) {
+			return connect.NewError(connect.CodeUnauthenticated, "unknown user or bad token")
+		}
+		id = loginKey(owner)
+	} else {
+		t, err := s.store.Get(ctx, id)
+		if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(hello.Token)) != 1 {
+			return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
+		}
+		owner = t.OwnerID
 	}
 
 	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
@@ -266,7 +281,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 		}
 		s.mu.Unlock()
-		if mine {
+		if mine && !login {
 			s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
 		}
 	}()
@@ -307,10 +322,15 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				continue
 			}
 			var action thread.Action
+			var reason string
 			if e.GetTurnEnded() != nil {
 				action = thread.TurnEnded{}
 			}
-			if _, err := s.apply(ctx, id, action, e); err != nil {
+			// The runner stays up for debugging but won't start the agent.
+			if st := e.GetSetupStep(); st.GetState() == bandav1.SetupState_SETUP_STATE_FAILED {
+				action, reason = thread.EnvLost{}, "Setup failed: "+st.Title
+			}
+			if _, err := s.applyBecause(ctx, id, action, reason, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
@@ -328,6 +348,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				}
 			}
 			s.mu.Unlock()
+		case *bandav1.ConnectRequest_LoginStatus:
+			if err := s.store.SetLogin(ctx, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
+				slog.Error("store login status", "user", owner, "err", err)
+			}
 		case *bandav1.ConnectRequest_FileResponse:
 			s.fileResponse(k.FileResponse)
 		case *bandav1.ConnectRequest_Diff:
@@ -370,6 +394,11 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 // apply runs an action (nil = none) through the state machine and stores the
 // given events plus any status/mode change, then fans them out.
 func (s *Service) apply(ctx context.Context, id string, a thread.Action, events ...*bandav1.Event) (thread.Effect, error) {
+	return s.applyBecause(ctx, id, a, "", events...)
+}
+
+// applyBecause is apply with a reason for the status change.
+func (s *Service) applyBecause(ctx context.Context, id string, a thread.Action, reason string, events ...*bandav1.Event) (thread.Effect, error) {
 	var effect thread.Effect
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		if a == nil {
@@ -380,7 +409,13 @@ func (s *Service) apply(ctx context.Context, id string, a thread.Action, events 
 			return nil, err
 		}
 		effect = eff
-		out := append(events, stateEvents(t.State, next)...)
+		changes := stateEvents(t.State, next)
+		for _, c := range changes {
+			if sc := c.GetStatusChanged(); sc != nil {
+				sc.Reason = reason
+			}
+		}
+		out := append(events, changes...)
 		t.State = next
 		return out, nil
 	})
@@ -412,7 +447,11 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	s.mu.Lock()
 	delete(s.runners, t.ID)
 	s.mu.Unlock()
-	if err := s.sandboxes.Ensure(ctx, t); err != nil {
+	st, err := s.store.Settings(ctx, t.OwnerID, harness)
+	if err == nil {
+		err = s.sandboxes.Ensure(ctx, t, st.AuthMethod)
+	}
+	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
 		s.apply(context.WithoutCancel(ctx), t.ID, thread.EnvLost{})
 	}

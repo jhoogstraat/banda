@@ -3,11 +3,15 @@
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import XIcon from '@lucide/svelte/icons/x';
+	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -23,9 +27,12 @@
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
+	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
+	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import DiffView from '#lib/components/diff-view.svelte';
 	import FileBrowser from '#lib/components/file-browser.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
+	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
@@ -38,10 +45,11 @@
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { api } from '#lib/api.js';
 	import { apply, type Chat } from '#lib/events.js';
-	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
@@ -51,23 +59,16 @@
 	const chat = $state<Chat>({ items: [], streaming: '' });
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
-	// The terminal and the file browser mount when their tab is first opened and then stay alive; a key change reopens the terminal.
+	// The terminal and the file browser mount when their tab is first opened and then stay alive.
 	let tab = $state('diff');
 	let termOpened = $state(false);
 	let filesOpened = $state(false);
-	let termKey = $state(0);
-	let termCommand = $state('');
 	$effect(() => {
 		if (tab === 'terminal') termOpened = true;
 		if (tab === 'files') filesOpened = true;
 	});
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
-	function login() {
-		termCommand = 'claude auth login';
-		termKey++;
-		tab = 'terminal';
-		diffOpen = true;
-	}
+	let loginOpen = $state(false);
 	let error = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
@@ -223,8 +224,42 @@
 						<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 							<Response content={item.text} class="h-auto" />
 							{#if owner && loginNeeded(item.text)}
-								<Button size="sm" class="mt-2" onclick={login}>Log in to Claude Code</Button>
+								<Button size="sm" class="mt-2" onclick={() => (loginOpen = true)}>Log in to Claude Code</Button>
 							{/if}
+						</div>
+					{:else if item.kind === 'setup'}
+						<div>
+							{#each item.steps as step (step.id)}
+								{@const failed = step.state === SetupState.FAILED}
+								<Tool class="group/tool mb-0 border-0" open={failed}>
+									<CollapsibleTrigger
+										disabled={!step.output}
+										class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {step.state === SetupState.SKIPPED
+											? 'text-muted-foreground'
+											: ''}"
+									>
+										{#if step.state === SetupState.DONE}
+											<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
+										{:else if failed}
+											<XCircleIcon class="size-3.5 shrink-0 text-destructive" />
+										{:else if step.state === SetupState.SKIPPED}
+											<CircleMinusIcon class="size-3.5 shrink-0" />
+										{:else}
+											<Loader size={14} class="text-muted-foreground" />
+										{/if}
+										<span class="min-w-0 flex-1 truncate">{step.title}{step.state === SetupState.SKIPPED ? ' (skipped)' : ''}</span>
+										{#if step.output}
+											<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90" />
+										{/if}
+									</CollapsibleTrigger>
+									<ToolContent class="ml-4 border-l pl-2">
+										<pre
+											class="my-1 max-h-64 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap {failed
+												? 'bg-destructive/10 text-destructive'
+												: 'bg-muted/50'}">{step.output}</pre>
+									</ToolContent>
+								</Tool>
+							{/each}
 						</div>
 					{:else if item.kind === 'mode'}
 						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
@@ -292,10 +327,16 @@
 		</TabsContent>
 		{#if owner && termOpened}
 			<div class="min-h-0 flex-1 {tab === 'terminal' ? '' : 'hidden'}">
-				{#key termKey}<Terminal threadId={id} command={termCommand} />{/key}
+				<Terminal
+					open={(cols, rows, signal) => api.openTerminal({ threadId: id, cols, rows }, { signal })}
+					write={(data) => api.writeTerminal({ threadId: id, data })}
+					resize={(cols, rows) => api.resizeTerminal({ threadId: id, cols, rows })}
+				/>
 			</div>
 		{:else if tab === 'terminal'}
 			<p class="p-4 text-sm text-muted-foreground">Only the thread owner can open the terminal.</p>
 		{/if}
 	</Tabs>
 </SidePane>
+
+<LoginDialog bind:open={loginOpen} />

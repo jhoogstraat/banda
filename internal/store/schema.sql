@@ -58,3 +58,26 @@ CREATE TABLE IF NOT EXISTS mentions (
 CREATE INDEX IF NOT EXISTS mentions_open ON mentions (user_id) WHERE answered_at IS NULL;
 
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS turns int NOT NULL DEFAULT 0;
+
+-- How each user signs in to each harness, and their login as last reported
+-- by one of their environments.
+CREATE TABLE IF NOT EXISTS harness_settings (
+  user_id          text NOT NULL,
+  harness          text NOT NULL,
+  auth_method      text NOT NULL DEFAULT 'subscription',
+  api_key_set      boolean NOT NULL DEFAULT false,
+  login_state      text NOT NULL DEFAULT 'unknown',
+  login_checked_at timestamptz,
+  PRIMARY KEY (user_id, harness)
+);
+
+-- Names of each user's secrets. The values live only in Kubernetes Secrets.
+CREATE TABLE IF NOT EXISTS secrets (
+  user_id    text NOT NULL,
+  name       text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, name)
+);
+
+-- Authenticates the runner of the user's login environment.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;

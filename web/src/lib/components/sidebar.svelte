@@ -6,7 +6,6 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import { Button } from '#lib/components/ui/button/index.js';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
@@ -123,7 +122,7 @@
 			<div class="truncate text-sm">{name}</div>
 			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
 		</div>
-		<Button variant="ghost" size="icon" aria-label="Settings"><SettingsIcon /></Button>
+		<IconButton icon={SettingsIcon} label="Settings" href="/settings" variant={page.url.pathname === '/settings' ? 'secondary' : 'ghost'} />
 	</Sidebar.Footer>
 </Sidebar.Root>
 <NewThreadDialog bind:open={newOpen} />

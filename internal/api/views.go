@@ -87,6 +87,7 @@ func (s *Service) SuspendIdle(ctx context.Context, idle time.Duration) {
 				s.do(ctx, id, effect)
 			}
 		}
+		s.suspendIdleLogins(ctx)
 	}
 }
 

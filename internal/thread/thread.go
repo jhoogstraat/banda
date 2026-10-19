@@ -70,6 +70,8 @@ type EnvReady struct{ Pending bool }
 
 type TurnEnded struct{}
 
+// EnvLost: the runner disconnected, or a setup step failed (the runner then
+// stays connected so the owner can debug in the terminal; Retry reruns setup).
 type EnvLost struct{}
 
 // Suspend: the thread has been idle for a while, or its owner snoozed or
