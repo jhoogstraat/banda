@@ -92,8 +92,11 @@ func (s *Store) List(ctx context.Context, ownerID, viewerID string) ([]Thread, e
 // GetFor returns a thread with viewerID's snooze/settle state.
 func (s *Store) GetFor(ctx context.Context, id, viewerID string) (Thread, error) {
 	threads, err := s.listWithView(ctx, `t.id = $2`, viewerID, id)
-	if err != nil || len(threads) == 0 {
-		return Thread{}, errors.Join(err, ErrNotFound)
+	if err != nil {
+		return Thread{}, err
+	}
+	if len(threads) == 0 {
+		return Thread{}, ErrNotFound
 	}
 	return threads[0], nil
 }
