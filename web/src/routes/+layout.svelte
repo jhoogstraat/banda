@@ -2,7 +2,8 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { ModeWatcher, setMode } from 'mode-watcher';
-	import Sidebar from '#lib/components/sidebar.svelte';
+	import AppSidebar from '#lib/components/sidebar.svelte';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
 	import { loadThreads } from '#lib/threads.svelte.js';
 	import type { LayoutProps } from './$types';
@@ -28,12 +29,13 @@
 <ModeWatcher />
 
 <TooltipProvider>
-	<div class="flex h-dvh">
-		<Sidebar />
-		<main class="flex min-w-0 flex-1">
+	<!-- The only place that knows about screen sizes: the sidebar is a column on desktop and a drawer on phones. -->
+	<Sidebar.Provider class="h-dvh">
+		<AppSidebar />
+		<Sidebar.Inset class="min-w-0 flex-row overflow-hidden">
 			{#key page.url.pathname}
 				{@render children()}
 			{/key}
-		</main>
-	</div>
+		</Sidebar.Inset>
+	</Sidebar.Provider>
 </TooltipProvider>

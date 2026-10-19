@@ -6,6 +6,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
@@ -31,6 +32,13 @@
 	const others = $derived(threads.users.filter((u) => u.id !== threads.me?.id));
 	const viewed = $derived(others.find((u) => u.id === threads.viewing));
 	const name = $derived(threads.me?.name ?? '');
+
+	// On phones the sidebar is a drawer: close it once a link was followed.
+	const sidebar = Sidebar.useSidebar();
+	$effect(() => {
+		void page.url.pathname;
+		sidebar.setOpenMobile(false);
+	});
 </script>
 
 {#snippet title(text: string, n: number)}
@@ -68,8 +76,8 @@
 	{/if}
 {/snippet}
 
-<aside class="flex w-64 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
-	<div class="flex flex-col gap-3 p-3">
+<Sidebar.Root>
+	<Sidebar.Header class="gap-3 p-3">
 		<span class="px-1 text-lg font-semibold tracking-tight">Banda</span>
 		<Button href="/" variant="outline"><PlusIcon /> New thread</Button>
 		<NativeSelect aria-label="People" value={threads.viewing} onchange={(e) => view(e.currentTarget.value)} class="w-full">
@@ -78,8 +86,8 @@
 				{#each others as u (u.id)}<NativeSelectOption value={u.id}>{u.name}</NativeSelectOption>{/each}
 			</NativeSelectOptGroup>
 		</NativeSelect>
-	</div>
-	<nav class="flex-1 space-y-3 overflow-y-auto px-2 pb-3">
+	</Sidebar.Header>
+	<Sidebar.Content class="space-y-3 px-2 pb-3">
 		{#if threads.viewing}
 			<div class="flex items-center justify-between px-2 pb-1 text-sm font-medium">
 				<span class="truncate">{viewed?.name ?? threads.viewing}'s threads</span>
@@ -96,8 +104,8 @@
 			{@render section('Snoozed', sections.snoozed, true)}
 			{@render section('Settled', sections.settled, true)}
 		{/if}
-	</nav>
-	<div class="flex items-center gap-2 border-t p-3">
+	</Sidebar.Content>
+	<Sidebar.Footer class="flex-row items-center gap-2 border-t p-3">
 		<UserAvatar {name} class="size-7" />
 		<div class="min-w-0 flex-1 leading-tight">
 			<div class="truncate text-sm">{name}</div>
@@ -113,5 +121,5 @@
 			<AtSignIcon /> {threads.mentioned.length}
 		</Button>
 		<Button variant="ghost" size="icon" aria-label="Settings"><SettingsIcon /></Button>
-	</div>
-</aside>
+	</Sidebar.Footer>
+</Sidebar.Root>

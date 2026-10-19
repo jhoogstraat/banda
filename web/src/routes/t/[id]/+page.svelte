@@ -7,6 +7,7 @@
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import XIcon from '@lucide/svelte/icons/x';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -27,6 +28,8 @@
 	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
+	import PageHeader from '#lib/components/page-header.svelte';
+	import SidePane from '#lib/components/side-pane.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import ThreadActions from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
@@ -46,7 +49,8 @@
 
 	let thread = $state<Thread>();
 	const chat = $state<Chat>({ items: [], streaming: '' });
-	let diffOpen = $state(true);
+	// Unset: the pane picks its own default (open on desktop, closed on phones).
+	let diffOpen = $state<boolean>();
 	// The terminal and the file browser mount when their tab is first opened and then stay alive; a key change reopens the terminal.
 	let tab = $state('diff');
 	let termOpened = $state(false);
@@ -157,7 +161,7 @@
 {/snippet}
 
 <div class="flex min-w-0 flex-1 flex-col">
-	<header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+	<PageHeader>
 		<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
 		{#if thread}<StatusDot status={thread.status} label />{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
@@ -180,7 +184,7 @@
 			{/if}
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
 		</div>
-	</header>
+	</PageHeader>
 
 	<Conversation class="min-h-0 flex-1">
 		<ConversationContent class="min-h-0 flex-1 overflow-y-auto">
@@ -272,13 +276,13 @@
 	</div>
 </div>
 
-<!-- Hidden rather than removed, so closing the pane keeps the terminal running. -->
-<aside class="{diffOpen ? 'flex' : 'hidden'} w-[32rem] max-w-[45%] shrink-0 flex-col border-l">
+<SidePane bind:open={diffOpen}>
 	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
 		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
 			<TabsTrigger value="diff">Diff</TabsTrigger>
 			<TabsTrigger value="files">Files</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
+			<IconButton icon={XIcon} label="Close the pane" class="ml-auto" onclick={() => (diffOpen = false)} />
 		</TabsList>
 		<TabsContent value="diff" class="min-h-0 overflow-auto">
 			<DiffView diff={thread?.diff ?? ''} />
@@ -294,4 +298,4 @@
 			<p class="p-4 text-sm text-muted-foreground">Only the thread owner can open the terminal.</p>
 		{/if}
 	</Tabs>
-</aside>
+</SidePane>

@@ -142,6 +142,7 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
 - Banda MCP server for agents.
+- Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`make deploy`, `deploy/banda.yaml`).
 
 **Verified only partly**
