@@ -34,7 +34,22 @@ func main() {
 		log.Fatalf("sandbox client: %v", err)
 	}
 
-	server := connect.NewServer(api.DevAuth())
+	auth := api.DevAuth()
+	var sso *api.OIDC
+	if issuer := os.Getenv("OIDC_ISSUER"); issuer != "" {
+		sso, err = api.NewOIDC(ctx, st, api.OIDCConfig{
+			Issuer:        issuer,
+			ClientID:      os.Getenv("OIDC_CLIENT_ID"),
+			ClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
+			PublicURL:     env("PUBLIC_URL", "http://localhost:5173"),
+			SessionSecret: os.Getenv("SESSION_SECRET"),
+		})
+		if err != nil {
+			log.Fatalf("oidc: %v", err)
+		}
+		auth = sso.Interceptor()
+	}
+	server := connect.NewServer(auth)
 	svc := api.New(st, sb)
 	bandav1connect.RegisterThreadServiceHandler(server, svc)
 	bandav1connect.RegisterRunnerServiceHandler(server, svc)
@@ -46,6 +61,9 @@ func main() {
 	go svc.SuspendIdle(ctx, idle)
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
+	if sso != nil {
+		sso.Mount(mux)
+	}
 	if dir := os.Getenv("WEB_DIR"); dir != "" {
 		mux.Handle("/", spa(dir))
 	}

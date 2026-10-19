@@ -1,0 +1,82 @@
+# Dev-only OIDC provider. Sign in as alice, bob or carol (@example.com) with the password "password".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex
+  namespace: banda
+data:
+  config.yaml: |
+    issuer: http://localhost:5556/dex
+    storage:
+      type: memory
+    web:
+      http: 0.0.0.0:5556
+    oauth2:
+      skipApprovalScreen: true
+    enablePasswordDB: true
+    staticClients:
+      - id: banda
+        secret: banda-dev-secret
+        name: Banda
+        redirectURIs:
+          - http://localhost:5173/auth/callback
+          - http://localhost:8787/auth/callback
+    staticPasswords:
+      - email: alice@example.com
+        username: alice
+        userID: 92a688f8-23fa-4a67-81c6-a24893fece99
+        hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"
+      - email: bob@example.com
+        username: bob
+        userID: 76646764-9798-4536-8fe3-81421ef48909
+        hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"
+      - email: carol@example.com
+        username: carol
+        userID: ded8cfbc-82fe-4dc4-8809-362ef8c108fa
+        hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: banda
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      containers:
+        - name: dex
+          image: ghcr.io/dexidp/dex:v2.46.0
+          args: [dex, serve, /etc/dex/config.yaml]
+          ports:
+            - containerPort: 5556
+          readinessProbe:
+            httpGet:
+              path: /dex/healthz
+              port: 5556
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dex
+      volumes:
+        - name: config
+          configMap:
+            name: dex
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: banda
+spec:
+  type: NodePort
+  selector:
+    app: dex
+  ports:
+    - port: 5556
+      nodePort: 30556

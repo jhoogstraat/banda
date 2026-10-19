@@ -21,3 +21,16 @@ For private repos, create the secret before creating the thread:
 ```sh
 kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 ```
+
+## Sign in
+
+`make cluster` also runs [Dex](https://dexidp.io), a local OIDC provider on `localhost:5556`. Open `http://localhost:5173` and sign in as `alice`, `bob` or `carol` (`@example.com`) with the password `password`. `make api AUTH=dev` skips sign-in and trusts the `X-Banda-User` header instead.
+
+To use another OIDC provider, set these before `make api` (or when running `cmd/api`) and register `$PUBLIC_URL/auth/callback` as its redirect URI:
+
+| Variable | Meaning |
+|---|---|
+| `OIDC_ISSUER` | Issuer URL, which serves `/.well-known/openid-configuration`. Enables sign-in. |
+| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Client credentials. |
+| `PUBLIC_URL` | Origin the browser uses, default `http://localhost:5173`. |
+| `SESSION_SECRET` | Signs the session cookie. If empty, a random one is used and sessions end when the API restarts. |
