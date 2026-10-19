@@ -17,6 +17,7 @@ export OIDC_ISSUER ?= http://localhost:5556/dex
 export OIDC_CLIENT_ID ?= banda
 export OIDC_CLIENT_SECRET ?= banda-dev-secret
 export PUBLIC_URL ?= http://localhost:5173
+export SESSION_SECRET ?= banda-local-dev-session-secret
 endif
 
 .PHONY: gen test cluster image api web login e2e deploy

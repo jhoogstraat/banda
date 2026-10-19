@@ -214,7 +214,7 @@
 						{/if}
 					{:else if item.kind === 'notice'}
 						<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-							<Response content={item.text} />
+							<Response content={item.text} class="h-auto" />
 							{#if owner && loginNeeded(item.text)}
 								<Button size="sm" class="mt-2" onclick={login}>Log in to Claude Code</Button>
 							{/if}
