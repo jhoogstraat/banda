@@ -105,6 +105,13 @@ func pvcSpec(size string) corev1.PersistentVolumeClaimSpec {
 	}
 }
 
+// Suspend deletes the thread's pod and keeps its volumes.
+func (c *Client) Suspend(ctx context.Context, threadID string) error {
+	_, err := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace).Patch(ctx, "t-"+threadID, types.MergePatchType,
+		[]byte(`{"spec":{"operatingMode":"Suspended"}}`), metav1.PatchOptions{})
+	return err
+}
+
 func (c *Client) sandbox(name, claudeClaim string, t store.Thread) *sbv1.Sandbox {
 	env := map[string]string{
 		"HOME":                         home,

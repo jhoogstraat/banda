@@ -11,6 +11,7 @@ const (
 	Working       Status = "working"
 	AwaitingInput Status = "awaiting_input"
 	Errored       Status = "errored"
+	Suspended     Status = "suspended" // idle, environment paused
 )
 
 type Mode string
@@ -30,10 +31,11 @@ type State struct {
 type Effect int
 
 const (
-	None      Effect = iota
-	StartTurn        // deliver the message (or pending prompt) to the agent
-	StopTurn         // interrupt the running turn
-	Provision        // (re)create the environment
+	None       Effect = iota
+	StartTurn         // deliver the message (or pending prompt) to the agent
+	StopTurn          // interrupt the running turn
+	Provision         // (re)create or resume the environment
+	SuspendEnv        // pause the environment, keeping its volumes
 )
 
 var (
@@ -68,6 +70,13 @@ type TurnEnded struct{}
 
 type EnvLost struct{}
 
+// Suspend: the thread has been idle for a while, or its owner snoozed or
+// settled it.
+type Suspend struct{}
+
+// Wake resumes a suspended environment without a prompt, e.g. to open a terminal.
+type Wake struct{ By string }
+
 func (Send) action()      {}
 func (Interrupt) action() {}
 func (SetMode) action()   {}
@@ -75,6 +84,8 @@ func (Retry) action()     {}
 func (EnvReady) action()  {}
 func (TurnEnded) action() {}
 func (EnvLost) action()   {}
+func (Suspend) action()   {}
+func (Wake) action()      {}
 
 func Apply(s State, a Action) (State, Effect, error) {
 	switch a := a.(type) {
@@ -91,6 +102,10 @@ func Apply(s State, a Action) (State, Effect, error) {
 			return s, None, ErrBusy
 		case Starting, Errored:
 			return s, None, ErrNotReady
+		case Suspended:
+			// The caller keeps the message as the pending prompt.
+			s.Status = Starting
+			return s, Provision, nil
 		}
 		s.Status = Working
 		return s, StartTurn, nil
@@ -123,6 +138,7 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, Provision, nil
 
 	case EnvReady:
+		// Ignored while suspended: that is a dying pod; resuming goes through Starting.
 		if s.Status != Starting && s.Status != Errored {
 			return s, None, nil
 		}
@@ -140,8 +156,27 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, None, nil
 
 	case EnvLost:
-		s.Status = Errored
+		if s.Status != Suspended { // suspending stops the runner on purpose
+			s.Status = Errored
+		}
 		return s, None, nil
+
+	case Suspend:
+		if s.Status == Working || s.Status == Suspended {
+			return s, None, nil
+		}
+		s.Status = Suspended
+		return s, SuspendEnv, nil
+
+	case Wake:
+		if a.By != s.OwnerID {
+			return s, None, ErrForbidden
+		}
+		if s.Status != Suspended {
+			return s, None, nil
+		}
+		s.Status = Starting
+		return s, Provision, nil
 	}
 	return s, None, errors.New("unknown action")
 }

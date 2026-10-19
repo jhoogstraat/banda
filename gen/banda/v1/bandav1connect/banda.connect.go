@@ -14,6 +14,8 @@ import (
 const (
 	// ThreadServiceName is the fully-qualified name of the ThreadService service.
 	ThreadServiceName = "banda.v1.ThreadService"
+	// UserServiceName is the fully-qualified name of the UserService service.
+	UserServiceName = "banda.v1.UserService"
 	// RunnerServiceName is the fully-qualified name of the RunnerService service.
 	RunnerServiceName = "banda.v1.RunnerService"
 )
@@ -42,6 +44,27 @@ const (
 	ThreadServiceRetryProcedure = "/banda.v1.ThreadService/Retry"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
+	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
+	// RPC.
+	ThreadServiceListMentionedProcedure = "/banda.v1.ThreadService/ListMentioned"
+	// ThreadServiceSnoozeProcedure is the procedure name of the ThreadService's Snooze RPC.
+	ThreadServiceSnoozeProcedure = "/banda.v1.ThreadService/Snooze"
+	// ThreadServiceSettleProcedure is the procedure name of the ThreadService's Settle RPC.
+	ThreadServiceSettleProcedure = "/banda.v1.ThreadService/Settle"
+	// ThreadServicePushProcedure is the procedure name of the ThreadService's Push RPC.
+	ThreadServicePushProcedure = "/banda.v1.ThreadService/Push"
+	// ThreadServiceOpenTerminalProcedure is the procedure name of the ThreadService's OpenTerminal RPC.
+	ThreadServiceOpenTerminalProcedure = "/banda.v1.ThreadService/OpenTerminal"
+	// ThreadServiceWriteTerminalProcedure is the procedure name of the ThreadService's WriteTerminal
+	// RPC.
+	ThreadServiceWriteTerminalProcedure = "/banda.v1.ThreadService/WriteTerminal"
+	// ThreadServiceResizeTerminalProcedure is the procedure name of the ThreadService's ResizeTerminal
+	// RPC.
+	ThreadServiceResizeTerminalProcedure = "/banda.v1.ThreadService/ResizeTerminal"
+	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
+	UserServiceMeProcedure = "/banda.v1.UserService/Me"
+	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
+	UserServiceListUsersProcedure = "/banda.v1.UserService/ListUsers"
 	// RunnerServiceConnectProcedure is the procedure name of the RunnerService's Connect RPC.
 	RunnerServiceConnectProcedure = "/banda.v1.RunnerService/Connect"
 )
@@ -103,6 +126,55 @@ var (
 			Procedure:  ThreadServiceWatchThreadProcedure,
 		}
 	})
+	threadServiceListMentionedSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ListMentioned"),
+			Procedure:  ThreadServiceListMentionedProcedure,
+		}
+	})
+	threadServiceSnoozeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Snooze"),
+			Procedure:  ThreadServiceSnoozeProcedure,
+		}
+	})
+	threadServiceSettleSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Settle"),
+			Procedure:  ThreadServiceSettleProcedure,
+		}
+	})
+	threadServicePushSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Push"),
+			Procedure:  ThreadServicePushProcedure,
+		}
+	})
+	threadServiceOpenTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("OpenTerminal"),
+			Procedure:  ThreadServiceOpenTerminalProcedure,
+		}
+	})
+	threadServiceWriteTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("WriteTerminal"),
+			Procedure:  ThreadServiceWriteTerminalProcedure,
+		}
+	})
+	threadServiceResizeTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ResizeTerminal"),
+			Procedure:  ThreadServiceResizeTerminalProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -116,6 +188,21 @@ type ThreadServiceClient interface {
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
+	// Other users' threads in which the caller is mentioned and hasn't answered.
+	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
+	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
+	// suspends the environment.
+	Snooze(context.Context, *v1.SnoozeRequest) (*v1.SnoozeResponse, error)
+	// Per-viewer settle. The owner settling also suspends the environment.
+	Settle(context.Context, *v1.SettleRequest) (*v1.SettleResponse, error)
+	// Pushes the thread branch to origin (owner only). The result arrives as a
+	// notice event.
+	Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error)
+	// A terminal in the thread's environment (owner only). Output streams until
+	// the process exits; opening again replaces the previous terminal.
+	OpenTerminal(context.Context, *v1.OpenTerminalRequest) (ThreadServiceOpenTerminalClientStream, error)
+	WriteTerminal(context.Context, *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error)
+	ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -145,6 +232,27 @@ func (s ThreadServiceWatchThreadClientStream) Close() error {
 	return s.stream.Close()
 }
 
+// ThreadServiceOpenTerminalClientStream is the client stream for the ThreadService's OpenTerminal
+// RPC.
+type ThreadServiceOpenTerminalClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s ThreadServiceOpenTerminalClientStream) Receive() (*v1.OpenTerminalResponse, error) {
+	var res v1.OpenTerminalResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s ThreadServiceOpenTerminalClientStream) Close() error {
+	return s.stream.Close()
+}
+
 // ThreadServiceHandler is an implementation of the banda.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	CreateThread(context.Context, *v1.CreateThreadRequest) (*v1.CreateThreadResponse, error)
@@ -156,6 +264,21 @@ type ThreadServiceHandler interface {
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
+	// Other users' threads in which the caller is mentioned and hasn't answered.
+	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
+	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
+	// suspends the environment.
+	Snooze(context.Context, *v1.SnoozeRequest) (*v1.SnoozeResponse, error)
+	// Per-viewer settle. The owner settling also suspends the environment.
+	Settle(context.Context, *v1.SettleRequest) (*v1.SettleResponse, error)
+	// Pushes the thread branch to origin (owner only). The result arrives as a
+	// notice event.
+	Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error)
+	// A terminal in the thread's environment (owner only). Output streams until
+	// the process exits; opening again replaces the previous terminal.
+	OpenTerminal(context.Context, *v1.OpenTerminalRequest, ThreadServiceOpenTerminalServerStream) error
+	WriteTerminal(context.Context, *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error)
+	ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -171,6 +294,13 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceSetModeSpec(), Handler: adapter.setMode},
 		connect.Method{Spec: threadServiceRetrySpec(), Handler: adapter.retry},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
+		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
+		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
+		connect.Method{Spec: threadServiceSettleSpec(), Handler: adapter.settle},
+		connect.Method{Spec: threadServicePushSpec(), Handler: adapter.push},
+		connect.Method{Spec: threadServiceOpenTerminalSpec(), Handler: adapter.openTerminal},
+		connect.Method{Spec: threadServiceWriteTerminalSpec(), Handler: adapter.writeTerminal},
+		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
 	)
 }
 
@@ -187,6 +317,22 @@ func (s ThreadServiceWatchThreadServerStream) SendHeaders() error {
 
 // Send sends a response message to the client.
 func (s ThreadServiceWatchThreadServerStream) Send(res *v1.WatchThreadResponse) error {
+	return s.stream.Send(res)
+}
+
+// ThreadServiceOpenTerminalServerStream is the server stream for the ThreadService's OpenTerminal
+// RPC.
+type ThreadServiceOpenTerminalServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s ThreadServiceOpenTerminalServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s ThreadServiceOpenTerminalServerStream) Send(res *v1.OpenTerminalResponse) error {
 	return s.stream.Send(res)
 }
 
@@ -223,6 +369,34 @@ func (UnimplementedThreadServiceHandler) Retry(context.Context, *v1.RetryRequest
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.WatchThread is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ListMentioned is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Snooze(context.Context, *v1.SnoozeRequest) (*v1.SnoozeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Snooze is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Settle(context.Context, *v1.SettleRequest) (*v1.SettleResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Settle is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Push is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) OpenTerminal(context.Context, *v1.OpenTerminalRequest, ThreadServiceOpenTerminalServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.OpenTerminal is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) WriteTerminal(context.Context, *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.WriteTerminal is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ResizeTerminal(context.Context, *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ResizeTerminal is not implemented")
 }
 
 type threadServiceClient struct {
@@ -291,6 +465,62 @@ func (c *threadServiceClient) WatchThread(ctx context.Context, req *v1.WatchThre
 		return ThreadServiceWatchThreadClientStream{}, err
 	}
 	return ThreadServiceWatchThreadClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) ListMentioned(ctx context.Context, req *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
+	var res v1.ListMentionedResponse
+	if err := c.client.CallUnary(ctx, threadServiceListMentionedSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Snooze(ctx context.Context, req *v1.SnoozeRequest) (*v1.SnoozeResponse, error) {
+	var res v1.SnoozeResponse
+	if err := c.client.CallUnary(ctx, threadServiceSnoozeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Settle(ctx context.Context, req *v1.SettleRequest) (*v1.SettleResponse, error) {
+	var res v1.SettleResponse
+	if err := c.client.CallUnary(ctx, threadServiceSettleSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Push(ctx context.Context, req *v1.PushRequest) (*v1.PushResponse, error) {
+	var res v1.PushResponse
+	if err := c.client.CallUnary(ctx, threadServicePushSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) OpenTerminal(ctx context.Context, req *v1.OpenTerminalRequest) (ThreadServiceOpenTerminalClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, threadServiceOpenTerminalSpec(), req)
+	if err != nil {
+		return ThreadServiceOpenTerminalClientStream{}, err
+	}
+	return ThreadServiceOpenTerminalClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) WriteTerminal(ctx context.Context, req *v1.WriteTerminalRequest) (*v1.WriteTerminalResponse, error) {
+	var res v1.WriteTerminalResponse
+	if err := c.client.CallUnary(ctx, threadServiceWriteTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ResizeTerminal(ctx context.Context, req *v1.ResizeTerminalRequest) (*v1.ResizeTerminalResponse, error) {
+	var res v1.ResizeTerminalResponse
+	if err := c.client.CallUnary(ctx, threadServiceResizeTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 type threadServiceHandler struct{ svc ThreadServiceHandler }
@@ -385,6 +615,187 @@ func (h threadServiceHandler) watchThread(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	return h.svc.WatchThread(ctx, &req, ThreadServiceWatchThreadServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) listMentioned(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListMentionedRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListMentioned(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) snooze(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SnoozeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Snooze(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) settle(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SettleRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Settle(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) push(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PushRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Push(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) openTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.OpenTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.OpenTerminal(ctx, &req, ThreadServiceOpenTerminalServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) writeTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.WriteTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.WriteTerminal(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) resizeTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ResizeTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ResizeTerminal(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+var (
+	userServiceMeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("UserService").Methods().ByName("Me"),
+			Procedure:  UserServiceMeProcedure,
+		}
+	})
+	userServiceListUsersSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("UserService").Methods().ByName("ListUsers"),
+			Procedure:  UserServiceListUsersProcedure,
+		}
+	})
+)
+
+// UserServiceClient is a client for the banda.v1.UserService service.
+type UserServiceClient interface {
+	Me(context.Context, *v1.MeRequest) (*v1.MeResponse, error)
+	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
+}
+
+// NewUserServiceClient constructs a client for the banda.v1.UserService service. Multiple service
+// clients may share a single connect.Client.
+func NewUserServiceClient(client *connect.Client) UserServiceClient {
+	return &userServiceClient{client: client}
+}
+
+// UserServiceHandler is an implementation of the banda.v1.UserService service.
+type UserServiceHandler interface {
+	Me(context.Context, *v1.MeRequest) (*v1.MeResponse, error)
+	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
+}
+
+// RegisterUserServiceHandler registers svc as the banda.v1.UserService implementation on server.
+func RegisterUserServiceHandler(server *connect.Server, svc UserServiceHandler) {
+	adapter := userServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: userServiceMeSpec(), Handler: adapter.me},
+		connect.Method{Spec: userServiceListUsersSpec(), Handler: adapter.listUsers},
+	)
+}
+
+// UnimplementedUserServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedUserServiceHandler struct{}
+
+func (UnimplementedUserServiceHandler) Me(context.Context, *v1.MeRequest) (*v1.MeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.UserService.Me is not implemented")
+}
+
+func (UnimplementedUserServiceHandler) ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.UserService.ListUsers is not implemented")
+}
+
+type userServiceClient struct {
+	client *connect.Client
+}
+
+func (c *userServiceClient) Me(ctx context.Context, req *v1.MeRequest) (*v1.MeResponse, error) {
+	var res v1.MeResponse
+	if err := c.client.CallUnary(ctx, userServiceMeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *userServiceClient) ListUsers(ctx context.Context, req *v1.ListUsersRequest) (*v1.ListUsersResponse, error) {
+	var res v1.ListUsersResponse
+	if err := c.client.CallUnary(ctx, userServiceListUsersSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type userServiceHandler struct{ svc UserServiceHandler }
+
+func (h userServiceHandler) me(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.MeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Me(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h userServiceHandler) listUsers(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListUsersRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListUsers(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
 
 var (

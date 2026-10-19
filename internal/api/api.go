@@ -39,17 +39,6 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 	}
 }
 
-// user returns the caller's id.
-// ponytail: trusted dev header until OIDC lands in M2. Do not expose M1 beyond localhost.
-func user(ctx context.Context) string {
-	if info, ok := connect.CallInfoForServerContext(ctx); ok {
-		if u := info.RequestHeader().Get("X-Banda-User"); u != "" {
-			return u
-		}
-	}
-	return "dev"
-}
-
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
 	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
@@ -82,7 +71,7 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 }
 
 func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
-	threads, err := s.store.List(ctx, or(req.OwnerId, user(ctx)))
+	threads, err := s.store.List(ctx, or(req.OwnerId, user(ctx)), user(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -106,15 +95,53 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	if m == nil || strings.TrimSpace(m.Text) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "message text is required")
 	}
-	by := user(ctx)
-	effect, err := s.apply(ctx, req.ThreadId, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0},
-		messageEvent(by, m))
+	by, id := user(ctx), req.ThreadId
+	before, err := s.store.Get(ctx, id)
+	if err != nil {
+		return nil, cerr(err)
+	}
+	unseen, err := s.store.Events(ctx, id, before.DeliveredSeq)
 	if err != nil {
 		return nil, err
 	}
-	if effect == thread.StartTurn {
-		s.toRunner(ctx, req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: m.Text}}})
+	names := s.names(ctx)
+
+	var effect thread.Effect
+	var prompt string
+	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0})
+		if err != nil {
+			return nil, err
+		}
+		effect = eff
+		if eff == thread.StartTurn || eff == thread.Provision {
+			var fresh []*bandav1.Event
+			for _, e := range unseen {
+				if e.Seq > t.DeliveredSeq {
+					fresh = append(fresh, e)
+				}
+			}
+			prompt = agentPrompt(t.OwnerID, names, fresh, by, m.Text)
+			t.DeliveredSeq = t.LastSeq + 1 // the message stored below
+			if eff == thread.Provision {   // suspended: deliver once the environment is back
+				t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
+			}
+		}
+		events := append([]*bandav1.Event{messageEvent(by, m)}, stateEvents(t.State, next)...)
+		t.State = next
+		return events, nil
+	})
+	if err != nil {
+		return nil, cerr(err)
 	}
+	s.broadcast(id, stored)
+	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
+		slog.Error("store mentions", "thread", id, "err", err)
+	}
+	if effect == thread.StartTurn {
+		s.toRunner(ctx, id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}})
+	}
+	s.do(ctx, id, effect)
 	return &bandav1.SendMessageResponse{}, nil
 }
 
@@ -123,9 +150,7 @@ func (s *Service) Interrupt(ctx context.Context, req *bandav1.InterruptRequest) 
 	if err != nil {
 		return nil, err
 	}
-	if effect == thread.StopTurn {
-		s.toRunner(ctx, req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Stop{Stop: &bandav1.Stop{}}})
-	}
+	s.do(ctx, req.ThreadId, effect)
 	return &bandav1.InterruptResponse{}, nil
 }
 
@@ -143,13 +168,7 @@ func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav
 	if err != nil {
 		return nil, err
 	}
-	if effect == thread.Provision {
-		t, err := s.store.Get(ctx, req.ThreadId)
-		if err != nil {
-			return nil, err
-		}
-		s.provision(ctx, t)
-	}
+	s.do(ctx, req.ThreadId, effect)
 	return &bandav1.RetryResponse{}, nil
 }
 
@@ -284,6 +303,7 @@ func (s *Service) ready(ctx context.Context, id string, ch chan *bandav1.Connect
 		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 		if effect == thread.StartTurn {
 			prompt, t.PendingPrompt = t.PendingPrompt, ""
+			t.DeliveredSeq = t.LastSeq
 		}
 		events := stateEvents(t.State, next)
 		t.State = next
@@ -323,6 +343,22 @@ func (s *Service) apply(ctx context.Context, id string, a thread.Action, events 
 	return effect, nil
 }
 
+// do carries out an effect. StartTurn needs a prompt, so callers handle it.
+func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
+	switch e {
+	case thread.StopTurn:
+		s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Stop{Stop: &bandav1.Stop{}}})
+	case thread.Provision:
+		if t, err := s.store.Get(ctx, id); err == nil {
+			s.provision(ctx, t)
+		}
+	case thread.SuspendEnv:
+		if err := s.sandboxes.Suspend(ctx, id); err != nil {
+			slog.Error("suspend sandbox", "thread", id, "err", err)
+		}
+	}
+}
+
 func (s *Service) provision(ctx context.Context, t store.Thread) {
 	if err := s.sandboxes.Ensure(ctx, t); err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
@@ -330,15 +366,23 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	}
 }
 
+// toRunner delivers a prompt; a missing runner means the environment is gone.
 func (s *Service) toRunner(ctx context.Context, id string, msg *bandav1.ConnectResponse) {
+	if !s.sendRunner(id, msg) {
+		s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
+	}
+}
+
+// sendRunner reports false if no runner is connected for the thread.
+func (s *Service) sendRunner(id string, msg *bandav1.ConnectResponse) bool {
 	s.mu.Lock()
 	ch := s.runners[id]
 	s.mu.Unlock()
 	if ch == nil {
-		s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
-		return
+		return false
 	}
 	ch <- msg
+	return true
 }
 
 func (s *Service) watch(id string) chan *bandav1.Event {
@@ -416,26 +460,33 @@ var (
 		thread.Working:       bandav1.Status_STATUS_WORKING,
 		thread.AwaitingInput: bandav1.Status_STATUS_AWAITING_INPUT,
 		thread.Errored:       bandav1.Status_STATUS_ERRORED,
+		thread.Suspended:     bandav1.Status_STATUS_SUSPENDED,
 	}
 	modeToProto   = map[thread.Mode]bandav1.Mode{thread.AgentMode: bandav1.Mode_MODE_AGENT, thread.ChatMode: bandav1.Mode_MODE_CHAT}
 	modeFromProto = map[bandav1.Mode]thread.Mode{bandav1.Mode_MODE_AGENT: thread.AgentMode, bandav1.Mode_MODE_CHAT: thread.ChatMode}
 )
 
 func toProto(t store.Thread) *bandav1.Thread {
-	return &bandav1.Thread{
-		Id:        t.ID,
-		OwnerId:   t.OwnerID,
-		Title:     t.Title,
-		RepoUrl:   t.RepoURL,
-		Branch:    t.Branch,
-		Model:     t.Model,
-		Effort:    t.Effort,
-		Status:    statusToProto[t.Status],
-		Mode:      modeToProto[t.Mode],
-		Diff:      t.Diff,
-		CreatedAt: timestamppb.New(t.CreatedAt),
-		UpdatedAt: timestamppb.New(t.UpdatedAt),
+	p := &bandav1.Thread{
+		Id:         t.ID,
+		OwnerId:    t.OwnerID,
+		Title:      t.Title,
+		RepoUrl:    t.RepoURL,
+		Branch:     t.Branch,
+		Model:      t.Model,
+		Effort:     t.Effort,
+		Status:     statusToProto[t.Status],
+		Mode:       modeToProto[t.Mode],
+		Diff:       t.Diff,
+		CreatedAt:  timestamppb.New(t.CreatedAt),
+		UpdatedAt:  timestamppb.New(t.UpdatedAt),
+		BaseBranch: t.BaseBranch,
+		Settled:    t.Settled,
 	}
+	if t.SnoozedUntil != nil {
+		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)
+	}
+	return p
 }
 
 func title(prompt string) string {

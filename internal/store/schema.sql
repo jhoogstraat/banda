@@ -26,3 +26,33 @@ CREATE TABLE IF NOT EXISTS events (
   body      jsonb NOT NULL,
   PRIMARY KEY (thread_id, seq)
 );
+
+-- Last event seq included in a prompt to the agent, so chat messages posted
+-- in between can be handed over as context.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS delivered_seq bigint NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS users (
+  id         text PRIMARY KEY,
+  name       text NOT NULL,
+  email      text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Each viewer's own snooze/settle state of a thread.
+CREATE TABLE IF NOT EXISTS thread_views (
+  user_id       text NOT NULL,
+  thread_id     text NOT NULL REFERENCES threads (id) ON DELETE CASCADE,
+  snoozed_until timestamptz,
+  settled_at    timestamptz,
+  PRIMARY KEY (user_id, thread_id)
+);
+
+CREATE TABLE IF NOT EXISTS mentions (
+  thread_id   text NOT NULL REFERENCES threads (id) ON DELETE CASCADE,
+  seq         bigint NOT NULL,
+  user_id     text NOT NULL,
+  answered_at timestamptz,
+  PRIMARY KEY (thread_id, seq, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS mentions_open ON mentions (user_id) WHERE answered_at IS NULL;

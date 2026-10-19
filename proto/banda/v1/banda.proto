@@ -15,6 +15,26 @@ service ThreadService {
   rpc Retry(RetryRequest) returns (RetryResponse);
   // Replays stored events with seq > after_seq, then streams live events.
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
+  // Other users' threads in which the caller is mentioned and hasn't answered.
+  rpc ListMentioned(ListMentionedRequest) returns (ListMentionedResponse);
+  // Per-viewer snooze; an unset `until` clears it. The owner snoozing also
+  // suspends the environment.
+  rpc Snooze(SnoozeRequest) returns (SnoozeResponse);
+  // Per-viewer settle. The owner settling also suspends the environment.
+  rpc Settle(SettleRequest) returns (SettleResponse);
+  // Pushes the thread branch to origin (owner only). The result arrives as a
+  // notice event.
+  rpc Push(PushRequest) returns (PushResponse);
+  // A terminal in the thread's environment (owner only). Output streams until
+  // the process exits; opening again replaces the previous terminal.
+  rpc OpenTerminal(OpenTerminalRequest) returns (stream OpenTerminalResponse);
+  rpc WriteTerminal(WriteTerminalRequest) returns (WriteTerminalResponse);
+  rpc ResizeTerminal(ResizeTerminalRequest) returns (ResizeTerminalResponse);
+}
+
+service UserService {
+  rpc Me(MeRequest) returns (MeResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
 // RunnerService is dialed by the runner inside each sandbox pod, so the API
@@ -29,6 +49,8 @@ enum Status {
   STATUS_WORKING = 2;
   STATUS_AWAITING_INPUT = 3;
   STATUS_ERRORED = 4;
+  // Idle with the environment paused; the next prompt resumes it.
+  STATUS_SUSPENDED = 5;
 }
 
 enum Mode {
@@ -53,6 +75,16 @@ message Thread {
   string diff = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
+  string base_branch = 13;
+  // The caller's own view of the thread.
+  google.protobuf.Timestamp snoozed_until = 14;
+  bool settled = 15;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
 }
 
 message Event {
@@ -186,6 +218,72 @@ message RetryRequest {
 
 message RetryResponse {}
 
+message ListMentionedRequest {}
+
+message ListMentionedResponse {
+  repeated Thread threads = 1;
+}
+
+message SnoozeRequest {
+  string thread_id = 1;
+  google.protobuf.Timestamp until = 2;
+}
+
+message SnoozeResponse {}
+
+message SettleRequest {
+  string thread_id = 1;
+  bool settled = 2;
+}
+
+message SettleResponse {}
+
+message PushRequest {
+  string thread_id = 1;
+}
+
+message PushResponse {}
+
+message OpenTerminalRequest {
+  string thread_id = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+  // Empty runs a login shell.
+  string command = 4;
+}
+
+message OpenTerminalResponse {
+  bytes data = 1;
+  bool exited = 2;
+}
+
+message WriteTerminalRequest {
+  string thread_id = 1;
+  bytes data = 2;
+}
+
+message WriteTerminalResponse {}
+
+message ResizeTerminalRequest {
+  string thread_id = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
+message ResizeTerminalResponse {}
+
+message MeRequest {}
+
+message MeResponse {
+  User user = 1;
+}
+
+message ListUsersRequest {}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
 message WatchThreadRequest {
   string thread_id = 1;
   int64 after_seq = 2;
@@ -205,6 +303,7 @@ message ConnectRequest {
     // Agent output. The API assigns seq and stores everything but deltas.
     Event event = 2;
     Diff diff = 3;
+    TerminalOutput terminal_output = 5;
   }
 }
 
@@ -215,6 +314,11 @@ message Hello {
 
 message Ready {}
 
+message TerminalOutput {
+  bytes data = 1;
+  bool exited = 2;
+}
+
 message Diff {
   string diff = 1;
 }
@@ -224,6 +328,11 @@ message ConnectResponse {
   oneof kind {
     Prompt prompt = 1;
     Stop stop = 2;
+    Push push = 3;
+    TerminalOpen terminal_open = 4;
+    TerminalInput terminal_input = 5;
+    TerminalResize terminal_resize = 6;
+    TerminalClose terminal_close = 7;
   }
 }
 
@@ -233,3 +342,23 @@ message Prompt {
 
 // Interrupts the current turn.
 message Stop {}
+
+// Push the thread branch and report the result as a notice.
+message Push {}
+
+message TerminalOpen {
+  uint32 cols = 1;
+  uint32 rows = 2;
+  string command = 3;
+}
+
+message TerminalInput {
+  bytes data = 1;
+}
+
+message TerminalResize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+message TerminalClose {}

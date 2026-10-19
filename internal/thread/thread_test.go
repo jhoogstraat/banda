@@ -49,6 +49,22 @@ func TestApply(t *testing.T) {
 			with(idle, func(s *State) { s.Status = Errored }), None, nil},
 		{"retry", with(idle, func(s *State) { s.Status = Errored }), Retry{By: "ann"},
 			with(idle, func(s *State) { s.Status = Starting }), Provision, nil},
+		{"idle thread suspends", idle, Suspend{},
+			with(idle, func(s *State) { s.Status = Suspended }), SuspendEnv, nil},
+		{"working thread does not suspend", with(idle, func(s *State) { s.Status = Working }), Suspend{},
+			with(idle, func(s *State) { s.Status = Working }), None, nil},
+		{"prompt resumes a suspended thread", with(idle, func(s *State) { s.Status = Suspended }), Send{By: "ann"},
+			with(idle, func(s *State) { s.Status = Starting }), Provision, nil},
+		{"chat in a suspended thread keeps it suspended", with(idle, func(s *State) { s.Status = Suspended }), Send{By: "bob"},
+			with(chat, func(s *State) { s.Status = Suspended }), None, nil},
+		{"runner stopping during suspend is expected", with(idle, func(s *State) { s.Status = Suspended }), EnvLost{},
+			with(idle, func(s *State) { s.Status = Suspended }), None, nil},
+		{"dying pod reporting ready is ignored", with(idle, func(s *State) { s.Status = Suspended }), EnvReady{},
+			with(idle, func(s *State) { s.Status = Suspended }), None, nil},
+		{"owner wakes a suspended thread", with(idle, func(s *State) { s.Status = Suspended }), Wake{By: "ann"},
+			with(idle, func(s *State) { s.Status = Starting }), Provision, nil},
+		{"others cannot wake it", with(idle, func(s *State) { s.Status = Suspended }), Wake{By: "bob"},
+			with(idle, func(s *State) { s.Status = Suspended }), None, ErrForbidden},
 	}
 	for _, tt := range tests {
 		got, effect, err := Apply(tt.in, tt.action)

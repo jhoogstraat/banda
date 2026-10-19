@@ -27,17 +27,23 @@ func main() {
 	}
 	sb, err := sandbox.New(sandbox.Config{
 		Namespace: env("SANDBOX_NAMESPACE", "banda"),
-		Image:     env("SANDBOX_IMAGE", "banda-sandbox:dev"),
-		APIURL:    env("RUNNER_API_URL", "http://host.docker.internal:8787"),
+		Image:     env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
+		APIURL:    env("RUNNER_API_URL", "http://host.containers.internal:8787"),
 	})
 	if err != nil {
 		log.Fatalf("sandbox client: %v", err)
 	}
 
-	server := connect.NewServer()
+	server := connect.NewServer(api.DevAuth())
 	svc := api.New(st, sb)
 	bandav1connect.RegisterThreadServiceHandler(server, svc)
 	bandav1connect.RegisterRunnerServiceHandler(server, svc)
+	bandav1connect.RegisterUserServiceHandler(server, svc)
+	idle, err := time.ParseDuration(env("IDLE_SUSPEND_AFTER", "30m"))
+	if err != nil {
+		log.Fatalf("IDLE_SUSPEND_AFTER: %v", err)
+	}
+	go svc.SuspendIdle(ctx, idle)
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
 	if dir := os.Getenv("WEB_DIR"); dir != "" {

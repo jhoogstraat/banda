@@ -12,7 +12,7 @@ import type { Message as Message$1 } from "@bufbuild/protobuf";
  * Describes the file banda/v1/banda.proto.
  */
 export const file_banda_v1_banda: GenFile = /*@__PURE__*/
-  fileDesc("ChRiYW5kYS92MS9iYW5kYS5wcm90bxIIYmFuZGEudjEipAIKBlRocmVhZBIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIQCghyZXBvX3VybBgEIAEoCRIOCgZicmFuY2gYBSABKAkSDQoFbW9kZWwYBiABKAkSDgoGZWZmb3J0GAcgASgJEiAKBnN0YXR1cxgIIAEoDjIQLmJhbmRhLnYxLlN0YXR1cxIcCgRtb2RlGAkgASgOMg4uYmFuZGEudjEuTW9kZRIMCgRkaWZmGAogASgJEi4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItgECgVFdmVudBIRCgl0aHJlYWRfaWQYASABKAkSCwoDc2VxGAIgASgDEigKBHRpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWFjdG9yGAQgASgJEiQKB21lc3NhZ2UYCiABKAsyES5iYW5kYS52MS5NZXNzYWdlSAASKQoKYWdlbnRfdGV4dBgLIAEoCzITLmJhbmRhLnYxLkFnZW50VGV4dEgAEjQKEGFnZW50X3RleHRfZGVsdGEYDCABKAsyGC5iYW5kYS52MS5BZ2VudFRleHREZWx0YUgAEjEKDmFnZW50X3RoaW5raW5nGA0gASgLMhcuYmFuZGEudjEuQWdlbnRUaGlua2luZ0gAEicKCXRvb2xfY2FsbBgOIAEoCzISLmJhbmRhLnYxLlRvb2xDYWxsSAASKwoLdG9vbF9yZXN1bHQYDyABKAsyFC5iYW5kYS52MS5Ub29sUmVzdWx0SAASKQoKdHVybl9lbmRlZBgQIAEoCzITLmJhbmRhLnYxLlR1cm5FbmRlZEgAEjEKDnN0YXR1c19jaGFuZ2VkGBEgASgLMhcuYmFuZGEudjEuU3RhdHVzQ2hhbmdlZEgAEi0KDG1vZGVfY2hhbmdlZBgSIAEoCzIVLmJhbmRhLnYxLk1vZGVDaGFuZ2VkSAASLQoMZGlmZl9jaGFuZ2VkGBMgASgLMhUuYmFuZGEudjEuRGlmZkNoYW5nZWRIABIiCgZub3RpY2UYFCABKAsyEC5iYW5kYS52MS5Ob3RpY2VIAEIGCgRraW5kIksKB01lc3NhZ2USDAoEdGV4dBgBIAEoCRIWCg5tZW50aW9uc19hZ2VudBgCIAEoCBIaChJtZW50aW9uZWRfdXNlcl9pZHMYAyADKAkiGQoJQWdlbnRUZXh0EgwKBHRleHQYASABKAkiHgoOQWdlbnRUZXh0RGVsdGESDAoEdGV4dBgBIAEoCSIdCg1BZ2VudFRoaW5raW5nEgwKBHRleHQYASABKAkiOAoIVG9vbENhbGwSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRISCgppbnB1dF9qc29uGAMgASgJIkQKClRvb2xSZXN1bHQSFAoMdG9vbF9jYWxsX2lkGAEgASgJEg4KBm91dHB1dBgCIAEoCRIQCghpc19lcnJvchgDIAEoCCJTCglUdXJuRW5kZWQSEAoIaXNfZXJyb3IYASABKAgSDQoFZXJyb3IYAiABKAkSEwoLZHVyYXRpb25fbXMYAyABKAMSEAoIY29zdF91c2QYBCABKAEiQQoNU3RhdHVzQ2hhbmdlZBIgCgZzdGF0dXMYASABKA4yEC5iYW5kYS52MS5TdGF0dXMSDgoGcmVhc29uGAIgASgJIisKC01vZGVDaGFuZ2VkEhwKBG1vZGUYASABKA4yDi5iYW5kYS52MS5Nb2RlIg0KC0RpZmZDaGFuZ2VkIhYKBk5vdGljZRIMCgR0ZXh0GAEgASgJImsKE0NyZWF0ZVRocmVhZFJlcXVlc3QSEAoIcmVwb191cmwYASABKAkSEwoLYmFzZV9icmFuY2gYAiABKAkSDQoFbW9kZWwYAyABKAkSDgoGZWZmb3J0GAQgASgJEg4KBnByb21wdBgFIAEoCSI4ChRDcmVhdGVUaHJlYWRSZXNwb25zZRIgCgZ0aHJlYWQYASABKAsyEC5iYW5kYS52MS5UaHJlYWQiJgoSTGlzdFRocmVhZHNSZXF1ZXN0EhAKCG93bmVyX2lkGAEgASgJIjgKE0xpc3RUaHJlYWRzUmVzcG9uc2USIQoHdGhyZWFkcxgBIAMoCzIQLmJhbmRhLnYxLlRocmVhZCIlChBHZXRUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSI1ChFHZXRUaHJlYWRSZXNwb25zZRIgCgZ0aHJlYWQYASABKAsyEC5iYW5kYS52MS5UaHJlYWQiSwoSU2VuZE1lc3NhZ2VSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIiCgdtZXNzYWdlGAIgASgLMhEuYmFuZGEudjEuTWVzc2FnZSIVChNTZW5kTWVzc2FnZVJlc3BvbnNlIiUKEEludGVycnVwdFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIhMKEUludGVycnVwdFJlc3BvbnNlIkEKDlNldE1vZGVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIcCgRtb2RlGAIgASgOMg4uYmFuZGEudjEuTW9kZSIRCg9TZXRNb2RlUmVzcG9uc2UiIQoMUmV0cnlSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSIPCg1SZXRyeVJlc3BvbnNlIjoKEldhdGNoVGhyZWFkUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSEQoJYWZ0ZXJfc2VxGAIgASgDIjUKE1dhdGNoVGhyZWFkUmVzcG9uc2USHgoFZXZlbnQYASABKAsyDy5iYW5kYS52MS5FdmVudCKeAQoOQ29ubmVjdFJlcXVlc3QSIAoFaGVsbG8YASABKAsyDy5iYW5kYS52MS5IZWxsb0gAEiAKBXJlYWR5GAQgASgLMg8uYmFuZGEudjEuUmVhZHlIABIgCgVldmVudBgCIAEoCzIPLmJhbmRhLnYxLkV2ZW50SAASHgoEZGlmZhgDIAEoCzIOLmJhbmRhLnYxLkRpZmZIAEIGCgRraW5kIikKBUhlbGxvEhEKCXRocmVhZF9pZBgBIAEoCRINCgV0b2tlbhgCIAEoCSIHCgVSZWFkeSIUCgREaWZmEgwKBGRpZmYYASABKAkiXQoPQ29ubmVjdFJlc3BvbnNlEiIKBnByb21wdBgBIAEoCzIQLmJhbmRhLnYxLlByb21wdEgAEh4KBHN0b3AYAiABKAsyDi5iYW5kYS52MS5TdG9wSABCBgoEa2luZCIWCgZQcm9tcHQSDAoEdGV4dBgBIAEoCSIGCgRTdG9wKngKBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABITCg9TVEFUVVNfU1RBUlRJTkcQARISCg5TVEFUVVNfV09SS0lORxACEhkKFVNUQVRVU19BV0FJVElOR19JTlBVVBADEhIKDlNUQVRVU19FUlJPUkVEEAQqOwoETW9kZRIUChBNT0RFX1VOU1BFQ0lGSUVEEAASDgoKTU9ERV9BR0VOVBABEg0KCU1PREVfQ0hBVBACMsoECg1UaHJlYWRTZXJ2aWNlEk0KDENyZWF0ZVRocmVhZBIdLmJhbmRhLnYxLkNyZWF0ZVRocmVhZFJlcXVlc3QaHi5iYW5kYS52MS5DcmVhdGVUaHJlYWRSZXNwb25zZRJKCgtMaXN0VGhyZWFkcxIcLmJhbmRhLnYxLkxpc3RUaHJlYWRzUmVxdWVzdBodLmJhbmRhLnYxLkxpc3RUaHJlYWRzUmVzcG9uc2USRAoJR2V0VGhyZWFkEhouYmFuZGEudjEuR2V0VGhyZWFkUmVxdWVzdBobLmJhbmRhLnYxLkdldFRocmVhZFJlc3BvbnNlEkoKC1NlbmRNZXNzYWdlEhwuYmFuZGEudjEuU2VuZE1lc3NhZ2VSZXF1ZXN0Gh0uYmFuZGEudjEuU2VuZE1lc3NhZ2VSZXNwb25zZRJECglJbnRlcnJ1cHQSGi5iYW5kYS52MS5JbnRlcnJ1cHRSZXF1ZXN0GhsuYmFuZGEudjEuSW50ZXJydXB0UmVzcG9uc2USPgoHU2V0TW9kZRIYLmJhbmRhLnYxLlNldE1vZGVSZXF1ZXN0GhkuYmFuZGEudjEuU2V0TW9kZVJlc3BvbnNlEjgKBVJldHJ5EhYuYmFuZGEudjEuUmV0cnlSZXF1ZXN0GhcuYmFuZGEudjEuUmV0cnlSZXNwb25zZRJMCgtXYXRjaFRocmVhZBIcLmJhbmRhLnYxLldhdGNoVGhyZWFkUmVxdWVzdBodLmJhbmRhLnYxLldhdGNoVGhyZWFkUmVzcG9uc2UwATJTCg1SdW5uZXJTZXJ2aWNlEkIKB0Nvbm5lY3QSGC5iYW5kYS52MS5Db25uZWN0UmVxdWVzdBoZLmJhbmRhLnYxLkNvbm5lY3RSZXNwb25zZSgBMAFCjgEKDGNvbS5iYW5kYS52MUIKQmFuZGFQcm90b1ABWjFnaXRodWIuY29tL2pob29nc3RyYWF0L2JhbmRhL2dlbi9iYW5kYS92MTtiYW5kYXYxogIDQlhYqgIIQmFuZGEuVjHKAghCYW5kYVxWMeICFEJhbmRhXFYxXEdQQk1ldGFkYXRh6gIJQmFuZGE6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("ChRiYW5kYS92MS9iYW5kYS5wcm90bxIIYmFuZGEudjEi/QIKBlRocmVhZBIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIQCghyZXBvX3VybBgEIAEoCRIOCgZicmFuY2gYBSABKAkSDQoFbW9kZWwYBiABKAkSDgoGZWZmb3J0GAcgASgJEiAKBnN0YXR1cxgIIAEoDjIQLmJhbmRhLnYxLlN0YXR1cxIcCgRtb2RlGAkgASgOMg4uYmFuZGEudjEuTW9kZRIMCgRkaWZmGAogASgJEi4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2Jhc2VfYnJhbmNoGA0gASgJEjEKDXNub296ZWRfdW50aWwYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB3NldHRsZWQYDyABKAgiLwoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJItgECgVFdmVudBIRCgl0aHJlYWRfaWQYASABKAkSCwoDc2VxGAIgASgDEigKBHRpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWFjdG9yGAQgASgJEiQKB21lc3NhZ2UYCiABKAsyES5iYW5kYS52MS5NZXNzYWdlSAASKQoKYWdlbnRfdGV4dBgLIAEoCzITLmJhbmRhLnYxLkFnZW50VGV4dEgAEjQKEGFnZW50X3RleHRfZGVsdGEYDCABKAsyGC5iYW5kYS52MS5BZ2VudFRleHREZWx0YUgAEjEKDmFnZW50X3RoaW5raW5nGA0gASgLMhcuYmFuZGEudjEuQWdlbnRUaGlua2luZ0gAEicKCXRvb2xfY2FsbBgOIAEoCzISLmJhbmRhLnYxLlRvb2xDYWxsSAASKwoLdG9vbF9yZXN1bHQYDyABKAsyFC5iYW5kYS52MS5Ub29sUmVzdWx0SAASKQoKdHVybl9lbmRlZBgQIAEoCzITLmJhbmRhLnYxLlR1cm5FbmRlZEgAEjEKDnN0YXR1c19jaGFuZ2VkGBEgASgLMhcuYmFuZGEudjEuU3RhdHVzQ2hhbmdlZEgAEi0KDG1vZGVfY2hhbmdlZBgSIAEoCzIVLmJhbmRhLnYxLk1vZGVDaGFuZ2VkSAASLQoMZGlmZl9jaGFuZ2VkGBMgASgLMhUuYmFuZGEudjEuRGlmZkNoYW5nZWRIABIiCgZub3RpY2UYFCABKAsyEC5iYW5kYS52MS5Ob3RpY2VIAEIGCgRraW5kIksKB01lc3NhZ2USDAoEdGV4dBgBIAEoCRIWCg5tZW50aW9uc19hZ2VudBgCIAEoCBIaChJtZW50aW9uZWRfdXNlcl9pZHMYAyADKAkiGQoJQWdlbnRUZXh0EgwKBHRleHQYASABKAkiHgoOQWdlbnRUZXh0RGVsdGESDAoEdGV4dBgBIAEoCSIdCg1BZ2VudFRoaW5raW5nEgwKBHRleHQYASABKAkiOAoIVG9vbENhbGwSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRISCgppbnB1dF9qc29uGAMgASgJIkQKClRvb2xSZXN1bHQSFAoMdG9vbF9jYWxsX2lkGAEgASgJEg4KBm91dHB1dBgCIAEoCRIQCghpc19lcnJvchgDIAEoCCJTCglUdXJuRW5kZWQSEAoIaXNfZXJyb3IYASABKAgSDQoFZXJyb3IYAiABKAkSEwoLZHVyYXRpb25fbXMYAyABKAMSEAoIY29zdF91c2QYBCABKAEiQQoNU3RhdHVzQ2hhbmdlZBIgCgZzdGF0dXMYASABKA4yEC5iYW5kYS52MS5TdGF0dXMSDgoGcmVhc29uGAIgASgJIisKC01vZGVDaGFuZ2VkEhwKBG1vZGUYASABKA4yDi5iYW5kYS52MS5Nb2RlIg0KC0RpZmZDaGFuZ2VkIhYKBk5vdGljZRIMCgR0ZXh0GAEgASgJImsKE0NyZWF0ZVRocmVhZFJlcXVlc3QSEAoIcmVwb191cmwYASABKAkSEwoLYmFzZV9icmFuY2gYAiABKAkSDQoFbW9kZWwYAyABKAkSDgoGZWZmb3J0GAQgASgJEg4KBnByb21wdBgFIAEoCSI4ChRDcmVhdGVUaHJlYWRSZXNwb25zZRIgCgZ0aHJlYWQYASABKAsyEC5iYW5kYS52MS5UaHJlYWQiJgoSTGlzdFRocmVhZHNSZXF1ZXN0EhAKCG93bmVyX2lkGAEgASgJIjgKE0xpc3RUaHJlYWRzUmVzcG9uc2USIQoHdGhyZWFkcxgBIAMoCzIQLmJhbmRhLnYxLlRocmVhZCIlChBHZXRUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSI1ChFHZXRUaHJlYWRSZXNwb25zZRIgCgZ0aHJlYWQYASABKAsyEC5iYW5kYS52MS5UaHJlYWQiSwoSU2VuZE1lc3NhZ2VSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIiCgdtZXNzYWdlGAIgASgLMhEuYmFuZGEudjEuTWVzc2FnZSIVChNTZW5kTWVzc2FnZVJlc3BvbnNlIiUKEEludGVycnVwdFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIhMKEUludGVycnVwdFJlc3BvbnNlIkEKDlNldE1vZGVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIcCgRtb2RlGAIgASgOMg4uYmFuZGEudjEuTW9kZSIRCg9TZXRNb2RlUmVzcG9uc2UiIQoMUmV0cnlSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSIPCg1SZXRyeVJlc3BvbnNlIhYKFExpc3RNZW50aW9uZWRSZXF1ZXN0IjoKFUxpc3RNZW50aW9uZWRSZXNwb25zZRIhCgd0aHJlYWRzGAEgAygLMhAuYmFuZGEudjEuVGhyZWFkIk0KDVNub296ZVJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEikKBXVudGlsGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIQCg5Tbm9vemVSZXNwb25zZSIzCg1TZXR0bGVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIPCgdzZXR0bGVkGAIgASgIIhAKDlNldHRsZVJlc3BvbnNlIiAKC1B1c2hSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSIOCgxQdXNoUmVzcG9uc2UiVQoTT3BlblRlcm1pbmFsUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSDAoEY29scxgCIAEoDRIMCgRyb3dzGAMgASgNEg8KB2NvbW1hbmQYBCABKAkiNAoUT3BlblRlcm1pbmFsUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIOCgZleGl0ZWQYAiABKAgiNwoUV3JpdGVUZXJtaW5hbFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBGRhdGEYAiABKAwiFwoVV3JpdGVUZXJtaW5hbFJlc3BvbnNlIkYKFVJlc2l6ZVRlcm1pbmFsUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSDAoEY29scxgCIAEoDRIMCgRyb3dzGAMgASgNIhgKFlJlc2l6ZVRlcm1pbmFsUmVzcG9uc2UiCwoJTWVSZXF1ZXN0IioKCk1lUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLmJhbmRhLnYxLlVzZXIiEgoQTGlzdFVzZXJzUmVxdWVzdCIyChFMaXN0VXNlcnNSZXNwb25zZRIdCgV1c2VycxgBIAMoCzIOLmJhbmRhLnYxLlVzZXIiOgoSV2F0Y2hUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIRCglhZnRlcl9zZXEYAiABKAMiNQoTV2F0Y2hUaHJlYWRSZXNwb25zZRIeCgVldmVudBgBIAEoCzIPLmJhbmRhLnYxLkV2ZW50ItMBCg5Db25uZWN0UmVxdWVzdBIgCgVoZWxsbxgBIAEoCzIPLmJhbmRhLnYxLkhlbGxvSAASIAoFcmVhZHkYBCABKAsyDy5iYW5kYS52MS5SZWFkeUgAEiAKBWV2ZW50GAIgASgLMg8uYmFuZGEudjEuRXZlbnRIABIeCgRkaWZmGAMgASgLMg4uYmFuZGEudjEuRGlmZkgAEjMKD3Rlcm1pbmFsX291dHB1dBgFIAEoCzIYLmJhbmRhLnYxLlRlcm1pbmFsT3V0cHV0SABCBgoEa2luZCIpCgVIZWxsbxIRCgl0aHJlYWRfaWQYASABKAkSDQoFdG9rZW4YAiABKAkiBwoFUmVhZHkiLgoOVGVybWluYWxPdXRwdXQSDAoEZGF0YRgBIAEoDBIOCgZleGl0ZWQYAiABKAgiFAoERGlmZhIMCgRkaWZmGAEgASgJIskCCg9Db25uZWN0UmVzcG9uc2USIgoGcHJvbXB0GAEgASgLMhAuYmFuZGEudjEuUHJvbXB0SAASHgoEc3RvcBgCIAEoCzIOLmJhbmRhLnYxLlN0b3BIABIeCgRwdXNoGAMgASgLMg4uYmFuZGEudjEuUHVzaEgAEi8KDXRlcm1pbmFsX29wZW4YBCABKAsyFi5iYW5kYS52MS5UZXJtaW5hbE9wZW5IABIxCg50ZXJtaW5hbF9pbnB1dBgFIAEoCzIXLmJhbmRhLnYxLlRlcm1pbmFsSW5wdXRIABIzCg90ZXJtaW5hbF9yZXNpemUYBiABKAsyGC5iYW5kYS52MS5UZXJtaW5hbFJlc2l6ZUgAEjEKDnRlcm1pbmFsX2Nsb3NlGAcgASgLMhcuYmFuZGEudjEuVGVybWluYWxDbG9zZUgAQgYKBGtpbmQiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiBgoEU3RvcCIGCgRQdXNoIjsKDFRlcm1pbmFsT3BlbhIMCgRjb2xzGAEgASgNEgwKBHJvd3MYAiABKA0SDwoHY29tbWFuZBgDIAEoCSIdCg1UZXJtaW5hbElucHV0EgwKBGRhdGEYASABKAwiLAoOVGVybWluYWxSZXNpemUSDAoEY29scxgBIAEoDRIMCgRyb3dzGAIgASgNIg8KDVRlcm1pbmFsQ2xvc2UqjgEKBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABITCg9TVEFUVVNfU1RBUlRJTkcQARISCg5TVEFUVVNfV09SS0lORxACEhkKFVNUQVRVU19BV0FJVElOR19JTlBVVBADEhIKDlNUQVRVU19FUlJPUkVEEAQSFAoQU1RBVFVTX1NVU1BFTkRFRBAFKjsKBE1vZGUSFAoQTU9ERV9VTlNQRUNJRklFRBAAEg4KCk1PREVfQUdFTlQQARINCglNT0RFX0NIQVQQAjLFCAoNVGhyZWFkU2VydmljZRJNCgxDcmVhdGVUaHJlYWQSHS5iYW5kYS52MS5DcmVhdGVUaHJlYWRSZXF1ZXN0Gh4uYmFuZGEudjEuQ3JlYXRlVGhyZWFkUmVzcG9uc2USSgoLTGlzdFRocmVhZHMSHC5iYW5kYS52MS5MaXN0VGhyZWFkc1JlcXVlc3QaHS5iYW5kYS52MS5MaXN0VGhyZWFkc1Jlc3BvbnNlEkQKCUdldFRocmVhZBIaLmJhbmRhLnYxLkdldFRocmVhZFJlcXVlc3QaGy5iYW5kYS52MS5HZXRUaHJlYWRSZXNwb25zZRJKCgtTZW5kTWVzc2FnZRIcLmJhbmRhLnYxLlNlbmRNZXNzYWdlUmVxdWVzdBodLmJhbmRhLnYxLlNlbmRNZXNzYWdlUmVzcG9uc2USRAoJSW50ZXJydXB0EhouYmFuZGEudjEuSW50ZXJydXB0UmVxdWVzdBobLmJhbmRhLnYxLkludGVycnVwdFJlc3BvbnNlEj4KB1NldE1vZGUSGC5iYW5kYS52MS5TZXRNb2RlUmVxdWVzdBoZLmJhbmRhLnYxLlNldE1vZGVSZXNwb25zZRI4CgVSZXRyeRIWLmJhbmRhLnYxLlJldHJ5UmVxdWVzdBoXLmJhbmRhLnYxLlJldHJ5UmVzcG9uc2USTAoLV2F0Y2hUaHJlYWQSHC5iYW5kYS52MS5XYXRjaFRocmVhZFJlcXVlc3QaHS5iYW5kYS52MS5XYXRjaFRocmVhZFJlc3BvbnNlMAESUAoNTGlzdE1lbnRpb25lZBIeLmJhbmRhLnYxLkxpc3RNZW50aW9uZWRSZXF1ZXN0Gh8uYmFuZGEudjEuTGlzdE1lbnRpb25lZFJlc3BvbnNlEjsKBlNub296ZRIXLmJhbmRhLnYxLlNub296ZVJlcXVlc3QaGC5iYW5kYS52MS5Tbm9vemVSZXNwb25zZRI7CgZTZXR0bGUSFy5iYW5kYS52MS5TZXR0bGVSZXF1ZXN0GhguYmFuZGEudjEuU2V0dGxlUmVzcG9uc2USNQoEUHVzaBIVLmJhbmRhLnYxLlB1c2hSZXF1ZXN0GhYuYmFuZGEudjEuUHVzaFJlc3BvbnNlEk8KDE9wZW5UZXJtaW5hbBIdLmJhbmRhLnYxLk9wZW5UZXJtaW5hbFJlcXVlc3QaHi5iYW5kYS52MS5PcGVuVGVybWluYWxSZXNwb25zZTABElAKDVdyaXRlVGVybWluYWwSHi5iYW5kYS52MS5Xcml0ZVRlcm1pbmFsUmVxdWVzdBofLmJhbmRhLnYxLldyaXRlVGVybWluYWxSZXNwb25zZRJTCg5SZXNpemVUZXJtaW5hbBIfLmJhbmRhLnYxLlJlc2l6ZVRlcm1pbmFsUmVxdWVzdBogLmJhbmRhLnYxLlJlc2l6ZVRlcm1pbmFsUmVzcG9uc2UyhAEKC1VzZXJTZXJ2aWNlEi8KAk1lEhMuYmFuZGEudjEuTWVSZXF1ZXN0GhQuYmFuZGEudjEuTWVSZXNwb25zZRJECglMaXN0VXNlcnMSGi5iYW5kYS52MS5MaXN0VXNlcnNSZXF1ZXN0GhsuYmFuZGEudjEuTGlzdFVzZXJzUmVzcG9uc2UyUwoNUnVubmVyU2VydmljZRJCCgdDb25uZWN0EhguYmFuZGEudjEuQ29ubmVjdFJlcXVlc3QaGS5iYW5kYS52MS5Db25uZWN0UmVzcG9uc2UoATABQo4BCgxjb20uYmFuZGEudjFCCkJhbmRhUHJvdG9QAVoxZ2l0aHViLmNvbS9qaG9vZ3N0cmFhdC9iYW5kYS9nZW4vYmFuZGEvdjE7YmFuZGF2MaICA0JYWKoCCEJhbmRhLlYxygIIQmFuZGFcVjHiAhRCYW5kYVxWMVxHUEJNZXRhZGF0YeoCCUJhbmRhOjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message banda.v1.Thread
@@ -79,6 +79,23 @@ export type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 12;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string base_branch = 13;
+   */
+  baseBranch: string;
+
+  /**
+   * The caller's own view of the thread.
+   *
+   * @generated from field: google.protobuf.Timestamp snoozed_until = 14;
+   */
+  snoozedUntil?: Timestamp | undefined;
+
+  /**
+   * @generated from field: bool settled = 15;
+   */
+  settled: boolean;
 };
 
 /**
@@ -87,6 +104,33 @@ export type Thread = Message$1<"banda.v1.Thread"> & {
  */
 export const ThreadSchema: GenMessage<Thread> = /*@__PURE__*/
   messageDesc(file_banda_v1_banda, 0);
+
+/**
+ * @generated from message banda.v1.User
+ */
+export type User = Message$1<"banda.v1.User"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string email = 3;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message banda.v1.User.
+ * Use `create(UserSchema)` to create a new message.
+ */
+export const UserSchema: GenMessage<User> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 1);
 
 /**
  * @generated from message banda.v1.Event
@@ -193,7 +237,7 @@ export type Event = Message$1<"banda.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 1);
+  messageDesc(file_banda_v1_banda, 2);
 
 /**
  * @generated from message banda.v1.Message
@@ -220,7 +264,7 @@ export type Message = Message$1<"banda.v1.Message"> & {
  * Use `create(MessageSchema)` to create a new message.
  */
 export const MessageSchema: GenMessage<Message> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 2);
+  messageDesc(file_banda_v1_banda, 3);
 
 /**
  * @generated from message banda.v1.AgentText
@@ -237,7 +281,7 @@ export type AgentText = Message$1<"banda.v1.AgentText"> & {
  * Use `create(AgentTextSchema)` to create a new message.
  */
 export const AgentTextSchema: GenMessage<AgentText> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 3);
+  messageDesc(file_banda_v1_banda, 4);
 
 /**
  * Ephemeral streaming chunk of the agent text that is being written.
@@ -256,7 +300,7 @@ export type AgentTextDelta = Message$1<"banda.v1.AgentTextDelta"> & {
  * Use `create(AgentTextDeltaSchema)` to create a new message.
  */
 export const AgentTextDeltaSchema: GenMessage<AgentTextDelta> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 4);
+  messageDesc(file_banda_v1_banda, 5);
 
 /**
  * @generated from message banda.v1.AgentThinking
@@ -273,7 +317,7 @@ export type AgentThinking = Message$1<"banda.v1.AgentThinking"> & {
  * Use `create(AgentThinkingSchema)` to create a new message.
  */
 export const AgentThinkingSchema: GenMessage<AgentThinking> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 5);
+  messageDesc(file_banda_v1_banda, 6);
 
 /**
  * @generated from message banda.v1.ToolCall
@@ -300,7 +344,7 @@ export type ToolCall = Message$1<"banda.v1.ToolCall"> & {
  * Use `create(ToolCallSchema)` to create a new message.
  */
 export const ToolCallSchema: GenMessage<ToolCall> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 6);
+  messageDesc(file_banda_v1_banda, 7);
 
 /**
  * @generated from message banda.v1.ToolResult
@@ -327,7 +371,7 @@ export type ToolResult = Message$1<"banda.v1.ToolResult"> & {
  * Use `create(ToolResultSchema)` to create a new message.
  */
 export const ToolResultSchema: GenMessage<ToolResult> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 7);
+  messageDesc(file_banda_v1_banda, 8);
 
 /**
  * @generated from message banda.v1.TurnEnded
@@ -359,7 +403,7 @@ export type TurnEnded = Message$1<"banda.v1.TurnEnded"> & {
  * Use `create(TurnEndedSchema)` to create a new message.
  */
 export const TurnEndedSchema: GenMessage<TurnEnded> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 8);
+  messageDesc(file_banda_v1_banda, 9);
 
 /**
  * @generated from message banda.v1.StatusChanged
@@ -381,7 +425,7 @@ export type StatusChanged = Message$1<"banda.v1.StatusChanged"> & {
  * Use `create(StatusChangedSchema)` to create a new message.
  */
 export const StatusChangedSchema: GenMessage<StatusChanged> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 9);
+  messageDesc(file_banda_v1_banda, 10);
 
 /**
  * @generated from message banda.v1.ModeChanged
@@ -398,7 +442,7 @@ export type ModeChanged = Message$1<"banda.v1.ModeChanged"> & {
  * Use `create(ModeChangedSchema)` to create a new message.
  */
 export const ModeChangedSchema: GenMessage<ModeChanged> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 10);
+  messageDesc(file_banda_v1_banda, 11);
 
 /**
  * @generated from message banda.v1.DiffChanged
@@ -411,7 +455,7 @@ export type DiffChanged = Message$1<"banda.v1.DiffChanged"> & {
  * Use `create(DiffChangedSchema)` to create a new message.
  */
 export const DiffChangedSchema: GenMessage<DiffChanged> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 11);
+  messageDesc(file_banda_v1_banda, 12);
 
 /**
  * Something the user needs to know or do, e.g. log in to Claude Code.
@@ -430,7 +474,7 @@ export type Notice = Message$1<"banda.v1.Notice"> & {
  * Use `create(NoticeSchema)` to create a new message.
  */
 export const NoticeSchema: GenMessage<Notice> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 12);
+  messageDesc(file_banda_v1_banda, 13);
 
 /**
  * @generated from message banda.v1.CreateThreadRequest
@@ -467,7 +511,7 @@ export type CreateThreadRequest = Message$1<"banda.v1.CreateThreadRequest"> & {
  * Use `create(CreateThreadRequestSchema)` to create a new message.
  */
 export const CreateThreadRequestSchema: GenMessage<CreateThreadRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 13);
+  messageDesc(file_banda_v1_banda, 14);
 
 /**
  * @generated from message banda.v1.CreateThreadResponse
@@ -484,7 +528,7 @@ export type CreateThreadResponse = Message$1<"banda.v1.CreateThreadResponse"> & 
  * Use `create(CreateThreadResponseSchema)` to create a new message.
  */
 export const CreateThreadResponseSchema: GenMessage<CreateThreadResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 14);
+  messageDesc(file_banda_v1_banda, 15);
 
 /**
  * @generated from message banda.v1.ListThreadsRequest
@@ -503,7 +547,7 @@ export type ListThreadsRequest = Message$1<"banda.v1.ListThreadsRequest"> & {
  * Use `create(ListThreadsRequestSchema)` to create a new message.
  */
 export const ListThreadsRequestSchema: GenMessage<ListThreadsRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 15);
+  messageDesc(file_banda_v1_banda, 16);
 
 /**
  * @generated from message banda.v1.ListThreadsResponse
@@ -520,7 +564,7 @@ export type ListThreadsResponse = Message$1<"banda.v1.ListThreadsResponse"> & {
  * Use `create(ListThreadsResponseSchema)` to create a new message.
  */
 export const ListThreadsResponseSchema: GenMessage<ListThreadsResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 16);
+  messageDesc(file_banda_v1_banda, 17);
 
 /**
  * @generated from message banda.v1.GetThreadRequest
@@ -537,7 +581,7 @@ export type GetThreadRequest = Message$1<"banda.v1.GetThreadRequest"> & {
  * Use `create(GetThreadRequestSchema)` to create a new message.
  */
 export const GetThreadRequestSchema: GenMessage<GetThreadRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 17);
+  messageDesc(file_banda_v1_banda, 18);
 
 /**
  * @generated from message banda.v1.GetThreadResponse
@@ -554,7 +598,7 @@ export type GetThreadResponse = Message$1<"banda.v1.GetThreadResponse"> & {
  * Use `create(GetThreadResponseSchema)` to create a new message.
  */
 export const GetThreadResponseSchema: GenMessage<GetThreadResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 18);
+  messageDesc(file_banda_v1_banda, 19);
 
 /**
  * @generated from message banda.v1.SendMessageRequest
@@ -576,7 +620,7 @@ export type SendMessageRequest = Message$1<"banda.v1.SendMessageRequest"> & {
  * Use `create(SendMessageRequestSchema)` to create a new message.
  */
 export const SendMessageRequestSchema: GenMessage<SendMessageRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 19);
+  messageDesc(file_banda_v1_banda, 20);
 
 /**
  * @generated from message banda.v1.SendMessageResponse
@@ -589,7 +633,7 @@ export type SendMessageResponse = Message$1<"banda.v1.SendMessageResponse"> & {
  * Use `create(SendMessageResponseSchema)` to create a new message.
  */
 export const SendMessageResponseSchema: GenMessage<SendMessageResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 20);
+  messageDesc(file_banda_v1_banda, 21);
 
 /**
  * @generated from message banda.v1.InterruptRequest
@@ -606,7 +650,7 @@ export type InterruptRequest = Message$1<"banda.v1.InterruptRequest"> & {
  * Use `create(InterruptRequestSchema)` to create a new message.
  */
 export const InterruptRequestSchema: GenMessage<InterruptRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 21);
+  messageDesc(file_banda_v1_banda, 22);
 
 /**
  * @generated from message banda.v1.InterruptResponse
@@ -619,7 +663,7 @@ export type InterruptResponse = Message$1<"banda.v1.InterruptResponse"> & {
  * Use `create(InterruptResponseSchema)` to create a new message.
  */
 export const InterruptResponseSchema: GenMessage<InterruptResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 22);
+  messageDesc(file_banda_v1_banda, 23);
 
 /**
  * @generated from message banda.v1.SetModeRequest
@@ -641,7 +685,7 @@ export type SetModeRequest = Message$1<"banda.v1.SetModeRequest"> & {
  * Use `create(SetModeRequestSchema)` to create a new message.
  */
 export const SetModeRequestSchema: GenMessage<SetModeRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 23);
+  messageDesc(file_banda_v1_banda, 24);
 
 /**
  * @generated from message banda.v1.SetModeResponse
@@ -654,7 +698,7 @@ export type SetModeResponse = Message$1<"banda.v1.SetModeResponse"> & {
  * Use `create(SetModeResponseSchema)` to create a new message.
  */
 export const SetModeResponseSchema: GenMessage<SetModeResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 24);
+  messageDesc(file_banda_v1_banda, 25);
 
 /**
  * @generated from message banda.v1.RetryRequest
@@ -671,7 +715,7 @@ export type RetryRequest = Message$1<"banda.v1.RetryRequest"> & {
  * Use `create(RetryRequestSchema)` to create a new message.
  */
 export const RetryRequestSchema: GenMessage<RetryRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 25);
+  messageDesc(file_banda_v1_banda, 26);
 
 /**
  * @generated from message banda.v1.RetryResponse
@@ -684,7 +728,328 @@ export type RetryResponse = Message$1<"banda.v1.RetryResponse"> & {
  * Use `create(RetryResponseSchema)` to create a new message.
  */
 export const RetryResponseSchema: GenMessage<RetryResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 26);
+  messageDesc(file_banda_v1_banda, 27);
+
+/**
+ * @generated from message banda.v1.ListMentionedRequest
+ */
+export type ListMentionedRequest = Message$1<"banda.v1.ListMentionedRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.ListMentionedRequest.
+ * Use `create(ListMentionedRequestSchema)` to create a new message.
+ */
+export const ListMentionedRequestSchema: GenMessage<ListMentionedRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 28);
+
+/**
+ * @generated from message banda.v1.ListMentionedResponse
+ */
+export type ListMentionedResponse = Message$1<"banda.v1.ListMentionedResponse"> & {
+  /**
+   * @generated from field: repeated banda.v1.Thread threads = 1;
+   */
+  threads: Thread[];
+};
+
+/**
+ * Describes the message banda.v1.ListMentionedResponse.
+ * Use `create(ListMentionedResponseSchema)` to create a new message.
+ */
+export const ListMentionedResponseSchema: GenMessage<ListMentionedResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 29);
+
+/**
+ * @generated from message banda.v1.SnoozeRequest
+ */
+export type SnoozeRequest = Message$1<"banda.v1.SnoozeRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp until = 2;
+   */
+  until?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.SnoozeRequest.
+ * Use `create(SnoozeRequestSchema)` to create a new message.
+ */
+export const SnoozeRequestSchema: GenMessage<SnoozeRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 30);
+
+/**
+ * @generated from message banda.v1.SnoozeResponse
+ */
+export type SnoozeResponse = Message$1<"banda.v1.SnoozeResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SnoozeResponse.
+ * Use `create(SnoozeResponseSchema)` to create a new message.
+ */
+export const SnoozeResponseSchema: GenMessage<SnoozeResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 31);
+
+/**
+ * @generated from message banda.v1.SettleRequest
+ */
+export type SettleRequest = Message$1<"banda.v1.SettleRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: bool settled = 2;
+   */
+  settled: boolean;
+};
+
+/**
+ * Describes the message banda.v1.SettleRequest.
+ * Use `create(SettleRequestSchema)` to create a new message.
+ */
+export const SettleRequestSchema: GenMessage<SettleRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 32);
+
+/**
+ * @generated from message banda.v1.SettleResponse
+ */
+export type SettleResponse = Message$1<"banda.v1.SettleResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SettleResponse.
+ * Use `create(SettleResponseSchema)` to create a new message.
+ */
+export const SettleResponseSchema: GenMessage<SettleResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 33);
+
+/**
+ * @generated from message banda.v1.PushRequest
+ */
+export type PushRequest = Message$1<"banda.v1.PushRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.PushRequest.
+ * Use `create(PushRequestSchema)` to create a new message.
+ */
+export const PushRequestSchema: GenMessage<PushRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 34);
+
+/**
+ * @generated from message banda.v1.PushResponse
+ */
+export type PushResponse = Message$1<"banda.v1.PushResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.PushResponse.
+ * Use `create(PushResponseSchema)` to create a new message.
+ */
+export const PushResponseSchema: GenMessage<PushResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 35);
+
+/**
+ * @generated from message banda.v1.OpenTerminalRequest
+ */
+export type OpenTerminalRequest = Message$1<"banda.v1.OpenTerminalRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: uint32 cols = 2;
+   */
+  cols: number;
+
+  /**
+   * @generated from field: uint32 rows = 3;
+   */
+  rows: number;
+
+  /**
+   * Empty runs a login shell.
+   *
+   * @generated from field: string command = 4;
+   */
+  command: string;
+};
+
+/**
+ * Describes the message banda.v1.OpenTerminalRequest.
+ * Use `create(OpenTerminalRequestSchema)` to create a new message.
+ */
+export const OpenTerminalRequestSchema: GenMessage<OpenTerminalRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 36);
+
+/**
+ * @generated from message banda.v1.OpenTerminalResponse
+ */
+export type OpenTerminalResponse = Message$1<"banda.v1.OpenTerminalResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: bool exited = 2;
+   */
+  exited: boolean;
+};
+
+/**
+ * Describes the message banda.v1.OpenTerminalResponse.
+ * Use `create(OpenTerminalResponseSchema)` to create a new message.
+ */
+export const OpenTerminalResponseSchema: GenMessage<OpenTerminalResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 37);
+
+/**
+ * @generated from message banda.v1.WriteTerminalRequest
+ */
+export type WriteTerminalRequest = Message$1<"banda.v1.WriteTerminalRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message banda.v1.WriteTerminalRequest.
+ * Use `create(WriteTerminalRequestSchema)` to create a new message.
+ */
+export const WriteTerminalRequestSchema: GenMessage<WriteTerminalRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 38);
+
+/**
+ * @generated from message banda.v1.WriteTerminalResponse
+ */
+export type WriteTerminalResponse = Message$1<"banda.v1.WriteTerminalResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.WriteTerminalResponse.
+ * Use `create(WriteTerminalResponseSchema)` to create a new message.
+ */
+export const WriteTerminalResponseSchema: GenMessage<WriteTerminalResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 39);
+
+/**
+ * @generated from message banda.v1.ResizeTerminalRequest
+ */
+export type ResizeTerminalRequest = Message$1<"banda.v1.ResizeTerminalRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: uint32 cols = 2;
+   */
+  cols: number;
+
+  /**
+   * @generated from field: uint32 rows = 3;
+   */
+  rows: number;
+};
+
+/**
+ * Describes the message banda.v1.ResizeTerminalRequest.
+ * Use `create(ResizeTerminalRequestSchema)` to create a new message.
+ */
+export const ResizeTerminalRequestSchema: GenMessage<ResizeTerminalRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 40);
+
+/**
+ * @generated from message banda.v1.ResizeTerminalResponse
+ */
+export type ResizeTerminalResponse = Message$1<"banda.v1.ResizeTerminalResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.ResizeTerminalResponse.
+ * Use `create(ResizeTerminalResponseSchema)` to create a new message.
+ */
+export const ResizeTerminalResponseSchema: GenMessage<ResizeTerminalResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 41);
+
+/**
+ * @generated from message banda.v1.MeRequest
+ */
+export type MeRequest = Message$1<"banda.v1.MeRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.MeRequest.
+ * Use `create(MeRequestSchema)` to create a new message.
+ */
+export const MeRequestSchema: GenMessage<MeRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 42);
+
+/**
+ * @generated from message banda.v1.MeResponse
+ */
+export type MeResponse = Message$1<"banda.v1.MeResponse"> & {
+  /**
+   * @generated from field: banda.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message banda.v1.MeResponse.
+ * Use `create(MeResponseSchema)` to create a new message.
+ */
+export const MeResponseSchema: GenMessage<MeResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 43);
+
+/**
+ * @generated from message banda.v1.ListUsersRequest
+ */
+export type ListUsersRequest = Message$1<"banda.v1.ListUsersRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.ListUsersRequest.
+ * Use `create(ListUsersRequestSchema)` to create a new message.
+ */
+export const ListUsersRequestSchema: GenMessage<ListUsersRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 44);
+
+/**
+ * @generated from message banda.v1.ListUsersResponse
+ */
+export type ListUsersResponse = Message$1<"banda.v1.ListUsersResponse"> & {
+  /**
+   * @generated from field: repeated banda.v1.User users = 1;
+   */
+  users: User[];
+};
+
+/**
+ * Describes the message banda.v1.ListUsersResponse.
+ * Use `create(ListUsersResponseSchema)` to create a new message.
+ */
+export const ListUsersResponseSchema: GenMessage<ListUsersResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 45);
 
 /**
  * @generated from message banda.v1.WatchThreadRequest
@@ -706,7 +1071,7 @@ export type WatchThreadRequest = Message$1<"banda.v1.WatchThreadRequest"> & {
  * Use `create(WatchThreadRequestSchema)` to create a new message.
  */
 export const WatchThreadRequestSchema: GenMessage<WatchThreadRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 27);
+  messageDesc(file_banda_v1_banda, 46);
 
 /**
  * @generated from message banda.v1.WatchThreadResponse
@@ -723,7 +1088,7 @@ export type WatchThreadResponse = Message$1<"banda.v1.WatchThreadResponse"> & {
  * Use `create(WatchThreadResponseSchema)` to create a new message.
  */
 export const WatchThreadResponseSchema: GenMessage<WatchThreadResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 28);
+  messageDesc(file_banda_v1_banda, 47);
 
 /**
  * Runner -> API.
@@ -764,6 +1129,12 @@ export type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
      */
     value: Diff;
     case: "diff";
+  } | {
+    /**
+     * @generated from field: banda.v1.TerminalOutput terminal_output = 5;
+     */
+    value: TerminalOutput;
+    case: "terminalOutput";
   } | { case: undefined; value?: undefined };
 };
 
@@ -772,7 +1143,7 @@ export type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
  * Use `create(ConnectRequestSchema)` to create a new message.
  */
 export const ConnectRequestSchema: GenMessage<ConnectRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 29);
+  messageDesc(file_banda_v1_banda, 48);
 
 /**
  * @generated from message banda.v1.Hello
@@ -794,7 +1165,7 @@ export type Hello = Message$1<"banda.v1.Hello"> & {
  * Use `create(HelloSchema)` to create a new message.
  */
 export const HelloSchema: GenMessage<Hello> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 30);
+  messageDesc(file_banda_v1_banda, 49);
 
 /**
  * @generated from message banda.v1.Ready
@@ -807,7 +1178,29 @@ export type Ready = Message$1<"banda.v1.Ready"> & {
  * Use `create(ReadySchema)` to create a new message.
  */
 export const ReadySchema: GenMessage<Ready> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 31);
+  messageDesc(file_banda_v1_banda, 50);
+
+/**
+ * @generated from message banda.v1.TerminalOutput
+ */
+export type TerminalOutput = Message$1<"banda.v1.TerminalOutput"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: bool exited = 2;
+   */
+  exited: boolean;
+};
+
+/**
+ * Describes the message banda.v1.TerminalOutput.
+ * Use `create(TerminalOutputSchema)` to create a new message.
+ */
+export const TerminalOutputSchema: GenMessage<TerminalOutput> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 51);
 
 /**
  * @generated from message banda.v1.Diff
@@ -824,7 +1217,7 @@ export type Diff = Message$1<"banda.v1.Diff"> & {
  * Use `create(DiffSchema)` to create a new message.
  */
 export const DiffSchema: GenMessage<Diff> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 32);
+  messageDesc(file_banda_v1_banda, 52);
 
 /**
  * API -> runner.
@@ -847,6 +1240,36 @@ export type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
      */
     value: Stop;
     case: "stop";
+  } | {
+    /**
+     * @generated from field: banda.v1.Push push = 3;
+     */
+    value: Push;
+    case: "push";
+  } | {
+    /**
+     * @generated from field: banda.v1.TerminalOpen terminal_open = 4;
+     */
+    value: TerminalOpen;
+    case: "terminalOpen";
+  } | {
+    /**
+     * @generated from field: banda.v1.TerminalInput terminal_input = 5;
+     */
+    value: TerminalInput;
+    case: "terminalInput";
+  } | {
+    /**
+     * @generated from field: banda.v1.TerminalResize terminal_resize = 6;
+     */
+    value: TerminalResize;
+    case: "terminalResize";
+  } | {
+    /**
+     * @generated from field: banda.v1.TerminalClose terminal_close = 7;
+     */
+    value: TerminalClose;
+    case: "terminalClose";
   } | { case: undefined; value?: undefined };
 };
 
@@ -855,7 +1278,7 @@ export type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
  * Use `create(ConnectResponseSchema)` to create a new message.
  */
 export const ConnectResponseSchema: GenMessage<ConnectResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 33);
+  messageDesc(file_banda_v1_banda, 53);
 
 /**
  * @generated from message banda.v1.Prompt
@@ -872,7 +1295,7 @@ export type Prompt = Message$1<"banda.v1.Prompt"> & {
  * Use `create(PromptSchema)` to create a new message.
  */
 export const PromptSchema: GenMessage<Prompt> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 34);
+  messageDesc(file_banda_v1_banda, 54);
 
 /**
  * Interrupts the current turn.
@@ -887,7 +1310,101 @@ export type Stop = Message$1<"banda.v1.Stop"> & {
  * Use `create(StopSchema)` to create a new message.
  */
 export const StopSchema: GenMessage<Stop> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 35);
+  messageDesc(file_banda_v1_banda, 55);
+
+/**
+ * Push the thread branch and report the result as a notice.
+ *
+ * @generated from message banda.v1.Push
+ */
+export type Push = Message$1<"banda.v1.Push"> & {
+};
+
+/**
+ * Describes the message banda.v1.Push.
+ * Use `create(PushSchema)` to create a new message.
+ */
+export const PushSchema: GenMessage<Push> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 56);
+
+/**
+ * @generated from message banda.v1.TerminalOpen
+ */
+export type TerminalOpen = Message$1<"banda.v1.TerminalOpen"> & {
+  /**
+   * @generated from field: uint32 cols = 1;
+   */
+  cols: number;
+
+  /**
+   * @generated from field: uint32 rows = 2;
+   */
+  rows: number;
+
+  /**
+   * @generated from field: string command = 3;
+   */
+  command: string;
+};
+
+/**
+ * Describes the message banda.v1.TerminalOpen.
+ * Use `create(TerminalOpenSchema)` to create a new message.
+ */
+export const TerminalOpenSchema: GenMessage<TerminalOpen> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 57);
+
+/**
+ * @generated from message banda.v1.TerminalInput
+ */
+export type TerminalInput = Message$1<"banda.v1.TerminalInput"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message banda.v1.TerminalInput.
+ * Use `create(TerminalInputSchema)` to create a new message.
+ */
+export const TerminalInputSchema: GenMessage<TerminalInput> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 58);
+
+/**
+ * @generated from message banda.v1.TerminalResize
+ */
+export type TerminalResize = Message$1<"banda.v1.TerminalResize"> & {
+  /**
+   * @generated from field: uint32 cols = 1;
+   */
+  cols: number;
+
+  /**
+   * @generated from field: uint32 rows = 2;
+   */
+  rows: number;
+};
+
+/**
+ * Describes the message banda.v1.TerminalResize.
+ * Use `create(TerminalResizeSchema)` to create a new message.
+ */
+export const TerminalResizeSchema: GenMessage<TerminalResize> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 59);
+
+/**
+ * @generated from message banda.v1.TerminalClose
+ */
+export type TerminalClose = Message$1<"banda.v1.TerminalClose"> & {
+};
+
+/**
+ * Describes the message banda.v1.TerminalClose.
+ * Use `create(TerminalCloseSchema)` to create a new message.
+ */
+export const TerminalCloseSchema: GenMessage<TerminalClose> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 60);
 
 /**
  * @generated from enum banda.v1.Status
@@ -917,6 +1434,13 @@ export enum Status {
    * @generated from enum value: STATUS_ERRORED = 4;
    */
   ERRORED = 4,
+
+  /**
+   * Idle with the environment paused; the next prompt resumes it.
+   *
+   * @generated from enum value: STATUS_SUSPENDED = 5;
+   */
+  SUSPENDED = 5,
 }
 
 /**
@@ -1027,8 +1551,100 @@ export const ThreadService: GenService<{
     input: typeof WatchThreadRequestSchema;
     output: typeof WatchThreadResponseSchema;
   },
+  /**
+   * Other users' threads in which the caller is mentioned and hasn't answered.
+   *
+   * @generated from rpc banda.v1.ThreadService.ListMentioned
+   */
+  listMentioned: {
+    methodKind: "unary";
+    input: typeof ListMentionedRequestSchema;
+    output: typeof ListMentionedResponseSchema;
+  },
+  /**
+   * Per-viewer snooze; an unset `until` clears it. The owner snoozing also
+   * suspends the environment.
+   *
+   * @generated from rpc banda.v1.ThreadService.Snooze
+   */
+  snooze: {
+    methodKind: "unary";
+    input: typeof SnoozeRequestSchema;
+    output: typeof SnoozeResponseSchema;
+  },
+  /**
+   * Per-viewer settle. The owner settling also suspends the environment.
+   *
+   * @generated from rpc banda.v1.ThreadService.Settle
+   */
+  settle: {
+    methodKind: "unary";
+    input: typeof SettleRequestSchema;
+    output: typeof SettleResponseSchema;
+  },
+  /**
+   * Pushes the thread branch to origin (owner only). The result arrives as a
+   * notice event.
+   *
+   * @generated from rpc banda.v1.ThreadService.Push
+   */
+  push: {
+    methodKind: "unary";
+    input: typeof PushRequestSchema;
+    output: typeof PushResponseSchema;
+  },
+  /**
+   * A terminal in the thread's environment (owner only). Output streams until
+   * the process exits; opening again replaces the previous terminal.
+   *
+   * @generated from rpc banda.v1.ThreadService.OpenTerminal
+   */
+  openTerminal: {
+    methodKind: "server_streaming";
+    input: typeof OpenTerminalRequestSchema;
+    output: typeof OpenTerminalResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.ThreadService.WriteTerminal
+   */
+  writeTerminal: {
+    methodKind: "unary";
+    input: typeof WriteTerminalRequestSchema;
+    output: typeof WriteTerminalResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.ThreadService.ResizeTerminal
+   */
+  resizeTerminal: {
+    methodKind: "unary";
+    input: typeof ResizeTerminalRequestSchema;
+    output: typeof ResizeTerminalResponseSchema;
+  },
 }> = /*@__PURE__*/
   serviceDesc(file_banda_v1_banda, 0);
+
+/**
+ * @generated from service banda.v1.UserService
+ */
+export const UserService: GenService<{
+  /**
+   * @generated from rpc banda.v1.UserService.Me
+   */
+  me: {
+    methodKind: "unary";
+    input: typeof MeRequestSchema;
+    output: typeof MeResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.UserService.ListUsers
+   */
+  listUsers: {
+    methodKind: "unary";
+    input: typeof ListUsersRequestSchema;
+    output: typeof ListUsersResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_banda_v1_banda, 1);
 
 /**
  * RunnerService is dialed by the runner inside each sandbox pod, so the API
@@ -1046,5 +1662,5 @@ export const RunnerService: GenService<{
     output: typeof ConnectResponseSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_banda_v1_banda, 1);
+  serviceDesc(file_banda_v1_banda, 2);
 
