@@ -28,6 +28,8 @@ type Service struct {
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
 	runners  map[string]chan *bandav1.ConnectResponse
+	// terminals holds each thread's single terminal subscriber (see OpenTerminal).
+	terminals map[string]chan *bandav1.TerminalOutput
 }
 
 func New(st *store.Store, sb *sandbox.Client) *Service {
@@ -36,6 +38,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		sandboxes: sb,
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
 		runners:   map[string]chan *bandav1.ConnectResponse{},
+		terminals: map[string]chan *bandav1.TerminalOutput{},
 	}
 }
 
@@ -233,6 +236,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		mine := s.runners[id] == ch
 		if mine {
 			delete(s.runners, id)
+			if term := s.terminals[id]; term != nil { // the terminal dies with the runner
+				close(term)
+				delete(s.terminals, id)
+			}
 		}
 		s.mu.Unlock()
 		if mine {
@@ -282,6 +289,17 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if _, err := s.apply(ctx, id, action, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
 			}
+		case *bandav1.ConnectRequest_TerminalOutput:
+			s.mu.Lock()
+			if term := s.terminals[id]; term != nil {
+				select {
+				case term <- k.TerminalOutput:
+				default: // too slow, drop it like a lagging watcher
+					close(term)
+					delete(s.terminals, id)
+				}
+			}
+			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
 			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 				t.Diff = k.Diff.Diff

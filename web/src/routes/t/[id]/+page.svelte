@@ -5,6 +5,7 @@
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
+	import UploadIcon from '@lucide/svelte/icons/upload';
 	import {
 		Conversation,
 		ConversationContent,
@@ -22,10 +23,11 @@
 	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
 	import ToolOutput from '#lib/components/ai-elements/tool/tool-output.svelte';
 	import StatusDot, { statusLabel } from '#lib/components/status-dot.svelte';
+	import Terminal from '#lib/components/terminal.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
-	import { api } from '#lib/api.js';
+	import { api, userApi } from '#lib/api.js';
 	import { apply, type Chat } from '#lib/events.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads } from '#lib/threads.svelte.js';
@@ -36,6 +38,23 @@
 	let thread = $state<Thread>();
 	const chat = $state<Chat>({ items: [], streaming: '' });
 	let diffOpen = $state(true);
+	let me = $state('');
+	const isOwner = $derived(!!me && thread?.ownerId === me);
+	// The terminal mounts when its tab is first opened and then stays alive; a key change reopens it.
+	let tab = $state('diff');
+	let termOpened = $state(false);
+	let termKey = $state(0);
+	let termCommand = $state('');
+	$effect(() => {
+		if (tab === 'terminal') termOpened = true;
+	});
+	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
+	function login() {
+		termCommand = 'claude auth login';
+		termKey++;
+		tab = 'terminal';
+		diffOpen = true;
+	}
 	let error = $state('');
 	let offline = $state(false);
 
@@ -97,6 +116,7 @@
 	$effect(() => {
 		const ctrl = new AbortController();
 		load();
+		userApi.me({}).then((r) => (me = r.user?.id ?? ''), () => {});
 		watch(ctrl.signal);
 		return () => {
 			ctrl.abort();
@@ -143,6 +163,11 @@
 		{/if}
 		{#if offline}<span class="text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex items-center gap-2">
+			{#if isOwner}
+				<Button variant="outline" size="sm" title="Push the branch to origin" onclick={() => act(api.push({ threadId: id }))}>
+					<UploadIcon /> Push
+				</Button>
+			{/if}
 			{#if thread?.status === Status.WORKING}
 				<Button variant="destructive" size="sm" onclick={() => act(api.interrupt({ threadId: id }))}>
 					<SquareIcon /> Interrupt
@@ -202,6 +227,9 @@
 					{:else if item.kind === 'notice'}
 						<div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 							<Response content={item.text} />
+							{#if isOwner && loginNeeded(item.text)}
+								<Button size="sm" class="mt-2" onclick={login}>Log in to Claude Code</Button>
+							{/if}
 						</div>
 					{:else if item.kind === 'status'}
 						<p class="text-center text-xs text-muted-foreground/70">
@@ -242,22 +270,29 @@
 	</div>
 </div>
 
-{#if diffOpen}
-	<aside class="flex w-[32rem] max-w-[45%] shrink-0 flex-col border-l">
-		<Tabs value="diff" class="min-h-0 flex-1 gap-0">
-			<TabsList variant="line" class="group-data-horizontal/tabs:h-14 w-full shrink-0 justify-start border-b px-2">
-				<TabsTrigger value="diff">Diff</TabsTrigger>
-			</TabsList>
-			<TabsContent value="diff" class="min-h-0 overflow-auto">
-				{#if thread?.diff}
-					<pre class="diff">{#each thread.diff.split('\n') as line}<span class={diffClass(line)}>{line || ' '}</span>{/each}</pre>
-				{:else}
-					<p class="p-4 text-sm text-muted-foreground">No changes yet.</p>
-				{/if}
-			</TabsContent>
-		</Tabs>
-	</aside>
-{/if}
+<!-- Hidden rather than removed, so closing the pane keeps the terminal running. -->
+<aside class="{diffOpen ? 'flex' : 'hidden'} w-[32rem] max-w-[45%] shrink-0 flex-col border-l">
+	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
+		<TabsList variant="line" class="group-data-horizontal/tabs:h-14 w-full shrink-0 justify-start border-b px-2">
+			<TabsTrigger value="diff">Diff</TabsTrigger>
+			<TabsTrigger value="terminal">Terminal</TabsTrigger>
+		</TabsList>
+		<TabsContent value="diff" class="min-h-0 overflow-auto">
+			{#if thread?.diff}
+				<pre class="diff">{#each thread.diff.split('\n') as line}<span class={diffClass(line)}>{line || ' '}</span>{/each}</pre>
+			{:else}
+				<p class="p-4 text-sm text-muted-foreground">No changes yet.</p>
+			{/if}
+		</TabsContent>
+		{#if isOwner && termOpened}
+			<div class="min-h-0 flex-1 {tab === 'terminal' ? '' : 'hidden'}">
+				{#key termKey}<Terminal threadId={id} command={termCommand} />{/key}
+			</div>
+		{:else if tab === 'terminal'}
+			<p class="p-4 text-sm text-muted-foreground">Only the thread owner can open the terminal.</p>
+		{/if}
+	</Tabs>
+</aside>
 
 <style>
 	.diff {

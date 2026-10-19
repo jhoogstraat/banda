@@ -39,6 +39,8 @@
 		"@connectrpc/connect-web": "^2.2.0",
 		"@shikijs/langs": "^4.5.0",
 		"@shikijs/themes": "^4.5.0",
+		"@xterm/addon-fit": "^0.11.0",
+		"@xterm/xterm": "^6.0.0",
 		"ai": "^6.0.309",
 		"dompurify": "^3.4.17",
 		"mode-watcher": "^1.1.0",

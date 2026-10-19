@@ -56,16 +56,54 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer stream.Close()
+	// The terminal, push and claude's output all send, from different goroutines.
+	var sendMu sync.Mutex
+	sendReq := func(r *bandav1.ConnectRequest) error {
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		return stream.Send(r)
+	}
 	send := func(e *bandav1.Event) error {
-		return stream.Send(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Event{Event: e}})
+		return sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Event{Event: e}})
 	}
 	notice := func(text string) error {
 		return send(&bandav1.Event{Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
 	}
-	if err := stream.Send(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Hello{Hello: &bandav1.Hello{
+	if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Hello{Hello: &bandav1.Hello{
 		ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN")}}}); err != nil {
 		return err
 	}
+
+	// API -> runner. The terminal works from here on, so the user can log in
+	// while we wait for it; prompts and stops queue until claude is up.
+	// Losing the API stops claude gracefully and the runner exits.
+	// ponytail: no reconnect loop, the container restart is the reconnect.
+	cmds := make(chan *bandav1.ConnectResponse, 16)
+	term := &terminal{send: sendReq}
+	defer term.close()
+	go func() {
+		defer cancel()
+		for {
+			msg, err := stream.Receive()
+			if err != nil {
+				return
+			}
+			switch k := msg.Kind.(type) {
+			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop:
+				cmds <- msg
+			case *bandav1.ConnectResponse_Push:
+				go push(ctx, notice)
+			case *bandav1.ConnectResponse_TerminalOpen:
+				term.open(k.TerminalOpen)
+			case *bandav1.ConnectResponse_TerminalInput:
+				term.input(k.TerminalInput.Data)
+			case *bandav1.ConnectResponse_TerminalResize:
+				term.resize(k.TerminalResize.Cols, k.TerminalResize.Rows)
+			case *bandav1.ConnectResponse_TerminalClose:
+				term.close()
+			}
+		}
+	}()
 
 	if err := checkout(ctx); err != nil {
 		notice("Could not prepare the checkout: " + err.Error())
@@ -79,24 +117,25 @@ func run(ctx context.Context) error {
 		notice("Could not start Claude Code: " + err.Error())
 		return err
 	}
-	if err := stream.Send(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
+	if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
 		return err
 	}
 
-	// API -> claude. Losing the API stops claude gracefully and the runner exits.
-	// ponytail: no reconnect loop, the container restart is the reconnect.
+	// API -> claude.
 	go func() {
 		defer cancel()
 		for {
-			msg, err := stream.Receive()
-			if err != nil {
+			var err error
+			select {
+			case <-ctx.Done():
 				return
-			}
-			switch k := msg.Kind.(type) {
-			case *bandav1.ConnectResponse_Prompt:
-				err = claude.write(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": k.Prompt.Text}})
-			case *bandav1.ConnectResponse_Stop:
-				err = claude.interrupt()
+			case msg := <-cmds:
+				switch k := msg.Kind.(type) {
+				case *bandav1.ConnectResponse_Prompt:
+					err = claude.write(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": k.Prompt.Text}})
+				case *bandav1.ConnectResponse_Stop:
+					err = claude.interrupt()
+				}
 			}
 			if err != nil {
 				return
@@ -122,7 +161,7 @@ func run(ctx context.Context) error {
 		}
 		if turnEnded {
 			authNoticed = false
-			if err := stream.Send(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: diff(ctx)}}}); err != nil {
+			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: diff(ctx)}}}); err != nil {
 				return err
 			}
 		}
@@ -179,7 +218,7 @@ func waitForLogin(ctx context.Context, notice func(string) error) error {
 }
 
 func loginHint(problem string) string {
-	return fmt.Sprintf("%s Run `make login SANDBOX=t-%s` (or `kubectl exec -it -n banda t-%s -- claude auth login`). The thread continues once you are logged in.", problem, threadID, threadID)
+	return fmt.Sprintf("%s Open the Terminal tab and run `claude auth login` (or use the Log in button). Fallback: `make login SANDBOX=t-%s` or `kubectl exec -it -n banda t-%s -- claude auth login`. The thread continues once you are logged in.", problem, threadID, threadID)
 }
 
 type claudeProc struct {
