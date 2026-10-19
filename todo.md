@@ -1,19 +1,30 @@
-- Banda: Application for Teams to develop a software system together
-  - Actions and State machine first (for api)
-  - Kubernetes based (agent substrate, kagent, etc.)
-  - SvelteKit 3 with high fidelity UI (https://github.com/sikandarjodd/ai-elements)
-    - UI inspired by amp / t3 code and the like (3 pane split with left navigation sidebar, main chat window, right pane for stuff like diff, files, browser, etc.)
-  - Users log in with sso oidc
-  - Integration with Claude Code / Codex / ACP
-  - Work happens in threads with the coding agent with the common configuration options (harness, model, effort)
-  - A threads starts a remote isolated environment (agent substrate, kagent and the like)
-  - Deeply integrated with git
-  - MCP server that allows agents to see and interact with other threads
-  - People can @mention anyone to switch into chat mode and discuss right inside the chat. The agent only reacts on @mentions in this mode. Otherwise its reacts always like normal.
-  - Left navigation bar has list of threads for the user
-    - Threads that wait for user input are visible up top
-    - Threads that the agents currently work on are hidden in a section "working" and moved to the bottom. Can be opened
-    - Threads that the user has "snoozed" for a defined amount of time on are hidden in a section "snoozed" and moved to the bottom. Can be opened
-    - Threads that the user has "settled" are hidden in a section "settled" and moved to the bottom. Can be opened
-    - At the bttom shows user account / mentions / settings
-    - Mentions switches the sidebars threads to only shows the threads you have been mentioned in and are waiting the users input.
+Status as of branch `v1`. Details, decisions and open risks: [PLAN.md](PLAN.md).
+
+- [x] Banda: Application for Teams to develop a software system together
+  - [x] Actions and State machine first (for api): `internal/thread`, pure `Apply(State, Action)`
+  - [x] Kubernetes based: kubernetes-sigs/agent-sandbox (Sandbox CRD, suspend/resume), kind on Podman locally
+  - [x] SvelteKit 3 with high fidelity UI (ai-elements Svelte port, shadcn-svelte), no BFF: the web app talks Connect to the Go API
+    - [x] 3 pane split: sidebar, chat, right pane with Diff, Files (read-only) and Terminal (owner only)
+    - [ ] Browser in the right pane
+  - [x] Users log in with SSO OIDC (Dex locally, any OIDC provider via env)
+  - [ ] Integration with Claude Code / Codex / ACP
+    - [x] Claude Code natively (headless stream-json, each user's own subscription, login once per user)
+    - [ ] Codex and other harnesses (check their subscription terms first)
+    - [ ] ACP (deferred by decision)
+  - [x] Threads with the common configuration options (harness, model, effort), chosen when the thread is created
+    - [ ] Changing model or effort mid-thread
+    - [ ] Permission prompts (turns run with `--dangerously-skip-permissions` inside the sandbox)
+  - [x] A thread starts a remote isolated environment: one sandbox per thread; paused when idle (30 min), snoozed or settled; resumed on the next prompt
+    - [ ] Deleting sandboxes of settled threads
+  - [x] Deeply integrated with git: branch `banda/<id>` per thread, diff after every turn, Push with a pull-request link
+  - [x] MCP server that allows agents to see and interact with other threads (list, read, post, create)
+  - [x] @mentions and chat mode. Decided: anyone can post into any thread; a teammate's post switches to chat mode unless it mentions @agent; only the owner switches chat mode off; in chat mode everyone, the owner included, must mention @agent
+  - [x] Left navigation bar has list of threads for the user, and you can browse other users' threads
+    - [x] Threads where the user is mentioned are shown at the very top ("Mentioned")
+    - [x] Threads that wait for user input are visible up top
+    - [x] "Working" section at the bottom, collapsed, can be opened
+    - [x] "Snoozed" section (snooze for a chosen time; per user), can be opened
+    - [x] "Settled" section (per user), can be opened
+    - [x] Bottom shows user account / mentions / settings (the settings button has no page yet)
+    - [x] Mentions switches the sidebar to only the threads you have been mentioned in and that wait for your input
+  - [ ] Several API replicas (needs Postgres `LISTEN/NOTIFY` fan-out)
