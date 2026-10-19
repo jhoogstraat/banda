@@ -514,7 +514,7 @@ func cerr(err error) error {
 		return connect.NewError(connect.CodeNotFound, err.Error())
 	case errors.Is(err, thread.ErrForbidden):
 		return connect.NewError(connect.CodePermissionDenied, err.Error())
-	case errors.Is(err, thread.ErrBusy), errors.Is(err, thread.ErrNotReady):
+	case errors.Is(err, thread.ErrNotReady):
 		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	return err

@@ -56,3 +56,5 @@ CREATE TABLE IF NOT EXISTS mentions (
 );
 
 CREATE INDEX IF NOT EXISTS mentions_open ON mentions (user_id) WHERE answered_at IS NULL;
+
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS turns int NOT NULL DEFAULT 0;

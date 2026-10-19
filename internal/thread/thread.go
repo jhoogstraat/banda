@@ -25,6 +25,9 @@ type State struct {
 	OwnerID string
 	Status  Status
 	Mode    Mode
+	// Turns delivered to the agent and not yet ended. Claude Code queues
+	// prompts sent mid-turn, so a thread stays working until all have ended.
+	Turns int
 }
 
 // Effect is what the caller must do once the new state is persisted.
@@ -40,7 +43,6 @@ const (
 
 var (
 	ErrForbidden = errors.New("only the thread owner can do this")
-	ErrBusy      = errors.New("the agent is still working")
 	ErrNotReady  = errors.New("the environment is not ready")
 )
 
@@ -98,8 +100,6 @@ func Apply(s State, a Action) (State, Effect, error) {
 			return s, None, nil
 		}
 		switch s.Status {
-		case Working:
-			return s, None, ErrBusy
 		case Starting, Errored:
 			return s, None, ErrNotReady
 		case Suspended:
@@ -107,7 +107,7 @@ func Apply(s State, a Action) (State, Effect, error) {
 			s.Status = Starting
 			return s, Provision, nil
 		}
-		s.Status = Working
+		s.Status, s.Turns = Working, s.Turns+1
 		return s, StartTurn, nil
 
 	case Interrupt:
@@ -145,21 +145,24 @@ func Apply(s State, a Action) (State, Effect, error) {
 			return s, None, nil
 		}
 		if a.Pending {
-			s.Status = Working
+			s.Status, s.Turns = Working, 1
 			return s, StartTurn, nil
 		}
-		s.Status = AwaitingInput
+		s.Status, s.Turns = AwaitingInput, 0
 		return s, None, nil
 
 	case TurnEnded:
 		if s.Status == Working {
-			s.Status = AwaitingInput
+			s.Turns = max(s.Turns-1, 0)
+			if s.Turns == 0 {
+				s.Status = AwaitingInput
+			}
 		}
 		return s, None, nil
 
 	case EnvLost:
 		if s.Status != Suspended { // suspending stops the runner on purpose
-			s.Status = Errored
+			s.Status, s.Turns = Errored, 0
 		}
 		return s, None, nil
 

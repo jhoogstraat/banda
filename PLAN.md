@@ -99,7 +99,7 @@ awaiting_input / starting / errored ──Suspend (idle, owner snooze/settle)─
 suspended ──turn-starting post (kept as pending prompt) / owner Wake──▶ starting
 ```
 
-Mode is `agent` or `chat`; the rules are in the Decisions table. Posts that don't start a turn are always allowed. A post that would start a turn is rejected while the agent is working (no queue yet) or while the environment is starting or errored.
+Mode is `agent` or `chat`; the rules are in the Decisions table. Posts that don't start a turn are always allowed. Prompts sent while the agent works are queued (Claude Code runs them in order) and the thread stays `working` until all turns have ended. A post that would start a turn is rejected while the environment is starting or errored.
 
 Snooze and settle are per viewer. **Sidebar sections**, computed per viewer:
 
