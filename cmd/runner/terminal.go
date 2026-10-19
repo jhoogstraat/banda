@@ -20,6 +20,7 @@ type terminal struct {
 	mu  sync.Mutex
 	cmd *exec.Cmd
 	pty *os.File
+	in  chan []byte // keystrokes, written by their own goroutine so a stuck program can't block the runner
 }
 
 func (t *terminal) open(o *bandav1.TerminalOpen) {
@@ -40,8 +41,14 @@ func (t *terminal) open(o *bandav1.TerminalOpen) {
 		t.send(output(&bandav1.TerminalOutput{Data: []byte("could not start the terminal: " + err.Error() + "\r\n"), Exited: true}))
 		return
 	}
+	in := make(chan []byte, 256)
+	go func() {
+		for b := range in {
+			f.Write(b)
+		}
+	}()
 	t.mu.Lock()
-	t.cmd, t.pty = cmd, f
+	t.cmd, t.pty, t.in = cmd, f, in
 	t.mu.Unlock()
 
 	go func() {
@@ -59,7 +66,8 @@ func (t *terminal) open(o *bandav1.TerminalOpen) {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		if t.cmd == cmd { // not closed or replaced meanwhile
-			t.cmd, t.pty = nil, nil
+			close(t.in)
+			t.cmd, t.pty, t.in = nil, nil, nil
 			f.Close()
 			t.send(output(&bandav1.TerminalOutput{Exited: true}))
 		}
@@ -73,8 +81,11 @@ func output(o *bandav1.TerminalOutput) *bandav1.ConnectRequest {
 func (t *terminal) input(data []byte) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.pty != nil {
-		t.pty.Write(data)
+	if t.in != nil {
+		select {
+		case t.in <- data:
+		default: // the program isn't reading; drop rather than block
+		}
 	}
 }
 
@@ -92,7 +103,8 @@ func (t *terminal) close() {
 	defer t.mu.Unlock()
 	if t.cmd != nil {
 		syscall.Kill(-t.cmd.Process.Pid, syscall.SIGHUP)
+		close(t.in)
 		t.pty.Close()
-		t.cmd, t.pty = nil, nil
+		t.cmd, t.pty, t.in = nil, nil, nil
 	}
 }

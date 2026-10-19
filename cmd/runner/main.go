@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -64,6 +65,7 @@ func run(ctx context.Context) error {
 		return stream.Send(r)
 	}
 	send := func(e *bandav1.Event) error {
+		scrub(e)
 		return sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Event{Event: e}})
 	}
 	notice := func(text string) error {
@@ -117,6 +119,13 @@ func run(ctx context.Context) error {
 		notice("Could not start Claude Code: " + err.Error())
 		return err
 	}
+	// Every way out of here stops claude gracefully and waits for it: a kill
+	// in the middle of a token refresh would log the user out everywhere.
+	defer func() {
+		cancel()
+		go io.Copy(io.Discard, claude.stdout)
+		claude.cmd.Wait()
+	}()
 	if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
 		return err
 	}
@@ -161,7 +170,7 @@ func run(ctx context.Context) error {
 		}
 		if turnEnded {
 			authNoticed = false
-			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: diff(ctx)}}}); err != nil {
+			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
 				return err
 			}
 		}
@@ -174,25 +183,34 @@ func run(ctx context.Context) error {
 // checkout clones the repo onto the thread branch the first time; the home
 // volume keeps it across restarts.
 func checkout(ctx context.Context) error {
-	if _, err := os.Stat(filepath.Join(work, ".git")); err == nil {
+	git := func(args ...string) error {
+		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s: %w: %s", args[0], err, out)
+		}
 		return nil
 	}
 	steps := [][]string{
 		{"config", "--global", "user.name", "Banda"},
 		{"config", "--global", "user.email", "banda@localhost"},
 	}
-	if os.Getenv("GIT_TOKEN") != "" {
-		// Reads the token from the environment at use time; it is never written to disk.
-		steps = append(steps, []string{"config", "--global", "credential.helper", `!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
+	if u, err := url.Parse(os.Getenv("BANDA_REPO_URL")); err == nil && u.Scheme == "https" && os.Getenv("GIT_TOKEN") != "" {
+		// Only for the repo's host. Reads the token from the environment at use
+		// time; it is never written to disk.
+		steps = append(steps, []string{"config", "--global", "credential.https://" + u.Host + ".helper",
+			`!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
 	}
-	steps = append(steps,
-		[]string{"clone", "--branch", os.Getenv("BANDA_BASE_BRANCH"), os.Getenv("BANDA_REPO_URL"), work},
-		[]string{"-C", work, "switch", "-c", os.Getenv("BANDA_BRANCH")},
-	)
+	if _, err := os.Stat(filepath.Join(work, ".git")); err != nil {
+		steps = append(steps, []string{"clone", "--branch", os.Getenv("BANDA_BASE_BRANCH"), os.Getenv("BANDA_REPO_URL"), work})
+	}
 	for _, args := range steps {
-		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
-			return fmt.Errorf("git %s: %w: %s", args[0], err, out)
+		if err := git(args...); err != nil {
+			return err
 		}
+	}
+	// Also covers a previous start that died right after cloning.
+	branch := os.Getenv("BANDA_BRANCH")
+	if git("-C", work, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch) != nil {
+		return git("-C", work, "switch", "-c", branch)
 	}
 	return nil
 }
@@ -200,7 +218,7 @@ func checkout(ctx context.Context) error {
 func waitForLogin(ctx context.Context, notice func(string) error) error {
 	told := false
 	for {
-		if exec.CommandContext(ctx, "claude", "auth", "status", "--json").Run() == nil {
+		if claudeCmd(ctx, "auth", "status", "--json").Run() == nil {
 			return nil
 		}
 		if !told {
@@ -253,13 +271,9 @@ func startClaude(ctx context.Context) (*claudeProc, error) {
 		args = append(args, "--session-id", sid)
 	}
 
-	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd := claudeCmd(ctx, args...)
 	cmd.Dir = work
 	cmd.Stderr = os.Stderr
-	// Never kill claude outright: a kill during a token refresh logs the user
-	// out of every pod. The pod's grace period is 90s.
-	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
-	cmd.WaitDelay = 80 * time.Second
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -269,6 +283,15 @@ func startClaude(ctx context.Context) (*claudeProc, error) {
 		return nil, err
 	}
 	return &claudeProc{cmd: cmd, stdout: stdout, stdin: stdin}, cmd.Start()
+}
+
+// claudeCmd never kills claude outright: a kill during a token refresh logs
+// the user out of every pod. The pod's grace period is 90s.
+func claudeCmd(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 80 * time.Second
+	return cmd
 }
 
 // write sends one stream-json line. A malformed line kills claude, so only
@@ -326,7 +349,7 @@ func diff(ctx context.Context) string {
 		}
 	}
 	if len(out) > max {
-		return string(out[:max]) + "\n… diff truncated at 1 MiB"
+		out = append(out[:max], "\n… diff truncated at 1 MiB"...)
 	}
-	return string(out)
+	return string(out) // redact makes it valid UTF-8
 }

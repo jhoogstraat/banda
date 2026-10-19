@@ -10,7 +10,9 @@ endif
 TARGET ?= sandbox
 IMAGE ?= localhost/banda-sandbox:dev
 # `make api AUTH=dev` skips sign-in. Otherwise the API signs in against Dex (set OIDC_* to use another provider).
-ifneq ($(AUTH),dev)
+ifeq ($(AUTH),dev)
+export DEV_AUTH := 1
+else
 export OIDC_ISSUER ?= http://localhost:5556/dex
 export OIDC_CLIENT_ID ?= banda
 export OIDC_CLIENT_SECRET ?= banda-dev-secret

@@ -25,3 +25,14 @@ func TestSession(t *testing.T) {
 		t.Fatal("empty session accepted")
 	}
 }
+
+func TestLocalPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"/t/abc?x=1": "/t/abc?x=1", "": "/", "https://evil.com": "/", "//evil.com": "/", "/\\evil.com": "/",
+		"/./\\evil.com": "/", "/\t/evil.com": "/", "/%5Cevil.com": "/%5Cevil.com", "evil.com": "/",
+	} {
+		if got := localPath(in); got != want {
+			t.Errorf("localPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

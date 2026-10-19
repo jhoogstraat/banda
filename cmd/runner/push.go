@@ -24,5 +24,10 @@ func push(ctx context.Context, notice func(string) error) {
 	if m := githubRepo.FindStringSubmatch(os.Getenv("BANDA_REPO_URL")); m != nil {
 		text += fmt.Sprintf(" [Open a pull request](https://github.com/%s/compare/%s...%s?expand=1)", m[1], os.Getenv("BANDA_BASE_BRANCH"), branch)
 	}
+	status := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	status.Dir = work
+	if out, _ := status.Output(); len(out) > 0 {
+		text += " Uncommitted changes were not pushed; ask the agent to commit them."
+	}
 	notice(text)
 }

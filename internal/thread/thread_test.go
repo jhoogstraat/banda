@@ -59,6 +59,8 @@ func TestApply(t *testing.T) {
 			with(chat, func(s *State) { s.Status = Suspended }), None, nil},
 		{"runner stopping during suspend is expected", with(idle, func(s *State) { s.Status = Suspended }), EnvLost{},
 			with(idle, func(s *State) { s.Status = Suspended }), None, nil},
+		{"runner restarted mid-turn", with(idle, func(s *State) { s.Status = Working }), EnvReady{},
+			idle, None, nil},
 		{"dying pod reporting ready is ignored", with(idle, func(s *State) { s.Status = Suspended }), EnvReady{},
 			with(idle, func(s *State) { s.Status = Suspended }), None, nil},
 		{"owner wakes a suspended thread", with(idle, func(s *State) { s.Status = Suspended }), Wake{By: "ann"},

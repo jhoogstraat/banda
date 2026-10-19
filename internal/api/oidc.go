@@ -124,11 +124,19 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, o.cookie(sessionCookie, o.sign(u.ID, time.Now().Add(sessionTTL)), int(sessionTTL.Seconds())))
-	next := flow.Get("next")
-	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, `/\`) {
-		next = "/" // only relative paths: no open redirect
+	http.Redirect(w, r, localPath(flow.Get("next")), http.StatusFound)
+}
+
+// localPath returns next if it is a plain path on this site, else "/": no
+// open redirect. Browsers read backslashes like slashes and drop control
+// characters, so those are refused too.
+func localPath(next string) string {
+	u, err := url.Parse(next)
+	if err != nil || u.Scheme != "" || u.Host != "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") ||
+		strings.ContainsFunc(next, func(r rune) bool { return r == '\\' || r < ' ' || r == 0x7f }) {
+		return "/"
 	}
-	http.Redirect(w, r, next, http.StatusFound)
+	return next
 }
 
 func (o *OIDC) logout(w http.ResponseWriter, r *http.Request) {

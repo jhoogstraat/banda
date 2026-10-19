@@ -138,8 +138,10 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, Provision, nil
 
 	case EnvReady:
-		// Ignored while suspended: that is a dying pod; resuming goes through Starting.
-		if s.Status != Starting && s.Status != Errored {
+		// A fresh claude runs no turn, so this also ends a turn lost with a
+		// restarted API. Ignored while suspended: that is a dying pod;
+		// resuming goes through Starting.
+		if s.Status == AwaitingInput || s.Status == Suspended {
 			return s, None, nil
 		}
 		if a.Pending {

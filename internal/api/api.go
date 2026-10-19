@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -27,9 +28,15 @@ type Service struct {
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
-	runners  map[string]chan *bandav1.ConnectResponse
+	runners  map[string]*runner
 	// terminals holds each thread's single terminal subscriber (see OpenTerminal).
 	terminals map[string]chan *bandav1.TerminalOutput
+}
+
+// runner is a connected runner: commands go to ch until done is closed.
+type runner struct {
+	ch   chan *bandav1.ConnectResponse
+	done chan struct{}
 }
 
 func New(st *store.Store, sb *sandbox.Client) *Service {
@@ -37,7 +44,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		store:     st,
 		sandboxes: sb,
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
-		runners:   map[string]chan *bandav1.ConnectResponse{},
+		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 	}
 }
@@ -142,7 +149,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		slog.Error("store mentions", "thread", id, "err", err)
 	}
 	if effect == thread.StartTurn {
-		s.toRunner(ctx, id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}})
+		s.deliver(ctx, id, prompt)
 	}
 	s.do(ctx, id, effect)
 	return &bandav1.SendMessageResponse{}, nil
@@ -202,6 +209,19 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 			if e.Seq != 0 && e.Seq <= last {
 				continue
 			}
+			if e.Seq > last+1 { // concurrent updates were broadcast out of order: catch up from the store
+				missed, err := s.store.Events(ctx, req.ThreadId, last)
+				if err != nil {
+					return err
+				}
+				for _, m := range missed {
+					if err := stream.Send(&bandav1.WatchThreadResponse{Event: m}); err != nil {
+						return err
+					}
+					last = m.Seq
+				}
+				continue
+			}
 			if err := stream.Send(&bandav1.WatchThreadResponse{Event: e}); err != nil {
 				return err
 			}
@@ -227,13 +247,14 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
 	}
 
-	ch := make(chan *bandav1.ConnectResponse, 16)
+	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
 	s.mu.Lock()
-	s.runners[id] = ch
+	s.runners[id] = r
 	s.mu.Unlock()
+	defer close(r.done)
 	defer func() {
 		s.mu.Lock()
-		mine := s.runners[id] == ch
+		mine := s.runners[id] == r
 		if mine {
 			delete(s.runners, id)
 			if term := s.terminals[id]; term != nil { // the terminal dies with the runner
@@ -252,7 +273,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			select {
 			case <-ctx.Done():
 				return
-			case msg := <-ch:
+			case msg := <-r.ch:
 				if err := stream.Send(msg); err != nil {
 					slog.Warn("send to runner", "thread", id, "err", err)
 					return
@@ -268,7 +289,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 		switch k := msg.Kind.(type) {
 		case *bandav1.ConnectRequest_Ready:
-			if err := s.ready(ctx, id, ch); err != nil {
+			if err := s.ready(ctx, id, r); err != nil {
 				return err
 			}
 		case *bandav1.ConnectRequest_Event:
@@ -294,9 +315,13 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if term := s.terminals[id]; term != nil {
 				select {
 				case term <- k.TerminalOutput:
-				default: // too slow, drop it like a lagging watcher
+				default: // too slow, drop it like a lagging watcher, and end the shell
 					close(term)
 					delete(s.terminals, id)
+					select {
+					case r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalClose{TerminalClose: &bandav1.TerminalClose{}}}:
+					default:
+					}
 				}
 			}
 			s.mu.Unlock()
@@ -315,7 +340,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 
 // ready marks the environment ready and hands over the initial prompt if it
 // has not been delivered yet.
-func (s *Service) ready(ctx context.Context, id string, ch chan *bandav1.ConnectResponse) error {
+func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	var prompt string
 	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
@@ -332,7 +357,7 @@ func (s *Service) ready(ctx context.Context, id string, ch chan *bandav1.Connect
 	}
 	s.broadcast(id, events)
 	if prompt != "" {
-		ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}}
+		s.deliver(ctx, id, prompt)
 	}
 	return nil
 }
@@ -378,29 +403,52 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 }
 
 func (s *Service) provision(ctx context.Context, t store.Thread) {
+	// Ensure replaces a running pod; its runner's disconnect is expected.
+	s.mu.Lock()
+	delete(s.runners, t.ID)
+	s.mu.Unlock()
 	if err := s.sandboxes.Ensure(ctx, t); err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
 		s.apply(context.WithoutCancel(ctx), t.ID, thread.EnvLost{})
 	}
 }
 
-// toRunner delivers a prompt; a missing runner means the environment is gone.
-func (s *Service) toRunner(ctx context.Context, id string, msg *bandav1.ConnectResponse) {
-	if !s.sendRunner(id, msg) {
-		s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
+// deliver hands a prompt to the runner. Without one the environment is gone:
+// keep the prompt for the next runner, which delivers it once it is ready.
+func (s *Service) deliver(ctx context.Context, id, prompt string) {
+	if s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}}) {
+		return
 	}
+	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
+		next, _, _ := thread.Apply(t.State, thread.EnvLost{})
+		events := stateEvents(t.State, next)
+		t.State = next
+		return events, nil
+	})
+	if err != nil {
+		slog.Error("keep undelivered prompt", "thread", id, "err", err)
+		return
+	}
+	s.broadcast(id, events)
 }
 
-// sendRunner reports false if no runner is connected for the thread.
+// sendRunner reports false if no runner is connected for the thread, or it
+// stops taking commands.
 func (s *Service) sendRunner(id string, msg *bandav1.ConnectResponse) bool {
 	s.mu.Lock()
-	ch := s.runners[id]
+	r := s.runners[id]
 	s.mu.Unlock()
-	if ch == nil {
+	if r == nil {
 		return false
 	}
-	ch <- msg
-	return true
+	select {
+	case r.ch <- msg:
+		return true
+	case <-r.done:
+	case <-time.After(10 * time.Second):
+	}
+	return false
 }
 
 func (s *Service) watch(id string) chan *bandav1.Event {

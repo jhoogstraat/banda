@@ -48,6 +48,8 @@ func main() {
 			log.Fatalf("oidc: %v", err)
 		}
 		auth = sso.Interceptor()
+	} else if os.Getenv("DEV_AUTH") != "1" {
+		log.Fatal("set OIDC_ISSUER to enable sign-in, or DEV_AUTH=1 to trust the X-Banda-User header (local development only)")
 	}
 	server := connect.NewServer(auth)
 	svc := api.New(st, sb)

@@ -2,6 +2,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
@@ -171,6 +172,7 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 		if err != nil {
 			return t, nil, err
 		}
+		body = bytes.ReplaceAll(body, []byte(`\u0000`), []byte(`\ufffd`)) // jsonb rejects NUL
 		if _, err := tx.Exec(ctx, `INSERT INTO events (thread_id, seq, body) VALUES ($1, $2, $3)`, t.ID, seq, body); err != nil {
 			return t, nil, err
 		}

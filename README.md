@@ -39,7 +39,7 @@ To use another OIDC provider, set these before `make api` (or when running `cmd/
 | `PUBLIC_URL` | Origin the browser uses, default `http://localhost:5173`. |
 | `SESSION_SECRET` | Signs the session cookie. If empty, a random one is used and sessions end when the API restarts. |
 
-Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build).
+Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1` (what `make api AUTH=dev` sets). Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build).
 
 ## Tests
 

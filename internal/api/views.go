@@ -75,6 +75,14 @@ func (s *Service) SuspendIdle(ctx context.Context, idle time.Duration) {
 			continue
 		}
 		for _, id := range ids {
+			s.mu.Lock()
+			_, inTerminal := s.terminals[id] // terminal use is activity too
+			s.mu.Unlock()
+			if inTerminal {
+				continue
+			}
+			// ponytail: no per-thread lock around apply+do; a post racing this
+			// suspend can leave the pod paused while starting until the next sweep.
 			if effect, err := s.apply(ctx, id, thread.Suspend{}); err == nil {
 				s.do(ctx, id, effect)
 			}

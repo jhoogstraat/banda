@@ -1,6 +1,7 @@
 # banda-api running in the cluster. Settings come from the optional Secret
 # "banda-api" (e.g. OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET,
-# PUBLIC_URL, SESSION_SECRET); without OIDC settings it runs with dev auth.
+# PUBLIC_URL, SESSION_SECRET). Without OIDC settings it refuses to start
+# unless DEV_AUTH=1 (trusts a header: local experiments only).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
