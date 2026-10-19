@@ -1,0 +1,454 @@
+// Package api implements the ThreadService for the web client and the
+// RunnerService the sandbox runners dial into.
+package api
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"errors"
+	"log/slog"
+	"strings"
+	"sync"
+
+	"connectrpc.com/connect/v2"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
+	"github.com/jhoogstraat/banda/internal/sandbox"
+	"github.com/jhoogstraat/banda/internal/store"
+	"github.com/jhoogstraat/banda/internal/thread"
+)
+
+type Service struct {
+	store     *store.Store
+	sandboxes *sandbox.Client
+
+	mu       sync.Mutex
+	watchers map[string]map[chan *bandav1.Event]struct{}
+	runners  map[string]chan *bandav1.ConnectResponse
+}
+
+func New(st *store.Store, sb *sandbox.Client) *Service {
+	return &Service{
+		store:     st,
+		sandboxes: sb,
+		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
+		runners:   map[string]chan *bandav1.ConnectResponse{},
+	}
+}
+
+// user returns the caller's id.
+// ponytail: trusted dev header until OIDC lands in M2. Do not expose M1 beyond localhost.
+func user(ctx context.Context) string {
+	if info, ok := connect.CallInfoForServerContext(ctx); ok {
+		if u := info.RequestHeader().Get("X-Banda-User"); u != "" {
+			return u
+		}
+	}
+	return "dev"
+}
+
+func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
+	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
+	}
+	id := strings.ToLower(rand.Text())
+	t := store.Thread{
+		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
+		ID:            id,
+		Title:         title(req.Prompt),
+		RepoURL:       req.RepoUrl,
+		BaseBranch:    or(req.BaseBranch, "main"),
+		Branch:        "banda/" + id,
+		Model:         or(req.Model, "claude-opus-5-5"),
+		Effort:        or(req.Effort, "high"),
+		PendingPrompt: req.Prompt,
+		RunnerToken:   rand.Text(),
+	}
+	if err := s.store.Create(ctx, t); err != nil {
+		return nil, err
+	}
+	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		return []*bandav1.Event{messageEvent(t.OwnerID, &bandav1.Message{Text: req.Prompt})}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.broadcast(id, events)
+	s.provision(ctx, t)
+	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+}
+
+func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
+	threads, err := s.store.List(ctx, or(req.OwnerId, user(ctx)))
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.ListThreadsResponse{}
+	for _, t := range threads {
+		res.Threads = append(res.Threads, toProto(t))
+	}
+	return res, nil
+}
+
+func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) (*bandav1.GetThreadResponse, error) {
+	t, err := s.store.Get(ctx, req.ThreadId)
+	if err != nil {
+		return nil, cerr(err)
+	}
+	return &bandav1.GetThreadResponse{Thread: toProto(t)}, nil
+}
+
+func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageRequest) (*bandav1.SendMessageResponse, error) {
+	m := req.Message
+	if m == nil || strings.TrimSpace(m.Text) == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "message text is required")
+	}
+	by := user(ctx)
+	effect, err := s.apply(ctx, req.ThreadId, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0},
+		messageEvent(by, m))
+	if err != nil {
+		return nil, err
+	}
+	if effect == thread.StartTurn {
+		s.toRunner(ctx, req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: m.Text}}})
+	}
+	return &bandav1.SendMessageResponse{}, nil
+}
+
+func (s *Service) Interrupt(ctx context.Context, req *bandav1.InterruptRequest) (*bandav1.InterruptResponse, error) {
+	effect, err := s.apply(ctx, req.ThreadId, thread.Interrupt{By: user(ctx)})
+	if err != nil {
+		return nil, err
+	}
+	if effect == thread.StopTurn {
+		s.toRunner(ctx, req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Stop{Stop: &bandav1.Stop{}}})
+	}
+	return &bandav1.InterruptResponse{}, nil
+}
+
+func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*bandav1.SetModeResponse, error) {
+	mode, ok := modeFromProto[req.Mode]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "unknown mode")
+	}
+	_, err := s.apply(ctx, req.ThreadId, thread.SetMode{By: user(ctx), Mode: mode})
+	return &bandav1.SetModeResponse{}, err
+}
+
+func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav1.RetryResponse, error) {
+	effect, err := s.apply(ctx, req.ThreadId, thread.Retry{By: user(ctx)})
+	if err != nil {
+		return nil, err
+	}
+	if effect == thread.Provision {
+		t, err := s.store.Get(ctx, req.ThreadId)
+		if err != nil {
+			return nil, err
+		}
+		s.provision(ctx, t)
+	}
+	return &bandav1.RetryResponse{}, nil
+}
+
+func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadRequest, stream bandav1connect.ThreadServiceWatchThreadServerStream) error {
+	ch := s.watch(req.ThreadId)
+	defer s.unwatch(req.ThreadId, ch)
+
+	// Subscribe before replaying so nothing falls in between; skip duplicates.
+	last := req.AfterSeq
+	stored, err := s.store.Events(ctx, req.ThreadId, last)
+	if err != nil {
+		return err
+	}
+	for _, e := range stored {
+		if err := stream.Send(&bandav1.WatchThreadResponse{Event: e}); err != nil {
+			return err
+		}
+		last = e.Seq
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case e, ok := <-ch:
+			if !ok {
+				return connect.NewError(connect.CodeUnavailable, "watcher fell behind, reconnect")
+			}
+			if e.Seq != 0 && e.Seq <= last {
+				continue
+			}
+			if err := stream.Send(&bandav1.WatchThreadResponse{Event: e}); err != nil {
+				return err
+			}
+			if e.Seq != 0 {
+				last = e.Seq
+			}
+		}
+	}
+}
+
+func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServiceConnectServerStream) error {
+	first, err := stream.Receive()
+	if err != nil {
+		return err
+	}
+	hello := first.GetHello()
+	if hello == nil {
+		return connect.NewError(connect.CodeInvalidArgument, "first message must be hello")
+	}
+	id := hello.ThreadId
+	t, err := s.store.Get(ctx, id)
+	if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(hello.Token)) != 1 {
+		return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
+	}
+
+	ch := make(chan *bandav1.ConnectResponse, 16)
+	s.mu.Lock()
+	s.runners[id] = ch
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		mine := s.runners[id] == ch
+		if mine {
+			delete(s.runners, id)
+		}
+		s.mu.Unlock()
+		if mine {
+			s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-ch:
+				if err := stream.Send(msg); err != nil {
+					slog.Warn("send to runner", "thread", id, "err", err)
+					return
+				}
+			}
+		}
+	}()
+
+	for {
+		msg, err := stream.Receive()
+		if err != nil {
+			return nil
+		}
+		switch k := msg.Kind.(type) {
+		case *bandav1.ConnectRequest_Ready:
+			if err := s.ready(ctx, id, ch); err != nil {
+				return err
+			}
+		case *bandav1.ConnectRequest_Event:
+			e := k.Event
+			e.Actor = "agent"
+			if e.GetNotice() != nil {
+				e.Actor = "system"
+			}
+			if e.GetAgentTextDelta() != nil {
+				e.ThreadId, e.Seq, e.Time = id, 0, timestamppb.Now()
+				s.broadcast(id, []*bandav1.Event{e})
+				continue
+			}
+			var action thread.Action
+			if e.GetTurnEnded() != nil {
+				action = thread.TurnEnded{}
+			}
+			if _, err := s.apply(ctx, id, action, e); err != nil {
+				slog.Error("store agent event", "thread", id, "err", err)
+			}
+		case *bandav1.ConnectRequest_Diff:
+			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+				t.Diff = k.Diff.Diff
+				return []*bandav1.Event{{Actor: "system", Kind: &bandav1.Event_DiffChanged{DiffChanged: &bandav1.DiffChanged{}}}}, nil
+			})
+			if err != nil {
+				slog.Error("store diff", "thread", id, "err", err)
+			}
+			s.broadcast(id, events)
+		}
+	}
+}
+
+// ready marks the environment ready and hands over the initial prompt if it
+// has not been delivered yet.
+func (s *Service) ready(ctx context.Context, id string, ch chan *bandav1.ConnectResponse) error {
+	var prompt string
+	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
+		if effect == thread.StartTurn {
+			prompt, t.PendingPrompt = t.PendingPrompt, ""
+		}
+		events := stateEvents(t.State, next)
+		t.State = next
+		return events, nil
+	})
+	if err != nil {
+		return err
+	}
+	s.broadcast(id, events)
+	if prompt != "" {
+		ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}}
+	}
+	return nil
+}
+
+// apply runs an action (nil = none) through the state machine and stores the
+// given events plus any status/mode change, then fans them out.
+func (s *Service) apply(ctx context.Context, id string, a thread.Action, events ...*bandav1.Event) (thread.Effect, error) {
+	var effect thread.Effect
+	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		if a == nil {
+			return events, nil
+		}
+		next, eff, err := thread.Apply(t.State, a)
+		if err != nil {
+			return nil, err
+		}
+		effect = eff
+		out := append(events, stateEvents(t.State, next)...)
+		t.State = next
+		return out, nil
+	})
+	if err != nil {
+		return thread.None, cerr(err)
+	}
+	s.broadcast(id, stored)
+	return effect, nil
+}
+
+func (s *Service) provision(ctx context.Context, t store.Thread) {
+	if err := s.sandboxes.Ensure(ctx, t); err != nil {
+		slog.Error("provision sandbox", "thread", t.ID, "err", err)
+		s.apply(context.WithoutCancel(ctx), t.ID, thread.EnvLost{})
+	}
+}
+
+func (s *Service) toRunner(ctx context.Context, id string, msg *bandav1.ConnectResponse) {
+	s.mu.Lock()
+	ch := s.runners[id]
+	s.mu.Unlock()
+	if ch == nil {
+		s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
+		return
+	}
+	ch <- msg
+}
+
+func (s *Service) watch(id string) chan *bandav1.Event {
+	ch := make(chan *bandav1.Event, 256)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.watchers[id] == nil {
+		s.watchers[id] = map[chan *bandav1.Event]struct{}{}
+	}
+	s.watchers[id][ch] = struct{}{}
+	return ch
+}
+
+func (s *Service) unwatch(id string, ch chan *bandav1.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.watchers[id][ch]; ok {
+		delete(s.watchers[id], ch)
+		close(ch)
+	}
+}
+
+// broadcast fans events out. A watcher that cannot keep up is dropped and
+// reconnects from its last seq.
+// ponytail: in-memory fan-out, single API replica; Postgres LISTEN/NOTIFY for more.
+func (s *Service) broadcast(id string, events []*bandav1.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for ch := range s.watchers[id] {
+		for _, e := range events {
+			select {
+			case ch <- e:
+				continue
+			default:
+			}
+			delete(s.watchers[id], ch)
+			close(ch)
+			break
+		}
+	}
+}
+
+func messageEvent(by string, m *bandav1.Message) *bandav1.Event {
+	return &bandav1.Event{Actor: by, Kind: &bandav1.Event_Message{Message: m}}
+}
+
+func stateEvents(old, next thread.State) []*bandav1.Event {
+	var out []*bandav1.Event
+	if old.Status != next.Status {
+		out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_StatusChanged{
+			StatusChanged: &bandav1.StatusChanged{Status: statusToProto[next.Status]}}})
+	}
+	if old.Mode != next.Mode {
+		out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_ModeChanged{
+			ModeChanged: &bandav1.ModeChanged{Mode: modeToProto[next.Mode]}}})
+	}
+	return out
+}
+
+func cerr(err error) error {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return connect.NewError(connect.CodeNotFound, err.Error())
+	case errors.Is(err, thread.ErrForbidden):
+		return connect.NewError(connect.CodePermissionDenied, err.Error())
+	case errors.Is(err, thread.ErrBusy), errors.Is(err, thread.ErrNotReady):
+		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
+	}
+	return err
+}
+
+var (
+	statusToProto = map[thread.Status]bandav1.Status{
+		thread.Starting:      bandav1.Status_STATUS_STARTING,
+		thread.Working:       bandav1.Status_STATUS_WORKING,
+		thread.AwaitingInput: bandav1.Status_STATUS_AWAITING_INPUT,
+		thread.Errored:       bandav1.Status_STATUS_ERRORED,
+	}
+	modeToProto   = map[thread.Mode]bandav1.Mode{thread.AgentMode: bandav1.Mode_MODE_AGENT, thread.ChatMode: bandav1.Mode_MODE_CHAT}
+	modeFromProto = map[bandav1.Mode]thread.Mode{bandav1.Mode_MODE_AGENT: thread.AgentMode, bandav1.Mode_MODE_CHAT: thread.ChatMode}
+)
+
+func toProto(t store.Thread) *bandav1.Thread {
+	return &bandav1.Thread{
+		Id:        t.ID,
+		OwnerId:   t.OwnerID,
+		Title:     t.Title,
+		RepoUrl:   t.RepoURL,
+		Branch:    t.Branch,
+		Model:     t.Model,
+		Effort:    t.Effort,
+		Status:    statusToProto[t.Status],
+		Mode:      modeToProto[t.Mode],
+		Diff:      t.Diff,
+		CreatedAt: timestamppb.New(t.CreatedAt),
+		UpdatedAt: timestamppb.New(t.UpdatedAt),
+	}
+}
+
+func title(prompt string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(prompt), "\n")
+	if r := []rune(line); len(r) > 60 {
+		return string(r[:60]) + "…"
+	}
+	return line
+}
+
+func or(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}

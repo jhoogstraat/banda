@@ -1,0 +1,235 @@
+syntax = "proto3";
+
+package banda.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ThreadService is the API the web client talks to.
+service ThreadService {
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc Interrupt(InterruptRequest) returns (InterruptResponse);
+  rpc SetMode(SetModeRequest) returns (SetModeResponse);
+  rpc Retry(RetryRequest) returns (RetryResponse);
+  // Replays stored events with seq > after_seq, then streams live events.
+  rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
+}
+
+// RunnerService is dialed by the runner inside each sandbox pod, so the API
+// never has to reach into pods.
+service RunnerService {
+  rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_STARTING = 1;
+  STATUS_WORKING = 2;
+  STATUS_AWAITING_INPUT = 3;
+  STATUS_ERRORED = 4;
+}
+
+enum Mode {
+  MODE_UNSPECIFIED = 0;
+  // Every owner message starts a turn.
+  MODE_AGENT = 1;
+  // Only messages that mention the agent start a turn.
+  MODE_CHAT = 2;
+}
+
+message Thread {
+  string id = 1;
+  string owner_id = 2;
+  string title = 3;
+  string repo_url = 4;
+  string branch = 5;
+  string model = 6;
+  string effort = 7;
+  Status status = 8;
+  Mode mode = 9;
+  // Unified diff of the branch against its base, refreshed after each turn.
+  string diff = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message Event {
+  string thread_id = 1;
+  // Order within the thread. 0 for ephemeral events that are not stored.
+  int64 seq = 2;
+  google.protobuf.Timestamp time = 3;
+  // User id, "agent" or "system".
+  string actor = 4;
+  oneof kind {
+    Message message = 10;
+    AgentText agent_text = 11;
+    AgentTextDelta agent_text_delta = 12;
+    AgentThinking agent_thinking = 13;
+    ToolCall tool_call = 14;
+    ToolResult tool_result = 15;
+    TurnEnded turn_ended = 16;
+    StatusChanged status_changed = 17;
+    ModeChanged mode_changed = 18;
+    DiffChanged diff_changed = 19;
+    Notice notice = 20;
+  }
+}
+
+message Message {
+  string text = 1;
+  bool mentions_agent = 2;
+  repeated string mentioned_user_ids = 3;
+}
+
+message AgentText {
+  string text = 1;
+}
+
+// Ephemeral streaming chunk of the agent text that is being written.
+message AgentTextDelta {
+  string text = 1;
+}
+
+message AgentThinking {
+  string text = 1;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  string input_json = 3;
+}
+
+message ToolResult {
+  string tool_call_id = 1;
+  string output = 2;
+  bool is_error = 3;
+}
+
+message TurnEnded {
+  bool is_error = 1;
+  string error = 2;
+  int64 duration_ms = 3;
+  double cost_usd = 4;
+}
+
+message StatusChanged {
+  Status status = 1;
+  string reason = 2;
+}
+
+message ModeChanged {
+  Mode mode = 1;
+}
+
+message DiffChanged {}
+
+// Something the user needs to know or do, e.g. log in to Claude Code.
+message Notice {
+  string text = 1;
+}
+
+message CreateThreadRequest {
+  string repo_url = 1;
+  string base_branch = 2;
+  string model = 3;
+  string effort = 4;
+  string prompt = 5;
+}
+
+message CreateThreadResponse {
+  Thread thread = 1;
+}
+
+message ListThreadsRequest {
+  // Empty means the caller.
+  string owner_id = 1;
+}
+
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+}
+
+message GetThreadRequest {
+  string thread_id = 1;
+}
+
+message GetThreadResponse {
+  Thread thread = 1;
+}
+
+message SendMessageRequest {
+  string thread_id = 1;
+  Message message = 2;
+}
+
+message SendMessageResponse {}
+
+message InterruptRequest {
+  string thread_id = 1;
+}
+
+message InterruptResponse {}
+
+message SetModeRequest {
+  string thread_id = 1;
+  Mode mode = 2;
+}
+
+message SetModeResponse {}
+
+message RetryRequest {
+  string thread_id = 1;
+}
+
+message RetryResponse {}
+
+message WatchThreadRequest {
+  string thread_id = 1;
+  int64 after_seq = 2;
+}
+
+message WatchThreadResponse {
+  Event event = 1;
+}
+
+// Runner -> API.
+message ConnectRequest {
+  oneof kind {
+    // First message on every connection.
+    Hello hello = 1;
+    // The agent can take prompts (checkout done, Claude Code logged in).
+    Ready ready = 4;
+    // Agent output. The API assigns seq and stores everything but deltas.
+    Event event = 2;
+    Diff diff = 3;
+  }
+}
+
+message Hello {
+  string thread_id = 1;
+  string token = 2;
+}
+
+message Ready {}
+
+message Diff {
+  string diff = 1;
+}
+
+// API -> runner.
+message ConnectResponse {
+  oneof kind {
+    Prompt prompt = 1;
+    Stop stop = 2;
+  }
+}
+
+message Prompt {
+  string text = 1;
+}
+
+// Interrupts the current turn.
+message Stop {}

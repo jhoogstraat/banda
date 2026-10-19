@@ -1,0 +1,7 @@
+[tools]
+go = "1.27"
+node = "26"
+pnpm = "latest"
+buf = "latest"
+kind = "latest"
+kubectl = "latest"

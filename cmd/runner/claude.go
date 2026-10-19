@@ -1,0 +1,111 @@
+package main
+
+import (
+	"encoding/json"
+	"strings"
+
+	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+)
+
+// line is the subset of Claude Code's stream-json output we use.
+// See docs/research/claude-headless.md.
+type line struct {
+	Type            string  `json:"type"`
+	Subtype         string  `json:"subtype"`
+	ParentToolUseID *string `json:"parent_tool_use_id"`
+	Message         struct {
+		Content json.RawMessage `json:"content"`
+	} `json:"message"`
+	Event struct {
+		Type  string `json:"type"`
+		Delta struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"delta"`
+	} `json:"event"`
+	// result
+	IsError      bool    `json:"is_error"`
+	Result       string  `json:"result"`
+	DurationMS   int64   `json:"duration_ms"`
+	TotalCostUSD float64 `json:"total_cost_usd"`
+	// system/api_retry
+	Error string `json:"error"`
+}
+
+type block struct {
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	ToolUseID string          `json:"tool_use_id"`
+	Content   json.RawMessage `json:"content"`
+	IsError   bool            `json:"is_error"`
+}
+
+// authErrors are api_retry categories that mean the user must log in again.
+var authErrors = map[string]bool{"authentication_failed": true, "oauth_org_not_allowed": true, "account_on_hold": true, "billing_error": true}
+
+// translate maps one stream-json line to Banda events. authFailed reports a
+// retry loop caused by a bad login, which the caller should interrupt.
+// ponytail: subagent (Task tool) internals are dropped; show them nested when the UI wants them.
+func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool) {
+	var l line
+	if json.Unmarshal(raw, &l) != nil || l.ParentToolUseID != nil {
+		return nil, false, false
+	}
+	switch l.Type {
+	case "stream_event":
+		if l.Event.Type == "content_block_delta" && l.Event.Delta.Type == "text_delta" {
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentTextDelta{AgentTextDelta: &bandav1.AgentTextDelta{Text: l.Event.Delta.Text}}})
+		}
+	case "assistant", "user":
+		var blocks []block
+		if json.Unmarshal(l.Message.Content, &blocks) != nil {
+			return nil, false, false // plain string content is our own prompt echoed back
+		}
+		for _, b := range blocks {
+			switch b.Type {
+			case "text":
+				events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: b.Text}}})
+			case "thinking":
+				if b.Thinking != "" {
+					events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentThinking{AgentThinking: &bandav1.AgentThinking{Text: b.Thinking}}})
+				}
+			case "tool_use":
+				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Id: b.ID, Name: b.Name, InputJson: string(b.Input)}}})
+			case "tool_result":
+				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolResult{ToolResult: &bandav1.ToolResult{ToolCallId: b.ToolUseID, Output: text(b.Content), IsError: b.IsError}}})
+			}
+		}
+	case "result":
+		te := &bandav1.TurnEnded{IsError: l.IsError, DurationMs: l.DurationMS, CostUsd: l.TotalCostUSD}
+		if l.IsError {
+			te.Error = l.Result
+		}
+		return []*bandav1.Event{{Kind: &bandav1.Event_TurnEnded{TurnEnded: te}}}, true, false
+	case "system":
+		return nil, false, l.Subtype == "api_retry" && authErrors[l.Error]
+	}
+	return events, false, false
+}
+
+// text flattens tool_result content, which is a string or a list of blocks.
+func text(raw json.RawMessage) string {
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var blocks []block
+	json.Unmarshal(raw, &blocks)
+	var parts []string
+	for _, b := range blocks {
+		if b.Type == "text" {
+			parts = append(parts, b.Text)
+		} else {
+			parts = append(parts, "["+b.Type+"]")
+		}
+	}
+	return strings.Join(parts, "\n")
+}
