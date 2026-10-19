@@ -30,7 +30,13 @@ const maxListed, maxDiff = 50, 20 << 10
 func (s *Service) MCPHandler() http.Handler {
 	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return s.mcpServer(r.Context().Value(callerKey{}).(store.Thread))
-	}, &mcp.StreamableHTTPOptions{Stateless: true})
+	}, &mcp.StreamableHTTPOptions{
+		Stateless: true,
+		// Runners reach a host-run API through the container VM's loopback with a
+		// non-local Host header. Every request needs the thread's bearer token,
+		// which a DNS-rebinding page cannot have.
+		DisableLocalhostProtection: true,
+	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t, err := s.store.Get(r.Context(), r.Header.Get("X-Banda-Thread"))
 		if err != nil && !errors.Is(err, store.ErrNotFound) {

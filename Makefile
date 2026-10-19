@@ -17,7 +17,7 @@ export OIDC_CLIENT_SECRET ?= banda-dev-secret
 export PUBLIC_URL ?= http://localhost:5173
 endif
 
-.PHONY: gen test cluster image api web login
+.PHONY: gen test cluster image api web login e2e
 
 gen:
 	$(X) buf generate
@@ -46,3 +46,6 @@ web:
 
 login:
 	$(X) kubectl --context kind-banda exec -it -n banda $(SANDBOX) -- claude auth login
+
+e2e:
+	deploy/e2e.sh
