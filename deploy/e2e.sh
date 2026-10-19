@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end check of a running system with the fake agent (no Claude login):
-#   make image TARGET=fake IMAGE=localhost/banda-sandbox:fake
-#   make api AUTH=dev IMAGE=localhost/banda-sandbox:fake
-#   make e2e
+# End-to-end check of a running system with the fake agent (no Claude login).
+# `mise run e2e` builds the fake image and starts a dev-auth API for it, then runs this.
 set -euo pipefail
 API=${API:-http://localhost:8787}
 REPO=${REPO:-https://github.com/octocat/Hello-World.git}

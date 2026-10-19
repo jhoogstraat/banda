@@ -238,7 +238,7 @@ func waitForLogin(ctx context.Context, notice func(string) error) error {
 }
 
 func loginHint(problem string) string {
-	return fmt.Sprintf("%s Open the Terminal tab and run `claude auth login` (or use the Log in button). Fallback: `make login SANDBOX=t-%s` or `kubectl exec -it -n banda t-%s -- claude auth login`. The thread continues once you are logged in.", problem, threadID, threadID)
+	return fmt.Sprintf("%s Open the Terminal tab and run `claude auth login` (or use the Log in button). Fallback: `kubectl exec -it -n banda t-%s -- claude auth login`. The thread continues once you are logged in.", problem, threadID)
 }
 
 type claudeProc struct {
