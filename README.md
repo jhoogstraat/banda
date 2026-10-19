@@ -2,6 +2,8 @@
 
 A web app where a team builds software together with coding agents. Each thread is one owner, one Claude Code agent and one isolated Kubernetes sandbox with the repo checked out on its own branch. Teammates can browse each other's threads, post into them and mention each other. See [PLAN.md](PLAN.md) for the architecture, decisions and status.
 
+![A thread with the diff pane](docs/screenshots/thread.png)
+
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev): `mise install` provides go, node, pnpm, buf, kind and kubectl.
