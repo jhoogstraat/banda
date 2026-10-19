@@ -23,6 +23,7 @@
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
 	import DiffView from '#lib/components/diff-view.svelte';
+	import FileBrowser from '#lib/components/file-browser.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
@@ -46,13 +47,15 @@
 	let thread = $state<Thread>();
 	const chat = $state<Chat>({ items: [], streaming: '' });
 	let diffOpen = $state(true);
-	// The terminal mounts when its tab is first opened and then stays alive; a key change reopens it.
+	// The terminal and the file browser mount when their tab is first opened and then stay alive; a key change reopens the terminal.
 	let tab = $state('diff');
 	let termOpened = $state(false);
+	let filesOpened = $state(false);
 	let termKey = $state(0);
 	let termCommand = $state('');
 	$effect(() => {
 		if (tab === 'terminal') termOpened = true;
+		if (tab === 'files') filesOpened = true;
 	});
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	function login() {
@@ -274,10 +277,14 @@
 	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
 		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
 			<TabsTrigger value="diff">Diff</TabsTrigger>
+			<TabsTrigger value="files">Files</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
 		</TabsList>
 		<TabsContent value="diff" class="min-h-0 overflow-auto">
 			<DiffView diff={thread?.diff ?? ''} />
+		</TabsContent>
+		<TabsContent value="files" class="min-h-0 overflow-auto">
+			{#if filesOpened}<FileBrowser threadId={id} diff={thread?.diff ?? ''} />{/if}
 		</TabsContent>
 		{#if owner && termOpened}
 			<div class="min-h-0 flex-1 {tab === 'terminal' ? '' : 'hidden'}">

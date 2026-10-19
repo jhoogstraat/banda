@@ -13,6 +13,9 @@ const bundledLanguages = {
 	tsx: () => import("@shikijs/langs/tsx"),
 	jsx: () => import("@shikijs/langs/jsx"),
 	css: () => import("@shikijs/langs/css"),
+	go: () => import("@shikijs/langs/go"),
+	html: () => import("@shikijs/langs/html"),
+	yaml: () => import("@shikijs/langs/yaml"),
 	text: () => import("@shikijs/langs/markdown"),
 };
 

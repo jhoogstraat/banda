@@ -139,6 +139,7 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 - Sidebar: Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
+- Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
 - Banda MCP server for agents.
 - In-cluster deployment of the API (`make deploy`, `deploy/banda.yaml`).
@@ -149,7 +150,7 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 **Not yet**
 - Permission prompts (`--permission-prompt-tool stdio`); turns run with `--dangerously-skip-permissions` inside the sandbox.
 - Deleting settled sandboxes (`shutdownTime`): waits until branches are pushed by default, so no work is lost.
-- Files and browser panes in the right pane; changing model or effort mid-thread.
+- A browser pane in the right pane; changing model or effort mid-thread.
 - Codex and other harnesses (check their subscription terms first).
 - Several API replicas (needs `LISTEN/NOTIFY` fan-out).
 

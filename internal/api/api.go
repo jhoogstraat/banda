@@ -31,6 +31,8 @@ type Service struct {
 	runners  map[string]*runner
 	// terminals holds each thread's single terminal subscriber (see OpenTerminal).
 	terminals map[string]chan *bandav1.TerminalOutput
+	// files holds the requests waiting for a runner's answer (see fileRequest).
+	files map[string]chan *bandav1.FileResponse
 }
 
 // runner is a connected runner: commands go to ch until done is closed.
@@ -46,6 +48,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
+		files:     map[string]chan *bandav1.FileResponse{},
 	}
 }
 
@@ -325,6 +328,8 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				}
 			}
 			s.mu.Unlock()
+		case *bandav1.ConnectRequest_FileResponse:
+			s.fileResponse(k.FileResponse)
 		case *bandav1.ConnectRequest_Diff:
 			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 				t.Diff = k.Diff.Diff
