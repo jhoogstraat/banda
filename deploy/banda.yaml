@@ -1,0 +1,79 @@
+# banda-api running in the cluster. Settings come from the optional Secret
+# "banda-api" (e.g. OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET,
+# PUBLIC_URL, SESSION_SECRET); without OIDC settings it runs with dev auth.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: banda-api
+  namespace: banda
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: banda-api
+  namespace: banda
+rules:
+  - apiGroups: [agents.x-k8s.io]
+    resources: [sandboxes]
+    verbs: [get, create, patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [delete]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: banda-api
+  namespace: banda
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: banda-api
+subjects:
+  - kind: ServiceAccount
+    name: banda-api
+    namespace: banda
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banda-api
+  namespace: banda
+spec:
+  replicas: 1 # in-memory event fan-out; see PLAN.md
+  selector:
+    matchLabels: {app: banda-api}
+  template:
+    metadata:
+      labels: {app: banda-api}
+    spec:
+      serviceAccountName: banda-api
+      containers:
+        - name: api
+          image: localhost/banda-api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8787
+          env:
+            - {name: DATABASE_URL, value: "postgres://banda:banda@postgres:5432/banda"}
+            - {name: SANDBOX_NAMESPACE, value: banda}
+            - {name: SANDBOX_IMAGE, value: localhost/banda-sandbox:dev}
+            - {name: RUNNER_API_URL, value: "http://banda-api.banda.svc:8787"}
+          envFrom:
+            - secretRef: {name: banda-api, optional: true}
+          readinessProbe:
+            httpGet: {path: /, port: 8787}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banda-api
+  namespace: banda
+spec:
+  selector: {app: banda-api}
+  ports:
+    - port: 8787
+      targetPort: 8787
