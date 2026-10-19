@@ -198,6 +198,15 @@ func startClaude(ctx context.Context) (*claudeProc, error) {
 	if e := os.Getenv("BANDA_EFFORT"); e != "" {
 		args = append(args, "--effort", e)
 	}
+	// Neither flag is restored on --resume, so both are always passed.
+	mcpConfig, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"banda": map[string]any{
+		"type": "http", "url": os.Getenv("BANDA_API_URL") + "/mcp",
+		"headers": map[string]string{"Authorization": "Bearer " + os.Getenv("BANDA_RUNNER_TOKEN"), "X-Banda-Thread": threadID},
+	}}})
+	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", fmt.Sprintf(
+		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
+			"The banda MCP tools (list_threads, read_thread, post_message, create_thread) let you see other threads, post into them and start new threads.",
+		threadID, os.Getenv("BANDA_BRANCH")))
 	sid := sessionID(threadID)
 	if hasTranscript(sid) {
 		args = append(args, "--resume", sid)

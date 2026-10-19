@@ -64,6 +64,7 @@ func main() {
 	if sso != nil {
 		sso.Mount(mux)
 	}
+	mux.Handle("/mcp", svc.MCPHandler())
 	if dir := os.Getenv("WEB_DIR"); dir != "" {
 		mux.Handle("/", spa(dir))
 	}
