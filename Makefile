@@ -17,7 +17,7 @@ export OIDC_CLIENT_SECRET ?= banda-dev-secret
 export PUBLIC_URL ?= http://localhost:5173
 endif
 
-.PHONY: gen test cluster image api web login e2e
+.PHONY: gen test cluster image api web login e2e deploy
 
 gen:
 	$(X) buf generate
@@ -49,3 +49,10 @@ login:
 
 e2e:
 	deploy/e2e.sh
+
+deploy:
+	$(CONTAINER) build -f deploy/api.Dockerfile -t localhost/banda-api:dev .
+	$(CONTAINER) save localhost/banda-api:dev -o /tmp/banda-api.tar
+	$(X) kind load image-archive /tmp/banda-api.tar --name banda
+	$(X) kubectl --context kind-banda apply -f deploy/banda.yaml
+	$(X) kubectl --context kind-banda rollout restart -n banda deployment/banda-api

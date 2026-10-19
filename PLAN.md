@@ -25,7 +25,11 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Posting | Anyone can post in any thread at any time. |
 | Chat mode | A post by someone other than the owner, or any post that mentions a person, switches the thread to chat mode, unless the post mentions the agent. Only the owner can switch chat mode off; it never ends by itself. In agent mode the owner doesn't need to mention the agent. In chat mode everyone, the owner included, must mention the agent to start a turn. |
 | Sandboxes | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) v1.0.7, core `Sandbox` CRD only. See [research](docs/research/sandbox-lifecycle.md). |
-| Claude login | A per-user volume mounted as `CLAUDE_CONFIG_DIR` into that user's pods. Only the `claude` binary reads or writes it. See [research](docs/research/claude-login.md). |
+| Claude login | A per-user volume mounted as `CLAUDE_CONFIG_DIR` into that user's pods. Only the `claude` binary reads or writes it. Users log in from the browser through the thread's terminal (`claude auth login`). See [research](docs/research/claude-login.md). |
+| Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
+| Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
+| Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Local runtime | Podman machine `banda` (rootful), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
 
@@ -66,17 +70,19 @@ Kubernetes (agent-sandbox) ── one Sandbox pod per thread:
   - sends the diff after each turn.
 - **web** (`web/`): SvelteKit, `adapter-static`, with [ai-elements for Svelte](https://github.com/sikandarjodd/ai-elements). 3 panes: sidebar, chat, and a right pane (diff for now).
 - **Contract**: `proto/banda/v1/banda.proto`. buf generates the Go code (`gen/`) and the TS code (`web/src/lib/gen/`).
+- **MCP** (`internal/api/mcp.go`): the Banda MCP server, passed to every `claude` via `--mcp-config`.
+- **Terminal**: the runner opens a PTY on request and streams it through the same dial-in stream; the web client renders it with xterm.js.
 - ponytail: one API replica with in-memory fan-out. Switch to Postgres `LISTEN/NOTIFY` when we need a second replica.
 
 ## Domain model
 
 | Entity | Fields |
 |---|---|
-| User | M1: the dev header. M2: OIDC `sub`, name, email, avatar. |
-| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, runner token, latest diff |
+| User | OIDC `sub`, name, email (dev auth: the header value) |
+| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, delivered seq (what the agent has seen), runner token, latest diff |
 | Event | thread, seq, protojson body (`banda.v1.Event`). Append-only; the chat is rendered from these. |
-| Mention (M3) | event, user, answered_at. Drives the Mentioned section. |
-| ThreadView (M2) | user, thread, snoozed_until, settled_at, last_read_seq. Per-user overlay. |
+| Mention | thread, event seq, user, answered_at. Drives the Mentioned section. |
+| ThreadView | user, thread, snoozed_until, settled_at. Per-user overlay. |
 
 ## Thread state machine
 
@@ -89,23 +95,25 @@ starting ──EnvReady──▶ working ──TurnEnded──▶ awaiting_input
    └──EnvReady (no prompt)──▶ awaiting_input
 working ──Interrupt──▶ (stop sent; TurnEnded follows)
 any ──EnvLost──▶ errored ──Retry / runner reconnects──▶ starting / awaiting_input
+awaiting_input / starting / errored ──Suspend (idle, owner snooze/settle)──▶ suspended
+suspended ──turn-starting post (kept as pending prompt) / owner Wake──▶ starting
 ```
 
-Mode is `agent` or `chat`; the rules are in the Decisions table. Posts that don't start a turn are always allowed. A post that would start a turn is rejected while the agent is working (M1: no queue) or while the environment isn't ready.
+Mode is `agent` or `chat`; the rules are in the Decisions table. Posts that don't start a turn are always allowed. A post that would start a turn is rejected while the agent is working (no queue yet) or while the environment is starting or errored.
 
-Snooze and settle (M2) are per viewer. **Sidebar sections**, computed per viewer:
+Snooze and settle are per viewer. **Sidebar sections**, computed per viewer:
 
 | Section | Rule | Position |
 |---|---|---|
 | Mentioned | someone else's thread, I'm mentioned, unanswered | top |
-| Needs input | my thread, `awaiting_input` or `errored`, not snoozed or settled | top |
+| Needs input | my thread, `awaiting_input`, `errored` or `suspended`, not snoozed or settled | top |
 | Working | my thread, `starting` or `working`, not snoozed or settled | bottom, collapsed |
 | Snoozed | `snoozed_until > now` | bottom, collapsed |
 | Settled | `settled_at` set | bottom, collapsed |
 
 ## Environment lifecycle
 
-Only the owner's own actions drive the environment. M1 implements create and recreate only; the rest is M4.
+Only the owner's own actions drive the environment. Implemented as below, except deleting settled sandboxes.
 
 | Thread state | Environment action |
 |---|---|
@@ -115,28 +123,35 @@ Only the owner's own actions drive the environment. M1 implements create and rec
 | `awaiting_input`, idle ≥ 30 min | `operatingMode: Suspended`: the pod is deleted, the PVCs stay (a one-minute ticker in banda-api) |
 | owner posts or opens the env | `operatingMode: Running`; the runner restarts `claude --resume <session>` |
 | owner snoozes | suspend now, resume lazily |
-| owner settles | suspend, plus `shutdownTime` = now + 7 days with `shutdownPolicy: Delete` |
+| owner settles | suspend (later: `shutdownTime` = now + 7 days with `shutdownPolicy: Delete`, once branches are pushed by default) |
 | `errored` → Retry | delete the pod; the controller recreates it on the same PVC |
 
 Expected resume time on kind: about 3–10 s. A suspended thread costs only disk. Deferred: warm pools, memory snapshots (upstream has none), gVisor/Kata, [agent-substrate](https://github.com/agent-substrate/substrate) (pre-1.0, and it wakes actors on inbound traffic while our runner dials out).
 
-## Milestones
+## Status
 
-**M1: Solo slice.** Demo: create a thread on a repo → watch Claude work → see the diff → send a follow-up.
-- kind cluster with agent-sandbox. Postgres runs in the cluster. The API runs on the host, and runners reach it via `host.docker.internal`.
-- The runner runs `claude` with `--dangerously-skip-permissions`, because the sandbox is the security boundary.
-- Claude login: `kubectl exec -it -n banda t-<id> -- claude auth login`, once per user.
-- Not in M1: OIDC, other users, mentions UI, snooze/settle, lifecycle automation, MCP, PRs, permission prompts.
+Everything below is implemented on branch `v1` and checked by `make e2e` against the kind cluster (fake agent), unless noted.
 
-**M2: Team basics.** OIDC login (any standard provider). Users list in the sidebar, per-user sections, terminal pane for Claude login. Permission prompts become `awaiting_input`.
+**Built**
+- Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
+- State machine: `starting`, `working`, `awaiting_input`, `errored`, `suspended`; agent/chat mode with the posting rules from the Decisions table.
+- Sign-in with OIDC (Dex locally), users, display names.
+- Sidebar: Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
+- Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
+- Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
+- Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
+- Banda MCP server for agents.
+- In-cluster deployment of the API (`make deploy`, `deploy/banda.yaml`).
 
-**M3: Mentions and chat mode UI.** @mention autocomplete, the Mentioned section, in-app notifications. Give the agent recent chat messages as context when it is mentioned.
+**Verified only partly**
+- Real Claude Code: the image starts, detects the missing login and prints the sign-in URL in the terminal. Completing a login and a real turn need a Claude subscription; the stream-json mapping is tested against recorded CLI output.
 
-**M4: Git and lifecycle.** Push the branch, open a PR, files pane. Suspend and resume per the lifecycle table.
-
-**M5: Banda MCP server.** Agents can list, read and search threads and post to a thread. The server is injected into every sandbox, scoped to the owner's access.
-
-**M6: Second harness and browser.** Codex (check OpenAI's subscription terms the same way). Browser pane previewing a dev-server port.
+**Not yet**
+- Permission prompts (`--permission-prompt-tool stdio`); turns run with `--dangerously-skip-permissions` inside the sandbox.
+- Deleting settled sandboxes (`shutdownTime`): waits until branches are pushed by default, so no work is lost.
+- Files and browser panes in the right pane; changing model or effort mid-thread.
+- Codex and other harnesses (check their subscription terms first).
+- Several API replicas (needs `LISTEN/NOTIFY` fan-out).
 
 ## Repo layout
 
@@ -148,11 +163,12 @@ proto/          Connect API definitions
 gen/            generated Go
 web/            SvelteKit app
 deploy/         kind config, Postgres, sandbox image
+deploy/e2e.sh   end-to-end check with the fake agent
 docs/research/  sandbox lifecycle, Claude login, Claude headless protocol
 ```
 
 ## Open questions
 
-1. **Repos:** GitHub App with org repos, or paste any git URL? Which git host? M1 takes any HTTPS URL, plus an optional token in the `banda-git` Secret.
-2. **Mid-thread changes:** can the model or effort change in the middle of a thread?
-3. **Teammate turns:** do they stay on the owner's subscription? See open risk 5 above.
+1. **Teammate turns:** do they stay on the owner's subscription? See open risk 5 above.
+2. **Repos:** any HTTPS git URL works, with an optional token in the `banda-git` Secret. A GitHub App would allow per-user access and opening PRs via the API.
+3. **Anthropic:** before open-sourcing, confirm the persistent login volume and teammate turns with Anthropic.
