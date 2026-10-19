@@ -1,0 +1,27 @@
+<script lang="ts">
+	import type { Component } from 'svelte';
+	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+
+	// A composer toolbar chip that picks one of a few values (model, effort).
+	let {
+		value = $bindable(),
+		options,
+		icon: Icon,
+		label
+	}: { value: string; options: string[]; icon: Component; label: string } = $props();
+</script>
+
+<DropdownMenu.Root>
+	<DropdownMenu.Trigger>
+		{#snippet child({ props })}
+			<PromptInput.Button {...props} size="sm" aria-label="{label}: {value}"><Icon /> {value}</PromptInput.Button>
+		{/snippet}
+	</DropdownMenu.Trigger>
+	<DropdownMenu.Content align="start" class="w-48">
+		<DropdownMenu.Label>{label}</DropdownMenu.Label>
+		<DropdownMenu.RadioGroup bind:value>
+			{#each options as o (o)}<DropdownMenu.RadioItem value={o}>{o}</DropdownMenu.RadioItem>{/each}
+		</DropdownMenu.RadioGroup>
+	</DropdownMenu.Content>
+</DropdownMenu.Root>

@@ -1,106 +1,84 @@
 <script lang="ts">
-	import PageHeader from '#lib/components/page-header.svelte';
 	import { goto } from '$app/navigation';
-	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
-	import { Label } from '#lib/components/ui/label/index.js';
-	import { NativeSelect, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
-	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import BotIcon from '@lucide/svelte/icons/bot';
+	import BrainIcon from '@lucide/svelte/icons/brain';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
+	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import OptionMenu from '#lib/components/option-menu.svelte';
+	import PageHeader from '#lib/components/page-header.svelte';
+	import RepoPicker from '#lib/components/repo-picker.svelte';
 	import { api } from '#lib/api.js';
-	import { loadThreads, threads } from '#lib/threads.svelte.js';
+	import { loadThreads, projects, threads } from '#lib/threads.svelte.js';
 
-	// The last repository is remembered (the app is a client-only SPA, so localStorage is always there).
-	let repoUrl = $state(localStorage.getItem('banda.repoUrl') ?? '');
-	let baseBranch = $state(localStorage.getItem('banda.baseBranch') ?? 'main');
-	let model = $state('claude-opus-5-5');
-	let effort = $state('high');
-	let prompt = $state('');
+	// A new thread is an empty chat: the first message creates it. The last choices are remembered
+	// (the app is a client-only SPA, so localStorage is always there).
+	const saved = (key: string, fallback: string) => localStorage.getItem(`banda.${key}`) ?? fallback;
+	let repoUrl = $state(threads.project || saved('repoUrl', ''));
+	let baseBranch = $state(saved('baseBranch', 'main'));
+	let model = $state(saved('model', 'claude-opus-5-5'));
+	let effort = $state(saved('effort', 'high'));
+	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
+	$effect(() => {
+		if (!repoUrl) repoUrl = projects()[0] ?? '';
+	});
 	let busy = $state(false);
 	let error = $state('');
 
-	async function submit(e: SubmitEvent) {
-		e.preventDefault();
+	async function submit({ text }: { text: string }) {
+		if (!text.trim()) return;
+		if (!repoUrl) {
+			error = 'Choose a repository first.';
+			throw new Error(error); // keeps the typed prompt in the box
+		}
 		busy = true;
 		error = '';
-		localStorage.setItem('banda.repoUrl', repoUrl);
-		localStorage.setItem('banda.baseBranch', baseBranch);
+		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort })) localStorage.setItem(`banda.${k}`, v);
 		try {
-			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt });
+			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
 			loadThreads().catch(() => {});
 			await goto(`/t/${thread!.id}`);
 		} catch (err) {
 			error = (err as Error).message;
 			busy = false;
+			throw err;
 		}
 	}
 </script>
 
 <div class="flex min-w-0 flex-1 flex-col">
-	<PageHeader />
-	<!-- Container queries: the form lays itself out by its own width, not the screen's. -->
-	<div class="@container flex flex-1 items-start justify-center overflow-y-auto p-3 @lg:items-center @lg:p-8">
-		<form onsubmit={submit} class="flex w-full max-w-xl flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm @lg:p-6">
-			<div>
-				<h1 class="text-xl font-semibold tracking-tight">New thread</h1>
-				<p class="text-sm text-muted-foreground">
-					{#if threads.me && !threads.list.length && !threads.viewing}
-						You have no threads yet. Point the agent at a repository and describe the task to start your first one.
-					{:else}
-						A coding agent works on your task in its own sandbox, on its own branch.
-					{/if}
-				</p>
-			</div>
-			<div class="flex flex-col gap-1.5">
-				<Label for="harness">Harness</Label>
-				<NativeSelect id="harness" value="claude-code" class="w-full">
-					<NativeSelectOption value="claude-code">Claude Code</NativeSelectOption>
-					<NativeSelectOption value="codex" disabled>Codex — soon</NativeSelectOption>
-				</NativeSelect>
-			</div>
-			<div class="grid gap-4 @md:grid-cols-[2fr_1fr]">
-				<div class="flex flex-col gap-1.5">
-					<Label for="repo">Repository URL</Label>
-					<Input id="repo" bind:value={repoUrl} placeholder="https://github.com/org/repo.git" required />
-				</div>
-				<div class="flex flex-col gap-1.5">
-					<Label for="base">Base branch</Label>
-					<Input id="base" bind:value={baseBranch} required />
-				</div>
-			</div>
-			<div class="grid grid-cols-2 gap-4">
-				<div class="flex flex-col gap-1.5">
-					<Label for="model">Model</Label>
-					<NativeSelect id="model" bind:value={model} class="w-full">
-						<NativeSelectOption value="claude-opus-5-5">claude-opus-5-5</NativeSelectOption>
-						<NativeSelectOption value="claude-sonnet-5-5">claude-sonnet-5-5</NativeSelectOption>
-						<NativeSelectOption value="claude-haiku-5-5">claude-haiku-5-5</NativeSelectOption>
-					</NativeSelect>
-				</div>
-				<div class="flex flex-col gap-1.5">
-					<Label for="effort">Effort</Label>
-					<NativeSelect id="effort" bind:value={effort} class="w-full">
-						{#each ['low', 'medium', 'high', 'xhigh', 'max'] as e (e)}
-							<NativeSelectOption value={e}>{e}</NativeSelectOption>
-						{/each}
-					</NativeSelect>
-				</div>
-			</div>
-			<div class="flex flex-col gap-1.5">
-				<Label for="prompt">Prompt</Label>
-				<Textarea
-					id="prompt"
-					bind:value={prompt}
-					rows={6}
-					placeholder="What should the agent do?"
-					required
-					onkeydown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.currentTarget.form?.requestSubmit()}
-				/>
-			</div>
-			{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
-			<Button type="submit" disabled={busy}>
-				{busy ? 'Creating…' : 'Create thread'}
-				<span class="text-xs opacity-60">⌘/Ctrl + Enter</span>
-			</Button>
-		</form>
+	<PageHeader><h1 class="text-sm font-medium">New thread</h1></PageHeader>
+
+	<div class="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
+		<ConversationEmptyState
+			title="What should the agent work on?"
+			description="It works in its own sandbox, on its own branch. Teammates can follow along and join in."
+		>
+			{#snippet icon()}<BotIcon class="size-8" />{/snippet}
+		</ConversationEmptyState>
+	</div>
+
+	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
+		<PromptInput.Root onSubmit={submit}>
+			<fieldset disabled={busy} class="contents">
+				<PromptInput.Body>
+					<PromptInput.Textarea placeholder="Describe the task. Enter sends, Shift+Enter adds a line." />
+				</PromptInput.Body>
+				<PromptInput.Toolbar>
+					<PromptInput.Tools class="min-w-0 flex-wrap">
+						<RepoPicker bind:repoUrl bind:baseBranch />
+						<OptionMenu
+							label="Model"
+							icon={CpuIcon}
+							bind:value={model}
+							options={['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']}
+						/>
+						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={['low', 'medium', 'high', 'xhigh', 'max']} />
+					</PromptInput.Tools>
+					<PromptInput.Submit status={busy ? 'submitted' : undefined} />
+				</PromptInput.Toolbar>
+			</fieldset>
+		</PromptInput.Root>
 	</div>
 </div>

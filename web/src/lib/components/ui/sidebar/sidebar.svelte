@@ -35,6 +35,7 @@
 	</div>
 {:else if sidebar.isMobile}
 	<Sheet.Root bind:open={() => sidebar.openMobile, (v) => sidebar.setOpenMobile(v)} {...restProps}>
+		<!-- Banda: no autofocus, or phones pop up the keyboard for the search field on every open. -->
 		<Sheet.Content
 			bind:ref
 			data-sidebar="sidebar"
@@ -46,6 +47,7 @@
 			)}
 			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
 			{side}
+			onOpenAutoFocus={(e) => e.preventDefault()}
 		>
 			<Sheet.Header class="sr-only">
 				<Sheet.Title>Sidebar</Sheet.Title>

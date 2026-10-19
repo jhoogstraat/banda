@@ -136,7 +136,8 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 - Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
 - State machine: `starting`, `working`, `awaiting_input`, `errored`, `suspended`; agent/chat mode with the posting rules from the Decisions table.
 - Sign-in with OIDC (Dex locally), users, display names.
-- Sidebar: Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
+- Sidebar: search, project filter (by repository) and new-thread button on top; Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
+- New thread is an empty chat: the first message creates the thread; repository, branch, model and effort are chips in the composer.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.

@@ -3,15 +3,20 @@
 	import { timestampMs } from '@bufbuild/protobuf/wkt';
 	import AtSignIcon from '@lucide/svelte/icons/at-sign';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import PlusIcon from '@lucide/svelte/icons/plus';
+	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import IconButton from '#lib/components/icon-button.svelte';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { threads, userName, view } from '#lib/threads.svelte.js';
+	import { matches, projectName, projects, threads, userName, view } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	// Precedence: settled > snoozed > status.
@@ -26,7 +31,7 @@
 
 	const sections = $derived.by(() => {
 		const s: Record<string, Thread[]> = { needs: [], working: [], snoozed: [], settled: [] };
-		for (const t of threads.list) s[sectionOf(t)].push(t);
+		for (const t of threads.list.filter(matches)) s[sectionOf(t)].push(t);
 		return s;
 	});
 	const others = $derived(threads.users.filter((u) => u.id !== threads.me?.id));
@@ -79,7 +84,33 @@
 <Sidebar.Root>
 	<Sidebar.Header class="gap-3 p-3">
 		<span class="px-1 text-lg font-semibold tracking-tight">Banda</span>
-		<Button href="/" variant="outline"><PlusIcon /> New thread</Button>
+		<div class="flex items-center gap-1">
+			<InputGroup.Root class="h-8">
+				<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
+				<InputGroup.Input placeholder="Search threads" aria-label="Search threads" bind:value={threads.search} />
+			</InputGroup.Root>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<IconButton
+							{...props}
+							icon={FolderGit2Icon}
+							label={threads.project ? `Project: ${projectName(threads.project)}` : 'Filter by project'}
+							variant={threads.project ? 'secondary' : 'ghost'}
+						/>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-60">
+					<DropdownMenu.RadioGroup bind:value={threads.project}>
+						<DropdownMenu.RadioItem value="">All projects</DropdownMenu.RadioItem>
+						{#each projects() as p (p)}
+							<DropdownMenu.RadioItem value={p} title={p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
+						{/each}
+					</DropdownMenu.RadioGroup>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<IconButton href="/" icon={SquarePenIcon} label="New thread" />
+		</div>
 		<NativeSelect aria-label="People" value={threads.viewing} onchange={(e) => view(e.currentTarget.value)} class="w-full">
 			<NativeSelectOption value="">My threads</NativeSelectOption>
 			<NativeSelectOptGroup label="People">
@@ -94,7 +125,7 @@
 				<Button variant="ghost" size="xs" onclick={() => view('')}>My threads</Button>
 			</div>
 		{:else}
-			{@render section('Mentioned', threads.mentioned, false, true)}
+			{@render section('Mentioned', threads.mentioned.filter(matches), false, true)}
 		{/if}
 		{#if threads.mentionsOnly}
 			{#if !threads.mentioned.length}<p class="px-2 text-sm text-muted-foreground">No open mentions.</p>{/if}
