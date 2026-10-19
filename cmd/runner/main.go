@@ -35,12 +35,23 @@ var (
 	threadID = os.Getenv("BANDA_THREAD_ID")
 	work     = filepath.Join(os.Getenv("HOME"), "work")
 	base     = "origin/" + os.Getenv("BANDA_BASE_BRANCH")
+	// errSetup: preparing the environment failed in a way a restart won't fix,
+	// e.g. a base branch that doesn't exist.
+	errSetup = errors.New("setup failed")
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
-	if err := run(ctx); err != nil && ctx.Err() == nil {
+	err := run(ctx)
+	if errors.Is(err, errSetup) {
+		// run has disconnected, so the thread shows as errored. Stay up instead
+		// of crash-looping until Retry or the idle suspend replaces the pod.
+		log.Print(err)
+		<-ctx.Done()
+		return
+	}
+	if err != nil && ctx.Err() == nil {
 		log.Fatal(err) // the container restarts and resumes the session
 	}
 }
@@ -111,7 +122,7 @@ func run(ctx context.Context) error {
 
 	if err := checkout(ctx); err != nil {
 		notice("Could not prepare the checkout: " + err.Error())
-		return err
+		return fmt.Errorf("%w: %w", errSetup, err)
 	}
 	if err := waitForLogin(ctx, notice); err != nil {
 		return err
@@ -119,7 +130,7 @@ func run(ctx context.Context) error {
 	claude, err := startClaude(ctx)
 	if err != nil {
 		notice("Could not start Claude Code: " + err.Error())
-		return err
+		return fmt.Errorf("%w: %w", errSetup, err)
 	}
 	// Every way out of here stops claude gracefully and waits for it: a kill
 	// in the middle of a token refresh would log the user out everywhere.

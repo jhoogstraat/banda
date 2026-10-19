@@ -62,4 +62,14 @@ sleep 1; wait_for STATUS_AWAITING_INPUT
 thread diff | grep -q hello3.txt
 ok "a prompt resumes the environment with the checkout intact"
 
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
+
+ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}" | jq -r .thread.id)
+wait_for STATUS_ERRORED
+sleep 15
+[ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Could not prepare%'")" = 1 ]
+ok "a bad base branch errors once, without a crash loop"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+
 echo "all checks passed"
