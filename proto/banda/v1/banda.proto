@@ -41,6 +41,25 @@ service UserService {
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
+// SettingsService is the caller's own harness accounts and secrets.
+// Secret and API key values are write-only: no RPC ever returns them.
+service SettingsService {
+  rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
+  // Chooses how a harness signs in. Applies to environments started
+  // afterwards. An API key, when given, replaces the stored one.
+  rpc SetAuthMethod(SetAuthMethodRequest) returns (SetAuthMethodResponse);
+  // Creates or replaces a secret, passed to all the caller's environments as
+  // an environment variable. Reserved names (harness credentials) are refused.
+  rpc SetSecret(SetSecretRequest) returns (SetSecretResponse);
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
+  // A terminal in the caller's login environment: a small pod that mounts
+  // only the caller's harness config volume, started on demand. It runs the
+  // harness's login or logout command. Output streams until it exits.
+  rpc OpenLoginTerminal(OpenLoginTerminalRequest) returns (stream OpenTerminalResponse);
+  rpc WriteLoginTerminal(WriteLoginTerminalRequest) returns (WriteTerminalResponse);
+  rpc ResizeLoginTerminal(ResizeLoginTerminalRequest) returns (ResizeTerminalResponse);
+}
+
 // RunnerService is dialed by the runner inside each sandbox pod, so the API
 // never has to reach into pods.
 service RunnerService {
@@ -110,6 +129,7 @@ message Event {
     ModeChanged mode_changed = 18;
     DiffChanged diff_changed = 19;
     Notice notice = 20;
+    SetupStep setup_step = 21;
   }
 }
 
@@ -165,6 +185,26 @@ message DiffChanged {}
 // Something the user needs to know or do, e.g. log in to Claude Code.
 message Notice {
   string text = 1;
+}
+
+// Progress of one step of preparing the environment. A later event with the
+// same id replaces an earlier one.
+message SetupStep {
+  // "checkout", "tools" (mise install), "setup" (.banda/setup.sh), "login".
+  string id = 1;
+  string title = 2;
+  SetupState state = 3;
+  // Redacted, truncated output; set when the step has finished.
+  string output = 4;
+}
+
+enum SetupState {
+  SETUP_STATE_UNSPECIFIED = 0;
+  SETUP_STATE_RUNNING = 1;
+  SETUP_STATE_DONE = 2;
+  SETUP_STATE_FAILED = 3;
+  // Nothing to do, e.g. the repo has no .banda/setup.sh.
+  SETUP_STATE_SKIPPED = 4;
 }
 
 message CreateThreadRequest {
@@ -312,6 +352,93 @@ message ListUsersResponse {
   repeated User users = 1;
 }
 
+enum AuthMethod {
+  AUTH_METHOD_UNSPECIFIED = 0;
+  // The user's own subscription, logged in with the harness's login command.
+  // Banda never sees the credentials.
+  AUTH_METHOD_SUBSCRIPTION = 1;
+  // An API key stored by Banda and passed to the environment.
+  AUTH_METHOD_API_KEY = 2;
+}
+
+enum LoginState {
+  LOGIN_STATE_UNSPECIFIED = 0;
+  // Never checked.
+  LOGIN_STATE_UNKNOWN = 1;
+  LOGIN_STATE_LOGGED_IN = 2;
+  LOGIN_STATE_LOGGED_OUT = 3;
+}
+
+message HarnessAccount {
+  // "claude". Later "codex".
+  string harness = 1;
+  string display_name = 2;
+  AuthMethod auth_method = 3;
+  bool api_key_set = 4;
+  // Subscription login as last reported by one of the user's environments.
+  LoginState login_state = 5;
+  google.protobuf.Timestamp login_checked_at = 6;
+}
+
+message SecretInfo {
+  string name = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message GetSettingsRequest {}
+
+message GetSettingsResponse {
+  repeated HarnessAccount accounts = 1;
+  repeated SecretInfo secrets = 2;
+}
+
+message SetAuthMethodRequest {
+  string harness = 1;
+  AuthMethod auth_method = 2;
+  // Required when switching to API_KEY and none is stored yet.
+  string api_key = 3;
+}
+
+message SetAuthMethodResponse {}
+
+message SetSecretRequest {
+  // An environment variable name: [A-Z_][A-Z0-9_]*.
+  string name = 1;
+  string value = 2;
+}
+
+message SetSecretResponse {}
+
+message DeleteSecretRequest {
+  string name = 1;
+}
+
+message DeleteSecretResponse {}
+
+enum LoginAction {
+  LOGIN_ACTION_UNSPECIFIED = 0;
+  LOGIN_ACTION_LOGIN = 1;
+  LOGIN_ACTION_LOGOUT = 2;
+}
+
+message OpenLoginTerminalRequest {
+  string harness = 1;
+  LoginAction action = 2;
+  uint32 cols = 3;
+  uint32 rows = 4;
+}
+
+message WriteLoginTerminalRequest {
+  string harness = 1;
+  bytes data = 2;
+}
+
+message ResizeLoginTerminalRequest {
+  string harness = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
 message WatchThreadRequest {
   string thread_id = 1;
   int64 after_seq = 2;
@@ -333,12 +460,22 @@ message ConnectRequest {
     Diff diff = 3;
     TerminalOutput terminal_output = 5;
     FileResponse file_response = 6;
+    // The harness login state, sent at start and whenever it changes.
+    LoginStatus login_status = 7;
   }
 }
 
 message Hello {
+  // Set by thread environments.
   string thread_id = 1;
   string token = 2;
+  // Set instead of thread_id by a user's login environment.
+  string login_user_id = 3;
+}
+
+message LoginStatus {
+  string harness = 1;
+  bool logged_in = 2;
 }
 
 message Ready {}

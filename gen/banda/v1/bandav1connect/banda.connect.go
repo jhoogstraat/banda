@@ -16,6 +16,8 @@ const (
 	ThreadServiceName = "banda.v1.ThreadService"
 	// UserServiceName is the fully-qualified name of the UserService service.
 	UserServiceName = "banda.v1.UserService"
+	// SettingsServiceName is the fully-qualified name of the SettingsService service.
+	SettingsServiceName = "banda.v1.SettingsService"
 	// RunnerServiceName is the fully-qualified name of the RunnerService service.
 	RunnerServiceName = "banda.v1.RunnerService"
 )
@@ -69,6 +71,26 @@ const (
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
 	UserServiceListUsersProcedure = "/banda.v1.UserService/ListUsers"
+	// SettingsServiceGetSettingsProcedure is the procedure name of the SettingsService's GetSettings
+	// RPC.
+	SettingsServiceGetSettingsProcedure = "/banda.v1.SettingsService/GetSettings"
+	// SettingsServiceSetAuthMethodProcedure is the procedure name of the SettingsService's
+	// SetAuthMethod RPC.
+	SettingsServiceSetAuthMethodProcedure = "/banda.v1.SettingsService/SetAuthMethod"
+	// SettingsServiceSetSecretProcedure is the procedure name of the SettingsService's SetSecret RPC.
+	SettingsServiceSetSecretProcedure = "/banda.v1.SettingsService/SetSecret"
+	// SettingsServiceDeleteSecretProcedure is the procedure name of the SettingsService's DeleteSecret
+	// RPC.
+	SettingsServiceDeleteSecretProcedure = "/banda.v1.SettingsService/DeleteSecret"
+	// SettingsServiceOpenLoginTerminalProcedure is the procedure name of the SettingsService's
+	// OpenLoginTerminal RPC.
+	SettingsServiceOpenLoginTerminalProcedure = "/banda.v1.SettingsService/OpenLoginTerminal"
+	// SettingsServiceWriteLoginTerminalProcedure is the procedure name of the SettingsService's
+	// WriteLoginTerminal RPC.
+	SettingsServiceWriteLoginTerminalProcedure = "/banda.v1.SettingsService/WriteLoginTerminal"
+	// SettingsServiceResizeLoginTerminalProcedure is the procedure name of the SettingsService's
+	// ResizeLoginTerminal RPC.
+	SettingsServiceResizeLoginTerminalProcedure = "/banda.v1.SettingsService/ResizeLoginTerminal"
 	// RunnerServiceConnectProcedure is the procedure name of the RunnerService's Connect RPC.
 	RunnerServiceConnectProcedure = "/banda.v1.RunnerService/Connect"
 )
@@ -868,6 +890,325 @@ func (h userServiceHandler) listUsers(ctx context.Context, _ connect.Spec, strea
 		return err
 	}
 	res, err := h.svc.ListUsers(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+var (
+	settingsServiceGetSettingsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("GetSettings"),
+			Procedure:  SettingsServiceGetSettingsProcedure,
+		}
+	})
+	settingsServiceSetAuthMethodSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetAuthMethod"),
+			Procedure:  SettingsServiceSetAuthMethodProcedure,
+		}
+	})
+	settingsServiceSetSecretSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetSecret"),
+			Procedure:  SettingsServiceSetSecretProcedure,
+		}
+	})
+	settingsServiceDeleteSecretSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("DeleteSecret"),
+			Procedure:  SettingsServiceDeleteSecretProcedure,
+		}
+	})
+	settingsServiceOpenLoginTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("OpenLoginTerminal"),
+			Procedure:  SettingsServiceOpenLoginTerminalProcedure,
+		}
+	})
+	settingsServiceWriteLoginTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("WriteLoginTerminal"),
+			Procedure:  SettingsServiceWriteLoginTerminalProcedure,
+		}
+	})
+	settingsServiceResizeLoginTerminalSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("ResizeLoginTerminal"),
+			Procedure:  SettingsServiceResizeLoginTerminalProcedure,
+		}
+	})
+)
+
+// SettingsServiceClient is a client for the banda.v1.SettingsService service.
+type SettingsServiceClient interface {
+	GetSettings(context.Context, *v1.GetSettingsRequest) (*v1.GetSettingsResponse, error)
+	// Chooses how a harness signs in. Applies to environments started
+	// afterwards. An API key, when given, replaces the stored one.
+	SetAuthMethod(context.Context, *v1.SetAuthMethodRequest) (*v1.SetAuthMethodResponse, error)
+	// Creates or replaces a secret, passed to all the caller's environments as
+	// an environment variable. Reserved names (harness credentials) are refused.
+	SetSecret(context.Context, *v1.SetSecretRequest) (*v1.SetSecretResponse, error)
+	DeleteSecret(context.Context, *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error)
+	// A terminal in the caller's login environment: a small pod that mounts
+	// only the caller's harness config volume, started on demand. It runs the
+	// harness's login or logout command. Output streams until it exits.
+	OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest) (SettingsServiceOpenLoginTerminalClientStream, error)
+	WriteLoginTerminal(context.Context, *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error)
+	ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error)
+}
+
+// NewSettingsServiceClient constructs a client for the banda.v1.SettingsService service. Multiple
+// service clients may share a single connect.Client.
+func NewSettingsServiceClient(client *connect.Client) SettingsServiceClient {
+	return &settingsServiceClient{client: client}
+}
+
+// SettingsServiceOpenLoginTerminalClientStream is the client stream for the SettingsService's
+// OpenLoginTerminal RPC.
+type SettingsServiceOpenLoginTerminalClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s SettingsServiceOpenLoginTerminalClientStream) Receive() (*v1.OpenTerminalResponse, error) {
+	var res v1.OpenTerminalResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s SettingsServiceOpenLoginTerminalClientStream) Close() error {
+	return s.stream.Close()
+}
+
+// SettingsServiceHandler is an implementation of the banda.v1.SettingsService service.
+type SettingsServiceHandler interface {
+	GetSettings(context.Context, *v1.GetSettingsRequest) (*v1.GetSettingsResponse, error)
+	// Chooses how a harness signs in. Applies to environments started
+	// afterwards. An API key, when given, replaces the stored one.
+	SetAuthMethod(context.Context, *v1.SetAuthMethodRequest) (*v1.SetAuthMethodResponse, error)
+	// Creates or replaces a secret, passed to all the caller's environments as
+	// an environment variable. Reserved names (harness credentials) are refused.
+	SetSecret(context.Context, *v1.SetSecretRequest) (*v1.SetSecretResponse, error)
+	DeleteSecret(context.Context, *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error)
+	// A terminal in the caller's login environment: a small pod that mounts
+	// only the caller's harness config volume, started on demand. It runs the
+	// harness's login or logout command. Output streams until it exits.
+	OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest, SettingsServiceOpenLoginTerminalServerStream) error
+	WriteLoginTerminal(context.Context, *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error)
+	ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error)
+}
+
+// RegisterSettingsServiceHandler registers svc as the banda.v1.SettingsService implementation on
+// server.
+func RegisterSettingsServiceHandler(server *connect.Server, svc SettingsServiceHandler) {
+	adapter := settingsServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: settingsServiceGetSettingsSpec(), Handler: adapter.getSettings},
+		connect.Method{Spec: settingsServiceSetAuthMethodSpec(), Handler: adapter.setAuthMethod},
+		connect.Method{Spec: settingsServiceSetSecretSpec(), Handler: adapter.setSecret},
+		connect.Method{Spec: settingsServiceDeleteSecretSpec(), Handler: adapter.deleteSecret},
+		connect.Method{Spec: settingsServiceOpenLoginTerminalSpec(), Handler: adapter.openLoginTerminal},
+		connect.Method{Spec: settingsServiceWriteLoginTerminalSpec(), Handler: adapter.writeLoginTerminal},
+		connect.Method{Spec: settingsServiceResizeLoginTerminalSpec(), Handler: adapter.resizeLoginTerminal},
+	)
+}
+
+// SettingsServiceOpenLoginTerminalServerStream is the server stream for the SettingsService's
+// OpenLoginTerminal RPC.
+type SettingsServiceOpenLoginTerminalServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s SettingsServiceOpenLoginTerminalServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s SettingsServiceOpenLoginTerminalServerStream) Send(res *v1.OpenTerminalResponse) error {
+	return s.stream.Send(res)
+}
+
+// UnimplementedSettingsServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedSettingsServiceHandler struct{}
+
+func (UnimplementedSettingsServiceHandler) GetSettings(context.Context, *v1.GetSettingsRequest) (*v1.GetSettingsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.GetSettings is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetAuthMethod(context.Context, *v1.SetAuthMethodRequest) (*v1.SetAuthMethodResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetAuthMethod is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetSecret(context.Context, *v1.SetSecretRequest) (*v1.SetSecretResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetSecret is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) DeleteSecret(context.Context, *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.DeleteSecret is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest, SettingsServiceOpenLoginTerminalServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.OpenLoginTerminal is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) WriteLoginTerminal(context.Context, *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.WriteLoginTerminal is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.ResizeLoginTerminal is not implemented")
+}
+
+type settingsServiceClient struct {
+	client *connect.Client
+}
+
+func (c *settingsServiceClient) GetSettings(ctx context.Context, req *v1.GetSettingsRequest) (*v1.GetSettingsResponse, error) {
+	var res v1.GetSettingsResponse
+	if err := c.client.CallUnary(ctx, settingsServiceGetSettingsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetAuthMethod(ctx context.Context, req *v1.SetAuthMethodRequest) (*v1.SetAuthMethodResponse, error) {
+	var res v1.SetAuthMethodResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetAuthMethodSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetSecret(ctx context.Context, req *v1.SetSecretRequest) (*v1.SetSecretResponse, error) {
+	var res v1.SetSecretResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetSecretSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) DeleteSecret(ctx context.Context, req *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error) {
+	var res v1.DeleteSecretResponse
+	if err := c.client.CallUnary(ctx, settingsServiceDeleteSecretSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) OpenLoginTerminal(ctx context.Context, req *v1.OpenLoginTerminalRequest) (SettingsServiceOpenLoginTerminalClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, settingsServiceOpenLoginTerminalSpec(), req)
+	if err != nil {
+		return SettingsServiceOpenLoginTerminalClientStream{}, err
+	}
+	return SettingsServiceOpenLoginTerminalClientStream{stream: stream}, nil
+}
+
+func (c *settingsServiceClient) WriteLoginTerminal(ctx context.Context, req *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error) {
+	var res v1.WriteTerminalResponse
+	if err := c.client.CallUnary(ctx, settingsServiceWriteLoginTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) ResizeLoginTerminal(ctx context.Context, req *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error) {
+	var res v1.ResizeTerminalResponse
+	if err := c.client.CallUnary(ctx, settingsServiceResizeLoginTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type settingsServiceHandler struct{ svc SettingsServiceHandler }
+
+func (h settingsServiceHandler) getSettings(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetSettingsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetSettings(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setAuthMethod(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetAuthMethodRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetAuthMethod(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setSecret(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetSecretRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetSecret(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) deleteSecret(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteSecretRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteSecret(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) openLoginTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.OpenLoginTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.OpenLoginTerminal(ctx, &req, SettingsServiceOpenLoginTerminalServerStream{stream: stream})
+}
+
+func (h settingsServiceHandler) writeLoginTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.WriteLoginTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.WriteLoginTerminal(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) resizeLoginTerminal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ResizeLoginTerminalRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ResizeLoginTerminal(ctx, &req)
 	if err != nil {
 		return err
 	}
