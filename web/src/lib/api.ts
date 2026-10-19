@@ -1,6 +1,6 @@
 import { Code, ConnectError, createClient, type Interceptor } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { ThreadService } from './gen/banda/v1/banda_pb';
+import { ThreadService, UserService } from './gen/banda/v1/banda_pb';
 
 // Signed out (or session expired): sign in again and come back to this page.
 // ponytail: unary calls only. Streams report errors while iterating, but every page makes a unary call first.
@@ -15,7 +15,6 @@ const signIn: Interceptor = (next) => async (req) => {
 	}
 };
 
-export const api = createClient(
-	ThreadService,
-	createConnectTransport({ baseUrl: '/', interceptors: [signIn] })
-);
+const transport = createConnectTransport({ baseUrl: '/', interceptors: [signIn] });
+export const api = createClient(ThreadService, transport);
+export const userApi = createClient(UserService, transport);

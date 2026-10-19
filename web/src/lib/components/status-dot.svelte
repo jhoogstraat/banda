@@ -11,7 +11,8 @@
 		[Status.STARTING]: 'bg-muted-foreground',
 		[Status.WORKING]: 'bg-sky-400 animate-pulse',
 		[Status.AWAITING_INPUT]: 'bg-amber-400',
-		[Status.ERRORED]: 'bg-red-500'
+		[Status.ERRORED]: 'bg-red-500',
+		[Status.SUSPENDED]: 'border border-muted-foreground'
 	} as Partial<Record<Status, string>>;
 </script>
 
