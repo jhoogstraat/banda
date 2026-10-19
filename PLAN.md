@@ -126,7 +126,7 @@ Only the owner's own actions drive the environment. Implemented as below, except
 | owner settles | suspend (later: `shutdownTime` = now + 7 days with `shutdownPolicy: Delete`, once branches are pushed by default) |
 | `errored` → Retry | delete the pod; the controller recreates it on the same PVC |
 
-Expected resume time on kind: about 3–10 s. A suspended thread costs only disk. Deferred: warm pools, memory snapshots (upstream has none), gVisor/Kata, [agent-substrate](https://github.com/agent-substrate/substrate) (pre-1.0, and it wakes actors on inbound traffic while our runner dials out).
+Expected resume time on kind: about 3–10 s. A suspended thread costs only disk. Deferred: warm pools, memory snapshots (upstream has none), gVisor/Kata, [agent-substrate](https://github.com/agent-substrate/substrate) (pre-1.0, no shared login volume, freezes `claude` instead of stopping it; see [docs/research/agent-substrate.md](docs/research/agent-substrate.md)).
 
 ## Status
 

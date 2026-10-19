@@ -6,7 +6,7 @@ Checked 2026-10-19. Sources are primary (repos at the tags named, official docs,
 
 - **agent-sandbox v1.0.7** (SIG Apps, all CRDs `v1beta1`) does what Banda needs for v1: one `Sandbox` per thread, a PVC per sandbox via `volumeClaimTemplates`, **suspend/resume** through `spec.operatingMode: Running | Suspended`, and timed teardown through `spec.shutdownTime` + `spec.shutdownPolicy`. Suspend **deletes the Pod and keeps the PVC**, so memory and processes are lost and disk survives. Resume creates a new Pod from the *current* `podTemplate` and reattaches the PVC.
 - **No upstream idle auto-suspend and no upstream memory snapshot.** Idle policy is still open ([#849](https://github.com/kubernetes-sigs/agent-sandbox/issues/849), [#968](https://github.com/kubernetes-sigs/agent-sandbox/issues/968)). Memory snapshots exist only as **GKE Pod Snapshots** (GKE with gVisor and GCS) or in **Agent Substrate** (pre-1.0). Banda drives suspend from its own state machine.
-- **"Agent substrate" is real**: [agent-substrate/substrate](https://github.com/agent-substrate/substrate), led by Google with Solo.io, v0.5.0 (2026-10-14), pre-1.0. It does true memory+disk suspend/resume with a claimed resume time under 400 ms. It is too young and too heavy for Banda v1, but worth watching.
+- **"Agent substrate" is real**: [agent-substrate/substrate](https://github.com/agent-substrate/substrate), led by Google with Solo.io, v0.5.0 (2026-10-14), pre-1.0. It does true memory+disk suspend/resume with a claimed resume time under 500 ms. It is too young and too heavy for Banda v1, but worth watching; see [agent-substrate.md](agent-substrate.md).
 - **kagent** now (v1.0.0-alpha) runs on Agent Substrate and even has a Claude Code harness. It only supports API-key/Bedrock/Vertex credentials injected by its gateway, and its model is declarative agents, sessions and the A2A protocol. **It is a poor fit for Banda**, but its Claude harness is a useful reference.
 - **Recommendation**: core `Sandbox` only (no templates, claims or warm pools). Put one PVC at `$HOME`, so the repo, `~/.claude/` and `~/.claude.json` all persist. Suspend after N minutes in `awaiting_input` and on owner snooze or settle. Resume on owner activity and restart `claude -p --resume <session-id>`. Delete settled threads after a grace period via `shutdownTime` + `shutdownPolicy: Delete`. Expect resume in seconds, not milliseconds.
 
@@ -138,7 +138,7 @@ What it does ([architecture.md](https://github.com/agent-substrate/substrate/blo
 - Suspend checkpoints memory and disk with `runsc` (gVisor) or Cloud Hypervisor (microVM). Plain runc is **not supported**.
 - Snapshots go to the node first ("pause"), then get uploaded to GCS/S3 ("suspend").
 - The Envoy-based `atenet-router` resumes an actor when an HTTP request carrying `ate-target-actor` arrives. Durable volumes are `durableDir`s.
-- Claims: resume in under 400 ms and 10–30x oversubscription. Local kind (including macOS via the Docker VM) works with gVisor.
+- Claims: resume in under 500 ms (README, no method published) and 10–30x oversubscription. Local kind (including macOS via the Docker VM) works with gVisor.
 
 Fit for Banda: not for v1.
 - It is pre-1.0 and needs its own Postgres, object storage and gRPC API.
