@@ -22,6 +22,15 @@ A web app where a team builds software together with coding agents. Each thread 
 3. Open http://localhost:5173, sign in, create a thread.
 4. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads.
 
+To use it from other machines on your network, pass your LAN address to `dex`, `web` and `api` and open `http://<address>:5173` everywhere, this machine included (the sign-in cookie belongs to that address):
+
+```sh
+H=$(ipconfig getifaddr en0)
+make dex PUBLIC_HOST=$H
+make web PUBLIC_HOST=$H   # listens on all interfaces, proxies Dex at /dex
+make api PUBLIC_HOST=$H
+```
+
 For private repos, create the secret before creating the thread:
 
 ```sh
