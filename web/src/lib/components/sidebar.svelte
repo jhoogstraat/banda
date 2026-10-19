@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { timestampMs } from '@bufbuild/protobuf/wkt';
-	import AtSignIcon from '@lucide/svelte/icons/at-sign';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
+	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -12,11 +11,11 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
-	import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
+	import NewThreadDialog from '#lib/components/new-thread-dialog.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { matches, projectName, projects, threads, userName, view } from '#lib/threads.svelte.js';
+	import { matches, projectName, projects, threads, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	// Precedence: settled > snoozed > status.
@@ -34,9 +33,8 @@
 		for (const t of threads.list.filter(matches)) s[sectionOf(t)].push(t);
 		return s;
 	});
-	const others = $derived(threads.users.filter((u) => u.id !== threads.me?.id));
-	const viewed = $derived(others.find((u) => u.id === threads.viewing));
 	const name = $derived(threads.me?.name ?? '');
+	let newOpen = $state(false);
 
 	// On phones the sidebar is a drawer: close it once a link was followed.
 	const sidebar = Sidebar.useSidebar();
@@ -94,7 +92,7 @@
 					{#snippet child({ props })}
 						<IconButton
 							{...props}
-							icon={FolderGit2Icon}
+							icon={ListFilterIcon}
 							label={threads.project ? `Project: ${projectName(threads.project)}` : 'Filter by project'}
 							variant={threads.project ? 'secondary' : 'ghost'}
 						/>
@@ -109,32 +107,15 @@
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
-			<IconButton href="/" icon={SquarePenIcon} label="New thread" />
+			<IconButton icon={SquarePenIcon} label="New thread" onclick={() => (newOpen = true)} />
 		</div>
-		<NativeSelect aria-label="People" value={threads.viewing} onchange={(e) => view(e.currentTarget.value)} class="w-full">
-			<NativeSelectOption value="">My threads</NativeSelectOption>
-			<NativeSelectOptGroup label="People">
-				{#each others as u (u.id)}<NativeSelectOption value={u.id}>{u.name}</NativeSelectOption>{/each}
-			</NativeSelectOptGroup>
-		</NativeSelect>
 	</Sidebar.Header>
 	<Sidebar.Content class="space-y-3 px-2 pb-3">
-		{#if threads.viewing}
-			<div class="flex items-center justify-between px-2 pb-1 text-sm font-medium">
-				<span class="truncate">{viewed?.name ?? threads.viewing}'s threads</span>
-				<Button variant="ghost" size="xs" onclick={() => view('')}>My threads</Button>
-			</div>
-		{:else}
-			{@render section('Mentioned', threads.mentioned.filter(matches), false, true)}
-		{/if}
-		{#if threads.mentionsOnly}
-			{#if !threads.mentioned.length}<p class="px-2 text-sm text-muted-foreground">No open mentions.</p>{/if}
-		{:else}
-			{@render section('Needs input', sections.needs)}
-			{@render section('Working', sections.working, true)}
-			{@render section('Snoozed', sections.snoozed, true)}
-			{@render section('Settled', sections.settled, true)}
-		{/if}
+		{@render section('Mentioned', threads.mentioned.filter(matches), false, true)}
+		{@render section('Needs input', sections.needs)}
+		{@render section('Working', sections.working, true)}
+		{@render section('Snoozed', sections.snoozed, true)}
+		{@render section('Settled', sections.settled, true)}
 	</Sidebar.Content>
 	<Sidebar.Footer class="flex-row items-center gap-2 border-t p-3">
 		<UserAvatar {name} class="size-7" />
@@ -142,15 +123,7 @@
 			<div class="truncate text-sm">{name}</div>
 			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
 		</div>
-		<Button
-			variant={threads.mentionsOnly ? 'secondary' : 'ghost'}
-			size="sm"
-			title="Only threads you are mentioned in"
-			aria-pressed={threads.mentionsOnly}
-			onclick={() => view('', !threads.mentionsOnly)}
-		>
-			<AtSignIcon /> {threads.mentioned.length}
-		</Button>
 		<Button variant="ghost" size="icon" aria-label="Settings"><SettingsIcon /></Button>
 	</Sidebar.Footer>
 </Sidebar.Root>
+<NewThreadDialog bind:open={newOpen} />

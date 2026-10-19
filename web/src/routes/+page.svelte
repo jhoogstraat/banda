@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
@@ -21,6 +22,11 @@
 	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
 	$effect(() => {
 		if (!repoUrl) repoUrl = projects()[0] ?? '';
+	});
+	// The new-thread dialog links here with ?repo=<url>.
+	$effect(() => {
+		const repo = page.url.searchParams.get('repo');
+		if (repo) repoUrl = repo;
 	});
 	let busy = $state(false);
 	let error = $state('');
