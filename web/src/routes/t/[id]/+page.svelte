@@ -21,14 +21,18 @@
 	import ToolHeader from '#lib/components/ai-elements/tool/tool-header.svelte';
 	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
 	import ToolOutput from '#lib/components/ai-elements/tool/tool-output.svelte';
+	import MentionInput from '#lib/components/mention-input.svelte';
+	import MentionText from '#lib/components/mention-text.svelte';
 	import StatusDot, { statusLabel } from '#lib/components/status-dot.svelte';
+	import ThreadActions from '#lib/components/thread-actions.svelte';
+	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { api } from '#lib/api.js';
 	import { apply, type Chat } from '#lib/events.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { loadThreads } from '#lib/threads.svelte.js';
+	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -38,6 +42,8 @@
 	let diffOpen = $state(true);
 	let error = $state('');
 	let offline = $state(false);
+	let picked = $state<{ id: string; name: string }[]>([]);
+	const owner = $derived(threads.me?.id === thread?.ownerId);
 
 	const modeName = (m: Mode) => Mode[m].toLowerCase();
 	const json = (s: string) => {
@@ -118,7 +124,11 @@
 
 	async function send({ text }: { text: string }) {
 		if (!text.trim()) return;
-		const message = { text, mentionsAgent: text.includes('@agent') };
+		const message = {
+			text,
+			mentionsAgent: /@agent\b/.test(text),
+			mentionedUserIds: picked.filter((u) => text.includes('@' + u.name)).map((u) => u.id)
+		};
 		// Throwing keeps the text in the prompt box so it can be retried.
 		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
 	}
@@ -133,6 +143,7 @@
 				variant="outline"
 				size="sm"
 				title="Toggle agent / chat mode"
+				disabled={!owner}
 				onclick={() =>
 					act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }))}
 			>
@@ -143,6 +154,7 @@
 		{/if}
 		{#if offline}<span class="text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex items-center gap-2">
+			{#if thread}<ThreadActions {thread} {act} />{/if}
 			{#if thread?.status === Status.WORKING}
 				<Button variant="destructive" size="sm" onclick={() => act(api.interrupt({ threadId: id }))}>
 					<SquareIcon /> Interrupt
@@ -162,8 +174,8 @@
 				{#each chat.items as item, i (i)}
 					{#if item.kind === 'message'}
 						<Message from="user">
-							<span class="ml-auto text-xs text-muted-foreground">{item.actor}</span>
-							<MessageContent class="whitespace-pre-wrap">{item.text}</MessageContent>
+							<span class="ml-auto text-xs text-muted-foreground">{userName(item.actor)}</span>
+							<MessageContent class="whitespace-pre-wrap"><MentionText text={item.text} /></MessageContent>
 						</Message>
 					{:else if item.kind === 'text'}
 						<Message from="assistant">
@@ -231,10 +243,11 @@
 
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
+		{#if thread}<ThreadBanners {thread} {act} />{/if}
 		<PromptInput.Root onSubmit={send}>
 			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
 				<PromptInput.Body>
-					<PromptInput.Textarea placeholder="Message the agent. Use @agent to mention it in chat mode." />
+					<MentionInput bind:picked placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar class="justify-end"><PromptInput.Submit /></PromptInput.Toolbar>
 			</fieldset>
