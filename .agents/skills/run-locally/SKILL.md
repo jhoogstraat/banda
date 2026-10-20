@@ -8,9 +8,9 @@ description: Boot Banda locally for testing, reachable from the LAN - Podman mac
 Everything goes through `deploy/dev.sh`, run as mise tasks from the repo root. Each task is idempotent: rerun it to restart.
 
 ```sh
-mise run up     # Podman machine, kind cluster, API (:8787) and web (:5173), on the LAN address
+mise run up     # default Podman machine, kind cluster, API (:8787) and web (:5173), on the LAN address
 mise run e2e    # end-to-end check with the fake agent on :8790, next to the normal API
-mise run down   # stop the servers and the Podman machine
+mise run down   # stop the servers and the kind node; the shared Podman machine keeps running
 ```
 
 `PUBLIC_HOST=localhost mise run up` serves this Mac only. The first `up` creates the cluster and sandbox image and takes several minutes. Run `mise run image` after changing `cmd/runner` or `deploy/sandbox.Dockerfile`, `mise run test` for the Go unit tests.
@@ -20,7 +20,7 @@ mise run down   # stop the servers and the Podman machine
 ## Rules
 
 - Never run the real `claude` binary for tests: it uses the user's personal Claude subscription. Use `mise run e2e`.
-- If `up` stops because another Podman machine is running, ask the user before stopping it: it runs their other containers.
+- Banda runs in `podman-machine-default`, shared with the user's other projects. Never stop it or other Podman machines without asking.
 - Do not push.
 
 ## Troubleshooting
