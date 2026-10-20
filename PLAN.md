@@ -135,7 +135,7 @@ Expected resume time on kind: about 3–10 s. A suspended thread costs only disk
 
 ## Status
 
-Everything below is implemented on branch `v1` and checked by `make e2e` against the kind cluster (fake agent), unless noted.
+Everything below is implemented on branch `v1` and checked by `mise run e2e` against the kind cluster (fake agent), unless noted.
 
 **Built**
 - Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
@@ -151,7 +151,7 @@ Everything below is implemented on branch `v1` and checked by `make e2e` against
 - Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
-- In-cluster deployment of the API (`make deploy`, `deploy/banda.yaml`).
+- In-cluster deployment of the API (`mise run deploy`, `deploy/banda.yaml`).
 
 **Verified only partly**
 - Real Claude Code: the image starts, detects the missing login and prints the sign-in URL in the terminal. Completing a login and a real turn need a Claude subscription; the stream-json mapping is tested against recorded CLI output.

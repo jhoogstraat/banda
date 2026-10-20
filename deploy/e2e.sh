@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end check of a running system with the fake agent (no Claude login):
-#   make image TARGET=fake IMAGE=localhost/banda-sandbox:fake
-#   make api AUTH=dev IMAGE=localhost/banda-sandbox:fake
-#   make e2e
+# End-to-end check of a running system with the fake agent (no Claude login).
+# `mise run e2e` builds the fake image and starts a dev-auth API for it, then runs this.
 set -euo pipefail
 API=${API:-http://localhost:8787}
 REPO=${REPO:-https://github.com/octocat/Hello-World.git}
@@ -141,5 +139,15 @@ ok "switching back to the subscription applies when the environment resumes"
 
 [ "$(sql "select count(*) from events where body::text like '%$SECRET%'")" = 0 ] || fail "a secret value was stored in events"
 ok "no secret value reached the database"
+
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
+
+ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}" | jq -r .thread.id)
+wait_for STATUS_ERRORED
+sleep 15
+[ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
+[ "$(steps checkout FAILED)" = 1 ]
+ok "a bad base branch errors once, without a crash loop"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 
 echo "all checks passed"

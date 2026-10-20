@@ -5,3 +5,93 @@ pnpm = "latest"
 buf = "latest"
 kind = "latest"
 kubectl = "latest"
+podman = "6"
+jq = "latest"
+
+[env]
+# Podman, not Docker: kind creates its node there and podman talks to the rootful banda machine.
+# For Docker, set KIND_EXPERIMENTAL_PROVIDER, CONTAINER=docker and
+# RUNNER_API_URL=http://host.docker.internal:8787 under [env] in mise.local.toml.
+KIND_EXPERIMENTAL_PROVIDER = "podman"
+CONTAINER_CONNECTION = "banda-root"
+
+# The tasks take settings from the environment, e.g. `PUBLIC_HOST=192.168.0.30 mise run api`:
+#   PUBLIC_HOST    address browsers use (default localhost). Not localhost: web listens on all interfaces.
+#   SANDBOX_IMAGE  sandbox image (default localhost/banda-sandbox:dev), TARGET its Dockerfile stage (default sandbox)
+#   DEV_AUTH=1     API skips sign-in and trusts the X-Banda-User header. Otherwise it signs in against Dex.
+
+[tasks.up]
+description = "Start the local stack: Podman machine, kind cluster, Dex, web and API (PUBLIC_HOST, default: LAN address)"
+run = "deploy/dev.sh up"
+
+[tasks.e2e]
+description = "End-to-end check with the fake agent on :8790, next to the normal API"
+run = "deploy/dev.sh e2e"
+
+[tasks.down]
+description = "Stop the API, web and the Podman machine"
+run = "deploy/dev.sh down"
+
+[tasks.test]
+description = "Go unit tests"
+run = "go test ./..."
+
+[tasks.gen]
+description = "Generate code from proto/ into gen/"
+run = "buf generate"
+
+[tasks.cluster]
+description = "Create the kind cluster with agent-sandbox, Postgres and Dex"
+run = """
+kind get clusters | grep -qx banda || kind create cluster --config deploy/kind.yaml
+kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+kubectl --context kind-banda apply -f deploy/postgres.yaml
+kubectl --context kind-banda rollout status statefulset/postgres -n banda --timeout=300s
+mise run dex
+"""
+
+[tasks.dex]
+description = "Apply Dex with its issuer on PUBLIC_HOST (browsers reach it through the web server at /dex)"
+run = """
+sed "s|localhost:5173|${PUBLIC_HOST:-localhost}:5173|" deploy/dex.yaml | kubectl --context kind-banda apply -f -
+kubectl --context kind-banda rollout restart deployment/dex -n banda
+kubectl --context kind-banda rollout status deployment/dex -n banda --timeout=300s
+"""
+
+[tasks.image]
+description = "Build the sandbox image and load it into kind (after changing cmd/runner or deploy/sandbox.Dockerfile)"
+run = """
+i=${SANDBOX_IMAGE:-localhost/banda-sandbox:dev}
+${CONTAINER:-podman} build -f deploy/sandbox.Dockerfile --target "${TARGET:-sandbox}" -t "$i" .
+${CONTAINER:-podman} save "$i" -o /tmp/banda-sandbox.tar
+kind load image-archive /tmp/banda-sandbox.tar --name banda
+"""
+
+[tasks.api]
+description = "Run the Go API on :8787 (ADDR)"
+run = """
+h=${PUBLIC_HOST:-localhost}
+[ -n "${DEV_AUTH:-}" ] || export \
+  OIDC_ISSUER=${OIDC_ISSUER:-http://$h:5173/dex} \
+  OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-banda} \
+  OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-banda-dev-secret} \
+  PUBLIC_URL=${PUBLIC_URL:-http://$h:5173} \
+  SESSION_SECRET=${SESSION_SECRET:-banda-local-dev-session-secret}
+export RUNNER_API_URL=${RUNNER_API_URL:-http://host.containers.internal:8787}
+export SANDBOX_IMAGE=${SANDBOX_IMAGE:-localhost/banda-sandbox:dev}
+exec go run ./cmd/api
+"""
+
+[tasks.web]
+description = "Run the Vite dev server on :5173"
+run = '''exec pnpm -C web dev $([ "${PUBLIC_HOST:-localhost}" = localhost ] || echo --host)'''
+
+[tasks.deploy]
+description = "Build the API image (with the web build), load it into kind and apply deploy/banda.yaml"
+run = """
+${CONTAINER:-podman} build -f deploy/api.Dockerfile -t localhost/banda-api:dev .
+${CONTAINER:-podman} save localhost/banda-api:dev -o /tmp/banda-api.tar
+kind load image-archive /tmp/banda-api.tar --name banda
+kubectl --context kind-banda apply -f deploy/banda.yaml
+kubectl --context kind-banda rollout restart -n banda deployment/banda-api
+"""

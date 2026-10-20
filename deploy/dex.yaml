@@ -6,7 +6,7 @@ metadata:
   namespace: banda
 data:
   config.yaml: |
-    issuer: http://localhost:5556/dex
+    issuer: http://localhost:5173/dex
     storage:
       type: memory
     web:
