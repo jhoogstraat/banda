@@ -2,7 +2,7 @@
 # Local dev stack. Run through mise, which provides the tools and env:
 #   mise run up     Podman machine, kind cluster, API and web (PUBLIC_HOST, default: LAN address)
 #   mise run e2e    fake-agent end-to-end check on :8790, next to the normal API
-#   mise run down   stop the servers and the Podman machine
+#   mise run down   stop the servers and the kind node
 set -euo pipefail
 cd "$(dirname "$0")/.."
 LOG=/tmp/banda-run
@@ -24,18 +24,10 @@ until_ok() {
 }
 listening() { lsof -tiTCP:"$1" -sTCP:LISTEN; }
 
+# Podman on macOS runs one VM at a time, so Banda shares the default machine with other projects.
 machine() {
-	podman machine inspect banda >/dev/null 2>&1 ||
-		podman machine init banda --cpus 6 --memory 10240 --disk-size 80 --rootful
-	[ "$(podman machine inspect banda --format '{{.State}}')" = running ] && return
-	# Podman on macOS runs one VM at a time; the others hold the user's own containers.
-	local other
-	other=$(podman machine list --format '{{.Name}} {{.Running}}' | awk '$2 == "true" { sub(/\*$/, "", $1); print $1 }')
-	if [ -n "$other" ]; then
-		echo "Podman machine '$other' is running. Stop it first (it stops its containers): podman machine stop $other" >&2
-		exit 1
-	fi
-	podman machine start banda
+	[ "$(podman machine inspect podman-machine-default --format '{{.State}}')" = running ] ||
+		podman machine start podman-machine-default
 }
 
 cluster() {
@@ -78,6 +70,6 @@ e2e() {
 case ${1:-} in
 up) machine; cluster; servers ;;
 e2e) machine; cluster; e2e ;;
-down) free 8787; free 5173; free 8790; podman machine stop banda ;;
+down) free 8787; free 5173; free 8790; podman stop banda-control-plane ;;
 *) echo "usage: $0 up|e2e|down" >&2; exit 2 ;;
 esac

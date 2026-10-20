@@ -9,11 +9,11 @@ podman = "6"
 jq = "latest"
 
 [env]
-# Podman, not Docker: kind creates its node there and podman talks to the rootful banda machine.
+# Podman, not Docker: kind creates its node in the shared default machine, through its root connection.
 # For Docker, set KIND_EXPERIMENTAL_PROVIDER, CONTAINER=docker and
 # RUNNER_API_URL=http://host.docker.internal:8787 under [env] in mise.local.toml.
 KIND_EXPERIMENTAL_PROVIDER = "podman"
-CONTAINER_CONNECTION = "banda-root"
+CONTAINER_CONNECTION = "podman-machine-default-root"
 
 # The tasks take settings from the environment, e.g. `PUBLIC_HOST=192.168.0.30 mise run api`:
 #   PUBLIC_HOST    address browsers use (default localhost). Not localhost: web listens on all interfaces.
@@ -29,7 +29,7 @@ description = "End-to-end check with the fake agent on :8790, next to the normal
 run = "deploy/dev.sh e2e"
 
 [tasks.down]
-description = "Stop the API, web and the Podman machine"
+description = "Stop the API, web and the kind node (the shared Podman machine keeps running)"
 run = "deploy/dev.sh down"
 
 [tasks.test]

@@ -32,7 +32,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
-| Local runtime | Podman machine `banda` (rootful), kind cluster `banda`. |
+| Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
 

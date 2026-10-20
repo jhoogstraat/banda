@@ -7,7 +7,7 @@ A web app where a team builds software together with coding agents. Each thread 
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev): `mise install` provides go, node, pnpm, buf, kind, kubectl, podman and jq.
-- Podman with a rootful machine named `banda` (`mise run up` creates it). `mise.toml` points `podman` and `kind` at it. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`.
+- Podman with the default machine (`podman machine init`, at least 8 CPUs and 16 GiB to share it with other projects). `mise.toml` points `podman` and `kind` at its root connection. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`.
 
 ## Dev loop
 
@@ -16,7 +16,7 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 1. `mise run up` starts the Podman machine and the kind cluster (agent-sandbox, Postgres on `localhost:5432`, Dex), creating them and the sandbox image the first time, then the web server (`:5173`) and the API (`:8787`). It serves your LAN address; `PUBLIC_HOST=localhost mise run up` serves this machine only. Rerun it to restart.
 2. Open the URL it prints, on this machine too (the sign-in cookie belongs to that address), sign in, create a thread.
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
-4. `mise run down` stops the servers and the machine.
+4. `mise run down` stops the servers and the kind node.
 
 `mise run image` rebuilds the sandbox image after changing `cmd/runner` or `deploy/sandbox.Dockerfile`; `mise run gen` regenerates `gen/` from `proto/`. Server logs are in `/tmp/banda-run/`.
 
