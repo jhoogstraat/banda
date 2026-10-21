@@ -53,6 +53,9 @@ description = "Create the kind cluster with agent-sandbox, Postgres and Dex"
 run = """
 kind get clusters | grep -qx banda || kind create cluster --config deploy/kind.yaml
 kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+# Each volume takes a helper pod; 4 workers (the default) can't keep up with parallel e2e runs.
+kubectl --context kind-banda -n local-path-storage get deploy local-path-provisioner -o jsonpath='{.spec.template.spec.containers[0].command}' | grep -q worker-threads ||
+  kubectl --context kind-banda -n local-path-storage patch deploy local-path-provisioner --type json -p '[{"op":"add","path":"/spec/template/spec/containers/0/command/-","value":"--worker-threads=16"}]'
 kubectl --context kind-banda apply -f deploy/postgres.yaml
 kubectl --context kind-banda rollout status statefulset/postgres -n banda --timeout=300s
 mise run dex
