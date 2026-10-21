@@ -53,7 +53,8 @@ test('auto-push and settling: commits reach origin; settling schedules deletion,
 		await alice.threads.settle({ threadId: t.id, settled: true });
 		await until(async () => !(await exists('sandbox', t.pod)), () => 'the settled environment is still there', 120_000);
 		await until(async () => !(await exists('pvc', `home-${t.pod}`)), () => 'its volume is still there', 60_000);
-		expect((await t.get()).environmentDeleted).toBe(true);
+		// The API goes by its own clock, the controller by the node's: they may disagree by a few seconds.
+		await t.waitFor('to report its environment deleted', (i) => i.environmentDeleted, 30_000);
 		await refused(bob.threads.environmentRecreate({ threadId: t.id }));
 		await alice.threads.environmentRecreate({ threadId: t.id });
 		const info = await t.waitForStatus(Status.AWAITING_INPUT);
