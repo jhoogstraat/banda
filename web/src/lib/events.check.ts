@@ -176,6 +176,16 @@ if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a con
 	apply(c, { seq: 9n, actor: 'ann', kind: { case: 'permissionResolved', value: { id: 'r1', decision: PermissionDecision.DENY, message: 'no' } } } as Event);
 	if (p1.resolved?.by !== 'ann' || p1.resolved.message !== 'no' || p2.resolved) throw new Error('an answer should resolve only its request');
 }
+{
+	// The CLI may ask before it streams the call: the card points at the call once it arrives, and gets its result.
+	const c = newChat();
+	apply(c, ev({ case: 'permissionRequested', value: { id: 'r1', toolCallId: 'tf', toolName: 'Bash', inputJson: '{"command":"ls"}' } }, 1n));
+	apply(c, ev({ case: 'toolCall', value: { id: 'tf', name: 'Bash', inputJson: '{"command":"ls"}' } }, 2n));
+	apply(c, ev({ case: 'toolResult', value: { toolCallId: 'tf', output: 'a.go' } }, 3n));
+	const [card, steps] = c.items;
+	if (card?.kind !== 'permission' || card.tool.seq !== 2n || card.tool.result?.output !== 'a.go' || steps?.kind !== 'steps' || card.tool !== steps.steps[0] || c.orphans.cards.size)
+		throw new Error('a permission card asked before its call should point at the call once it arrives');
+}
 apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
 const forked = chat.items.at(-1);
 if (forked?.kind !== 'fork' || forked.actor !== 'bob' || forked.note.threadId !== 't2') throw new Error('forkNote should become a link to the fork');
