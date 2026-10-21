@@ -55,7 +55,8 @@ export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = 
 	}
 	const mentioned = new Set(prev.mentioned.map((t) => t.id));
 	for (const t of next.mentioned) {
-		if (!mentioned.has(t.id)) out.push({ thread: t, title: `You were mentioned in ${name(t.ownerId)}'s thread` });
+		if (!mentioned.has(t.id))
+			out.push({ thread: t, title: t.handoffTo ? `${name(t.ownerId)} hands you a thread` : `You were mentioned in ${name(t.ownerId)}'s thread` });
 	}
 	return out;
 }

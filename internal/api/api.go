@@ -255,6 +255,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		PermissionPending:  len(t.Permissions) > 0,
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
+		HandoffTo:          t.HandoffTo,
 	}
 	if t.ForkedFrom != "" {
 		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}

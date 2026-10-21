@@ -92,6 +92,17 @@ service ThreadService {
   // Full-text search over every thread's messages, review comments, agent
   // text and tool calls, best matches first.
   rpc Search(SearchRequest) returns (SearchResponse);
+  // Offers the thread to a teammate (owner only). If the agent is idle, it
+  // first writes a briefing for them, as the owner's last turn. The next
+  // turns run on the recipient's subscription once they accept.
+  rpc HandoffOffer(HandoffOfferRequest) returns (HandoffOfferResponse);
+  // Takes the offered thread (the recipient only): its environment restarts
+  // with the recipient's Claude login and secrets, in a new Claude Code
+  // session that gets the conversation so far. Refused while the agent works.
+  rpc HandoffAccept(HandoffAcceptRequest) returns (HandoffAcceptResponse);
+  // Withdraws the pending offer: declined by the recipient, or cancelled by
+  // the owner.
+  rpc HandoffDecline(HandoffDeclineRequest) returns (HandoffDeclineResponse);
 }
 
 service UserService {
@@ -189,6 +200,9 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // The teammate the owner offered the thread to, until they accept or
+  // decline (see HandoffOffer).
+  string handoff_to = 31;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -272,6 +286,11 @@ message Event {
     LineageUpdate lineage_update = 32;
     // The owner changed the permission mode; actor is the owner.
     PermissionModeChanged permission_mode_changed = 34;
+    // The owner offered the thread to a teammate; actor is the owner.
+    HandoffOffered handoff_offered = 35;
+    // The offer at offer_seq was accepted or declined (actor: the recipient)
+    // or cancelled (actor: the owner).
+    HandoffResolved handoff_resolved = 36;
   }
 }
 
@@ -525,6 +544,27 @@ message TrustRequest {
 }
 
 message TrustResponse {}
+
+message HandoffOfferRequest {
+  string thread_id = 1;
+  string to_user_id = 2;
+  // Optional, for the recipient and the briefing.
+  string note = 3;
+}
+
+message HandoffOfferResponse {}
+
+message HandoffAcceptRequest {
+  string thread_id = 1;
+}
+
+message HandoffAcceptResponse {}
+
+message HandoffDeclineRequest {
+  string thread_id = 1;
+}
+
+message HandoffDeclineResponse {}
 
 message SpawnThreadRequest {
   string parent_id = 1;
@@ -877,6 +917,18 @@ message PermissionSetModeResponse {}
 
 message PermissionModeChanged {
   PermissionMode mode = 1;
+}
+
+message HandoffOffered {
+  string to_user_id = 1;
+  string note = 2;
+  // Why the agent writes no briefing (its environment isn't idle), or empty.
+  string no_briefing = 3;
+}
+
+message HandoffResolved {
+  int64 offer_seq = 1;
+  bool accepted = 2;
 }
 
 message WatchThreadResponse {

@@ -215,7 +215,7 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
 			"The banda MCP server's tools, listed in its instructions, let you see and search the team's other threads, post into them and start sub-threads.",
 		threadID, os.Getenv("BANDA_BRANCH")))
-	sid := sessionID(threadID)
+	sid := sessionID(threadID + os.Getenv("BANDA_SESSION_KEY"))
 	if hasTranscript(sid) {
 		args = append(args, "--resume", sid)
 	} else {
@@ -266,8 +266,9 @@ func controlRequest(req map[string]any) map[string]any {
 	return map[string]any{"type": "control_request", "request_id": rand.Text(), "request": req}
 }
 
-// sessionID derives a stable UUID from the thread id, so a restarted runner
-// resumes the same Claude Code session.
+// sessionID derives a stable UUID from the thread id (and BANDA_SESSION_KEY,
+// which changes with each handoff), so a restarted runner resumes the same
+// Claude Code session.
 func sessionID(thread string) string {
 	h := sha256.Sum256([]byte(thread))
 	h[6] = h[6]&0x0f | 0x40

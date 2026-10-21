@@ -12,6 +12,7 @@
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
@@ -32,7 +33,7 @@
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { userName } from '#lib/threads.svelte.js';
+	import { threads, userName } from '#lib/threads.svelte.js';
 
 	let {
 		item,
@@ -136,6 +137,40 @@
 			<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
 		{:else}
 			<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+		{/if}
+	</div>
+{:else if item.kind === 'handoff'}
+	{@const from = userName(item.actor)}
+	{@const to = userName(item.offer.toUserId)}
+	{@const r = item.resolved}
+	{@const open = !r && thread?.handoffTo === item.offer.toUserId}
+	<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm" role="group" aria-label="Handoff to {to}">
+		<div class="flex items-center gap-2">
+			<HandshakeIcon class="size-4 shrink-0 text-muted-foreground" />
+			<span><span class="font-medium">{from}</span> handed this thread to <span class="font-medium">{to}</span></span>
+			<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+		</div>
+		{#if item.offer.note}<p class="whitespace-pre-wrap"><MentionText text={item.offer.note} /></p>{/if}
+		{#if item.offer.noBriefing}<p class="text-xs text-muted-foreground">No briefing: {item.offer.noBriefing}.</p>{/if}
+		{#if r}
+			<p class="text-xs text-muted-foreground">
+				{userName(r.by)} {r.accepted ? 'accepted' : r.by === item.offer.toUserId ? 'declined' : 'cancelled the handoff'}
+			</p>
+		{:else if open && threads.me?.id === item.offer.toUserId}
+			{@const briefing = thread?.status === Status.WORKING}
+			<div class="flex flex-wrap items-center gap-2">
+				<Button size="sm" disabled={briefing} onclick={() => act(api.handoffAccept({ threadId }))}><CheckIcon /> Accept</Button>
+				<Button size="sm" variant="outline" onclick={() => act(api.handoffDecline({ threadId }))}><XIcon /> Decline</Button>
+				{#if briefing}<span class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> The agent is writing your briefing</span>{/if}
+			</div>
+			<p class="text-xs text-muted-foreground">Its next turns run on your Claude subscription, with your secrets.</p>
+		{:else if open && owner}
+			<div class="flex items-center gap-2">
+				<Button size="sm" variant="outline" onclick={() => act(api.handoffDecline({ threadId }))}><XIcon /> Cancel handoff</Button>
+				<span class="text-xs text-muted-foreground">Waiting for {to} to accept</span>
+			</div>
+		{:else if open}
+			<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {to} to accept</p>
 		{/if}
 	</div>
 {:else if item.kind === 'permission'}

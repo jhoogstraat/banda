@@ -188,6 +188,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * The teammate the owner offered the thread to, until they accept or
+   * decline (see HandoffOffer).
+   *
+   * @generated from field: string handoff_to = 31;
+   */
+  handoffTo: string;
 };
 
 /**
@@ -442,6 +450,23 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: PermissionModeChanged;
     case: "permissionModeChanged";
+  } | {
+    /**
+     * The owner offered the thread to a teammate; actor is the owner.
+     *
+     * @generated from field: banda.v1.HandoffOffered handoff_offered = 35;
+     */
+    value: HandoffOffered;
+    case: "handoffOffered";
+  } | {
+    /**
+     * The offer at offer_seq was accepted or declined (actor: the recipient)
+     * or cancelled (actor: the owner).
+     *
+     * @generated from field: banda.v1.HandoffResolved handoff_resolved = 36;
+     */
+    value: HandoffResolved;
+    case: "handoffResolved";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1425,6 +1450,102 @@ export declare type TrustResponse = Message$1<"banda.v1.TrustResponse"> & {
  * Use `create(TrustResponseSchema)` to create a new message.
  */
 export declare const TrustResponseSchema: GenMessage<TrustResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffOfferRequest
+ */
+export declare type HandoffOfferRequest = Message$1<"banda.v1.HandoffOfferRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string to_user_id = 2;
+   */
+  toUserId: string;
+
+  /**
+   * Optional, for the recipient and the briefing.
+   *
+   * @generated from field: string note = 3;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffOfferRequest.
+ * Use `create(HandoffOfferRequestSchema)` to create a new message.
+ */
+export declare const HandoffOfferRequestSchema: GenMessage<HandoffOfferRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffOfferResponse
+ */
+export declare type HandoffOfferResponse = Message$1<"banda.v1.HandoffOfferResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffOfferResponse.
+ * Use `create(HandoffOfferResponseSchema)` to create a new message.
+ */
+export declare const HandoffOfferResponseSchema: GenMessage<HandoffOfferResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffAcceptRequest
+ */
+export declare type HandoffAcceptRequest = Message$1<"banda.v1.HandoffAcceptRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffAcceptRequest.
+ * Use `create(HandoffAcceptRequestSchema)` to create a new message.
+ */
+export declare const HandoffAcceptRequestSchema: GenMessage<HandoffAcceptRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffAcceptResponse
+ */
+export declare type HandoffAcceptResponse = Message$1<"banda.v1.HandoffAcceptResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffAcceptResponse.
+ * Use `create(HandoffAcceptResponseSchema)` to create a new message.
+ */
+export declare const HandoffAcceptResponseSchema: GenMessage<HandoffAcceptResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffDeclineRequest
+ */
+export declare type HandoffDeclineRequest = Message$1<"banda.v1.HandoffDeclineRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffDeclineRequest.
+ * Use `create(HandoffDeclineRequestSchema)` to create a new message.
+ */
+export declare const HandoffDeclineRequestSchema: GenMessage<HandoffDeclineRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffDeclineResponse
+ */
+export declare type HandoffDeclineResponse = Message$1<"banda.v1.HandoffDeclineResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffDeclineResponse.
+ * Use `create(HandoffDeclineResponseSchema)` to create a new message.
+ */
+export declare const HandoffDeclineResponseSchema: GenMessage<HandoffDeclineResponse>;
 
 /**
  * @generated from message banda.v1.SpawnThreadRequest
@@ -2748,6 +2869,55 @@ export declare type PermissionModeChanged = Message$1<"banda.v1.PermissionModeCh
  * Use `create(PermissionModeChangedSchema)` to create a new message.
  */
 export declare const PermissionModeChangedSchema: GenMessage<PermissionModeChanged>;
+
+/**
+ * @generated from message banda.v1.HandoffOffered
+ */
+export declare type HandoffOffered = Message$1<"banda.v1.HandoffOffered"> & {
+  /**
+   * @generated from field: string to_user_id = 1;
+   */
+  toUserId: string;
+
+  /**
+   * @generated from field: string note = 2;
+   */
+  note: string;
+
+  /**
+   * Why the agent writes no briefing (its environment isn't idle), or empty.
+   *
+   * @generated from field: string no_briefing = 3;
+   */
+  noBriefing: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffOffered.
+ * Use `create(HandoffOfferedSchema)` to create a new message.
+ */
+export declare const HandoffOfferedSchema: GenMessage<HandoffOffered>;
+
+/**
+ * @generated from message banda.v1.HandoffResolved
+ */
+export declare type HandoffResolved = Message$1<"banda.v1.HandoffResolved"> & {
+  /**
+   * @generated from field: int64 offer_seq = 1;
+   */
+  offerSeq: bigint;
+
+  /**
+   * @generated from field: bool accepted = 2;
+   */
+  accepted: boolean;
+};
+
+/**
+ * Describes the message banda.v1.HandoffResolved.
+ * Use `create(HandoffResolvedSchema)` to create a new message.
+ */
+export declare const HandoffResolvedSchema: GenMessage<HandoffResolved>;
 
 /**
  * @generated from message banda.v1.WatchThreadResponse
@@ -4563,6 +4733,41 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof SearchRequestSchema;
     output: typeof SearchResponseSchema;
+  },
+  /**
+   * Offers the thread to a teammate (owner only). If the agent is idle, it
+   * first writes a briefing for them, as the owner's last turn. The next
+   * turns run on the recipient's subscription once they accept.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffOffer
+   */
+  handoffOffer: {
+    methodKind: "unary";
+    input: typeof HandoffOfferRequestSchema;
+    output: typeof HandoffOfferResponseSchema;
+  },
+  /**
+   * Takes the offered thread (the recipient only): its environment restarts
+   * with the recipient's Claude login and secrets, in a new Claude Code
+   * session that gets the conversation so far. Refused while the agent works.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffAccept
+   */
+  handoffAccept: {
+    methodKind: "unary";
+    input: typeof HandoffAcceptRequestSchema;
+    output: typeof HandoffAcceptResponseSchema;
+  },
+  /**
+   * Withdraws the pending offer: declined by the recipient, or cancelled by
+   * the owner.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffDecline
+   */
+  handoffDecline: {
+    methodKind: "unary";
+    input: typeof HandoffDeclineRequestSchema;
+    output: typeof HandoffDeclineResponseSchema;
   },
 }>;
 

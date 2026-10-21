@@ -4,6 +4,7 @@
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -29,6 +30,7 @@
 		push,
 		forkOpen = $bindable(),
 		spawnOpen = $bindable(),
+		handoffOpen = $bindable(),
 		paneOpen = $bindable()
 	}: {
 		thread?: Thread;
@@ -41,6 +43,7 @@
 		push: () => void;
 		forkOpen: boolean;
 		spawnOpen: boolean;
+		handoffOpen: boolean;
 		paneOpen?: boolean;
 	} = $props();
 
@@ -94,6 +97,7 @@
 			/>
 			<IconButton icon={GitForkIcon} label="Fork: try another way from here" onclick={() => (forkOpen = true)} />
 			<IconButton icon={GitBranchPlusIcon} label="Spawn a sub-thread" onclick={() => (spawnOpen = true)} />
+			{#if owner && !thread.handoffTo}<IconButton icon={HandshakeIcon} label="Hand off to a teammate" onclick={() => (handoffOpen = true)} />{/if}
 			<ThreadActions {thread} {act} />
 		{/if}
 		{#if pr}

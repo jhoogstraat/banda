@@ -115,6 +115,14 @@ const (
 	ThreadServiceRacePickProcedure = "/banda.v1.ThreadService/RacePick"
 	// ThreadServiceSearchProcedure is the procedure name of the ThreadService's Search RPC.
 	ThreadServiceSearchProcedure = "/banda.v1.ThreadService/Search"
+	// ThreadServiceHandoffOfferProcedure is the procedure name of the ThreadService's HandoffOffer RPC.
+	ThreadServiceHandoffOfferProcedure = "/banda.v1.ThreadService/HandoffOffer"
+	// ThreadServiceHandoffAcceptProcedure is the procedure name of the ThreadService's HandoffAccept
+	// RPC.
+	ThreadServiceHandoffAcceptProcedure = "/banda.v1.ThreadService/HandoffAccept"
+	// ThreadServiceHandoffDeclineProcedure is the procedure name of the ThreadService's HandoffDecline
+	// RPC.
+	ThreadServiceHandoffDeclineProcedure = "/banda.v1.ThreadService/HandoffDecline"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -412,6 +420,27 @@ var (
 			Procedure:  ThreadServiceSearchProcedure,
 		}
 	})
+	threadServiceHandoffOfferSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffOffer"),
+			Procedure:  ThreadServiceHandoffOfferProcedure,
+		}
+	})
+	threadServiceHandoffAcceptSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffAccept"),
+			Procedure:  ThreadServiceHandoffAcceptProcedure,
+		}
+	})
+	threadServiceHandoffDeclineSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffDecline"),
+			Procedure:  ThreadServiceHandoffDeclineProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -502,6 +531,17 @@ type ThreadServiceClient interface {
 	// Full-text search over every thread's messages, review comments, agent
 	// text and tool calls, best matches first.
 	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
+	// Offers the thread to a teammate (owner only). If the agent is idle, it
+	// first writes a briefing for them, as the owner's last turn. The next
+	// turns run on the recipient's subscription once they accept.
+	HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error)
+	// Takes the offered thread (the recipient only): its environment restarts
+	// with the recipient's Claude login and secrets, in a new Claude Code
+	// session that gets the conversation so far. Refused while the agent works.
+	HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error)
+	// Withdraws the pending offer: declined by the recipient, or cancelled by
+	// the owner.
+	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -701,6 +741,17 @@ type ThreadServiceHandler interface {
 	// Full-text search over every thread's messages, review comments, agent
 	// text and tool calls, best matches first.
 	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
+	// Offers the thread to a teammate (owner only). If the agent is idle, it
+	// first writes a briefing for them, as the owner's last turn. The next
+	// turns run on the recipient's subscription once they accept.
+	HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error)
+	// Takes the offered thread (the recipient only): its environment restarts
+	// with the recipient's Claude login and secrets, in a new Claude Code
+	// session that gets the conversation so far. Refused while the agent works.
+	HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error)
+	// Withdraws the pending offer: declined by the recipient, or cancelled by
+	// the owner.
+	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -746,6 +797,9 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
 		connect.Method{Spec: threadServiceRacePickSpec(), Handler: adapter.racePick},
 		connect.Method{Spec: threadServiceSearchSpec(), Handler: adapter.search},
+		connect.Method{Spec: threadServiceHandoffOfferSpec(), Handler: adapter.handoffOffer},
+		connect.Method{Spec: threadServiceHandoffAcceptSpec(), Handler: adapter.handoffAccept},
+		connect.Method{Spec: threadServiceHandoffDeclineSpec(), Handler: adapter.handoffDecline},
 	)
 }
 
@@ -980,6 +1034,18 @@ func (UnimplementedThreadServiceHandler) RacePick(context.Context, *v1.RacePickR
 
 func (UnimplementedThreadServiceHandler) Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Search is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffOffer is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffAccept is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffDecline is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1285,6 +1351,30 @@ func (c *threadServiceClient) RacePick(ctx context.Context, req *v1.RacePickRequ
 func (c *threadServiceClient) Search(ctx context.Context, req *v1.SearchRequest) (*v1.SearchResponse, error) {
 	var res v1.SearchResponse
 	if err := c.client.CallUnary(ctx, threadServiceSearchSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffOffer(ctx context.Context, req *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error) {
+	var res v1.HandoffOfferResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffOfferSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffAccept(ctx context.Context, req *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error) {
+	var res v1.HandoffAcceptResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffAcceptSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffDecline(ctx context.Context, req *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
+	var res v1.HandoffDeclineResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffDeclineSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1722,6 +1812,42 @@ func (h threadServiceHandler) search(ctx context.Context, _ connect.Spec, stream
 		return err
 	}
 	res, err := h.svc.Search(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffOffer(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffOfferRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffOffer(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffAccept(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffAcceptRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffAccept(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffDecline(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffDeclineRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffDecline(ctx, &req)
 	if err != nil {
 		return err
 	}

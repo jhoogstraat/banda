@@ -6,6 +6,7 @@ import (
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/store"
+	"github.com/jhoogstraat/banda/internal/thread"
 )
 
 func TestForkPrompt(t *testing.T) {
@@ -42,5 +43,26 @@ func TestForkPrompt(t *testing.T) {
 	got = forkPrompt(names, src, 0, []*bandav1.Event{msg("u1", strings.Repeat("é", maxTranscript))}, "")
 	if !strings.Contains(got, "Ann: é") || !strings.Contains(got, "é …") || len(got) > maxTranscript/2 {
 		t.Errorf("one huge message should be kept, shortened: %d bytes", len(got))
+	}
+}
+
+func TestHandoffPrompt(t *testing.T) {
+	ev := func(seq int64, actor string, e *bandav1.Event) *bandav1.Event { e.Seq, e.Actor = seq, actor; return e }
+	events := []*bandav1.Event{
+		ev(1, "u1", &bandav1.Event{Kind: &bandav1.Event_Message{Message: &bandav1.Message{Text: "add a file"}}}),
+		ev(2, "agent", &bandav1.Event{Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: "Added it."}}}),
+		ev(3, "u1", &bandav1.Event{Kind: &bandav1.Event_HandoffOffered{HandoffOffered: &bandav1.HandoffOffered{ToUserId: "u2", Note: "tests next"}}}),
+		ev(5, "agent", &bandav1.Event{Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: "Done: the file. Next: tests."}}}),
+	}
+	names := map[string]string{"u1": "Ann", "u2": "Bob"}
+	got := handoffPrompt(names, store.Thread{State: thread.State{OwnerID: "u1"}, ID: "t1", Title: "Add a file", Branch: "banda/t1"}, events, events[2], "u2")
+	for _, want := range []string{"Ann handed it over to Bob", "Ann: add a file\n\nYou: Added it.", "note on the handover: tests next",
+		"Your briefing for Bob, written before the handover:\n\nDone: the file. Next: tests.", "Tell Bob"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "Next: tests") != 1 {
+		t.Error("the briefing should not repeat in the conversation")
 	}
 }

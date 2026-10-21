@@ -159,3 +159,7 @@ CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAG
   AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
 CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
+-- The teammate the owner offered the thread to (see thread.Offer), and how
+-- many handoffs it has had: each starts a new Claude Code session.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoff_to text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoffs int NOT NULL DEFAULT 0;
