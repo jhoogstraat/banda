@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/store"
 )
 
 // actorName is the display name of an event actor: a user's name, or for
@@ -89,7 +90,7 @@ func fenced(s string) string {
 }
 
 // textAttachments loads the text files attached to messages, by id.
-func (s *Service) textAttachments(ctx context.Context, msgs []*bandav1.Message) (map[string]string, error) {
+func textAttachments(ctx context.Context, st *store.Store, msgs []*bandav1.Message) (map[string]string, error) {
 	var ids []string
 	for _, m := range msgs {
 		for _, a := range m.GetAttachments() {
@@ -101,7 +102,7 @@ func (s *Service) textAttachments(ctx context.Context, msgs []*bandav1.Message) 
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	files, err := s.store.Attachments(ctx, ids, true)
+	files, err := st.Attachments(ctx, ids, true)
 	texts := map[string]string{}
 	for _, f := range files {
 		texts[f.ID] = string(f.Data)

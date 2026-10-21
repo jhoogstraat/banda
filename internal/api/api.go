@@ -94,7 +94,7 @@ func (s *Service) apply(ctx context.Context, id string, a thread.Action, events 
 // applyBecause is apply with a reason for the status change.
 func (s *Service) applyBecause(ctx context.Context, id string, a thread.Action, reason string, events ...*bandav1.Event) (thread.Effect, error) {
 	var effect thread.Effect
-	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, stored, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if a == nil {
 			return events, nil
 		}

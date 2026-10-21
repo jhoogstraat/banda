@@ -58,7 +58,7 @@ func (s *Service) PermissionSetMode(ctx context.Context, req *bandav1.Permission
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "unknown permission mode")
 	}
-	t, events, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
+	t, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if err := t.CheckOwner(user(ctx)); err != nil {
 			return nil, err
 		}
@@ -90,7 +90,7 @@ func (s *Service) PermissionAnswer(ctx context.Context, req *bandav1.PermissionA
 		return nil, errNotRunning
 	}
 	var cmd *bandav1.PermissionCommand
-	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		res, c, err := answerPermission(t, by, req)
 		cmd = c
 		return []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_PermissionResolved{PermissionResolved: res}}}, err
@@ -138,7 +138,7 @@ func (s *Service) configure(t store.Thread) {
 
 // permissionEvent records a request from the runner, or its withdrawal.
 func (s *Service) permissionEvent(ctx context.Context, id string, e *bandav1.Event) {
-	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if t.Permissions == nil {
 			t.Permissions = map[string]string{}
 		}
@@ -164,7 +164,7 @@ func (s *Service) settlePermissions(ctx context.Context, id string, d bandav1.Pe
 	if t, err := s.store.Get(ctx, id); err != nil || len(t.Permissions) == 0 {
 		return
 	}
-	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		var out []*bandav1.Event
 		for _, rid := range slices.Sorted(maps.Keys(t.Permissions)) {
 			out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_PermissionResolved{PermissionResolved: &bandav1.PermissionResolved{Id: rid, Decision: d}}})

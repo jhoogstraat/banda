@@ -66,7 +66,7 @@ func (s *Service) start(ctx context.Context, t store.Thread, by string, first *b
 	if err := s.store.Create(ctx, t); err != nil {
 		return t, err
 	}
-	t, events, err := s.store.Update(ctx, t.ID, func(t *store.Thread) ([]*bandav1.Event, error) {
+	t, events, err := s.store.Update(ctx, t.ID, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if first == nil {
 			return nil, nil
 		}
@@ -161,7 +161,7 @@ func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*ba
 
 func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSettingsRequest) (*bandav1.SetAgentSettingsResponse, error) {
 	var changed *bandav1.AgentSettings
-	_, events, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if err := t.CheckOwner(user(ctx)); err != nil {
 			return nil, err
 		}

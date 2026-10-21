@@ -61,7 +61,15 @@ type Thread struct {
 	ParentTitle string
 }
 
-type Store struct{ db *pgxpool.Pool }
+// Store is the pool, or inside Update the transaction (see Update).
+type Store struct{ db querier }
+
+type querier interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 // Open connects and applies the schema.
 // ponytail: idempotent schema file, switch to versioned migrations once a column changes.
@@ -289,8 +297,11 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 
 // Update locks the thread, lets fn change it and return events to append,
 // then saves both atomically. It returns the stored events with seq and time
-// set. If fn returns an error nothing is saved.
-func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*bandav1.Event, error)) (Thread, []*bandav1.Event, error) {
+// set. If fn returns an error nothing is saved. fn reads through tx, the
+// transaction: a query on the pool would wait for a connection while this
+// one holds the thread's lock, and with the pool busy with others waiting
+// for that lock, nothing moves.
+func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thread) ([]*bandav1.Event, error)) (Thread, []*bandav1.Event, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return Thread{}, nil, err
@@ -301,7 +312,7 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	if err != nil {
 		return t, nil, err
 	}
-	events, err := fn(&t)
+	events, err := fn(&Store{tx}, &t)
 	if err != nil {
 		return t, nil, err
 	}
