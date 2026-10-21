@@ -70,7 +70,7 @@ func (s *Service) PermissionAnswer(ctx context.Context, req *bandav1.PermissionA
 	running := s.runners[id] != nil
 	s.mu.Unlock()
 	if !running { // its request died with the environment; reconnecting marks it lost
-		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
+		return nil, errNotRunning
 	}
 	var cmd *bandav1.PermissionCommand
 	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {

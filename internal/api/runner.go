@@ -15,6 +15,8 @@ import (
 	"github.com/jhoogstraat/banda/internal/tunnel"
 )
 
+var errNotRunning = connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
+
 // runner is a connected runner: commands go to ch until done is closed.
 type runner struct {
 	ch   chan *bandav1.ConnectResponse

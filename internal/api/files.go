@@ -48,7 +48,7 @@ func (s *Service) fileRequest(ctx context.Context, id string, req *bandav1.FileR
 		s.mu.Unlock()
 	}()
 	if !s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_FileRequest{FileRequest: req}}) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
+		return nil, errNotRunning
 	}
 	select {
 	case res := <-ch:

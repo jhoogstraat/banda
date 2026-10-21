@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"connectrpc.com/connect/v2"
-
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
 	"github.com/jhoogstraat/banda/internal/thread"
@@ -33,7 +31,7 @@ func (s *Service) OpenTerminal(ctx context.Context, req *bandav1.OpenTerminalReq
 // output until it exits or the client goes away.
 func (s *Service) terminal(ctx context.Context, key string, open *bandav1.TerminalOpen, send func(*bandav1.OpenTerminalResponse) error) error {
 	if !s.waitRunner(ctx, key) {
-		return connect.NewError(connect.CodeUnavailable, "the environment is not running")
+		return errNotRunning
 	}
 
 	// A new terminal replaces the previous one, whose stream then ends.
@@ -56,7 +54,7 @@ func (s *Service) terminal(ctx context.Context, key string, open *bandav1.Termin
 		}
 	}()
 	if !s.sendRunner(key, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalOpen{TerminalOpen: open}}) {
-		return connect.NewError(connect.CodeUnavailable, "the environment is not running")
+		return errNotRunning
 	}
 
 	for {
@@ -98,7 +96,7 @@ func terminalResize(cols, rows uint32) *bandav1.ConnectResponse {
 
 func (s *Service) toTerminal(key string, msg *bandav1.ConnectResponse) error {
 	if !s.sendRunner(key, msg) {
-		return connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
+		return errNotRunning
 	}
 	return nil
 }

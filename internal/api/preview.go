@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -39,8 +38,6 @@ const (
 	previewTTL     = 12 * time.Hour
 	maxPreviewBody = 64 << 20
 )
-
-var errNotRunning = errors.New("the environment is not running")
 
 // FrameAncestors is the CSP that keeps Banda's pages out of frames. Previewed
 // apps are on the same site, so in a frame of theirs Banda would be signed in

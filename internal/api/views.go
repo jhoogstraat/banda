@@ -152,7 +152,7 @@ func (s *Service) Push(ctx context.Context, req *bandav1.PushRequest) (*bandav1.
 		return nil, err
 	}
 	if !s.sendRunner(req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Push{Push: &bandav1.Push{}}}) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
+		return nil, errNotRunning
 	}
 	return &bandav1.PushResponse{}, nil
 }
