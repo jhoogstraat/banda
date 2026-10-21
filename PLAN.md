@@ -32,6 +32,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Agent activity | The chat reads as prose: tool calls and thinking between two texts fold into one "Used N tools" row showing the latest action. Common tools render richly (Bash as a terminal with its exit code, edits as a mini diff, searches with match counts); unknown tools keep the generic view. A subagent's tool calls nest in its Task call; its own text is dropped, since the Task result repeats it. The latest TodoWrite list is pinned above the composer as the plan while items are open. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
@@ -150,6 +151,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
 - Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents.
+- Agent activity: tool calls folded between texts, rich views for Bash, edits, searches and web tools, subagent calls nested in their Task call, the TodoWrite plan pinned above the composer.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`mise run deploy`, `deploy/banda.yaml`).
 - Keyboard: a Cmd/Ctrl-K command palette (also the search button in every page header, for phones) finds my, mentioned and teammates' threads, recently opened first, and runs the current thread's actions that apply to the viewer (pane and tabs, snooze, settle; owner: interrupt, retry, push, mode). Shortcuts: `c` new thread, `j`/`k` or Alt-↑/↓ through the sidebar, `g s` settings, `/` message box, `Esc`, `?` cheat sheet; never while typing. Not covered by e2e (UI only).

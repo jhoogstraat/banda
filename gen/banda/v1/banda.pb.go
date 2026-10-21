@@ -1030,12 +1030,14 @@ func (x *AgentThinking) GetText() string {
 }
 
 type ToolCall struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	InputJson     string                 `protobuf:"bytes,3,opt,name=input_json,json=inputJson,proto3" json:"input_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	InputJson string                 `protobuf:"bytes,3,opt,name=input_json,json=inputJson,proto3" json:"input_json,omitempty"`
+	// Set when a subagent made the call: the id of the Task tool call that started it.
+	ParentToolCallId string `protobuf:"bytes,4,opt,name=parent_tool_call_id,json=parentToolCallId,proto3" json:"parent_tool_call_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ToolCall) Reset() {
@@ -1085,6 +1087,13 @@ func (x *ToolCall) GetName() string {
 func (x *ToolCall) GetInputJson() string {
 	if x != nil {
 		return x.InputJson
+	}
+	return ""
+}
+
+func (x *ToolCall) GetParentToolCallId() string {
+	if x != nil {
+		return x.ParentToolCallId
 	}
 	return ""
 }
@@ -4990,12 +4999,13 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x0eAgentTextDelta\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"#\n" +
 	"\rAgentThinking\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"M\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"|\n" +
 	"\bToolCall\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
-	"input_json\x18\x03 \x01(\tR\tinputJson\"a\n" +
+	"input_json\x18\x03 \x01(\tR\tinputJson\x12-\n" +
+	"\x13parent_tool_call_id\x18\x04 \x01(\tR\x10parentToolCallId\"a\n" +
 	"\n" +
 	"ToolResult\x12 \n" +
 	"\ftool_call_id\x18\x01 \x01(\tR\n" +

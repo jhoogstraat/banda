@@ -54,6 +54,11 @@ ok "thread $ID: sandbox started, first turn ran, diff has its file"
 [ "$(steps checkout DONE)" = 1 ] && [ "$(steps setup SKIPPED)" = 1 ]
 ok "setup steps are reported: checkout done, no .banda/setup.sh"
 
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'toolCall'->>'name'='TodoWrite'")" = 2 ]
+[ "$(sql "select body->'toolCall'->>'name' from events where thread_id='$ID' and body->'toolCall'->>'parentToolCallId'='toolu_task1'")" = Glob ]
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'agentText'->>'text'='Two files.'")" = 0 ]
+ok "plans (TodoWrite) are stored; a subagent's tool calls carry their Task call, its text is dropped"
+
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"nice, carol what do you think?\"}}" bob >/dev/null
 [ "$(thread mode)" = MODE_CHAT ]
 ok "a teammate's post switches to chat mode"
