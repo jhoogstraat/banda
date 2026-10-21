@@ -35,6 +35,7 @@
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
+	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SidePane from '#lib/components/side-pane.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
@@ -105,7 +106,7 @@
 					if (event.seq) seq = event.seq;
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'agentSettings'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -135,6 +136,11 @@
 			error = (e as Error).message;
 			return false;
 		}
+	}
+
+	function setAgent(change: { model?: string; effort?: string }) {
+		Object.assign(thread!, change); // the chip shows the choice right away
+		act(api.setAgentSettings({ threadId: id, ...change }));
 	}
 
 	async function send({ text }: { text: string }) {
@@ -266,6 +272,8 @@
 						</div>
 					{:else if item.kind === 'mode'}
 						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
+					{:else if item.kind === 'settings'}
+						{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
 					{/if}
 				{/each}
 
@@ -302,7 +310,11 @@
 				</PromptInput.Body>
 				<PromptInput.Toolbar>
 					<div class="flex items-center gap-1.5 pl-2">
-						{#if thread}
+						{#if thread && owner}
+							<!-- A running agent switches once its turns have ended. -->
+							<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />
+							<OptionMenu label="Effort" icon={BrainIcon} bind:value={() => thread!.effort, (effort) => setAgent({ effort })} options={efforts} />
+						{:else if thread}
 							<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
 							<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
 						{/if}

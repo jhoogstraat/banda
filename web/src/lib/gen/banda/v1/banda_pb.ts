@@ -12,7 +12,7 @@ import type { Message as Message$1 } from "@bufbuild/protobuf";
  * Describes the file banda/v1/banda.proto.
  */
 export const file_banda_v1_banda: GenFile = /*@__PURE__*/
-  fileDesc("ChRiYW5kYS92MS9iYW5kYS5wcm90bxIIYmFuZGEudjEi/QIKBlRocmVhZBIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIQCghyZXBvX3VybBgEIAEoCRIOCgZicmFuY2gYBSABKAkSDQoFbW9kZWwYBiABKAkSDgoGZWZmb3J0GAcgASgJEiAKBnN0YXR1cxgIIAEoDjIQLmJhbmRhLnYxLlN0YXR1cxIcCgRtb2RlGAkgASgOMg4uYmFuZGEudjEuTW9kZRIMCgRkaWZmGAogASgJEi4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2Jhc2VfYnJhbmNoGA0gASgJEjEKDXNub296ZWRfdW50aWwYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB3NldHRsZWQYDyABKAgiLwoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJIoMFCgVFdmVudBIRCgl0aHJlYWRfaWQYASABKAkSCwoDc2VxGAIgASgDEigKBHRpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWFjdG9yGAQgASgJEiQKB21lc3NhZ2UYCiABKAsyES5iYW5kYS52MS5NZXNzYWdlSAASKQoKYWdlbnRfdGV4dBgLIAEoCzITLmJhbmRhLnYxLkFnZW50VGV4dEgAEjQKEGFnZW50X3RleHRfZGVsdGEYDCABKAsyGC5iYW5kYS52MS5BZ2VudFRleHREZWx0YUgAEjEKDmFnZW50X3RoaW5raW5nGA0gASgLMhcuYmFuZGEudjEuQWdlbnRUaGlua2luZ0gAEicKCXRvb2xfY2FsbBgOIAEoCzISLmJhbmRhLnYxLlRvb2xDYWxsSAASKwoLdG9vbF9yZXN1bHQYDyABKAsyFC5iYW5kYS52MS5Ub29sUmVzdWx0SAASKQoKdHVybl9lbmRlZBgQIAEoCzITLmJhbmRhLnYxLlR1cm5FbmRlZEgAEjEKDnN0YXR1c19jaGFuZ2VkGBEgASgLMhcuYmFuZGEudjEuU3RhdHVzQ2hhbmdlZEgAEi0KDG1vZGVfY2hhbmdlZBgSIAEoCzIVLmJhbmRhLnYxLk1vZGVDaGFuZ2VkSAASLQoMZGlmZl9jaGFuZ2VkGBMgASgLMhUuYmFuZGEudjEuRGlmZkNoYW5nZWRIABIiCgZub3RpY2UYFCABKAsyEC5iYW5kYS52MS5Ob3RpY2VIABIpCgpzZXR1cF9zdGVwGBUgASgLMhMuYmFuZGEudjEuU2V0dXBTdGVwSABCBgoEa2luZCJLCgdNZXNzYWdlEgwKBHRleHQYASABKAkSFgoObWVudGlvbnNfYWdlbnQYAiABKAgSGgoSbWVudGlvbmVkX3VzZXJfaWRzGAMgAygJIhkKCUFnZW50VGV4dBIMCgR0ZXh0GAEgASgJIh4KDkFnZW50VGV4dERlbHRhEgwKBHRleHQYASABKAkiHQoNQWdlbnRUaGlua2luZxIMCgR0ZXh0GAEgASgJIjgKCFRvb2xDYWxsEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKaW5wdXRfanNvbhgDIAEoCSJECgpUb29sUmVzdWx0EhQKDHRvb2xfY2FsbF9pZBgBIAEoCRIOCgZvdXRwdXQYAiABKAkSEAoIaXNfZXJyb3IYAyABKAgiUwoJVHVybkVuZGVkEhAKCGlzX2Vycm9yGAEgASgIEg0KBWVycm9yGAIgASgJEhMKC2R1cmF0aW9uX21zGAMgASgDEhAKCGNvc3RfdXNkGAQgASgBIkEKDVN0YXR1c0NoYW5nZWQSIAoGc3RhdHVzGAEgASgOMhAuYmFuZGEudjEuU3RhdHVzEg4KBnJlYXNvbhgCIAEoCSIrCgtNb2RlQ2hhbmdlZBIcCgRtb2RlGAEgASgOMg4uYmFuZGEudjEuTW9kZSINCgtEaWZmQ2hhbmdlZCIWCgZOb3RpY2USDAoEdGV4dBgBIAEoCSJbCglTZXR1cFN0ZXASCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSIwoFc3RhdGUYAyABKA4yFC5iYW5kYS52MS5TZXR1cFN0YXRlEg4KBm91dHB1dBgEIAEoCSJrChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhAKCHJlcG9fdXJsGAEgASgJEhMKC2Jhc2VfYnJhbmNoGAIgASgJEg0KBW1vZGVsGAMgASgJEg4KBmVmZm9ydBgEIAEoCRIOCgZwcm9tcHQYBSABKAkiOAoUQ3JlYXRlVGhyZWFkUmVzcG9uc2USIAoGdGhyZWFkGAEgASgLMhAuYmFuZGEudjEuVGhyZWFkIiYKEkxpc3RUaHJlYWRzUmVxdWVzdBIQCghvd25lcl9pZBgBIAEoCSI4ChNMaXN0VGhyZWFkc1Jlc3BvbnNlEiEKB3RocmVhZHMYASADKAsyEC5iYW5kYS52MS5UaHJlYWQiJQoQR2V0VGhyZWFkUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiNQoRR2V0VGhyZWFkUmVzcG9uc2USIAoGdGhyZWFkGAEgASgLMhAuYmFuZGEudjEuVGhyZWFkIksKElNlbmRNZXNzYWdlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSIgoHbWVzc2FnZRgCIAEoCzIRLmJhbmRhLnYxLk1lc3NhZ2UiFQoTU2VuZE1lc3NhZ2VSZXNwb25zZSIlChBJbnRlcnJ1cHRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSITChFJbnRlcnJ1cHRSZXNwb25zZSJBCg5TZXRNb2RlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSHAoEbW9kZRgCIAEoDjIOLmJhbmRhLnYxLk1vZGUiEQoPU2V0TW9kZVJlc3BvbnNlIiEKDFJldHJ5UmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiDwoNUmV0cnlSZXNwb25zZSIWChRMaXN0TWVudGlvbmVkUmVxdWVzdCI6ChVMaXN0TWVudGlvbmVkUmVzcG9uc2USIQoHdGhyZWFkcxgBIAMoCzIQLmJhbmRhLnYxLlRocmVhZCJNCg1Tbm9vemVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIpCgV1bnRpbBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiEAoOU25vb3plUmVzcG9uc2UiMwoNU2V0dGxlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSDwoHc2V0dGxlZBgCIAEoCCIQCg5TZXR0bGVSZXNwb25zZSIgCgtQdXNoUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiDgoMUHVzaFJlc3BvbnNlIlUKE09wZW5UZXJtaW5hbFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBGNvbHMYAiABKA0SDAoEcm93cxgDIAEoDRIPCgdjb21tYW5kGAQgASgJIjQKFE9wZW5UZXJtaW5hbFJlc3BvbnNlEgwKBGRhdGEYASABKAwSDgoGZXhpdGVkGAIgASgIIjcKFFdyaXRlVGVybWluYWxSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIMCgRkYXRhGAIgASgMIhcKFVdyaXRlVGVybWluYWxSZXNwb25zZSJGChVSZXNpemVUZXJtaW5hbFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBGNvbHMYAiABKA0SDAoEcm93cxgDIAEoDSIYChZSZXNpemVUZXJtaW5hbFJlc3BvbnNlIiUKEExpc3RGaWxlc1JlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIjUKEUxpc3RGaWxlc1Jlc3BvbnNlEg0KBXBhdGhzGAEgAygJEhEKCXRydW5jYXRlZBgCIAEoCCIyCg9SZWFkRmlsZVJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBHBhdGgYAiABKAkiRgoQUmVhZEZpbGVSZXNwb25zZRIPCgdjb250ZW50GAEgASgJEg4KBmJpbmFyeRgCIAEoCBIRCgl0cnVuY2F0ZWQYAyABKAgiCwoJTWVSZXF1ZXN0IioKCk1lUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLmJhbmRhLnYxLlVzZXIiEgoQTGlzdFVzZXJzUmVxdWVzdCIyChFMaXN0VXNlcnNSZXNwb25zZRIdCgV1c2VycxgBIAMoCzIOLmJhbmRhLnYxLlVzZXIi2AEKDkhhcm5lc3NBY2NvdW50Eg8KB2hhcm5lc3MYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEikKC2F1dGhfbWV0aG9kGAMgASgOMhQuYmFuZGEudjEuQXV0aE1ldGhvZBITCgthcGlfa2V5X3NldBgEIAEoCBIpCgtsb2dpbl9zdGF0ZRgFIAEoDjIULmJhbmRhLnYxLkxvZ2luU3RhdGUSNAoQbG9naW5fY2hlY2tlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiSgoKU2VjcmV0SW5mbxIMCgRuYW1lGAEgASgJEi4KCnVwZGF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhQKEkdldFNldHRpbmdzUmVxdWVzdCJoChNHZXRTZXR0aW5nc1Jlc3BvbnNlEioKCGFjY291bnRzGAEgAygLMhguYmFuZGEudjEuSGFybmVzc0FjY291bnQSJQoHc2VjcmV0cxgCIAMoCzIULmJhbmRhLnYxLlNlY3JldEluZm8iYwoUU2V0QXV0aE1ldGhvZFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIpCgthdXRoX21ldGhvZBgCIAEoDjIULmJhbmRhLnYxLkF1dGhNZXRob2QSDwoHYXBpX2tleRgDIAEoCSIXChVTZXRBdXRoTWV0aG9kUmVzcG9uc2UiLwoQU2V0U2VjcmV0UmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJIhMKEVNldFNlY3JldFJlc3BvbnNlIiMKE0RlbGV0ZVNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCSIWChREZWxldGVTZWNyZXRSZXNwb25zZSJuChhPcGVuTG9naW5UZXJtaW5hbFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIlCgZhY3Rpb24YAiABKA4yFS5iYW5kYS52MS5Mb2dpbkFjdGlvbhIMCgRjb2xzGAMgASgNEgwKBHJvd3MYBCABKA0iOgoZV3JpdGVMb2dpblRlcm1pbmFsUmVxdWVzdBIPCgdoYXJuZXNzGAEgASgJEgwKBGRhdGEYAiABKAwiSQoaUmVzaXplTG9naW5UZXJtaW5hbFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0iOgoSV2F0Y2hUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIRCglhZnRlcl9zZXEYAiABKAMiNQoTV2F0Y2hUaHJlYWRSZXNwb25zZRIeCgVldmVudBgBIAEoCzIPLmJhbmRhLnYxLkV2ZW50IrMCCg5Db25uZWN0UmVxdWVzdBIgCgVoZWxsbxgBIAEoCzIPLmJhbmRhLnYxLkhlbGxvSAASIAoFcmVhZHkYBCABKAsyDy5iYW5kYS52MS5SZWFkeUgAEiAKBWV2ZW50GAIgASgLMg8uYmFuZGEudjEuRXZlbnRIABIeCgRkaWZmGAMgASgLMg4uYmFuZGEudjEuRGlmZkgAEjMKD3Rlcm1pbmFsX291dHB1dBgFIAEoCzIYLmJhbmRhLnYxLlRlcm1pbmFsT3V0cHV0SAASLwoNZmlsZV9yZXNwb25zZRgGIAEoCzIWLmJhbmRhLnYxLkZpbGVSZXNwb25zZUgAEi0KDGxvZ2luX3N0YXR1cxgHIAEoCzIVLmJhbmRhLnYxLkxvZ2luU3RhdHVzSABCBgoEa2luZCJACgVIZWxsbxIRCgl0aHJlYWRfaWQYASABKAkSDQoFdG9rZW4YAiABKAkSFQoNbG9naW5fdXNlcl9pZBgDIAEoCSIxCgtMb2dpblN0YXR1cxIPCgdoYXJuZXNzGAEgASgJEhEKCWxvZ2dlZF9pbhgCIAEoCCIHCgVSZWFkeSIuCg5UZXJtaW5hbE91dHB1dBIMCgRkYXRhGAEgASgMEg4KBmV4aXRlZBgCIAEoCCIUCgREaWZmEgwKBGRpZmYYASABKAkidAoMRmlsZVJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSDQoFcGF0aHMYAiADKAkSEQoJdHJ1bmNhdGVkGAMgASgIEg8KB2NvbnRlbnQYBCABKAkSDgoGYmluYXJ5GAUgASgIEg0KBWVycm9yGAYgASgJIvgCCg9Db25uZWN0UmVzcG9uc2USIgoGcHJvbXB0GAEgASgLMhAuYmFuZGEudjEuUHJvbXB0SAASHgoEc3RvcBgCIAEoCzIOLmJhbmRhLnYxLlN0b3BIABIeCgRwdXNoGAMgASgLMg4uYmFuZGEudjEuUHVzaEgAEi8KDXRlcm1pbmFsX29wZW4YBCABKAsyFi5iYW5kYS52MS5UZXJtaW5hbE9wZW5IABIxCg50ZXJtaW5hbF9pbnB1dBgFIAEoCzIXLmJhbmRhLnYxLlRlcm1pbmFsSW5wdXRIABIzCg90ZXJtaW5hbF9yZXNpemUYBiABKAsyGC5iYW5kYS52MS5UZXJtaW5hbFJlc2l6ZUgAEjEKDnRlcm1pbmFsX2Nsb3NlGAcgASgLMhcuYmFuZGEudjEuVGVybWluYWxDbG9zZUgAEi0KDGZpbGVfcmVxdWVzdBgIIAEoCzIVLmJhbmRhLnYxLkZpbGVSZXF1ZXN0SABCBgoEa2luZCIWCgZQcm9tcHQSDAoEdGV4dBgBIAEoCSIGCgRTdG9wIgYKBFB1c2giOwoMVGVybWluYWxPcGVuEgwKBGNvbHMYASABKA0SDAoEcm93cxgCIAEoDRIPCgdjb21tYW5kGAMgASgJIh0KDVRlcm1pbmFsSW5wdXQSDAoEZGF0YRgBIAEoDCIsCg5UZXJtaW5hbFJlc2l6ZRIMCgRjb2xzGAEgASgNEgwKBHJvd3MYAiABKA0iDwoNVGVybWluYWxDbG9zZSI9CgtGaWxlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDAoEbGlzdBgDIAEoCCqOAQoGU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhMKD1NUQVRVU19TVEFSVElORxABEhIKDlNUQVRVU19XT1JLSU5HEAISGQoVU1RBVFVTX0FXQUlUSU5HX0lOUFVUEAMSEgoOU1RBVFVTX0VSUk9SRUQQBBIUChBTVEFUVVNfU1VTUEVOREVEEAUqOwoETW9kZRIUChBNT0RFX1VOU1BFQ0lGSUVEEAASDgoKTU9ERV9BR0VOVBABEg0KCU1PREVfQ0hBVBACKokBCgpTZXR1cFN0YXRlEhsKF1NFVFVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASFwoTU0VUVVBfU1RBVEVfUlVOTklORxABEhQKEFNFVFVQX1NUQVRFX0RPTkUQAhIWChJTRVRVUF9TVEFURV9GQUlMRUQQAxIXChNTRVRVUF9TVEFURV9TS0lQUEVEEAQqYAoKQXV0aE1ldGhvZBIbChdBVVRIX01FVEhPRF9VTlNQRUNJRklFRBAAEhwKGEFVVEhfTUVUSE9EX1NVQlNDUklQVElPThABEhcKE0FVVEhfTUVUSE9EX0FQSV9LRVkQAip5CgpMb2dpblN0YXRlEhsKF0xPR0lOX1NUQVRFX1VOU1BFQ0lGSUVEEAASFwoTTE9HSU5fU1RBVEVfVU5LTk9XThABEhkKFUxPR0lOX1NUQVRFX0xPR0dFRF9JThACEhoKFkxPR0lOX1NUQVRFX0xPR0dFRF9PVVQQAypcCgtMb2dpbkFjdGlvbhIcChhMT0dJTl9BQ1RJT05fVU5TUEVDSUZJRUQQABIWChJMT0dJTl9BQ1RJT05fTE9HSU4QARIXChNMT0dJTl9BQ1RJT05fTE9HT1VUEAIyzgkKDVRocmVhZFNlcnZpY2USTQoMQ3JlYXRlVGhyZWFkEh0uYmFuZGEudjEuQ3JlYXRlVGhyZWFkUmVxdWVzdBoeLmJhbmRhLnYxLkNyZWF0ZVRocmVhZFJlc3BvbnNlEkoKC0xpc3RUaHJlYWRzEhwuYmFuZGEudjEuTGlzdFRocmVhZHNSZXF1ZXN0Gh0uYmFuZGEudjEuTGlzdFRocmVhZHNSZXNwb25zZRJECglHZXRUaHJlYWQSGi5iYW5kYS52MS5HZXRUaHJlYWRSZXF1ZXN0GhsuYmFuZGEudjEuR2V0VGhyZWFkUmVzcG9uc2USSgoLU2VuZE1lc3NhZ2USHC5iYW5kYS52MS5TZW5kTWVzc2FnZVJlcXVlc3QaHS5iYW5kYS52MS5TZW5kTWVzc2FnZVJlc3BvbnNlEkQKCUludGVycnVwdBIaLmJhbmRhLnYxLkludGVycnVwdFJlcXVlc3QaGy5iYW5kYS52MS5JbnRlcnJ1cHRSZXNwb25zZRI+CgdTZXRNb2RlEhguYmFuZGEudjEuU2V0TW9kZVJlcXVlc3QaGS5iYW5kYS52MS5TZXRNb2RlUmVzcG9uc2USOAoFUmV0cnkSFi5iYW5kYS52MS5SZXRyeVJlcXVlc3QaFy5iYW5kYS52MS5SZXRyeVJlc3BvbnNlEkwKC1dhdGNoVGhyZWFkEhwuYmFuZGEudjEuV2F0Y2hUaHJlYWRSZXF1ZXN0Gh0uYmFuZGEudjEuV2F0Y2hUaHJlYWRSZXNwb25zZTABElAKDUxpc3RNZW50aW9uZWQSHi5iYW5kYS52MS5MaXN0TWVudGlvbmVkUmVxdWVzdBofLmJhbmRhLnYxLkxpc3RNZW50aW9uZWRSZXNwb25zZRI7CgZTbm9vemUSFy5iYW5kYS52MS5Tbm9vemVSZXF1ZXN0GhguYmFuZGEudjEuU25vb3plUmVzcG9uc2USOwoGU2V0dGxlEhcuYmFuZGEudjEuU2V0dGxlUmVxdWVzdBoYLmJhbmRhLnYxLlNldHRsZVJlc3BvbnNlEjUKBFB1c2gSFS5iYW5kYS52MS5QdXNoUmVxdWVzdBoWLmJhbmRhLnYxLlB1c2hSZXNwb25zZRJPCgxPcGVuVGVybWluYWwSHS5iYW5kYS52MS5PcGVuVGVybWluYWxSZXF1ZXN0Gh4uYmFuZGEudjEuT3BlblRlcm1pbmFsUmVzcG9uc2UwARJQCg1Xcml0ZVRlcm1pbmFsEh4uYmFuZGEudjEuV3JpdGVUZXJtaW5hbFJlcXVlc3QaHy5iYW5kYS52MS5Xcml0ZVRlcm1pbmFsUmVzcG9uc2USUwoOUmVzaXplVGVybWluYWwSHy5iYW5kYS52MS5SZXNpemVUZXJtaW5hbFJlcXVlc3QaIC5iYW5kYS52MS5SZXNpemVUZXJtaW5hbFJlc3BvbnNlEkQKCUxpc3RGaWxlcxIaLmJhbmRhLnYxLkxpc3RGaWxlc1JlcXVlc3QaGy5iYW5kYS52MS5MaXN0RmlsZXNSZXNwb25zZRJBCghSZWFkRmlsZRIZLmJhbmRhLnYxLlJlYWRGaWxlUmVxdWVzdBoaLmJhbmRhLnYxLlJlYWRGaWxlUmVzcG9uc2UyhAEKC1VzZXJTZXJ2aWNlEi8KAk1lEhMuYmFuZGEudjEuTWVSZXF1ZXN0GhQuYmFuZGEudjEuTWVSZXNwb25zZRJECglMaXN0VXNlcnMSGi5iYW5kYS52MS5MaXN0VXNlcnNSZXF1ZXN0GhsuYmFuZGEudjEuTGlzdFVzZXJzUmVzcG9uc2Uy2gQKD1NldHRpbmdzU2VydmljZRJKCgtHZXRTZXR0aW5ncxIcLmJhbmRhLnYxLkdldFNldHRpbmdzUmVxdWVzdBodLmJhbmRhLnYxLkdldFNldHRpbmdzUmVzcG9uc2USUAoNU2V0QXV0aE1ldGhvZBIeLmJhbmRhLnYxLlNldEF1dGhNZXRob2RSZXF1ZXN0Gh8uYmFuZGEudjEuU2V0QXV0aE1ldGhvZFJlc3BvbnNlEkQKCVNldFNlY3JldBIaLmJhbmRhLnYxLlNldFNlY3JldFJlcXVlc3QaGy5iYW5kYS52MS5TZXRTZWNyZXRSZXNwb25zZRJNCgxEZWxldGVTZWNyZXQSHS5iYW5kYS52MS5EZWxldGVTZWNyZXRSZXF1ZXN0Gh4uYmFuZGEudjEuRGVsZXRlU2VjcmV0UmVzcG9uc2USWQoRT3BlbkxvZ2luVGVybWluYWwSIi5iYW5kYS52MS5PcGVuTG9naW5UZXJtaW5hbFJlcXVlc3QaHi5iYW5kYS52MS5PcGVuVGVybWluYWxSZXNwb25zZTABEloKEldyaXRlTG9naW5UZXJtaW5hbBIjLmJhbmRhLnYxLldyaXRlTG9naW5UZXJtaW5hbFJlcXVlc3QaHy5iYW5kYS52MS5Xcml0ZVRlcm1pbmFsUmVzcG9uc2USXQoTUmVzaXplTG9naW5UZXJtaW5hbBIkLmJhbmRhLnYxLlJlc2l6ZUxvZ2luVGVybWluYWxSZXF1ZXN0GiAuYmFuZGEudjEuUmVzaXplVGVybWluYWxSZXNwb25zZTJTCg1SdW5uZXJTZXJ2aWNlEkIKB0Nvbm5lY3QSGC5iYW5kYS52MS5Db25uZWN0UmVxdWVzdBoZLmJhbmRhLnYxLkNvbm5lY3RSZXNwb25zZSgBMAFCjgEKDGNvbS5iYW5kYS52MUIKQmFuZGFQcm90b1ABWjFnaXRodWIuY29tL2pob29nc3RyYWF0L2JhbmRhL2dlbi9iYW5kYS92MTtiYW5kYXYxogIDQlhYqgIIQmFuZGEuVjHKAghCYW5kYVxWMeICFEJhbmRhXFYxXEdQQk1ldGFkYXRh6gIJQmFuZGE6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("ChRiYW5kYS92MS9iYW5kYS5wcm90bxIIYmFuZGEudjEi/QIKBlRocmVhZBIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIQCghyZXBvX3VybBgEIAEoCRIOCgZicmFuY2gYBSABKAkSDQoFbW9kZWwYBiABKAkSDgoGZWZmb3J0GAcgASgJEiAKBnN0YXR1cxgIIAEoDjIQLmJhbmRhLnYxLlN0YXR1cxIcCgRtb2RlGAkgASgOMg4uYmFuZGEudjEuTW9kZRIMCgRkaWZmGAogASgJEi4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2Jhc2VfYnJhbmNoGA0gASgJEjEKDXNub296ZWRfdW50aWwYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB3NldHRsZWQYDyABKAgiLwoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJIrYFCgVFdmVudBIRCgl0aHJlYWRfaWQYASABKAkSCwoDc2VxGAIgASgDEigKBHRpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWFjdG9yGAQgASgJEiQKB21lc3NhZ2UYCiABKAsyES5iYW5kYS52MS5NZXNzYWdlSAASKQoKYWdlbnRfdGV4dBgLIAEoCzITLmJhbmRhLnYxLkFnZW50VGV4dEgAEjQKEGFnZW50X3RleHRfZGVsdGEYDCABKAsyGC5iYW5kYS52MS5BZ2VudFRleHREZWx0YUgAEjEKDmFnZW50X3RoaW5raW5nGA0gASgLMhcuYmFuZGEudjEuQWdlbnRUaGlua2luZ0gAEicKCXRvb2xfY2FsbBgOIAEoCzISLmJhbmRhLnYxLlRvb2xDYWxsSAASKwoLdG9vbF9yZXN1bHQYDyABKAsyFC5iYW5kYS52MS5Ub29sUmVzdWx0SAASKQoKdHVybl9lbmRlZBgQIAEoCzITLmJhbmRhLnYxLlR1cm5FbmRlZEgAEjEKDnN0YXR1c19jaGFuZ2VkGBEgASgLMhcuYmFuZGEudjEuU3RhdHVzQ2hhbmdlZEgAEi0KDG1vZGVfY2hhbmdlZBgSIAEoCzIVLmJhbmRhLnYxLk1vZGVDaGFuZ2VkSAASLQoMZGlmZl9jaGFuZ2VkGBMgASgLMhUuYmFuZGEudjEuRGlmZkNoYW5nZWRIABIiCgZub3RpY2UYFCABKAsyEC5iYW5kYS52MS5Ob3RpY2VIABIpCgpzZXR1cF9zdGVwGBUgASgLMhMuYmFuZGEudjEuU2V0dXBTdGVwSAASMQoOYWdlbnRfc2V0dGluZ3MYGiABKAsyFy5iYW5kYS52MS5BZ2VudFNldHRpbmdzSABCBgoEa2luZCJLCgdNZXNzYWdlEgwKBHRleHQYASABKAkSFgoObWVudGlvbnNfYWdlbnQYAiABKAgSGgoSbWVudGlvbmVkX3VzZXJfaWRzGAMgAygJIhkKCUFnZW50VGV4dBIMCgR0ZXh0GAEgASgJIh4KDkFnZW50VGV4dERlbHRhEgwKBHRleHQYASABKAkiHQoNQWdlbnRUaGlua2luZxIMCgR0ZXh0GAEgASgJIjgKCFRvb2xDYWxsEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKaW5wdXRfanNvbhgDIAEoCSJECgpUb29sUmVzdWx0EhQKDHRvb2xfY2FsbF9pZBgBIAEoCRIOCgZvdXRwdXQYAiABKAkSEAoIaXNfZXJyb3IYAyABKAgiUwoJVHVybkVuZGVkEhAKCGlzX2Vycm9yGAEgASgIEg0KBWVycm9yGAIgASgJEhMKC2R1cmF0aW9uX21zGAMgASgDEhAKCGNvc3RfdXNkGAQgASgBIkEKDVN0YXR1c0NoYW5nZWQSIAoGc3RhdHVzGAEgASgOMhAuYmFuZGEudjEuU3RhdHVzEg4KBnJlYXNvbhgCIAEoCSIrCgtNb2RlQ2hhbmdlZBIcCgRtb2RlGAEgASgOMg4uYmFuZGEudjEuTW9kZSINCgtEaWZmQ2hhbmdlZCIWCgZOb3RpY2USDAoEdGV4dBgBIAEoCSJbCglTZXR1cFN0ZXASCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSIwoFc3RhdGUYAyABKA4yFC5iYW5kYS52MS5TZXR1cFN0YXRlEg4KBm91dHB1dBgEIAEoCSJrChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhAKCHJlcG9fdXJsGAEgASgJEhMKC2Jhc2VfYnJhbmNoGAIgASgJEg0KBW1vZGVsGAMgASgJEg4KBmVmZm9ydBgEIAEoCRIOCgZwcm9tcHQYBSABKAkiOAoUQ3JlYXRlVGhyZWFkUmVzcG9uc2USIAoGdGhyZWFkGAEgASgLMhAuYmFuZGEudjEuVGhyZWFkIiYKEkxpc3RUaHJlYWRzUmVxdWVzdBIQCghvd25lcl9pZBgBIAEoCSI4ChNMaXN0VGhyZWFkc1Jlc3BvbnNlEiEKB3RocmVhZHMYASADKAsyEC5iYW5kYS52MS5UaHJlYWQiJQoQR2V0VGhyZWFkUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiNQoRR2V0VGhyZWFkUmVzcG9uc2USIAoGdGhyZWFkGAEgASgLMhAuYmFuZGEudjEuVGhyZWFkIksKElNlbmRNZXNzYWdlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSIgoHbWVzc2FnZRgCIAEoCzIRLmJhbmRhLnYxLk1lc3NhZ2UiFQoTU2VuZE1lc3NhZ2VSZXNwb25zZSIlChBJbnRlcnJ1cHRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCSITChFJbnRlcnJ1cHRSZXNwb25zZSJBCg5TZXRNb2RlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSHAoEbW9kZRgCIAEoDjIOLmJhbmRhLnYxLk1vZGUiEQoPU2V0TW9kZVJlc3BvbnNlIi4KDUFnZW50U2V0dGluZ3MSDQoFbW9kZWwYASABKAkSDgoGZWZmb3J0GAIgASgJIksKF1NldEFnZW50U2V0dGluZ3NSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRINCgVtb2RlbBgCIAEoCRIOCgZlZmZvcnQYAyABKAkiGgoYU2V0QWdlbnRTZXR0aW5nc1Jlc3BvbnNlIiEKDFJldHJ5UmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiDwoNUmV0cnlSZXNwb25zZSIWChRMaXN0TWVudGlvbmVkUmVxdWVzdCI6ChVMaXN0TWVudGlvbmVkUmVzcG9uc2USIQoHdGhyZWFkcxgBIAMoCzIQLmJhbmRhLnYxLlRocmVhZCJNCg1Tbm9vemVSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIpCgV1bnRpbBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiEAoOU25vb3plUmVzcG9uc2UiMwoNU2V0dGxlUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSDwoHc2V0dGxlZBgCIAEoCCIQCg5TZXR0bGVSZXNwb25zZSIgCgtQdXNoUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiDgoMUHVzaFJlc3BvbnNlIlUKE09wZW5UZXJtaW5hbFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBGNvbHMYAiABKA0SDAoEcm93cxgDIAEoDRIPCgdjb21tYW5kGAQgASgJIjQKFE9wZW5UZXJtaW5hbFJlc3BvbnNlEgwKBGRhdGEYASABKAwSDgoGZXhpdGVkGAIgASgIIjcKFFdyaXRlVGVybWluYWxSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIMCgRkYXRhGAIgASgMIhcKFVdyaXRlVGVybWluYWxSZXNwb25zZSJGChVSZXNpemVUZXJtaW5hbFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBGNvbHMYAiABKA0SDAoEcm93cxgDIAEoDSIYChZSZXNpemVUZXJtaW5hbFJlc3BvbnNlIiUKEExpc3RGaWxlc1JlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJIjUKEUxpc3RGaWxlc1Jlc3BvbnNlEg0KBXBhdGhzGAEgAygJEhEKCXRydW5jYXRlZBgCIAEoCCIyCg9SZWFkRmlsZVJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEgwKBHBhdGgYAiABKAkiRgoQUmVhZEZpbGVSZXNwb25zZRIPCgdjb250ZW50GAEgASgJEg4KBmJpbmFyeRgCIAEoCBIRCgl0cnVuY2F0ZWQYAyABKAgiCwoJTWVSZXF1ZXN0IioKCk1lUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLmJhbmRhLnYxLlVzZXIiEgoQTGlzdFVzZXJzUmVxdWVzdCIyChFMaXN0VXNlcnNSZXNwb25zZRIdCgV1c2VycxgBIAMoCzIOLmJhbmRhLnYxLlVzZXIi2AEKDkhhcm5lc3NBY2NvdW50Eg8KB2hhcm5lc3MYASABKAkSFAoMZGlzcGxheV9uYW1lGAIgASgJEikKC2F1dGhfbWV0aG9kGAMgASgOMhQuYmFuZGEudjEuQXV0aE1ldGhvZBITCgthcGlfa2V5X3NldBgEIAEoCBIpCgtsb2dpbl9zdGF0ZRgFIAEoDjIULmJhbmRhLnYxLkxvZ2luU3RhdGUSNAoQbG9naW5fY2hlY2tlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiSgoKU2VjcmV0SW5mbxIMCgRuYW1lGAEgASgJEi4KCnVwZGF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhQKEkdldFNldHRpbmdzUmVxdWVzdCJoChNHZXRTZXR0aW5nc1Jlc3BvbnNlEioKCGFjY291bnRzGAEgAygLMhguYmFuZGEudjEuSGFybmVzc0FjY291bnQSJQoHc2VjcmV0cxgCIAMoCzIULmJhbmRhLnYxLlNlY3JldEluZm8iYwoUU2V0QXV0aE1ldGhvZFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIpCgthdXRoX21ldGhvZBgCIAEoDjIULmJhbmRhLnYxLkF1dGhNZXRob2QSDwoHYXBpX2tleRgDIAEoCSIXChVTZXRBdXRoTWV0aG9kUmVzcG9uc2UiLwoQU2V0U2VjcmV0UmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJIhMKEVNldFNlY3JldFJlc3BvbnNlIiMKE0RlbGV0ZVNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCSIWChREZWxldGVTZWNyZXRSZXNwb25zZSJuChhPcGVuTG9naW5UZXJtaW5hbFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIlCgZhY3Rpb24YAiABKA4yFS5iYW5kYS52MS5Mb2dpbkFjdGlvbhIMCgRjb2xzGAMgASgNEgwKBHJvd3MYBCABKA0iOgoZV3JpdGVMb2dpblRlcm1pbmFsUmVxdWVzdBIPCgdoYXJuZXNzGAEgASgJEgwKBGRhdGEYAiABKAwiSQoaUmVzaXplTG9naW5UZXJtaW5hbFJlcXVlc3QSDwoHaGFybmVzcxgBIAEoCRIMCgRjb2xzGAIgASgNEgwKBHJvd3MYAyABKA0iOgoSV2F0Y2hUaHJlYWRSZXF1ZXN0EhEKCXRocmVhZF9pZBgBIAEoCRIRCglhZnRlcl9zZXEYAiABKAMiNQoTV2F0Y2hUaHJlYWRSZXNwb25zZRIeCgVldmVudBgBIAEoCzIPLmJhbmRhLnYxLkV2ZW50IrMCCg5Db25uZWN0UmVxdWVzdBIgCgVoZWxsbxgBIAEoCzIPLmJhbmRhLnYxLkhlbGxvSAASIAoFcmVhZHkYBCABKAsyDy5iYW5kYS52MS5SZWFkeUgAEiAKBWV2ZW50GAIgASgLMg8uYmFuZGEudjEuRXZlbnRIABIeCgRkaWZmGAMgASgLMg4uYmFuZGEudjEuRGlmZkgAEjMKD3Rlcm1pbmFsX291dHB1dBgFIAEoCzIYLmJhbmRhLnYxLlRlcm1pbmFsT3V0cHV0SAASLwoNZmlsZV9yZXNwb25zZRgGIAEoCzIWLmJhbmRhLnYxLkZpbGVSZXNwb25zZUgAEi0KDGxvZ2luX3N0YXR1cxgHIAEoCzIVLmJhbmRhLnYxLkxvZ2luU3RhdHVzSABCBgoEa2luZCJACgVIZWxsbxIRCgl0aHJlYWRfaWQYASABKAkSDQoFdG9rZW4YAiABKAkSFQoNbG9naW5fdXNlcl9pZBgDIAEoCSIxCgtMb2dpblN0YXR1cxIPCgdoYXJuZXNzGAEgASgJEhEKCWxvZ2dlZF9pbhgCIAEoCCIHCgVSZWFkeSIuCg5UZXJtaW5hbE91dHB1dBIMCgRkYXRhGAEgASgMEg4KBmV4aXRlZBgCIAEoCCIUCgREaWZmEgwKBGRpZmYYASABKAkidAoMRmlsZVJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSDQoFcGF0aHMYAiADKAkSEQoJdHJ1bmNhdGVkGAMgASgIEg8KB2NvbnRlbnQYBCABKAkSDgoGYmluYXJ5GAUgASgIEg0KBWVycm9yGAYgASgJIqsDCg9Db25uZWN0UmVzcG9uc2USIgoGcHJvbXB0GAEgASgLMhAuYmFuZGEudjEuUHJvbXB0SAASHgoEc3RvcBgCIAEoCzIOLmJhbmRhLnYxLlN0b3BIABIeCgRwdXNoGAMgASgLMg4uYmFuZGEudjEuUHVzaEgAEi8KDXRlcm1pbmFsX29wZW4YBCABKAsyFi5iYW5kYS52MS5UZXJtaW5hbE9wZW5IABIxCg50ZXJtaW5hbF9pbnB1dBgFIAEoCzIXLmJhbmRhLnYxLlRlcm1pbmFsSW5wdXRIABIzCg90ZXJtaW5hbF9yZXNpemUYBiABKAsyGC5iYW5kYS52MS5UZXJtaW5hbFJlc2l6ZUgAEjEKDnRlcm1pbmFsX2Nsb3NlGAcgASgLMhcuYmFuZGEudjEuVGVybWluYWxDbG9zZUgAEi0KDGZpbGVfcmVxdWVzdBgIIAEoCzIVLmJhbmRhLnYxLkZpbGVSZXF1ZXN0SAASMQoOYWdlbnRfc2V0dGluZ3MYCSABKAsyFy5iYW5kYS52MS5BZ2VudFNldHRpbmdzSABCBgoEa2luZCIWCgZQcm9tcHQSDAoEdGV4dBgBIAEoCSIGCgRTdG9wIgYKBFB1c2giOwoMVGVybWluYWxPcGVuEgwKBGNvbHMYASABKA0SDAoEcm93cxgCIAEoDRIPCgdjb21tYW5kGAMgASgJIh0KDVRlcm1pbmFsSW5wdXQSDAoEZGF0YRgBIAEoDCIsCg5UZXJtaW5hbFJlc2l6ZRIMCgRjb2xzGAEgASgNEgwKBHJvd3MYAiABKA0iDwoNVGVybWluYWxDbG9zZSI9CgtGaWxlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDAoEbGlzdBgDIAEoCCqOAQoGU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhMKD1NUQVRVU19TVEFSVElORxABEhIKDlNUQVRVU19XT1JLSU5HEAISGQoVU1RBVFVTX0FXQUlUSU5HX0lOUFVUEAMSEgoOU1RBVFVTX0VSUk9SRUQQBBIUChBTVEFUVVNfU1VTUEVOREVEEAUqOwoETW9kZRIUChBNT0RFX1VOU1BFQ0lGSUVEEAASDgoKTU9ERV9BR0VOVBABEg0KCU1PREVfQ0hBVBACKokBCgpTZXR1cFN0YXRlEhsKF1NFVFVQX1NUQVRFX1VOU1BFQ0lGSUVEEAASFwoTU0VUVVBfU1RBVEVfUlVOTklORxABEhQKEFNFVFVQX1NUQVRFX0RPTkUQAhIWChJTRVRVUF9TVEFURV9GQUlMRUQQAxIXChNTRVRVUF9TVEFURV9TS0lQUEVEEAQqYAoKQXV0aE1ldGhvZBIbChdBVVRIX01FVEhPRF9VTlNQRUNJRklFRBAAEhwKGEFVVEhfTUVUSE9EX1NVQlNDUklQVElPThABEhcKE0FVVEhfTUVUSE9EX0FQSV9LRVkQAip5CgpMb2dpblN0YXRlEhsKF0xPR0lOX1NUQVRFX1VOU1BFQ0lGSUVEEAASFwoTTE9HSU5fU1RBVEVfVU5LTk9XThABEhkKFUxPR0lOX1NUQVRFX0xPR0dFRF9JThACEhoKFkxPR0lOX1NUQVRFX0xPR0dFRF9PVVQQAypcCgtMb2dpbkFjdGlvbhIcChhMT0dJTl9BQ1RJT05fVU5TUEVDSUZJRUQQABIWChJMT0dJTl9BQ1RJT05fTE9HSU4QARIXChNMT0dJTl9BQ1RJT05fTE9HT1VUEAIyqQoKDVRocmVhZFNlcnZpY2USTQoMQ3JlYXRlVGhyZWFkEh0uYmFuZGEudjEuQ3JlYXRlVGhyZWFkUmVxdWVzdBoeLmJhbmRhLnYxLkNyZWF0ZVRocmVhZFJlc3BvbnNlEkoKC0xpc3RUaHJlYWRzEhwuYmFuZGEudjEuTGlzdFRocmVhZHNSZXF1ZXN0Gh0uYmFuZGEudjEuTGlzdFRocmVhZHNSZXNwb25zZRJECglHZXRUaHJlYWQSGi5iYW5kYS52MS5HZXRUaHJlYWRSZXF1ZXN0GhsuYmFuZGEudjEuR2V0VGhyZWFkUmVzcG9uc2USSgoLU2VuZE1lc3NhZ2USHC5iYW5kYS52MS5TZW5kTWVzc2FnZVJlcXVlc3QaHS5iYW5kYS52MS5TZW5kTWVzc2FnZVJlc3BvbnNlEkQKCUludGVycnVwdBIaLmJhbmRhLnYxLkludGVycnVwdFJlcXVlc3QaGy5iYW5kYS52MS5JbnRlcnJ1cHRSZXNwb25zZRI+CgdTZXRNb2RlEhguYmFuZGEudjEuU2V0TW9kZVJlcXVlc3QaGS5iYW5kYS52MS5TZXRNb2RlUmVzcG9uc2USWQoQU2V0QWdlbnRTZXR0aW5ncxIhLmJhbmRhLnYxLlNldEFnZW50U2V0dGluZ3NSZXF1ZXN0GiIuYmFuZGEudjEuU2V0QWdlbnRTZXR0aW5nc1Jlc3BvbnNlEjgKBVJldHJ5EhYuYmFuZGEudjEuUmV0cnlSZXF1ZXN0GhcuYmFuZGEudjEuUmV0cnlSZXNwb25zZRJMCgtXYXRjaFRocmVhZBIcLmJhbmRhLnYxLldhdGNoVGhyZWFkUmVxdWVzdBodLmJhbmRhLnYxLldhdGNoVGhyZWFkUmVzcG9uc2UwARJQCg1MaXN0TWVudGlvbmVkEh4uYmFuZGEudjEuTGlzdE1lbnRpb25lZFJlcXVlc3QaHy5iYW5kYS52MS5MaXN0TWVudGlvbmVkUmVzcG9uc2USOwoGU25vb3plEhcuYmFuZGEudjEuU25vb3plUmVxdWVzdBoYLmJhbmRhLnYxLlNub296ZVJlc3BvbnNlEjsKBlNldHRsZRIXLmJhbmRhLnYxLlNldHRsZVJlcXVlc3QaGC5iYW5kYS52MS5TZXR0bGVSZXNwb25zZRI1CgRQdXNoEhUuYmFuZGEudjEuUHVzaFJlcXVlc3QaFi5iYW5kYS52MS5QdXNoUmVzcG9uc2USTwoMT3BlblRlcm1pbmFsEh0uYmFuZGEudjEuT3BlblRlcm1pbmFsUmVxdWVzdBoeLmJhbmRhLnYxLk9wZW5UZXJtaW5hbFJlc3BvbnNlMAESUAoNV3JpdGVUZXJtaW5hbBIeLmJhbmRhLnYxLldyaXRlVGVybWluYWxSZXF1ZXN0Gh8uYmFuZGEudjEuV3JpdGVUZXJtaW5hbFJlc3BvbnNlElMKDlJlc2l6ZVRlcm1pbmFsEh8uYmFuZGEudjEuUmVzaXplVGVybWluYWxSZXF1ZXN0GiAuYmFuZGEudjEuUmVzaXplVGVybWluYWxSZXNwb25zZRJECglMaXN0RmlsZXMSGi5iYW5kYS52MS5MaXN0RmlsZXNSZXF1ZXN0GhsuYmFuZGEudjEuTGlzdEZpbGVzUmVzcG9uc2USQQoIUmVhZEZpbGUSGS5iYW5kYS52MS5SZWFkRmlsZVJlcXVlc3QaGi5iYW5kYS52MS5SZWFkRmlsZVJlc3BvbnNlMoQBCgtVc2VyU2VydmljZRIvCgJNZRITLmJhbmRhLnYxLk1lUmVxdWVzdBoULmJhbmRhLnYxLk1lUmVzcG9uc2USRAoJTGlzdFVzZXJzEhouYmFuZGEudjEuTGlzdFVzZXJzUmVxdWVzdBobLmJhbmRhLnYxLkxpc3RVc2Vyc1Jlc3BvbnNlMtoECg9TZXR0aW5nc1NlcnZpY2USSgoLR2V0U2V0dGluZ3MSHC5iYW5kYS52MS5HZXRTZXR0aW5nc1JlcXVlc3QaHS5iYW5kYS52MS5HZXRTZXR0aW5nc1Jlc3BvbnNlElAKDVNldEF1dGhNZXRob2QSHi5iYW5kYS52MS5TZXRBdXRoTWV0aG9kUmVxdWVzdBofLmJhbmRhLnYxLlNldEF1dGhNZXRob2RSZXNwb25zZRJECglTZXRTZWNyZXQSGi5iYW5kYS52MS5TZXRTZWNyZXRSZXF1ZXN0GhsuYmFuZGEudjEuU2V0U2VjcmV0UmVzcG9uc2USTQoMRGVsZXRlU2VjcmV0Eh0uYmFuZGEudjEuRGVsZXRlU2VjcmV0UmVxdWVzdBoeLmJhbmRhLnYxLkRlbGV0ZVNlY3JldFJlc3BvbnNlElkKEU9wZW5Mb2dpblRlcm1pbmFsEiIuYmFuZGEudjEuT3BlbkxvZ2luVGVybWluYWxSZXF1ZXN0Gh4uYmFuZGEudjEuT3BlblRlcm1pbmFsUmVzcG9uc2UwARJaChJXcml0ZUxvZ2luVGVybWluYWwSIy5iYW5kYS52MS5Xcml0ZUxvZ2luVGVybWluYWxSZXF1ZXN0Gh8uYmFuZGEudjEuV3JpdGVUZXJtaW5hbFJlc3BvbnNlEl0KE1Jlc2l6ZUxvZ2luVGVybWluYWwSJC5iYW5kYS52MS5SZXNpemVMb2dpblRlcm1pbmFsUmVxdWVzdBogLmJhbmRhLnYxLlJlc2l6ZVRlcm1pbmFsUmVzcG9uc2UyUwoNUnVubmVyU2VydmljZRJCCgdDb25uZWN0EhguYmFuZGEudjEuQ29ubmVjdFJlcXVlc3QaGS5iYW5kYS52MS5Db25uZWN0UmVzcG9uc2UoATABQo4BCgxjb20uYmFuZGEudjFCCkJhbmRhUHJvdG9QAVoxZ2l0aHViLmNvbS9qaG9vZ3N0cmFhdC9iYW5kYS9nZW4vYmFuZGEvdjE7YmFuZGF2MaICA0JYWKoCCEJhbmRhLlYxygIIQmFuZGFcVjHiAhRCYW5kYVxWMVxHUEJNZXRhZGF0YeoCCUJhbmRhOjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message banda.v1.Thread
@@ -235,6 +235,14 @@ export type Event = Message$1<"banda.v1.Event"> & {
      */
     value: SetupStep;
     case: "setupStep";
+  } | {
+    /**
+     * The owner changed the model or effort; actor is the owner.
+     *
+     * @generated from field: banda.v1.AgentSettings agent_settings = 26;
+     */
+    value: AgentSettings;
+    case: "agentSettings";
   } | { case: undefined; value?: undefined };
 };
 
@@ -746,6 +754,72 @@ export const SetModeResponseSchema: GenMessage<SetModeResponse> = /*@__PURE__*/
   messageDesc(file_banda_v1_banda, 26);
 
 /**
+ * The agent's model and effort.
+ *
+ * @generated from message banda.v1.AgentSettings
+ */
+export type AgentSettings = Message$1<"banda.v1.AgentSettings"> & {
+  /**
+   * @generated from field: string model = 1;
+   */
+  model: string;
+
+  /**
+   * @generated from field: string effort = 2;
+   */
+  effort: string;
+};
+
+/**
+ * Describes the message banda.v1.AgentSettings.
+ * Use `create(AgentSettingsSchema)` to create a new message.
+ */
+export const AgentSettingsSchema: GenMessage<AgentSettings> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 27);
+
+/**
+ * @generated from message banda.v1.SetAgentSettingsRequest
+ */
+export type SetAgentSettingsRequest = Message$1<"banda.v1.SetAgentSettingsRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * Empty keeps the current value.
+   *
+   * @generated from field: string model = 2;
+   */
+  model: string;
+
+  /**
+   * @generated from field: string effort = 3;
+   */
+  effort: string;
+};
+
+/**
+ * Describes the message banda.v1.SetAgentSettingsRequest.
+ * Use `create(SetAgentSettingsRequestSchema)` to create a new message.
+ */
+export const SetAgentSettingsRequestSchema: GenMessage<SetAgentSettingsRequest> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 28);
+
+/**
+ * @generated from message banda.v1.SetAgentSettingsResponse
+ */
+export type SetAgentSettingsResponse = Message$1<"banda.v1.SetAgentSettingsResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetAgentSettingsResponse.
+ * Use `create(SetAgentSettingsResponseSchema)` to create a new message.
+ */
+export const SetAgentSettingsResponseSchema: GenMessage<SetAgentSettingsResponse> = /*@__PURE__*/
+  messageDesc(file_banda_v1_banda, 29);
+
+/**
  * @generated from message banda.v1.RetryRequest
  */
 export type RetryRequest = Message$1<"banda.v1.RetryRequest"> & {
@@ -760,7 +834,7 @@ export type RetryRequest = Message$1<"banda.v1.RetryRequest"> & {
  * Use `create(RetryRequestSchema)` to create a new message.
  */
 export const RetryRequestSchema: GenMessage<RetryRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 27);
+  messageDesc(file_banda_v1_banda, 30);
 
 /**
  * @generated from message banda.v1.RetryResponse
@@ -773,7 +847,7 @@ export type RetryResponse = Message$1<"banda.v1.RetryResponse"> & {
  * Use `create(RetryResponseSchema)` to create a new message.
  */
 export const RetryResponseSchema: GenMessage<RetryResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 28);
+  messageDesc(file_banda_v1_banda, 31);
 
 /**
  * @generated from message banda.v1.ListMentionedRequest
@@ -786,7 +860,7 @@ export type ListMentionedRequest = Message$1<"banda.v1.ListMentionedRequest"> & 
  * Use `create(ListMentionedRequestSchema)` to create a new message.
  */
 export const ListMentionedRequestSchema: GenMessage<ListMentionedRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 29);
+  messageDesc(file_banda_v1_banda, 32);
 
 /**
  * @generated from message banda.v1.ListMentionedResponse
@@ -803,7 +877,7 @@ export type ListMentionedResponse = Message$1<"banda.v1.ListMentionedResponse"> 
  * Use `create(ListMentionedResponseSchema)` to create a new message.
  */
 export const ListMentionedResponseSchema: GenMessage<ListMentionedResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 30);
+  messageDesc(file_banda_v1_banda, 33);
 
 /**
  * @generated from message banda.v1.SnoozeRequest
@@ -825,7 +899,7 @@ export type SnoozeRequest = Message$1<"banda.v1.SnoozeRequest"> & {
  * Use `create(SnoozeRequestSchema)` to create a new message.
  */
 export const SnoozeRequestSchema: GenMessage<SnoozeRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 31);
+  messageDesc(file_banda_v1_banda, 34);
 
 /**
  * @generated from message banda.v1.SnoozeResponse
@@ -838,7 +912,7 @@ export type SnoozeResponse = Message$1<"banda.v1.SnoozeResponse"> & {
  * Use `create(SnoozeResponseSchema)` to create a new message.
  */
 export const SnoozeResponseSchema: GenMessage<SnoozeResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 32);
+  messageDesc(file_banda_v1_banda, 35);
 
 /**
  * @generated from message banda.v1.SettleRequest
@@ -860,7 +934,7 @@ export type SettleRequest = Message$1<"banda.v1.SettleRequest"> & {
  * Use `create(SettleRequestSchema)` to create a new message.
  */
 export const SettleRequestSchema: GenMessage<SettleRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 33);
+  messageDesc(file_banda_v1_banda, 36);
 
 /**
  * @generated from message banda.v1.SettleResponse
@@ -873,7 +947,7 @@ export type SettleResponse = Message$1<"banda.v1.SettleResponse"> & {
  * Use `create(SettleResponseSchema)` to create a new message.
  */
 export const SettleResponseSchema: GenMessage<SettleResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 34);
+  messageDesc(file_banda_v1_banda, 37);
 
 /**
  * @generated from message banda.v1.PushRequest
@@ -890,7 +964,7 @@ export type PushRequest = Message$1<"banda.v1.PushRequest"> & {
  * Use `create(PushRequestSchema)` to create a new message.
  */
 export const PushRequestSchema: GenMessage<PushRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 35);
+  messageDesc(file_banda_v1_banda, 38);
 
 /**
  * @generated from message banda.v1.PushResponse
@@ -903,7 +977,7 @@ export type PushResponse = Message$1<"banda.v1.PushResponse"> & {
  * Use `create(PushResponseSchema)` to create a new message.
  */
 export const PushResponseSchema: GenMessage<PushResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 36);
+  messageDesc(file_banda_v1_banda, 39);
 
 /**
  * @generated from message banda.v1.OpenTerminalRequest
@@ -937,7 +1011,7 @@ export type OpenTerminalRequest = Message$1<"banda.v1.OpenTerminalRequest"> & {
  * Use `create(OpenTerminalRequestSchema)` to create a new message.
  */
 export const OpenTerminalRequestSchema: GenMessage<OpenTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 37);
+  messageDesc(file_banda_v1_banda, 40);
 
 /**
  * @generated from message banda.v1.OpenTerminalResponse
@@ -959,7 +1033,7 @@ export type OpenTerminalResponse = Message$1<"banda.v1.OpenTerminalResponse"> & 
  * Use `create(OpenTerminalResponseSchema)` to create a new message.
  */
 export const OpenTerminalResponseSchema: GenMessage<OpenTerminalResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 38);
+  messageDesc(file_banda_v1_banda, 41);
 
 /**
  * @generated from message banda.v1.WriteTerminalRequest
@@ -981,7 +1055,7 @@ export type WriteTerminalRequest = Message$1<"banda.v1.WriteTerminalRequest"> & 
  * Use `create(WriteTerminalRequestSchema)` to create a new message.
  */
 export const WriteTerminalRequestSchema: GenMessage<WriteTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 39);
+  messageDesc(file_banda_v1_banda, 42);
 
 /**
  * @generated from message banda.v1.WriteTerminalResponse
@@ -994,7 +1068,7 @@ export type WriteTerminalResponse = Message$1<"banda.v1.WriteTerminalResponse"> 
  * Use `create(WriteTerminalResponseSchema)` to create a new message.
  */
 export const WriteTerminalResponseSchema: GenMessage<WriteTerminalResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 40);
+  messageDesc(file_banda_v1_banda, 43);
 
 /**
  * @generated from message banda.v1.ResizeTerminalRequest
@@ -1021,7 +1095,7 @@ export type ResizeTerminalRequest = Message$1<"banda.v1.ResizeTerminalRequest"> 
  * Use `create(ResizeTerminalRequestSchema)` to create a new message.
  */
 export const ResizeTerminalRequestSchema: GenMessage<ResizeTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 41);
+  messageDesc(file_banda_v1_banda, 44);
 
 /**
  * @generated from message banda.v1.ResizeTerminalResponse
@@ -1034,7 +1108,7 @@ export type ResizeTerminalResponse = Message$1<"banda.v1.ResizeTerminalResponse"
  * Use `create(ResizeTerminalResponseSchema)` to create a new message.
  */
 export const ResizeTerminalResponseSchema: GenMessage<ResizeTerminalResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 42);
+  messageDesc(file_banda_v1_banda, 45);
 
 /**
  * @generated from message banda.v1.ListFilesRequest
@@ -1051,7 +1125,7 @@ export type ListFilesRequest = Message$1<"banda.v1.ListFilesRequest"> & {
  * Use `create(ListFilesRequestSchema)` to create a new message.
  */
 export const ListFilesRequestSchema: GenMessage<ListFilesRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 43);
+  messageDesc(file_banda_v1_banda, 46);
 
 /**
  * @generated from message banda.v1.ListFilesResponse
@@ -1075,7 +1149,7 @@ export type ListFilesResponse = Message$1<"banda.v1.ListFilesResponse"> & {
  * Use `create(ListFilesResponseSchema)` to create a new message.
  */
 export const ListFilesResponseSchema: GenMessage<ListFilesResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 44);
+  messageDesc(file_banda_v1_banda, 47);
 
 /**
  * @generated from message banda.v1.ReadFileRequest
@@ -1099,7 +1173,7 @@ export type ReadFileRequest = Message$1<"banda.v1.ReadFileRequest"> & {
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
 export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 45);
+  messageDesc(file_banda_v1_banda, 48);
 
 /**
  * @generated from message banda.v1.ReadFileResponse
@@ -1130,7 +1204,7 @@ export type ReadFileResponse = Message$1<"banda.v1.ReadFileResponse"> & {
  * Use `create(ReadFileResponseSchema)` to create a new message.
  */
 export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 46);
+  messageDesc(file_banda_v1_banda, 49);
 
 /**
  * @generated from message banda.v1.MeRequest
@@ -1143,7 +1217,7 @@ export type MeRequest = Message$1<"banda.v1.MeRequest"> & {
  * Use `create(MeRequestSchema)` to create a new message.
  */
 export const MeRequestSchema: GenMessage<MeRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 47);
+  messageDesc(file_banda_v1_banda, 50);
 
 /**
  * @generated from message banda.v1.MeResponse
@@ -1160,7 +1234,7 @@ export type MeResponse = Message$1<"banda.v1.MeResponse"> & {
  * Use `create(MeResponseSchema)` to create a new message.
  */
 export const MeResponseSchema: GenMessage<MeResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 48);
+  messageDesc(file_banda_v1_banda, 51);
 
 /**
  * @generated from message banda.v1.ListUsersRequest
@@ -1173,7 +1247,7 @@ export type ListUsersRequest = Message$1<"banda.v1.ListUsersRequest"> & {
  * Use `create(ListUsersRequestSchema)` to create a new message.
  */
 export const ListUsersRequestSchema: GenMessage<ListUsersRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 49);
+  messageDesc(file_banda_v1_banda, 52);
 
 /**
  * @generated from message banda.v1.ListUsersResponse
@@ -1190,7 +1264,7 @@ export type ListUsersResponse = Message$1<"banda.v1.ListUsersResponse"> & {
  * Use `create(ListUsersResponseSchema)` to create a new message.
  */
 export const ListUsersResponseSchema: GenMessage<ListUsersResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 50);
+  messageDesc(file_banda_v1_banda, 53);
 
 /**
  * @generated from message banda.v1.HarnessAccount
@@ -1236,7 +1310,7 @@ export type HarnessAccount = Message$1<"banda.v1.HarnessAccount"> & {
  * Use `create(HarnessAccountSchema)` to create a new message.
  */
 export const HarnessAccountSchema: GenMessage<HarnessAccount> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 51);
+  messageDesc(file_banda_v1_banda, 54);
 
 /**
  * @generated from message banda.v1.SecretInfo
@@ -1258,7 +1332,7 @@ export type SecretInfo = Message$1<"banda.v1.SecretInfo"> & {
  * Use `create(SecretInfoSchema)` to create a new message.
  */
 export const SecretInfoSchema: GenMessage<SecretInfo> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 52);
+  messageDesc(file_banda_v1_banda, 55);
 
 /**
  * @generated from message banda.v1.GetSettingsRequest
@@ -1271,7 +1345,7 @@ export type GetSettingsRequest = Message$1<"banda.v1.GetSettingsRequest"> & {
  * Use `create(GetSettingsRequestSchema)` to create a new message.
  */
 export const GetSettingsRequestSchema: GenMessage<GetSettingsRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 53);
+  messageDesc(file_banda_v1_banda, 56);
 
 /**
  * @generated from message banda.v1.GetSettingsResponse
@@ -1293,7 +1367,7 @@ export type GetSettingsResponse = Message$1<"banda.v1.GetSettingsResponse"> & {
  * Use `create(GetSettingsResponseSchema)` to create a new message.
  */
 export const GetSettingsResponseSchema: GenMessage<GetSettingsResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 54);
+  messageDesc(file_banda_v1_banda, 57);
 
 /**
  * @generated from message banda.v1.SetAuthMethodRequest
@@ -1322,7 +1396,7 @@ export type SetAuthMethodRequest = Message$1<"banda.v1.SetAuthMethodRequest"> & 
  * Use `create(SetAuthMethodRequestSchema)` to create a new message.
  */
 export const SetAuthMethodRequestSchema: GenMessage<SetAuthMethodRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 55);
+  messageDesc(file_banda_v1_banda, 58);
 
 /**
  * @generated from message banda.v1.SetAuthMethodResponse
@@ -1335,7 +1409,7 @@ export type SetAuthMethodResponse = Message$1<"banda.v1.SetAuthMethodResponse"> 
  * Use `create(SetAuthMethodResponseSchema)` to create a new message.
  */
 export const SetAuthMethodResponseSchema: GenMessage<SetAuthMethodResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 56);
+  messageDesc(file_banda_v1_banda, 59);
 
 /**
  * @generated from message banda.v1.SetSecretRequest
@@ -1359,7 +1433,7 @@ export type SetSecretRequest = Message$1<"banda.v1.SetSecretRequest"> & {
  * Use `create(SetSecretRequestSchema)` to create a new message.
  */
 export const SetSecretRequestSchema: GenMessage<SetSecretRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 57);
+  messageDesc(file_banda_v1_banda, 60);
 
 /**
  * @generated from message banda.v1.SetSecretResponse
@@ -1372,7 +1446,7 @@ export type SetSecretResponse = Message$1<"banda.v1.SetSecretResponse"> & {
  * Use `create(SetSecretResponseSchema)` to create a new message.
  */
 export const SetSecretResponseSchema: GenMessage<SetSecretResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 58);
+  messageDesc(file_banda_v1_banda, 61);
 
 /**
  * @generated from message banda.v1.DeleteSecretRequest
@@ -1389,7 +1463,7 @@ export type DeleteSecretRequest = Message$1<"banda.v1.DeleteSecretRequest"> & {
  * Use `create(DeleteSecretRequestSchema)` to create a new message.
  */
 export const DeleteSecretRequestSchema: GenMessage<DeleteSecretRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 59);
+  messageDesc(file_banda_v1_banda, 62);
 
 /**
  * @generated from message banda.v1.DeleteSecretResponse
@@ -1402,7 +1476,7 @@ export type DeleteSecretResponse = Message$1<"banda.v1.DeleteSecretResponse"> & 
  * Use `create(DeleteSecretResponseSchema)` to create a new message.
  */
 export const DeleteSecretResponseSchema: GenMessage<DeleteSecretResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 60);
+  messageDesc(file_banda_v1_banda, 63);
 
 /**
  * @generated from message banda.v1.OpenLoginTerminalRequest
@@ -1434,7 +1508,7 @@ export type OpenLoginTerminalRequest = Message$1<"banda.v1.OpenLoginTerminalRequ
  * Use `create(OpenLoginTerminalRequestSchema)` to create a new message.
  */
 export const OpenLoginTerminalRequestSchema: GenMessage<OpenLoginTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 61);
+  messageDesc(file_banda_v1_banda, 64);
 
 /**
  * @generated from message banda.v1.WriteLoginTerminalRequest
@@ -1456,7 +1530,7 @@ export type WriteLoginTerminalRequest = Message$1<"banda.v1.WriteLoginTerminalRe
  * Use `create(WriteLoginTerminalRequestSchema)` to create a new message.
  */
 export const WriteLoginTerminalRequestSchema: GenMessage<WriteLoginTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 62);
+  messageDesc(file_banda_v1_banda, 65);
 
 /**
  * @generated from message banda.v1.ResizeLoginTerminalRequest
@@ -1483,7 +1557,7 @@ export type ResizeLoginTerminalRequest = Message$1<"banda.v1.ResizeLoginTerminal
  * Use `create(ResizeLoginTerminalRequestSchema)` to create a new message.
  */
 export const ResizeLoginTerminalRequestSchema: GenMessage<ResizeLoginTerminalRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 63);
+  messageDesc(file_banda_v1_banda, 66);
 
 /**
  * @generated from message banda.v1.WatchThreadRequest
@@ -1505,7 +1579,7 @@ export type WatchThreadRequest = Message$1<"banda.v1.WatchThreadRequest"> & {
  * Use `create(WatchThreadRequestSchema)` to create a new message.
  */
 export const WatchThreadRequestSchema: GenMessage<WatchThreadRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 64);
+  messageDesc(file_banda_v1_banda, 67);
 
 /**
  * @generated from message banda.v1.WatchThreadResponse
@@ -1522,7 +1596,7 @@ export type WatchThreadResponse = Message$1<"banda.v1.WatchThreadResponse"> & {
  * Use `create(WatchThreadResponseSchema)` to create a new message.
  */
 export const WatchThreadResponseSchema: GenMessage<WatchThreadResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 65);
+  messageDesc(file_banda_v1_banda, 68);
 
 /**
  * Runner -> API.
@@ -1591,7 +1665,7 @@ export type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
  * Use `create(ConnectRequestSchema)` to create a new message.
  */
 export const ConnectRequestSchema: GenMessage<ConnectRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 66);
+  messageDesc(file_banda_v1_banda, 69);
 
 /**
  * @generated from message banda.v1.Hello
@@ -1622,7 +1696,7 @@ export type Hello = Message$1<"banda.v1.Hello"> & {
  * Use `create(HelloSchema)` to create a new message.
  */
 export const HelloSchema: GenMessage<Hello> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 67);
+  messageDesc(file_banda_v1_banda, 70);
 
 /**
  * @generated from message banda.v1.LoginStatus
@@ -1644,7 +1718,7 @@ export type LoginStatus = Message$1<"banda.v1.LoginStatus"> & {
  * Use `create(LoginStatusSchema)` to create a new message.
  */
 export const LoginStatusSchema: GenMessage<LoginStatus> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 68);
+  messageDesc(file_banda_v1_banda, 71);
 
 /**
  * @generated from message banda.v1.Ready
@@ -1657,7 +1731,7 @@ export type Ready = Message$1<"banda.v1.Ready"> & {
  * Use `create(ReadySchema)` to create a new message.
  */
 export const ReadySchema: GenMessage<Ready> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 69);
+  messageDesc(file_banda_v1_banda, 72);
 
 /**
  * @generated from message banda.v1.TerminalOutput
@@ -1679,7 +1753,7 @@ export type TerminalOutput = Message$1<"banda.v1.TerminalOutput"> & {
  * Use `create(TerminalOutputSchema)` to create a new message.
  */
 export const TerminalOutputSchema: GenMessage<TerminalOutput> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 70);
+  messageDesc(file_banda_v1_banda, 73);
 
 /**
  * @generated from message banda.v1.Diff
@@ -1696,7 +1770,7 @@ export type Diff = Message$1<"banda.v1.Diff"> & {
  * Use `create(DiffSchema)` to create a new message.
  */
 export const DiffSchema: GenMessage<Diff> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 71);
+  messageDesc(file_banda_v1_banda, 74);
 
 /**
  * The answer to a FileRequest.
@@ -1742,7 +1816,7 @@ export type FileResponse = Message$1<"banda.v1.FileResponse"> & {
  * Use `create(FileResponseSchema)` to create a new message.
  */
 export const FileResponseSchema: GenMessage<FileResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 72);
+  messageDesc(file_banda_v1_banda, 75);
 
 /**
  * API -> runner.
@@ -1801,6 +1875,15 @@ export type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
      */
     value: FileRequest;
     case: "fileRequest";
+  } | {
+    /**
+     * Sent on connect and on every change. The runner restarts the agent with
+     * them when no turn is running.
+     *
+     * @generated from field: banda.v1.AgentSettings agent_settings = 9;
+     */
+    value: AgentSettings;
+    case: "agentSettings";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1809,7 +1892,7 @@ export type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
  * Use `create(ConnectResponseSchema)` to create a new message.
  */
 export const ConnectResponseSchema: GenMessage<ConnectResponse> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 73);
+  messageDesc(file_banda_v1_banda, 76);
 
 /**
  * @generated from message banda.v1.Prompt
@@ -1826,7 +1909,7 @@ export type Prompt = Message$1<"banda.v1.Prompt"> & {
  * Use `create(PromptSchema)` to create a new message.
  */
 export const PromptSchema: GenMessage<Prompt> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 74);
+  messageDesc(file_banda_v1_banda, 77);
 
 /**
  * Interrupts the current turn.
@@ -1841,7 +1924,7 @@ export type Stop = Message$1<"banda.v1.Stop"> & {
  * Use `create(StopSchema)` to create a new message.
  */
 export const StopSchema: GenMessage<Stop> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 75);
+  messageDesc(file_banda_v1_banda, 78);
 
 /**
  * Push the thread branch and report the result as a notice.
@@ -1856,7 +1939,7 @@ export type Push = Message$1<"banda.v1.Push"> & {
  * Use `create(PushSchema)` to create a new message.
  */
 export const PushSchema: GenMessage<Push> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 76);
+  messageDesc(file_banda_v1_banda, 79);
 
 /**
  * @generated from message banda.v1.TerminalOpen
@@ -1883,7 +1966,7 @@ export type TerminalOpen = Message$1<"banda.v1.TerminalOpen"> & {
  * Use `create(TerminalOpenSchema)` to create a new message.
  */
 export const TerminalOpenSchema: GenMessage<TerminalOpen> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 77);
+  messageDesc(file_banda_v1_banda, 80);
 
 /**
  * @generated from message banda.v1.TerminalInput
@@ -1900,7 +1983,7 @@ export type TerminalInput = Message$1<"banda.v1.TerminalInput"> & {
  * Use `create(TerminalInputSchema)` to create a new message.
  */
 export const TerminalInputSchema: GenMessage<TerminalInput> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 78);
+  messageDesc(file_banda_v1_banda, 81);
 
 /**
  * @generated from message banda.v1.TerminalResize
@@ -1922,7 +2005,7 @@ export type TerminalResize = Message$1<"banda.v1.TerminalResize"> & {
  * Use `create(TerminalResizeSchema)` to create a new message.
  */
 export const TerminalResizeSchema: GenMessage<TerminalResize> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 79);
+  messageDesc(file_banda_v1_banda, 82);
 
 /**
  * @generated from message banda.v1.TerminalClose
@@ -1935,7 +2018,7 @@ export type TerminalClose = Message$1<"banda.v1.TerminalClose"> & {
  * Use `create(TerminalCloseSchema)` to create a new message.
  */
 export const TerminalCloseSchema: GenMessage<TerminalClose> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 80);
+  messageDesc(file_banda_v1_banda, 83);
 
 /**
  * Lists the checkout's files, or reads `path` from it.
@@ -1964,7 +2047,7 @@ export type FileRequest = Message$1<"banda.v1.FileRequest"> & {
  * Use `create(FileRequestSchema)` to create a new message.
  */
 export const FileRequestSchema: GenMessage<FileRequest> = /*@__PURE__*/
-  messageDesc(file_banda_v1_banda, 81);
+  messageDesc(file_banda_v1_banda, 84);
 
 /**
  * @generated from enum banda.v1.Status
@@ -2220,6 +2303,17 @@ export const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof SetModeRequestSchema;
     output: typeof SetModeResponseSchema;
+  },
+  /**
+   * Changes the agent's model and effort (owner only). A running agent
+   * restarts with them once its turns have ended; a paused one starts with them.
+   *
+   * @generated from rpc banda.v1.ThreadService.SetAgentSettings
+   */
+  setAgentSettings: {
+    methodKind: "unary";
+    input: typeof SetAgentSettingsRequestSchema;
+    output: typeof SetAgentSettingsResponseSchema;
   },
   /**
    * @generated from rpc banda.v1.ThreadService.Retry
