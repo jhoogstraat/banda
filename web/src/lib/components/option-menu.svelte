@@ -33,7 +33,7 @@
 	<DropdownMenu.Content align="start" class="w-48">
 		<DropdownMenu.Label>{label}</DropdownMenu.Label>
 		<DropdownMenu.RadioGroup bind:value>
-			{#each options as o (o)}<DropdownMenu.RadioItem value={o}>{o}</DropdownMenu.RadioItem>{/each}
+			{#each options as o (o)}<DropdownMenu.RadioItem value={o} closeOnSelect>{o}</DropdownMenu.RadioItem>{/each}
 		</DropdownMenu.RadioGroup>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

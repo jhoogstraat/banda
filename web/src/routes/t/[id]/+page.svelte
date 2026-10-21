@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
+	import { Code, ConnectError } from '@connectrpc/connect';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import BotIcon from '@lucide/svelte/icons/bot';
@@ -69,6 +70,9 @@
 	// The reason of the latest status change, e.g. why the environment failed.
 	let reason = $state('');
 	let offline = $state(false);
+	// GetThread said there is no such thread.
+	let missing = $state(false);
+	let closed = false;
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
 	// Ticks so typing expires; `others` drops the viewer from presence and typing.
 	let now = $state(Date.now());
@@ -99,11 +103,16 @@
 		focus = c;
 	}
 
+	// A failed load tries again: a quiet thread sends no event that would refresh it.
+	let loadError = '';
 	async function load() {
 		try {
 			thread = (await api.getThread({ threadId: id })).thread;
+			if (error === loadError) error = '';
 		} catch (e) {
-			error = (e as Error).message;
+			if (ConnectError.from(e).code === Code.NotFound) return void (missing = true);
+			error = loadError = (e as Error).message;
+			if (!closed) timer = setTimeout(load, 2000);
 		}
 	}
 
@@ -146,7 +155,7 @@
 
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
-		while (!signal.aborted) {
+		while (!signal.aborted && !missing) {
 			chat.streaming = ''; // deltas are not replayed, drop a half-finished bubble
 			try {
 				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq, tail: TAIL }, { signal })) {
@@ -164,12 +173,12 @@
 					apply(chat, event);
 					if (event.kind.case === 'lineageUpdate') lineage++;
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'autoPush'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
 			}
-			offline = true;
+			offline = !missing;
 			await new Promise((r) => setTimeout(r, 1000));
 		}
 	}
@@ -209,6 +218,7 @@
 		watch(ctrl.signal);
 		const tick = setInterval(() => (now = Date.now()), 1000);
 		return () => {
+			closed = true;
 			ctrl.abort();
 			clearTimeout(timer);
 			clearTimeout(readTimer);
@@ -224,6 +234,7 @@
 			return true;
 		} catch (e) {
 			error = (e as Error).message;
+			refresh(); // drops what the page showed ahead of the call (the model chip)
 			return false;
 		}
 	}
@@ -316,62 +327,68 @@
 <svelte:document onvisibilitychange={markRead} />
 
 <div class="flex min-w-0 flex-1 flex-col">
-	<ThreadHeader {thread} {owner} {offline} {here} {act} {interrupt} {toggleMode} {push} bind:forkOpen bind:spawnOpen bind:paneOpen={diffOpen} />
+	<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {push} bind:forkOpen bind:spawnOpen bind:paneOpen={diffOpen} />
 	<SubThreads threadId={id} version={lineage} />
 
-	<Conversation class="min-h-0 flex-1">
-		<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
-			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
-				{#if oldest > 1n}
-					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={() => loadOlder()}>
-						{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
-					</Button>
-				{/if}
-				{#each chat.items as item (item.key)}
-					<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
-					<div
-						data-key={item.key}
-						class="rounded-lg transition-shadow duration-500 [contain-intrinsic-size:auto_80px] [content-visibility:auto] {flash === item.key
-							? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
-							: ''}"
-					>
-						<ChatItem {item} threadId={id} {thread} {owner} {act} onreveal={reveal} onlogin={() => (loginOpen = true)} />
-					</div>
-				{/each}
+	{#if missing}
+		<ConversationEmptyState class="flex-1" title="Thread not found" description="It doesn't exist, or the link is wrong." />
+	{:else}
+		<Conversation class="min-h-0 flex-1">
+			<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
+				<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
+					{#if oldest > 1n}
+						<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={() => loadOlder()}>
+							{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
+						</Button>
+					{/if}
+					{#each chat.items as item (item.key)}
+						<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
+						<div
+							data-key={item.key}
+							class="rounded-lg transition-shadow duration-500 [contain-intrinsic-size:auto_80px] [content-visibility:auto] {flash === item.key
+								? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
+								: ''}"
+						>
+							<ChatItem {item} threadId={id} {thread} {owner} {act} onreveal={reveal} onlogin={() => (loginOpen = true)} />
+						</div>
+					{/each}
 
-				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
-				{#if thread?.status === Status.STARTING}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
-				{:else if thread?.status === Status.SUSPENDED && thread.environmentDeleted}
-					<div class="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
-						<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" />
-						<span class="flex-1">Environment deleted. Branch <code>{thread.branch}</code> is on origin.</span>
-						{#if owner}
-							<Button size="sm" onclick={recreate}><RotateCcwIcon /> Recreate environment</Button>
-						{/if}
-					</div>
-				{:else if thread?.status === Status.SUSPENDED}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
-				{:else if thread?.status === Status.ERRORED}
-					<div class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-						<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
-						<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
-						{#if owner}
-							<Button size="sm" onclick={retry}><RotateCcwIcon /> Retry</Button>
-						{/if}
-					</div>
-				{:else if !chat.items.length}
-					<ConversationEmptyState title="No messages yet" description="" />
-				{/if}
-			</div>
-		</ConversationContent>
-		<ConversationScrollButton />
-	</Conversation>
+					{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
+					{#if thread?.status === Status.STARTING}
+						<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
+					{:else if thread?.status === Status.SUSPENDED && thread.environmentDeleted}
+						<div class="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+							<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" />
+							<span class="flex-1">Environment deleted. Branch <code>{thread.branch}</code> is on origin.</span>
+							{#if owner}
+								<Button size="sm" onclick={recreate}><RotateCcwIcon /> Recreate environment</Button>
+							{/if}
+						</div>
+					{:else if thread?.status === Status.SUSPENDED}
+						<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
+					{:else if thread?.status === Status.ERRORED}
+						<div class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+							<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
+							<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
+							{#if owner}
+								<Button size="sm" onclick={retry}><RotateCcwIcon /> Retry</Button>
+							{/if}
+						</div>
+					{:else if !chat.items.length}
+						<ConversationEmptyState title="No messages yet" description="" />
+					{/if}
+				</div>
+			</ConversationContent>
+			<ConversationScrollButton />
+		</Conversation>
 
-	<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} />
+		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} />
+	{/if}
 </div>
 
-<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask {posted} onsend={sendReview} />
+{#if !missing}
+	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask {posted} onsend={sendReview} />
+{/if}
 
 <LoginDialog bind:open={loginOpen} />
 {#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}

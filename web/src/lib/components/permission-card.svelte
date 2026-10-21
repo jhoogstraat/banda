@@ -64,7 +64,7 @@
 	};
 </script>
 
-<div class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-amber-500/40 bg-amber-500/5'}">
+<div role="group" aria-label={plan ? 'Plan' : `Permission for ${name}`} class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-amber-500/40 bg-amber-500/5'}">
 	<div class="flex items-center gap-2">
 		<ShieldQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-amber-500'}" />
 		<span class="min-w-0 flex-1">

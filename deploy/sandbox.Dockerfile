@@ -36,7 +36,9 @@ ENTRYPOINT ["/usr/local/bin/runner"]
 # the e2e fixture repos in /opt/e2e/<name>.git, which the e2e git server serves:
 # plain (a README), setup-fails (its .banda/setup.sh fails), setup-bg (it
 # succeeds, leaving a background process) and setup-hold (it waits for
-# ~/e2e-release/setup). Their pre-receive hook can hold a push.
+# ~/e2e-release/setup). Their pre-receive hook can hold a push. A repo URL
+# https://github.com/e2e/<name>.git is the git server's <name> too, for what
+# only shows for GitHub repos (the pull request link).
 FROM sandbox AS fake
 COPY deploy/fake-claude /usr/local/bin/claude
 COPY deploy/e2e-pre-receive /opt/e2e/pre-receive
@@ -48,5 +50,6 @@ RUN repo() { git init -q -b main /tmp/$1 && mkdir /tmp/$1/.banda && printf "$2" 
  && repo setup-fails 'echo "setup sees $E2E_SECRET"\nexit 7\n' setup.sh \
  && repo setup-bg 'sleep 600 &\necho setup-bg-done\n' setup.sh \
  && repo setup-hold 'until [ -e ~/e2e-release/setup ]; do sleep 0.2; done\n' setup.sh \
- && chown -R 1000:1000 /opt/e2e
+ && chown -R 1000:1000 /opt/e2e \
+ && git config --system url.git://e2e-git/.insteadOf https://github.com/e2e/
 USER 1000
