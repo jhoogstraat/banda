@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
+	"github.com/jhoogstraat/banda/internal/tunnel"
 )
 
 type Service struct {
@@ -37,25 +39,41 @@ type Service struct {
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
 	files map[string]chan *bandav1.FileResponse
+	// previews is closed and removed when a thread's preview changes: its
+	// runner came or went, or reported other ports (see PreviewWatch).
+	previews map[string]chan struct{}
+
+	// Preview configures the preview origin (preview.go). Set before serving.
+	Preview      PreviewConfig
+	previewKey   signer
+	previewProxy *http.Transport
 }
 
 // runner is a connected runner: commands go to ch until done is closed.
 type runner struct {
 	ch   chan *bandav1.ConnectResponse
 	done chan struct{}
+	// tunnels carries the preview's connections into the pod; ports is what
+	// listens there. ports is guarded by Service.mu.
+	tunnels *tunnel.Mux
+	ports   []*bandav1.PreviewPort
 }
 
 func New(st *store.Store, sb *sandbox.Client) *Service {
-	return &Service{
+	s := &Service{
 		store:     st,
 		sandboxes: sb,
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
+		previews:  map[string]chan struct{}{},
 
 		loginLastUsed: map[string]time.Time{},
+		previewKey:    signer(rand.Text()),
 	}
+	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}
+	return s
 }
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
@@ -266,15 +284,24 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 	}
 
 	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
+	r.tunnels = tunnel.NewMux(func(t *bandav1.HttpTunnel) error {
+		if !r.send(&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_HttpTunnel{HttpTunnel: t}}) {
+			return errNotRunning
+		}
+		return nil
+	})
 	s.mu.Lock()
 	s.runners[id] = r
+	s.previewChanged(id)
 	s.mu.Unlock()
 	defer close(r.done)
+	defer r.tunnels.CloseAll()
 	defer func() {
 		s.mu.Lock()
 		mine := s.runners[id] == r
 		if mine {
 			delete(s.runners, id)
+			s.previewChanged(id)
 			if term := s.terminals[id]; term != nil { // the terminal dies with the runner
 				close(term)
 				delete(s.terminals, id)
@@ -354,6 +381,15 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 		case *bandav1.ConnectRequest_FileResponse:
 			s.fileResponse(k.FileResponse)
+		case *bandav1.ConnectRequest_HttpTunnel:
+			r.tunnels.Deliver(k.HttpTunnel)
+		case *bandav1.ConnectRequest_PreviewPorts:
+			s.mu.Lock()
+			r.ports = k.PreviewPorts.Ports
+			if s.runners[id] == r {
+				s.previewChanged(id)
+			}
+			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
 			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 				t.Diff = k.Diff.Diff
@@ -446,6 +482,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	// Ensure replaces a running pod; its runner's disconnect is expected.
 	s.mu.Lock()
 	delete(s.runners, t.ID)
+	s.previewChanged(t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)
 	var secrets []store.Secret
@@ -491,9 +528,10 @@ func (s *Service) sendRunner(id string, msg *bandav1.ConnectResponse) bool {
 	s.mu.Lock()
 	r := s.runners[id]
 	s.mu.Unlock()
-	if r == nil {
-		return false
-	}
+	return r != nil && r.send(msg)
+}
+
+func (r *runner) send(msg *bandav1.ConnectResponse) bool {
 	select {
 	case r.ch <- msg:
 		return true

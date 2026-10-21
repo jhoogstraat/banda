@@ -34,6 +34,13 @@ service ThreadService {
   // running environment. Fails while it is not running.
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  // The TCP ports listening in the thread's environment (everyone): the
+  // current state, then every change. Never wakes a paused environment,
+  // except for the owner with `wake` set.
+  rpc PreviewWatch(PreviewWatchRequest) returns (stream PreviewWatchResponse);
+  // A URL on the preview origin that shows what listens on `port`, through
+  // the runner. Opening it signs the browser in to the preview origin.
+  rpc PreviewOpen(PreviewOpenRequest) returns (PreviewOpenResponse);
 }
 
 service UserService {
@@ -340,6 +347,34 @@ message ReadFileResponse {
   bool truncated = 3;
 }
 
+message PreviewWatchRequest {
+  string thread_id = 1;
+  bool wake = 2;
+}
+
+message PreviewWatchResponse {
+  // A runner is connected; without one there are no ports.
+  bool running = 1;
+  repeated PreviewPort ports = 2;
+}
+
+message PreviewPort {
+  uint32 port = 1;
+  // What listens, e.g. "vite", "next" or "http.server". May be empty.
+  string process = 2;
+}
+
+message PreviewOpenRequest {
+  string thread_id = 1;
+  uint32 port = 2;
+  // Where to start, e.g. "/" or "/login?x=1".
+  string path = 3;
+}
+
+message PreviewOpenResponse {
+  string url = 1;
+}
+
 message MeRequest {}
 
 message MeResponse {
@@ -462,6 +497,9 @@ message ConnectRequest {
     FileResponse file_response = 6;
     // The harness login state, sent at start and whenever it changes.
     LoginStatus login_status = 7;
+    HttpTunnel http_tunnel = 8;
+    // The listening ports, sent at start and whenever they change.
+    PreviewPorts preview_ports = 9;
   }
 }
 
@@ -511,6 +549,7 @@ message ConnectResponse {
     TerminalResize terminal_resize = 6;
     TerminalClose terminal_close = 7;
     FileRequest file_request = 8;
+    HttpTunnel http_tunnel = 11;
   }
 }
 
@@ -546,4 +585,23 @@ message FileRequest {
   string request_id = 1;
   string path = 2;
   bool list = 3;
+}
+
+// One message of a TCP connection relayed between the API's preview proxy and
+// a port in the sandbox, in either direction. The API opens it with `port`.
+// Flow control: a side sends at most 8 data messages that the other has not
+// acknowledged yet.
+message HttpTunnel {
+  string id = 1;
+  uint32 port = 2;
+  bytes data = 3;
+  // How many of the peer's data messages were consumed.
+  uint32 ack = 4;
+  // The connection ended; `error` says why, if it failed.
+  bool close = 5;
+  string error = 6;
+}
+
+message PreviewPorts {
+  repeated PreviewPort ports = 1;
 }
