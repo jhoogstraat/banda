@@ -30,7 +30,6 @@
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
-	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import Browser from '#lib/components/browser.svelte';
@@ -46,24 +45,26 @@
 	import ThreadActions, { isSnoozed, presets, settle, snooze } from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
-	import ToolCall from '#lib/components/tool-call.svelte';
+	import Plan from '#lib/components/plan.svelte';
+	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
-	import { apply, type Chat } from '#lib/events.js';
+	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
-	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
+	import { threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
 	visited(id);
 
 	let thread = $state<Thread>();
-	const chat = $state<Chat>({ items: [], streaming: '' });
+	const chat = $state<Chat>(newChat());
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
 	// The terminal, the file browser and the browser mount when their tab is first opened and then stay alive.
@@ -83,6 +84,21 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// Ticks so typing expires; `others` drops the viewer from presence and typing.
+	let now = $state(Date.now());
+	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
+	const here = $derived(others(chat.present));
+	const typing = $derived(others(typingNow(chat, now)).map(userName));
+	const typingText = $derived(
+		typing.length > 2 ? `${typing.length} people are typing…` : typing.length ? `${typing.join(' and ')} ${typing.length > 1 ? 'are' : 'is'} typing…` : ''
+	);
+	// The composer reports typing at most every 2.5 s; posting resets it.
+	let typedAt = 0;
+	function typed() {
+		if (Date.now() - typedAt < 2500) return;
+		typedAt = Date.now();
+		api.sendTyping({ threadId: id }).catch(() => {});
+	}
 
 	const clock = (t?: Timestamp) =>
 		t ? timestampDate(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
@@ -90,7 +106,6 @@
 	async function load() {
 		try {
 			thread = (await api.getThread({ threadId: id })).thread;
-			loadThreads().catch(() => {});
 		} catch (e) {
 			error = (e as Error).message;
 		}
@@ -103,6 +118,13 @@
 		timer = setTimeout(load, 200);
 	};
 
+	// Marks the thread read while it is on screen, after a burst of events or when the tab comes back.
+	let readTimer: ReturnType<typeof setTimeout>;
+	const markRead = () => {
+		clearTimeout(readTimer);
+		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
+	};
+
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
 		while (!signal.aborted) {
@@ -111,7 +133,10 @@
 				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq }, { signal })) {
 					if (!event) continue;
 					offline = false;
-					if (event.seq) seq = event.seq;
+					if (event.seq) {
+						seq = event.seq;
+						markRead();
+					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
@@ -128,9 +153,12 @@
 		const ctrl = new AbortController();
 		load();
 		watch(ctrl.signal);
+		const tick = setInterval(() => (now = Date.now()), 1000);
 		return () => {
 			ctrl.abort();
 			clearTimeout(timer);
+			clearTimeout(readTimer);
+			clearInterval(tick);
 		};
 	});
 
@@ -196,8 +224,11 @@
 		};
 		// Throwing keeps the text in the prompt box so it can be retried.
 		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
+		typedAt = 0;
 	}
 </script>
+
+<svelte:document onvisibilitychange={markRead} />
 
 {#snippet divider(text: string, tone = 'text-muted-foreground')}
 	<div class="flex items-center gap-3 text-xs {tone}">
@@ -219,6 +250,30 @@
 		{#if thread}<StatusDot status={thread.status} label />{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-0.5">
+			{#if here.length}
+				<div class="mr-1.5 flex -space-x-1.5" aria-label="Here now">
+					{#each here.slice(0, 4) as u (u)}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props}><UserAvatar name={userName(u)} class="size-6 ring-2 ring-background" /></span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{userName(u)} · here now</TooltipContent>
+						</Tooltip>
+					{/each}
+					{#if here.length > 4}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props} class="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-background">+{here.length - 4}</span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{here.slice(4).map(userName).join(', ')} · here now</TooltipContent>
+						</Tooltip>
+					{/if}
+				</div>
+			{/if}
 			{#if owner && thread?.status === Status.WORKING}
 				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={interrupt} />
 			{/if}
@@ -259,13 +314,8 @@
 						</div>
 					{:else if item.kind === 'text'}
 						{@render agentText(item.text)}
-					{:else if item.kind === 'thinking'}
-						<Reasoning defaultOpen={false} class="mb-0">
-							<ReasoningTrigger><BrainIcon class="size-4" /> Thinking</ReasoningTrigger>
-							<ReasoningContent content={item.text} />
-						</Reasoning>
-					{:else if item.kind === 'tool'}
-						<ToolCall call={item.call} result={item.result} />
+					{:else if item.kind === 'steps'}
+						<ToolSteps steps={item.steps} />
 					{:else if item.kind === 'turn'}
 						{#if item.turn.isError}
 							{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
@@ -321,8 +371,6 @@
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 				{#if thread?.status === Status.STARTING}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
-				{:else if thread?.status === Status.WORKING}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> <span class="animate-pulse">Working…</span></div>
 				{:else if thread?.status === Status.SUSPENDED}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 				{:else if thread?.status === Status.ERRORED}
@@ -342,10 +390,22 @@
 	</Conversation>
 
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+		<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
+		<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+			{#if thread?.status === Status.WORKING}
+				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
+			{/if}
+			{#if typingText}
+				{#if thread?.status === Status.WORKING}<span>·</span>{/if}
+				<span class="flex gap-0.5"><span class="size-1 animate-bounce rounded-full bg-current"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:150ms]"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:300ms]"></span></span>
+				<span class="truncate">{typingText}</span>
+			{/if}
+		</div>
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
+		<Plan plan={chat.plan} />
 		<PromptInput.Root onSubmit={send}>
-			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
+			<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>

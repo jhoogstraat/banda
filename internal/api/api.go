@@ -8,7 +8,9 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +32,8 @@ type Service struct {
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
+	// present counts each thread's open WatchThread streams per user.
+	present map[string]map[string]int
 	// runners and terminals are keyed by thread id, or loginKey for login
 	// environments.
 	runners map[string]*runner
@@ -42,6 +46,7 @@ type Service struct {
 	// previews is closed and removed when a thread's preview changes: its
 	// runner came or went, or reported other ports (see PreviewWatch).
 	previews map[string]chan struct{}
+	inbox    map[*inboxWatcher]struct{}
 
 	// Preview configures the preview origin (preview.go). Set before serving.
 	Preview      PreviewConfig
@@ -64,10 +69,12 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		store:     st,
 		sandboxes: sb,
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
+		present:   map[string]map[string]int{},
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
 		previews:  map[string]chan struct{}{},
+		inbox:     map[*inboxWatcher]struct{}{},
 
 		loginLastUsed: map[string]time.Time{},
 		previewKey:    signer(rand.Text()),
@@ -175,6 +182,10 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
 		slog.Error("store mentions", "thread", id, "err", err)
 	}
+	if err := s.store.MarkRead(ctx, by, id); err != nil { // posting means having read it
+		slog.Error("mark read", "thread", id, "err", err)
+	}
+	s.pokeInbox(append([]string{by}, m.MentionedUserIds...)...)
 	if effect == thread.StartTurn {
 		s.deliver(ctx, id, prompt)
 	}
@@ -210,8 +221,8 @@ func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav
 }
 
 func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadRequest, stream bandav1connect.ThreadServiceWatchThreadServerStream) error {
-	ch := s.watch(req.ThreadId)
-	defer s.unwatch(req.ThreadId, ch)
+	ch := s.watch(req.ThreadId, user(ctx))
+	defer s.unwatch(req.ThreadId, user(ctx), ch)
 
 	// Subscribe before replaying so nothing falls in between; skip duplicates.
 	last := req.AfterSeq
@@ -541,7 +552,9 @@ func (r *runner) send(msg *bandav1.ConnectResponse) bool {
 	return false
 }
 
-func (s *Service) watch(id string) chan *bandav1.Event {
+// watch subscribes to a thread's events as user. Everyone, the new watcher
+// included, then gets the current presence.
+func (s *Service) watch(id, user string) chan *bandav1.Event {
 	ch := make(chan *bandav1.Event, 256)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -549,16 +562,42 @@ func (s *Service) watch(id string) chan *bandav1.Event {
 		s.watchers[id] = map[chan *bandav1.Event]struct{}{}
 	}
 	s.watchers[id][ch] = struct{}{}
+	if s.present[id] == nil {
+		s.present[id] = map[string]int{}
+	}
+	s.present[id][user]++
+	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
 	return ch
 }
 
-func (s *Service) unwatch(id string, ch chan *bandav1.Event) {
+func (s *Service) unwatch(id, user string, ch chan *bandav1.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.watchers[id][ch]; ok {
 		delete(s.watchers[id], ch)
 		close(ch)
 	}
+	if s.present[id][user]--; s.present[id][user] > 0 {
+		return // another tab of the same user is still here
+	}
+	delete(s.present[id], user)
+	if len(s.present[id]) == 0 {
+		delete(s.present, id)
+	}
+	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
+}
+
+// presence is the ephemeral PresenceChanged event for a thread. Callers hold mu.
+func (s *Service) presence(id string) *bandav1.Event {
+	users := slices.Sorted(maps.Keys(s.present[id]))
+	return &bandav1.Event{ThreadId: id, Time: timestamppb.Now(), Actor: "system",
+		Kind: &bandav1.Event_PresenceChanged{PresenceChanged: &bandav1.PresenceChanged{UserIds: users}}}
+}
+
+func (s *Service) SendTyping(ctx context.Context, req *bandav1.TypingRequest) (*bandav1.TypingResponse, error) {
+	s.broadcast(req.ThreadId, []*bandav1.Event{{ThreadId: req.ThreadId, Time: timestamppb.Now(), Actor: user(ctx),
+		Kind: &bandav1.Event_Typing{Typing: &bandav1.Typing{}}}})
+	return &bandav1.TypingResponse{}, nil
 }
 
 // broadcast fans events out. A watcher that cannot keep up is dropped and
@@ -567,6 +606,11 @@ func (s *Service) unwatch(id string, ch chan *bandav1.Event) {
 func (s *Service) broadcast(id string, events []*bandav1.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.inboxChanged(id, events)
+	s.broadcastLocked(id, events)
+}
+
+func (s *Service) broadcastLocked(id string, events []*bandav1.Event) {
 	for ch := range s.watchers[id] {
 		for _, e := range events {
 			select {
@@ -638,6 +682,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		UpdatedAt:  timestamppb.New(t.UpdatedAt),
 		BaseBranch: t.BaseBranch,
 		Settled:    t.Settled,
+		Unread:     t.Unread,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

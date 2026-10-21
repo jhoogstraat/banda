@@ -63,9 +63,11 @@ description = "Build the sandbox image and load it into kind (after changing cmd
 run = """
 i=${SANDBOX_IMAGE:-localhost/banda-sandbox:dev}
 ${CONTAINER:-podman} build -f deploy/sandbox.Dockerfile --target "${TARGET:-sandbox}" -t "$i" .
-t=/tmp/banda-sandbox-$(echo "$i" | tr /: --).tar # one per image: checkouts build side by side
+# Its own archive: checkouts build their images side by side.
+t=$(mktemp -u /tmp/banda-sandbox.XXXXXX).tar
 ${CONTAINER:-podman} save "$i" -o "$t"
 kind load image-archive "$t" --name banda
+rm -f "$t"
 """
 
 [tasks.api]

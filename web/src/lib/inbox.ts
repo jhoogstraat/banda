@@ -1,0 +1,34 @@
+import { timestampMs } from '@bufbuild/protobuf/wkt';
+import type { Thread } from './gen/banda/v1/banda_pb.ts';
+
+// Status values: node's type stripping (inbox.check.ts) can't load the generated enum.
+const STARTING = 1, WORKING = 2, AWAITING_INPUT = 3, ERRORED = 4;
+
+export type Inbox = { threads: Thread[]; mentioned: Thread[] };
+
+// The sidebar section of one of my threads. Precedence: settled > snoozed > status.
+export const sectionOf = (t: Thread, now = Date.now()) =>
+	t.settled
+		? 'settled'
+		: t.snoozedUntil && timestampMs(t.snoozedUntil) > now
+			? 'snoozed'
+			: t.status === STARTING || t.status === WORKING
+				? 'working'
+				: 'needs';
+
+// What deserves a notification between two inbox snapshots: my thread newly
+// needing input or failing (unless snoozed or settled), or a new mention.
+export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = (id) => id) {
+	const was = new Map(prev.threads.map((t) => [t.id, t.status]));
+	const out: { thread: Thread; title: string }[] = [];
+	for (const t of next.threads) {
+		if (was.get(t.id) === t.status || sectionOf(t) !== 'needs') continue;
+		if (t.status === AWAITING_INPUT) out.push({ thread: t, title: 'Your agent needs input' });
+		if (t.status === ERRORED) out.push({ thread: t, title: 'Your thread failed' });
+	}
+	const mentioned = new Set(prev.mentioned.map((t) => t.id));
+	for (const t of next.mentioned) {
+		if (!mentioned.has(t.id)) out.push({ thread: t, title: `You were mentioned in ${name(t.ownerId)}'s thread` });
+	}
+	return out;
+}

@@ -7,7 +7,7 @@
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
 	import { onkeydown } from '#lib/shortcuts.svelte.js';
-	import { loadThreads } from '#lib/threads.svelte.js';
+	import { attention, loadThreads, threads, watchInbox } from '#lib/threads.svelte.js';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -16,16 +16,20 @@
 	setMode('dark');
 
 	$effect(() => {
-		const poll = () => loadThreads().catch(() => {});
-		poll();
-		// ponytail: polling, replace with a watch stream when needed
-		const timer = setInterval(poll, 5000);
-		return () => clearInterval(timer);
+		const ctrl = new AbortController();
+		loadThreads().catch(() => {});
+		watchInbox(ctrl.signal);
+		const timer = setInterval(() => (threads.now = Date.now()), 30_000);
+		return () => {
+			ctrl.abort();
+			clearInterval(timer);
+		};
 	});
+	const count = $derived(attention());
 </script>
 
 <svelte:head>
-	<title>Banda</title>
+	<title>{count ? `(${count}) ` : ''}Banda</title>
 </svelte:head>
 
 <svelte:window {onkeydown} />

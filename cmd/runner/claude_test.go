@@ -14,7 +14,15 @@ func TestTranslate(t *testing.T) {
 		{`{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Let me think.","signature":"x"}]},"parent_tool_use_id":null}`, "agent_thinking:Let me think.", false, false},
 		{`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"echo hi"}}]},"parent_tool_use_id":null}`, `tool_call:Bash {"command":"echo hi"}`, false, false},
 		{`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_1","type":"tool_result","content":"hi","is_error":false}]},"parent_tool_use_id":null,"tool_use_result":{"stdout":"hi"}}`, "tool_result:toolu_1 hi", false, false},
-		{`{"type":"assistant","message":{"content":[{"type":"text","text":"from a subagent"}]},"parent_tool_use_id":"toolu_9"}`, "", false, false},
+		// TodoWrite and a Task with a nested call (the "Plans and subagents" section).
+		{`{"type":"assistant","message":{"id":"msg_2","content":[{"type":"tool_use","id":"toolu_todo1","name":"TodoWrite","input":{"todos":[{"content":"Fix the parser","status":"in_progress","activeForm":"Fixing the parser"}]}}]},"parent_tool_use_id":null,"session_id":"s"}`, `tool_call:TodoWrite {"todos":[{"content":"Fix the parser","status":"in_progress","activeForm":"Fixing the parser"}]}`, false, false},
+		{`{"type":"assistant","message":{"id":"msg_3","content":[{"type":"tool_use","id":"toolu_task1","name":"Task","input":{"description":"Find the parser","prompt":"Where is the config parser?","subagent_type":"Explore"}}]},"parent_tool_use_id":null,"session_id":"s"}`, `tool_call:Task {"description":"Find the parser","prompt":"Where is the config parser?","subagent_type":"Explore"}`, false, false},
+		{`{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Where is the config parser?"}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, "", false, false},
+		{`{"type":"assistant","message":{"id":"msg_4","content":[{"type":"tool_use","id":"toolu_sub1","name":"Grep","input":{"pattern":"func parse","path":"internal"}}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, `tool_call:Grep {"pattern":"func parse","path":"internal"} parent=toolu_task1`, false, false},
+		{`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_sub1","type":"tool_result","content":"Found 1 file\ninternal/config/parse.go"}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, "tool_result:toolu_sub1 Found 1 file\ninternal/config/parse.go", false, false},
+		{`{"type":"assistant","message":{"id":"msg_5","content":[{"type":"text","text":"It is in internal/config/parse.go."}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, "", false, false},
+		{`{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"It is"}},"parent_tool_use_id":"toolu_task1"}`, "", false, false},
+		{`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_task1","type":"tool_result","content":[{"type":"text","text":"The parser is internal/config/parse.go."}]}]},"parent_tool_use_id":null,"session_id":"s","tool_use_result":{"status":"completed","totalToolUseCount":1}}`, "tool_result:toolu_task1 The parser is internal/config/parse.go.", false, false},
 		{`{"type":"user","message":{"role":"user","content":"our own prompt"},"parent_tool_use_id":null}`, "", false, false},
 		{`{"type":"result","subtype":"success","is_error":false,"result":"Hello.","terminal_reason":"completed","duration_ms":45,"total_cost_usd":0.000208}`, "turn_ended:false", true, false},
 		{`{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}`, "turn_ended:true Not logged in · Please run /login", true, false},
@@ -38,6 +46,9 @@ func TestTranslate(t *testing.T) {
 				got = "agent_thinking:" + e.GetAgentThinking().Text
 			case e.GetToolCall() != nil:
 				got = "tool_call:" + e.GetToolCall().Name + " " + e.GetToolCall().InputJson
+				if p := e.GetToolCall().ParentToolCallId; p != "" {
+					got += " parent=" + p
+				}
 			case e.GetToolResult() != nil:
 				got = "tool_result:" + e.GetToolResult().ToolCallId + " " + e.GetToolResult().Output
 			case e.GetTurnEnded() != nil:

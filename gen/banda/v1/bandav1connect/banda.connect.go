@@ -71,6 +71,13 @@ const (
 	ThreadServicePreviewWatchProcedure = "/banda.v1.ThreadService/PreviewWatch"
 	// ThreadServicePreviewOpenProcedure is the procedure name of the ThreadService's PreviewOpen RPC.
 	ThreadServicePreviewOpenProcedure = "/banda.v1.ThreadService/PreviewOpen"
+	// ThreadServiceInboxWatchProcedure is the procedure name of the ThreadService's InboxWatch RPC.
+	ThreadServiceInboxWatchProcedure = "/banda.v1.ThreadService/InboxWatch"
+	// ThreadServiceInboxMarkReadProcedure is the procedure name of the ThreadService's InboxMarkRead
+	// RPC.
+	ThreadServiceInboxMarkReadProcedure = "/banda.v1.ThreadService/InboxMarkRead"
+	// ThreadServiceSendTypingProcedure is the procedure name of the ThreadService's SendTyping RPC.
+	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -233,6 +240,27 @@ var (
 			Procedure:  ThreadServicePreviewOpenProcedure,
 		}
 	})
+	threadServiceInboxWatchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("InboxWatch"),
+			Procedure:  ThreadServiceInboxWatchProcedure,
+		}
+	})
+	threadServiceInboxMarkReadSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("InboxMarkRead"),
+			Procedure:  ThreadServiceInboxMarkReadProcedure,
+		}
+	})
+	threadServiceSendTypingSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SendTyping"),
+			Procedure:  ThreadServiceSendTypingProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -272,6 +300,14 @@ type ThreadServiceClient interface {
 	// A URL on the preview origin that shows what listens on `port`, through
 	// the runner. Opening it signs the browser in to the preview origin.
 	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
+	// The caller's sidebar: sent at once, then again whenever one of its
+	// threads changes or the caller is mentioned somewhere new.
+	InboxWatch(context.Context, *v1.InboxWatchRequest) (ThreadServiceInboxWatchClientStream, error)
+	// Marks the thread read for the caller, up to its latest event.
+	InboxMarkRead(context.Context, *v1.InboxMarkReadRequest) (*v1.InboxMarkReadResponse, error)
+	// Tells the thread's watchers that the caller is typing. The composer calls
+	// it every few seconds while typing; clients forget it after a few seconds.
+	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -343,6 +379,26 @@ func (s ThreadServicePreviewWatchClientStream) Close() error {
 	return s.stream.Close()
 }
 
+// ThreadServiceInboxWatchClientStream is the client stream for the ThreadService's InboxWatch RPC.
+type ThreadServiceInboxWatchClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s ThreadServiceInboxWatchClientStream) Receive() (*v1.InboxWatchResponse, error) {
+	var res v1.InboxWatchResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s ThreadServiceInboxWatchClientStream) Close() error {
+	return s.stream.Close()
+}
+
 // ThreadServiceHandler is an implementation of the banda.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	CreateThread(context.Context, *v1.CreateThreadRequest) (*v1.CreateThreadResponse, error)
@@ -380,6 +436,14 @@ type ThreadServiceHandler interface {
 	// A URL on the preview origin that shows what listens on `port`, through
 	// the runner. Opening it signs the browser in to the preview origin.
 	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
+	// The caller's sidebar: sent at once, then again whenever one of its
+	// threads changes or the caller is mentioned somewhere new.
+	InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error
+	// Marks the thread read for the caller, up to its latest event.
+	InboxMarkRead(context.Context, *v1.InboxMarkReadRequest) (*v1.InboxMarkReadResponse, error)
+	// Tells the thread's watchers that the caller is typing. The composer calls
+	// it every few seconds while typing; clients forget it after a few seconds.
+	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -406,6 +470,9 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceReadFileSpec(), Handler: adapter.readFile},
 		connect.Method{Spec: threadServicePreviewWatchSpec(), Handler: adapter.previewWatch},
 		connect.Method{Spec: threadServicePreviewOpenSpec(), Handler: adapter.previewOpen},
+		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
+		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
+		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
 	)
 }
 
@@ -454,6 +521,21 @@ func (s ThreadServicePreviewWatchServerStream) SendHeaders() error {
 
 // Send sends a response message to the client.
 func (s ThreadServicePreviewWatchServerStream) Send(res *v1.PreviewWatchResponse) error {
+	return s.stream.Send(res)
+}
+
+// ThreadServiceInboxWatchServerStream is the server stream for the ThreadService's InboxWatch RPC.
+type ThreadServiceInboxWatchServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s ThreadServiceInboxWatchServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s ThreadServiceInboxWatchServerStream) Send(res *v1.InboxWatchResponse) error {
 	return s.stream.Send(res)
 }
 
@@ -534,6 +616,18 @@ func (UnimplementedThreadServiceHandler) PreviewWatch(context.Context, *v1.Previ
 
 func (UnimplementedThreadServiceHandler) PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PreviewOpen is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.InboxWatch is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) InboxMarkRead(context.Context, *v1.InboxMarkReadRequest) (*v1.InboxMarkReadResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.InboxMarkRead is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SendTyping is not implemented")
 }
 
 type threadServiceClient struct {
@@ -687,6 +781,30 @@ func (c *threadServiceClient) PreviewWatch(ctx context.Context, req *v1.PreviewW
 func (c *threadServiceClient) PreviewOpen(ctx context.Context, req *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
 	var res v1.PreviewOpenResponse
 	if err := c.client.CallUnary(ctx, threadServicePreviewOpenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) InboxWatch(ctx context.Context, req *v1.InboxWatchRequest) (ThreadServiceInboxWatchClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, threadServiceInboxWatchSpec(), req)
+	if err != nil {
+		return ThreadServiceInboxWatchClientStream{}, err
+	}
+	return ThreadServiceInboxWatchClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) InboxMarkRead(ctx context.Context, req *v1.InboxMarkReadRequest) (*v1.InboxMarkReadResponse, error) {
+	var res v1.InboxMarkReadResponse
+	if err := c.client.CallUnary(ctx, threadServiceInboxMarkReadSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) SendTyping(ctx context.Context, req *v1.TypingRequest) (*v1.TypingResponse, error) {
+	var res v1.TypingResponse
+	if err := c.client.CallUnary(ctx, threadServiceSendTypingSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -904,6 +1022,38 @@ func (h threadServiceHandler) previewOpen(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	res, err := h.svc.PreviewOpen(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) inboxWatch(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.InboxWatchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.InboxWatch(ctx, &req, ThreadServiceInboxWatchServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) inboxMarkRead(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.InboxMarkReadRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.InboxMarkRead(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) sendTyping(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TypingRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SendTyping(ctx, &req)
 	if err != nil {
 		return err
 	}
