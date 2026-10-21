@@ -64,5 +64,8 @@ func scrub(e *bandav1.Event) {
 		k.SetupStep.Output = redact(k.SetupStep.Output)
 	case *bandav1.Event_AutoPush:
 		k.AutoPush.Detail = redact(k.AutoPush.Detail)
+	case *bandav1.Event_PermissionRequested:
+		k.PermissionRequested.InputJson = redact(k.PermissionRequested.InputJson)
+		k.PermissionRequested.Reason = redact(k.PermissionRequested.Reason)
 	}
 }
