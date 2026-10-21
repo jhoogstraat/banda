@@ -79,7 +79,7 @@ test('APIs starting together on a fresh database all come up: they apply the sch
 	await sql(`CREATE DATABASE ${db}`);
 	try {
 		const url = process.env.DATABASE_URL!.replace(/\/[^/?]*(\?|$)/, `/${db}$1`);
-		await Promise.all([1, 2, 3, 4].map(() => startApi({ DATABASE_URL: url })));
+		await Promise.all([1, 2, 3, 4].map(() => startApi({ DATABASE_URL: url }, { sharedDatabase: true })));
 	} finally {
 		await sql(`DROP DATABASE ${db} WITH (FORCE)`);
 	}

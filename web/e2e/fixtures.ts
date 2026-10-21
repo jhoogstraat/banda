@@ -406,8 +406,7 @@ const freePort = () =>
 	});
 
 /**
- * An API process of a test's own, on the run's namespace and database (or a database of its own),
- * with extra env, e.g. { DATABASE_URL: `${DATABASE_URL}?pool_max_conns=1` } or { IDLE_SUSPEND_AFTER: '5s' }.
+ * An API process of a test's own (see startApi), on the run's namespace, with extra env, e.g. { IDLE_SUSPEND_AFTER: '5s' }.
  * Stop and start it mid-test; the run's shared API serves the other tests and is never restarted.
  */
 export class Api {
@@ -462,8 +461,11 @@ export class Api {
 type Fixtures = {
 	/** as('alice') is alice-<random> in this test only: tests never share users. Pass an Api to call that one. */
 	as: (name: string, api?: Api) => User;
-	/** Starts an API of this test's own (see Api); ownDatabase gives it a fresh database, so its sweeps touch no one else's threads. */
-	startApi: (env?: Record<string, string>, opts?: { ownDatabase?: boolean }) => Promise<Api>;
+	/**
+	 * Starts an API of this test's own (see Api) on a fresh database, so neither its schema nor its sweeps touch
+	 * other tests' threads; sharedDatabase puts it on the run's. query is added to its DATABASE_URL, e.g. pool_max_conns=1.
+	 */
+	startApi: (env?: Record<string, string>, opts?: { sharedDatabase?: boolean; query?: string }) => Promise<Api>;
 };
 
 export const test = base.extend<Fixtures>({
@@ -472,12 +474,13 @@ export const test = base.extend<Fixtures>({
 		const dbs: string[] = [];
 		await use(async (env = {}, opts = {}) => {
 			let db = DB;
-			if (opts.ownDatabase) {
+			if (!opts.sharedDatabase) {
 				db = `${DB}_${randomBytes(3).toString('hex')}`;
 				await sql(`CREATE DATABASE ${db}`);
 				dbs.push(db);
-				env = { DATABASE_URL: process.env.DATABASE_URL!.replace(/\/[^/?]*(\?|$)/, `/${db}$1`), ...env };
 			}
+			const url = `${process.env.DATABASE_URL!.replace(/\/[^/?]*(\?.*)?$/, `/${db}`)}${opts.query ? `?${opts.query}` : ''}`;
+			env = { DATABASE_URL: url, ...env };
 			const api = new Api(env, db);
 			apis.push(api);
 			await api.start();

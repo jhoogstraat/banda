@@ -27,7 +27,7 @@ test.fail('B2: settling while the last turn’s push is still running schedules 
 });
 
 test.fail('B4: with a one-connection pool, approving a teammate’s turn does not deadlock', async ({ as, startApi }) => {
-	const api = await startApi({ DATABASE_URL: `${process.env.DATABASE_URL}?pool_max_conns=1` });
+	const api = await startApi({}, { query: 'pool_max_conns=1' });
 	const [alice, bob] = [as('alice', api), as('bob', api)];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);

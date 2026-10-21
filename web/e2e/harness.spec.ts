@@ -74,7 +74,7 @@ test('a test’s own API restarts mid-test; the runner reconnects to it', async 
 });
 
 test('with its own database, a test’s API suspends idle threads within seconds', async ({ as, startApi }) => {
-	const api = await startApi({ IDLE_SUSPEND_AFTER: '5s', IDLE_SWEEP_EVERY: '1s' }, { ownDatabase: true });
+	const api = await startApi({ IDLE_SUSPEND_AFTER: '5s', IDLE_SWEEP_EVERY: '1s' });
 	const t = await as('alice', api).create();
 	await t.waitForStatus(Status.SUSPENDED, 120_000);
 });
