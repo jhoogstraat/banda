@@ -182,6 +182,33 @@ func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*ba
 	return &bandav1.SetModeResponse{}, err
 }
 
+func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSettingsRequest) (*bandav1.SetAgentSettingsResponse, error) {
+	var changed *bandav1.AgentSettings
+	_, events, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
+		if t.OwnerID != user(ctx) {
+			return nil, thread.ErrForbidden
+		}
+		if or(req.Model, t.Model) == t.Model && or(req.Effort, t.Effort) == t.Effort {
+			return nil, nil
+		}
+		t.Model, t.Effort = or(req.Model, t.Model), or(req.Effort, t.Effort)
+		changed = agentSettings(*t)
+		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: changed}}}, nil
+	})
+	if err != nil {
+		return nil, cerr(err)
+	}
+	s.broadcast(req.ThreadId, events)
+	if changed != nil { // without a runner the next start picks them up from the pod template
+		s.sendRunner(req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_AgentSettings{AgentSettings: changed}})
+	}
+	return &bandav1.SetAgentSettingsResponse{}, nil
+}
+
+func agentSettings(t store.Thread) *bandav1.AgentSettings {
+	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort}
+}
+
 func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav1.RetryResponse, error) {
 	effect, err := s.apply(ctx, req.ThreadId, thread.Retry{By: user(ctx)})
 	if err != nil {
@@ -252,6 +279,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 	}
 	// id is the thread, or for a login environment its loginKey.
 	id, owner, login := hello.ThreadId, hello.LoginUserId, hello.LoginUserId != ""
+	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
 	if login {
 		if !s.store.CheckLoginToken(ctx, owner, hello.Token) {
 			return connect.NewError(connect.CodeUnauthenticated, "unknown user or bad token")
@@ -263,9 +291,11 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
 		}
 		owner = t.OwnerID
+		// The pod's environment has the settings it was created with; a
+		// container restart in the same pod would miss later changes.
+		r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_AgentSettings{AgentSettings: agentSettings(t)}}
 	}
 
-	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
 	s.mu.Lock()
 	s.runners[id] = r
 	s.mu.Unlock()

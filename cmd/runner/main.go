@@ -100,6 +100,7 @@ func run(ctx context.Context) error {
 	// Losing the API stops claude gracefully and the runner exits.
 	// ponytail: no reconnect loop, the container restart is the reconnect.
 	cmds := make(chan *bandav1.ConnectResponse, 16)
+	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT")}}
 	term := &terminal{send: sendReq}
 	if loginUser != "" {
 		term.exited = func() { loginStatus(loggedIn(ctx)) }
@@ -114,6 +115,11 @@ func run(ctx context.Context) error {
 			}
 			switch k := msg.Kind.(type) {
 			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop:
+				cmds <- msg
+			case *bandav1.ConnectResponse_AgentSettings:
+				// Set now so a claude that hasn't started yet starts with them;
+				// queued so a running one restarts after the prompts sent before.
+				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort})
 				cmds <- msg
 			case *bandav1.ConnectResponse_Push:
 				go push(ctx, notice)
@@ -145,75 +151,134 @@ func run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
-	claude, err := startClaude(ctx)
-	if err != nil {
-		notice("Could not start Claude Code: " + err.Error())
-		return fmt.Errorf("%w: %w", errSetup, err)
-	}
 	// Every way out of here stops claude gracefully and waits for it: a kill
 	// in the middle of a token refresh would log the user out everywhere.
+	var claude *claudeProc
 	defer func() {
 		cancel()
-		go io.Copy(io.Discard, claude.stdout)
-		claude.cmd.Wait()
+		if claude != nil {
+			go io.Copy(io.Discard, claude.stdout)
+			claude.cmd.Wait()
+		}
 	}()
-	if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
-		return err
-	}
+	for first := true; ; first = false {
+		running := want.get()
+		if claude, err = startClaude(ctx, running); err != nil {
+			claude = nil
+			notice("Could not start Claude Code: " + err.Error())
+			return fmt.Errorf("%w: %w", errSetup, err)
+		}
+		if first {
+			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
+				return err
+			}
+		}
+		lines := make(chan []byte)
+		go func(stdout io.Reader) {
+			defer close(lines)
+			out := bufio.NewReaderSize(stdout, 1<<20)
+			for {
+				raw, err := out.ReadBytes('\n')
+				if len(raw) > 0 {
+					select {
+					case lines <- raw:
+					case <-ctx.Done():
+						return
+					}
+				}
+				if err != nil {
+					return
+				}
+			}
+		}(claude.stdout)
 
-	// API -> claude.
-	go func() {
-		defer cancel()
-		for {
-			var err error
+		// Relay until the settings changed and no turn is running: claude
+		// takes new flags only at start, and a turn is never cut short.
+		pending := 0 // prompts written whose turn hasn't ended
+		restart := false
+		authNoticed := false
+		for !restart || pending > 0 {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case msg := <-cmds:
+				var err error
 				switch k := msg.Kind.(type) {
 				case *bandav1.ConnectResponse_Prompt:
 					err = claude.write(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": k.Prompt.Text}})
+					pending++
 				case *bandav1.ConnectResponse_Stop:
 					err = claude.interrupt()
+				case *bandav1.ConnectResponse_AgentSettings:
+					restart = want.get() != running
+				}
+				if err != nil {
+					return err
+				}
+			case raw, ok := <-lines:
+				if !ok {
+					return fmt.Errorf("claude exited: %w", claude.cmd.Wait())
+				}
+				events, turnEnded, authFailed := translate(raw)
+				for _, e := range events {
+					if err := send(e); err != nil {
+						return err
+					}
+				}
+				if authFailed && !authNoticed {
+					authNoticed = true
+					claude.interrupt()
+					if apiKey {
+						notice("Claude Code rejected the API key. Set a new one in Settings, then retry.")
+					} else {
+						loginStatus(false)
+						notice(loginHint("Claude Code rejected the login."))
+					}
+				}
+				if turnEnded {
+					authNoticed = false
+					pending = max(0, pending-1) // an interrupt while idle ends no prompt
+					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
+						return err
+					}
 				}
 			}
-			if err != nil {
-				return
-			}
 		}
-	}()
 
-	// claude -> API.
-	out := bufio.NewReaderSize(claude.stdout, 1<<20)
-	authNoticed := false
-	for {
-		raw, readErr := out.ReadBytes('\n')
-		events, turnEnded, authFailed := translate(raw)
-		for _, e := range events {
-			if err := send(e); err != nil {
-				return err
-			}
+		// Idle: closing stdin makes claude exit by itself. SIGTERM, still
+		// graceful, only if it doesn't.
+		claude.stdin.Close()
+		proc := claude.cmd.Process
+		t := time.AfterFunc(30*time.Second, func() { proc.Signal(syscall.SIGTERM) })
+		for range lines {
 		}
-		if authFailed && !authNoticed {
-			authNoticed = true
-			claude.interrupt()
-			if apiKey {
-				notice("Claude Code rejected the API key. Set a new one in Settings, then retry.")
-			} else {
-				loginStatus(false)
-				notice(loginHint("Claude Code rejected the login."))
-			}
+		if err := claude.cmd.Wait(); err != nil {
+			log.Print("claude exit for restart: ", err)
 		}
-		if turnEnded {
-			authNoticed = false
-			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
-				return err
-			}
-		}
-		if readErr != nil {
-			return fmt.Errorf("claude exited: %w", claude.cmd.Wait())
-		}
+		t.Stop()
 	}
+}
+
+// settings are what claude runs with.
+type settings struct{ model, effort string }
+
+// wanted holds the settings claude should run with. The API sends them on
+// connect and on every change.
+type wanted struct {
+	mu sync.Mutex
+	s  settings
+}
+
+func (w *wanted) get() settings {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.s
+}
+
+func (w *wanted) set(s settings) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.s = s
 }
 
 // checkout clones the repo onto the thread branch the first time; the home
@@ -291,17 +356,17 @@ type claudeProc struct {
 	cmd    *exec.Cmd
 	stdout io.Reader
 	mu     sync.Mutex
-	stdin  io.Writer
+	stdin  io.WriteCloser
 }
 
-func startClaude(ctx context.Context) (*claudeProc, error) {
+func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	args := []string{"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--include-partial-messages", "--dangerously-skip-permissions"} // the sandbox is the boundary
-	if m := os.Getenv("BANDA_MODEL"); m != "" {
-		args = append(args, "--model", m)
+	if s.model != "" {
+		args = append(args, "--model", s.model)
 	}
-	if e := os.Getenv("BANDA_EFFORT"); e != "" {
-		args = append(args, "--effort", e)
+	if s.effort != "" {
+		args = append(args, "--effort", s.effort)
 	}
 	// Neither flag is restored on --resume, so both are always passed.
 	mcpConfig, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"banda": map[string]any{
