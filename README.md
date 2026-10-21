@@ -18,7 +18,7 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
 4. `mise run down` stops the servers and the kind node.
 
-Every thread leaves a sandbox behind until it is settled and pushed. `mise run clean` deletes the sandboxes, and their volumes, of threads nobody touched for `CLEAN_HOURS` (default 24); a later prompt starts a fresh checkout.
+Every thread leaves a sandbox behind until it is settled and pushed. `mise run clean` deletes the sandboxes, and their volumes, of threads with a repository nobody touched for `CLEAN_HOURS` (default 24); a later prompt starts a fresh checkout.
 
 In the app, Cmd/Ctrl-K opens the command palette and `?` lists the keyboard shortcuts.
 
@@ -33,6 +33,10 @@ kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 ## Permissions
 
 The permission chip in the composer sets what the agent asks for in that thread: nothing (bypass, the default), edits and commands (ask), commands other than edits (accept edits), or everything until you approve its plan (plan). Requests appear in the chat; you answer them, or your teammates once you trust them. "Always allow" applies to that tool for the rest of the thread.
+
+## Work without a repository
+
+For work without code, pick **No repository** in the composer's repository chip. The agent starts in an empty folder in the thread's environment; the Files tab and the terminal work on it, but there is no diff, push or pull request. The folder lives only in that environment, so settling the thread never deletes it. A fork gets the conversation but not the files, and sub-threads have no repository either.
 
 ## Preparing a repo
 
