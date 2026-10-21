@@ -291,6 +291,30 @@ for _ in $(seq 20); do [ "$(sql "select count(*) from events where thread_id='$I
 [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ]
 ok "push reports its result as a notice"
 
+# The parent's agent calls MCP the way claude would, with its thread's runner token.
+mcp() { kc exec "t-$ID" -- sh -c 'curl -sf -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "$0"' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$1\",\"arguments\":$2}}"; }
+CHILD=$(mcp create_thread '{"prompt":"e2e: a sub-thread"}' | grep -oE 'thread_id[^a-z0-9]+[a-z0-9]{26}' | head -1 | grep -oE '[a-z0-9]{26}$') || fail "create_thread returned no thread id"
+IDS+=("$CHILD")
+PARENT=$ID ID=$CHILD
+[ "$(thread parentId)" = "$PARENT" ] && [ "$(thread parentTitle)" != null ] || fail "the sub-thread does not link to its parent"
+[ "$(thread baseBranch)" = "$BASE" ] || fail "an unpushed parent's sub-thread should start from its base, got $(thread baseBranch)"
+wait_for STATUS_AWAITING_INPUT
+ID=$PARENT
+lineage() { sql "select body->'lineageUpdate'->>'text' from events where thread_id='$ID' and body->'lineageUpdate'->>'threadId'='$CHILD' and body->'lineageUpdate'->>'status'='$1'"; }
+for _ in $(seq 20); do [ -n "$(lineage STATUS_AWAITING_INPUT)" ] && break; sleep 0.5; done
+lineage STATUS_AWAITING_INPUT | grep -q hello || fail "the parent got no finish notice: $(lineage STATUS_AWAITING_INPUT)"
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'lineageUpdate'->>'status'='STATUS_STARTING'")" = 1 ] || fail "the spawn was not announced in the parent"
+mcp list_children '{}' | grep -q "$CHILD" || fail "list_children does not list the sub-thread"
+ok "an agent spawns a sub-thread over MCP; it links to its parent, which hears when it finishes"
+
+BOBS=$(call ThreadService/SpawnThread "{\"parentId\":\"$ID\",\"prompt\":\"e2e: bob's sub-thread\"}" bob | jq -r '.thread | select(.ownerId == "bob" and .parentId != null) | .id')
+[ -n "$BOBS" ] || fail "a teammate could not spawn a sub-thread"
+IDS+=("$BOBS")
+call ThreadService/Snooze "{\"threadId\":\"$BOBS\",\"until\":\"2099-01-01T00:00:00Z\"}" bob >/dev/null
+[ "$(call ThreadService/LineageChildren "{\"threadId\":\"$ID\"}" | jq -r '.threads | length')" = 2 ] || fail "LineageChildren does not list both sub-threads"
+call ThreadService/Snooze "{\"threadId\":\"$CHILD\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+ok "a teammate spawns a sub-thread of their own; the parent lists both"
+
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 [ "$(thread status)" = STATUS_SUSPENDED ]
 for _ in $(seq 30); do kc get pod "t-$ID" >/dev/null 2>&1 || break; sleep 2; done
@@ -312,6 +336,8 @@ thread diff | grep -q hello8.txt
 ok "a prompt resumes the environment with the checkout intact and the settings changed while paused"
 said "Received 1 image blocks (image/png) and 0 text files" || fail "the image of a prompt that resumed the environment was lost"
 ok "a prompt's images wait with it while the environment resumes"
+thread diff | grep -q "Sub-thread $CHILD" || fail "the parent agent's prompt does not mention its sub-thread"
+ok "the parent agent hears of its sub-threads in its next prompt"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
 ok "secrets are redacted from the diff"

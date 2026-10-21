@@ -17,6 +17,29 @@ export const sectionOf = (t: Thread, now = Date.now()) =>
 				? 'working'
 				: 'needs';
 
+// A sidebar thread with its sub-threads nested under it.
+export type Family = { thread: Thread; children: Family[] };
+
+export const size = (f: Family): number => 1 + f.children.reduce((n, c) => n + size(c), 0);
+
+const urgency = ['needs', 'working', 'snoozed', 'settled'];
+
+// My threads as families, by section. A family sits in the most urgent section of any member, so a
+// sub-thread that needs me surfaces with its parent. A thread whose parent isn't listed is a root.
+export function families(list: Thread[], now = Date.now()) {
+	const byId = new Map(list.map((t) => [t.id, { thread: t, children: [] } as Family]));
+	const roots: Family[] = [];
+	for (const f of byId.values()) {
+		const parent = byId.get(f.thread.parentId);
+		if (parent && parent !== f) parent.children.push(f);
+		else roots.push(f);
+	}
+	const rank = (f: Family): number => Math.min(urgency.indexOf(sectionOf(f.thread, now)), ...f.children.map(rank));
+	const out: Record<string, Family[]> = { needs: [], working: [], snoozed: [], settled: [] };
+	for (const f of roots) out[urgency[rank(f)]].push(f);
+	return out;
+}
+
 // What deserves a notification between two inbox snapshots: my thread newly
 // needing input or failing (unless snoozed or settled), a new teammate turn request, the agent asking for
 // permission, or a new mention.

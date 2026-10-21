@@ -187,4 +187,9 @@ apply(jump, ev({ case: 'toolCall', value: { id: 'j1', name: 'Bash', inputJson: '
 apply(jump, ev({ case: 'toolCall', value: { id: 'j2', name: 'Read', inputJson: '{}' } }, 6n));
 if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 || itemAt(jump, 2n) !== -1 || itemAt(jump, 7n) !== -1)
 	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
+
+const parent = newChat();
+apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: 3, text: 'Fixed it.' } }));
+const sub = parent.items[0];
+if (sub?.kind !== 'lineage' || sub.update.threadId !== 'c1' || sub.update.text !== 'Fixed it.') throw new Error('a lineage update should become a chat item');
 console.log('ok');

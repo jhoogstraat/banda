@@ -89,8 +89,8 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 }
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
-	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
+	if req.RepoUrl == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
 	}
 	t := store.Thread{
 		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
@@ -106,6 +106,18 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 		return nil, err
 	}
 	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+}
+
+// create starts a thread (owner, repo, base, model, effort, permission mode and
+// parent taken from t) with its first prompt.
+func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (store.Thread, error) {
+	if strings.TrimSpace(prompt) == "" {
+		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
+	}
+	t.Title, t.PendingPrompt = title(prompt), prompt
+	t.Status, t.Mode = thread.Starting, thread.AgentMode
+	t.Model, t.Effort = or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
+	return s.start(ctx, t, &bandav1.Message{Text: prompt})
 }
 
 // start stores a new thread, posts its first message (if any) as the owner
@@ -824,6 +836,7 @@ func (s *Service) broadcast(id string, events []*bandav1.Event) {
 	defer s.mu.Unlock()
 	s.inboxChanged(id, events)
 	s.broadcastLocked(id, events)
+	s.reportToParent(id, events)
 }
 
 func (s *Service) broadcastLocked(id string, events []*bandav1.Event) {
@@ -886,21 +899,23 @@ var (
 
 func toProto(t store.Thread) *bandav1.Thread {
 	p := &bandav1.Thread{
-		Id:         t.ID,
-		OwnerId:    t.OwnerID,
-		Title:      t.Title,
-		RepoUrl:    t.RepoURL,
-		Branch:     t.Branch,
-		Model:      t.Model,
-		Effort:     t.Effort,
-		Status:     statusToProto[t.Status],
-		Mode:       modeToProto[t.Mode],
-		Diff:       t.Diff,
-		CreatedAt:  timestamppb.New(t.CreatedAt),
-		UpdatedAt:  timestamppb.New(t.UpdatedAt),
-		BaseBranch: t.BaseBranch,
-		Settled:    t.Settled,
-		Unread:     t.Unread,
+		Id:          t.ID,
+		OwnerId:     t.OwnerID,
+		Title:       t.Title,
+		RepoUrl:     t.RepoURL,
+		Branch:      t.Branch,
+		Model:       t.Model,
+		Effort:      t.Effort,
+		Status:      statusToProto[t.Status],
+		Mode:        modeToProto[t.Mode],
+		Diff:        t.Diff,
+		CreatedAt:   timestamppb.New(t.CreatedAt),
+		UpdatedAt:   timestamppb.New(t.UpdatedAt),
+		BaseBranch:  t.BaseBranch,
+		Settled:     t.Settled,
+		Unread:      t.Unread,
+		ParentId:    t.ParentID,
+		ParentTitle: t.ParentTitle,
 
 		TurnRequests:       int32(t.Requests),
 		Trusted:            t.Trusted,

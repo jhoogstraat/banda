@@ -21,6 +21,11 @@ service ThreadService {
   rpc DeclineTurn(DeclineTurnRequest) returns (DeclineTurnResponse);
   // Owner only: whether teammates can start turns without approval.
   rpc Trust(TrustRequest) returns (TrustResponse);
+  // A sub-thread of parent_id, owned by the caller. It starts from the
+  // parent's branch if that was pushed, else from the parent's base branch.
+  rpc SpawnThread(SpawnThreadRequest) returns (SpawnThreadResponse);
+  // The sub-threads of a thread, most recently active first.
+  rpc LineageChildren(LineageChildrenRequest) returns (LineageChildrenResponse);
   // Replays stored events with seq > after_seq (or the last `tail`), then
   // streams live events. Large payloads are cut (Event.truncated).
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
@@ -179,6 +184,9 @@ message Thread {
   ForkOrigin forked_from = 28;
   // Shared by the threads started together by one Race or Fork.
   string race_id = 29;
+  // The thread this one was spawned from, if any.
+  string parent_id = 26;
+  string parent_title = 27;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -259,6 +267,7 @@ message Event {
     PermissionResolved permission_resolved = 31;
     // Links another thread: a fork of this one, or the pick of a race.
     ForkNote fork_note = 33;
+    LineageUpdate lineage_update = 32;
   }
 }
 
@@ -318,6 +327,16 @@ message TurnRequestResolved {
   int64 request_seq = 1;
   bool approved = 2;
   string note = 3;
+}
+
+// In a parent thread: a sub-thread was spawned (status STARTING), finished a
+// turn (AWAITING_INPUT, text is the first line of its last agent text) or
+// failed (ERRORED, text is why).
+message LineageUpdate {
+  string thread_id = 1;
+  string title = 2;
+  Status status = 3;
+  string text = 4;
 }
 
 message AgentText {
@@ -498,6 +517,27 @@ message TrustRequest {
 }
 
 message TrustResponse {}
+
+message SpawnThreadRequest {
+  string parent_id = 1;
+  string prompt = 2;
+  // Defaults: see SpawnThread; repo, model and effort are the parent's.
+  string base_branch = 3;
+  string model = 4;
+  string effort = 5;
+}
+
+message SpawnThreadResponse {
+  Thread thread = 1;
+}
+
+message LineageChildrenRequest {
+  string thread_id = 1;
+}
+
+message LineageChildrenResponse {
+  repeated Thread threads = 1;
+}
 
 message ListMentionedRequest {}
 

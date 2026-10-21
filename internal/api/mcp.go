@@ -65,6 +65,7 @@ type threadInfo struct {
 	Repo      string    `json:"repo"`
 	Branch    string    `json:"branch"`
 	UpdatedAt time.Time `json:"updated_at"`
+	ParentID  string    `json:"parent_id,omitempty"`
 }
 
 type (
@@ -84,10 +85,13 @@ type (
 		Text         string `json:"text" jsonschema:"the message"`
 		MentionAgent bool   `json:"mention_agent,omitempty" jsonschema:"make that thread's agent act on the message; only allowed for threads owned by the same person as this thread"`
 	}
+	childrenIn struct {
+		ThreadID string `json:"thread_id,omitempty" jsonschema:"thread whose sub-threads to list (default: this thread)"`
+	}
 	createIn struct {
 		Prompt     string `json:"prompt" jsonschema:"the task for the new thread's agent"`
 		RepoURL    string `json:"repo_url,omitempty" jsonschema:"git repository to clone (default: this thread's)"`
-		BaseBranch string `json:"base_branch,omitempty" jsonschema:"branch to start from (default: this thread's)"`
+		BaseBranch string `json:"base_branch,omitempty" jsonschema:"branch to start from (default: this thread's branch if it was pushed, else this thread's base branch)"`
 		Model      string `json:"model,omitempty" jsonschema:"model (default: this thread's)"`
 		Effort     string `json:"effort,omitempty" jsonschema:"effort (default: this thread's)"`
 	}
@@ -133,12 +137,16 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			if err != nil {
 				return nil, listOut{}, err
 			}
-			names, out := s.names(ctx), listOut{Threads: make([]threadInfo, 0, len(threads))}
-			for _, t := range threads {
-				out.Threads = append(out.Threads, threadInfo{t.ID, t.Title, t.OwnerID, actorName(names, t.OwnerID),
-					string(t.Status), string(t.Mode), t.RepoURL, t.Branch, t.UpdatedAt})
+			return nil, s.threadInfos(ctx, threads), nil
+		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "list_children", Description: "List the sub-threads spawned from a thread (by create_thread or by a person), most recently active first. Their finished turns and failures are also reported in the parent thread's chat."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in childrenIn) (*mcp.CallToolResult, listOut, error) {
+			threads, err := s.store.Children(ctx, or(in.ThreadID, caller.ID), caller.OwnerID)
+			if err != nil {
+				return nil, listOut{}, err
 			}
-			return nil, out, nil
+			return nil, s.threadInfos(ctx, threads), nil
 		})
 
 	mcp.AddTool(srv, &mcp.Tool{Name: "read_thread", Description: "Read another thread: its metadata and a compact transcript of its most recent events (messages with their authors, agent text, tool names, turn ends with errors, notices). Optionally include its current git diff."},
@@ -207,15 +215,13 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return textResult("Message posted."), nil, nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "create_thread", Description: "Start a new thread: a fresh coding agent in its own sandbox that begins working on the prompt, owned by the same person as this thread. Repository, base branch, model and effort default to this thread's. Follow its progress with read_thread."},
+	mcp.AddTool(srv, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, createOut, error) {
-			res, err := s.CreateThread(WithUser(ctx, caller.OwnerID), &bandav1.CreateThreadRequest{Prompt: in.Prompt,
-				RepoUrl: or(in.RepoURL, caller.RepoURL), BaseBranch: or(in.BaseBranch, caller.BaseBranch),
-				Model: or(in.Model, caller.Model), Effort: or(in.Effort, caller.Effort)})
+			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort)
 			if err != nil {
 				return nil, createOut{}, err
 			}
-			return nil, createOut{res.Thread.Id}, nil
+			return nil, createOut{child.ID}, nil
 		})
 	return srv
 }
@@ -228,6 +234,8 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 		switch k := e.Kind.(type) {
 		case *bandav1.Event_Message:
 			lines = append(lines, actorName(names, e.Actor)+": "+messageText(k.Message)+attached(k.Message))
+		case *bandav1.Event_LineageUpdate:
+			lines = append(lines, lineageLine(k.LineageUpdate))
 		case *bandav1.Event_TurnRequest:
 			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+messageText(k.TurnRequest.GetMessage())+attached(k.TurnRequest.GetMessage()))
 		case *bandav1.Event_TurnRequestResolved:
@@ -262,4 +270,14 @@ func attached(m *bandav1.Message) string {
 		s += " [attached: " + a.Name + "]"
 	}
 	return s
+
+}
+
+func (s *Service) threadInfos(ctx context.Context, threads []store.Thread) listOut {
+	names, out := s.names(ctx), listOut{Threads: make([]threadInfo, 0, len(threads))}
+	for _, t := range threads {
+		out.Threads = append(out.Threads, threadInfo{t.ID, t.Title, t.OwnerID, actorName(names, t.OwnerID),
+			string(t.Status), string(t.Mode), t.RepoURL, t.Branch, t.UpdatedAt, t.ParentID})
+	}
+	return out
 }

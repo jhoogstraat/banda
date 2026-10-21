@@ -4,6 +4,7 @@ import type {
 	Attachment,
 	Event,
 	ForkNote,
+	LineageUpdate,
 	Mode,
 	PermissionRequested,
 	PermissionResolved,
@@ -32,6 +33,8 @@ export type Item = { key: number } & (
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
 	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
+	// A sub-thread was spawned, finished its turns or failed.
+	| { kind: 'lineage'; actor: string; update: LineageUpdate }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'push'; text: string; pushed: boolean }
@@ -131,6 +134,9 @@ export function apply(chat: Chat, e: Event) {
 		case 'message':
 			delete chat.typing[e.actor];
 			chat.items.push({ key, kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, attachments: k.value.attachments, time: e.time });
+			break;
+		case 'lineageUpdate':
+			chat.items.push({ key, kind: 'lineage', actor: e.actor, update: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];

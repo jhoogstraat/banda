@@ -102,6 +102,9 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 -- Attachment ids of the images that go with pending_prompt.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS pending_images text[] NOT NULL DEFAULT '{}';
+-- The thread a sub-thread was spawned from ('' for none).
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS parent_id text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS threads_parent ON threads (parent_id) WHERE parent_id <> '';
 
 -- The latest notable event, summarized for the team board (protojson of
 -- banda.v1.TeamActivity).
