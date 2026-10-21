@@ -2,6 +2,7 @@
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
+	import TeamSecrets from '#lib/components/team-secrets.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { ConnectError } from '@connectrpc/connect';
@@ -195,7 +196,7 @@
 				</div>
 			</section>
 
-			<section>
+			<section aria-label="Secrets & variables">
 				{@render heading('secrets', 'Secrets & variables', 'passed to all your threads as environment variables')}
 				<div class="divide-y rounded-lg border">
 					{#each secrets as s (s.name)}
@@ -233,6 +234,8 @@
 					</form>
 				</div>
 			</section>
+
+			<TeamSecrets />
 		</div>
 	</div>
 </div>
