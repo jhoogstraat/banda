@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -90,7 +91,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		s.mu.Unlock()
 		if mine && !login {
 			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
-			_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 				return envLost(t, 0), nil
 			})
 			if err != nil {
@@ -213,17 +214,24 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
-			_, events, err := s.store.Update(bg, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			// The runner sends it after every turn: only a change makes viewers fetch it again.
+			_, events, err := s.store.Update(bg, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+				if t.Diff == k.Diff.Diff {
+					return nil, errUnchanged
+				}
 				t.Diff = k.Diff.Diff
 				return []*bandav1.Event{{Actor: "system", Kind: &bandav1.Event_DiffChanged{DiffChanged: &bandav1.DiffChanged{}}}}, nil
 			})
-			if err != nil {
+			if err != nil && err != errUnchanged {
 				slog.Error("store diff", "thread", id, "err", err)
 			}
 			s.broadcast(id, events)
 		}
 	}
 }
+
+// errUnchanged makes an Update save nothing.
+var errUnchanged = errors.New("unchanged")
 
 // ready marks the environment ready and hands over the pending prompt, with
 // what was posted since it was kept.
@@ -241,7 +249,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 		if err != nil {
 			return err
 		}
-		t, events, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		t, events, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 			next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 			events := lostTurns(t.State, 0) // e.g. the API restarted mid-turn
 			if effect == thread.StartTurn {

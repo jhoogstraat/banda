@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 
@@ -40,7 +41,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		if err != nil {
 			return err
 		}
-		_, stored, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		_, stored, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 			// Only MCP posts as "agent:<thread>", and it lets an agent start turns
 			// only in threads of its own owner.
 			next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
@@ -128,7 +129,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 	var prompt string
 	var images []string
 	unlock := s.lockDelivery(id)
-	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, stored, err := s.store.Update(ctx, id, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		var a thread.Action = thread.Decline{By: by}
 		if approve {
 			a = thread.Approve{By: by}
@@ -138,7 +139,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 			return nil, err
 		}
 		// Read under the thread's lock, so a request resolves only once.
-		events, err := s.store.Events(ctx, id, min(t.DeliveredSeq, seq-1))
+		events, err := tx.EventsOf(ctx, id, min(t.DeliveredSeq, seq-1), slices.Concat(promptKinds, []string{"turnRequest", "turnRequestResolved"})...)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +149,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 		}
 		effect = eff
 		m := r.GetTurnRequest().GetMessage()
-		texts, err := s.textAttachments(ctx, append(messages(events), m))
+		texts, err := textAttachments(ctx, tx, append(messages(events), m))
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +207,7 @@ func (s *Service) readUnseen(ctx context.Context, id string, m *bandav1.Message)
 		return unseen{}, err
 	}
 	u := unseen{last: t.LastSeq}
-	if u.events, err = s.store.Events(ctx, id, t.DeliveredSeq); err != nil {
+	if u.events, err = s.store.EventsOf(ctx, id, t.DeliveredSeq, promptKinds...); err != nil {
 		return u, err
 	}
 	if n := len(u.events); n > 0 {
@@ -216,7 +217,7 @@ func (s *Service) readUnseen(ctx context.Context, id string, m *bandav1.Message)
 	if m != nil {
 		msgs = append(msgs, m)
 	}
-	u.texts, err = s.textAttachments(ctx, msgs)
+	u.texts, err = textAttachments(ctx, s.store, msgs)
 	return u, err
 }
 
@@ -262,7 +263,7 @@ func (s *Service) deliver(ctx context.Context, id, prompt string, images []strin
 	if s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: p}}) {
 		return
 	}
-	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
 		t.PendingImages = lastImages(append(t.PendingImages, images...))
 		return envLost(t, 1), nil

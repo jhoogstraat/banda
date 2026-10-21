@@ -4,8 +4,10 @@ package store
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -62,30 +64,51 @@ type Thread struct {
 	ParentTitle string
 }
 
-type Store struct{ db *pgxpool.Pool }
+// Store is the pool, or inside Update the transaction (see Update).
+type Store struct{ db querier }
 
-// Open connects and applies the schema.
+type querier interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// Open connects and applies the schema unless the database has it already.
 // ponytail: idempotent schema file, switch to versioned migrations once a column changes.
 func Open(ctx context.Context, url string) (*Store, error) {
 	db, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	// One statement list is one transaction; the lock keeps APIs starting together from deadlocking on it.
-	// Its ALTERs lock tables even when there is nothing to change, so it can still deadlock with another
-	// API's traffic, and Postgres may pick it as the victim: try again.
-	for try := 1; ; try++ {
-		_, err = db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema)
-		var pe *pgconn.PgError
-		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
-			break
-		}
+	// Its ALTERs lock tables even when there is nothing to change, so applying it to a live database can
+	// deadlock with the traffic of another API on it: skip it when it's current.
+	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(schema)))
+	var applied string
+	if db.QueryRow(ctx, `SELECT hash FROM schema_applied`).Scan(&applied); applied != sum {
+		err = applySchema(ctx, db, sum)
 	}
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
 	return &Store{db}, nil
+}
+
+// applySchema applies the schema and records its hash. One statement list is one transaction; the lock
+// keeps APIs starting together from deadlocking on it. It can still deadlock with another API's traffic,
+// and Postgres may pick it as the victim: try again.
+func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
+	for try := 1; ; try++ {
+		_, err := db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema+`
+			CREATE TABLE IF NOT EXISTS schema_applied (hash text NOT NULL);
+			DELETE FROM schema_applied;
+			INSERT INTO schema_applied VALUES ('`+sum+`');`)
+		var pe *pgconn.PgError
+		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
+			return err
+		}
+	}
 }
 
 // cols are the thread columns Get, Update and the lists read; fields says where
@@ -191,7 +214,7 @@ type TurnTotals struct {
 func (s *Store) TurnTotals(ctx context.Context, ids []string) (map[string]TurnTotals, error) {
 	rows, err := s.db.Query(ctx, `SELECT thread_id, count(*), coalesce(sum((body->'turnEnded'->>'costUsd')::float8), 0),
 		coalesce(sum((body->'turnEnded'->>'durationMs')::bigint), 0)
-		FROM events WHERE thread_id = ANY($1) AND body ? 'turnEnded' GROUP BY thread_id`, ids)
+		FROM events WHERE thread_id = ANY($1) AND kind = 'turnEnded' GROUP BY thread_id`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +259,7 @@ func (s *Store) AgentSpawned(ctx context.Context, owner string) (int, error) {
 func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 	var text string
 	err := s.db.QueryRow(ctx, `SELECT coalesce(body->'agentText'->>'text', '') FROM events
-		WHERE thread_id = $1 AND body ? 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
+		WHERE thread_id = $1 AND kind = 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}
@@ -246,7 +269,7 @@ func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 // Pushed reports whether the thread's branch was ever pushed to origin.
 func (s *Store) Pushed(ctx context.Context, id string) (bool, error) {
 	var ok bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1 AND kind = 'autoPush'
 		AND body @> '{"autoPush": {"branchPushed": true}}')`, id).Scan(&ok)
 	return ok, err
 }
@@ -290,8 +313,11 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 
 // Update locks the thread, lets fn change it and return events to append,
 // then saves both atomically. It returns the stored events with seq and time
-// set. If fn returns an error nothing is saved.
-func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*bandav1.Event, error)) (Thread, []*bandav1.Event, error) {
+// set. If fn returns an error nothing is saved. fn reads through tx, the
+// transaction: a query on the pool would wait for a connection while this
+// one holds the thread's lock, and with the pool busy with others waiting
+// for that lock, nothing moves.
+func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thread) ([]*bandav1.Event, error)) (Thread, []*bandav1.Event, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return Thread{}, nil, err
@@ -302,7 +328,7 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	if err != nil {
 		return t, nil, err
 	}
-	events, err := fn(&t)
+	events, err := fn(&Store{tx}, &t)
 	if err != nil {
 		return t, nil, err
 	}
@@ -348,6 +374,11 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 
 func (s *Store) Events(ctx context.Context, id string, afterSeq int64) ([]*bandav1.Event, error) {
 	return s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 ORDER BY seq`, id, afterSeq)
+}
+
+// EventsOf is Events of the given kinds only (Event.kind oneof JSON names, e.g. "message").
+func (s *Store) EventsOf(ctx context.Context, id string, afterSeq int64, kinds ...string) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 AND kind = ANY($3) ORDER BY seq`, id, afterSeq, kinds)
 }
 
 // Before returns the newest limit events with seq < beforeSeq, in seq order.

@@ -21,5 +21,5 @@ A web app where a team builds software together with coding agents. Each thread 
 
 ## Checks
 
-- `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. A bug fix comes with an e2e test that fails before it; `web/e2e/known-bugs.spec.ts` holds open bugs as `test.fail()`.
+- `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. A bug fix comes with an e2e test that fails before it; a known bug not fixed yet is reproduced in its spec as `test.fail()`.
 - `node web/src/lib/events.check.ts`: web event reducer. `pnpm -C web check`: Svelte types.

@@ -152,3 +152,10 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS search tsvector GENERATED ALWAYS AS 
   || jsonb_to_tsvector('english'::regconfig, coalesce(body->'message'->'review', body->'turnRequest'->'message'->'review', '[]'), '["string"]')
 ) STORED;
 CREATE INDEX IF NOT EXISTS events_search ON events USING gin (search);
+-- Each event's kind (its Event.kind oneof field, e.g. 'message'), so queries
+-- that need only some kinds skip the large bodies of the others. Adding the
+-- column fills it for existing events.
+CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAGE sql
+  AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
+CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);

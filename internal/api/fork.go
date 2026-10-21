@@ -33,7 +33,7 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 	if err != nil {
 		return nil, err
 	}
-	events, err := s.store.Events(ctx, src.ID, 0)
+	events, err := s.store.EventsOf(ctx, src.ID, 0, "message", "agentText", "turnEnded") // what forkPrompt and the turn count use
 	if err != nil {
 		return nil, err
 	}

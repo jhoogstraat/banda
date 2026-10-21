@@ -74,6 +74,9 @@ func main() {
 	if svc.MaxAgentThreads, err = strconv.Atoi(env("MAX_AGENT_THREADS", "8")); err != nil {
 		log.Fatalf("MAX_AGENT_THREADS: %v", err)
 	}
+	if svc.WatchBuffer, err = strconv.Atoi(env("WATCH_BUFFER", "256")); err != nil {
+		log.Fatalf("WATCH_BUFFER: %v", err)
+	}
 	every, err := time.ParseDuration(env("IDLE_SWEEP_EVERY", "1m"))
 	if err != nil {
 		log.Fatalf("IDLE_SWEEP_EVERY: %v", err)

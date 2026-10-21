@@ -6,7 +6,6 @@ import (
 	"math"
 	"slices"
 
-	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -14,7 +13,7 @@ import (
 )
 
 func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadRequest, stream bandav1connect.ThreadServiceWatchThreadServerStream) error {
-	ch := s.watch(req.ThreadId, user(ctx))
+	ch, behind := s.watch(req.ThreadId, user(ctx))
 	defer s.unwatch(req.ThreadId, user(ctx), ch)
 
 	// Subscribe before replaying so nothing falls in between; skip duplicates.
@@ -44,57 +43,73 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 			last = e.Seq
 		}
 	}
+	// catchUp sends the stored events after last.
+	catchUp := func() error {
+		missed, err := s.store.Events(ctx, req.ThreadId, last)
+		for _, m := range missed {
+			if err == nil {
+				err = stream.Send(&bandav1.WatchThreadResponse{Event: slim(m)})
+			}
+			last = m.Seq
+		}
+		return err
+	}
+	deliver := func(e *bandav1.Event) error {
+		if e.Seq != 0 && e.Seq <= last {
+			return nil
+		}
+		if e.Seq > last+1 { // missed some (concurrent updates broadcast out of order, or it fell behind)
+			return catchUp()
+		}
+		if e.Seq != 0 {
+			last = e.Seq
+		}
+		return stream.Send(&bandav1.WatchThreadResponse{Event: slim(e)})
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case e, ok := <-ch:
-			if !ok {
-				return connect.NewError(connect.CodeUnavailable, "watcher fell behind, reconnect")
+		case e := <-ch:
+			if err := deliver(e); err != nil {
+				return err
 			}
-			if e.Seq != 0 && e.Seq <= last {
-				continue
-			}
-			if e.Seq > last+1 { // concurrent updates were broadcast out of order: catch up from the store
-				missed, err := s.store.Events(ctx, req.ThreadId, last)
+		case <-behind:
+			// Events didn't fit: the ephemeral ones are lost, the stored ones are in the store.
+			// What did fit comes first, so deltas don't land after their text.
+			for drained := false; !drained; {
+				select {
+				case e := <-ch:
+					err = deliver(e)
+				default:
+					drained, err = true, catchUp()
+				}
 				if err != nil {
 					return err
 				}
-				for _, m := range missed {
-					if err := stream.Send(&bandav1.WatchThreadResponse{Event: slim(m)}); err != nil {
-						return err
-					}
-					last = m.Seq
-				}
-				continue
-			}
-			if err := stream.Send(&bandav1.WatchThreadResponse{Event: slim(e)}); err != nil {
-				return err
-			}
-			if e.Seq != 0 {
-				last = e.Seq
 			}
 		}
 	}
 }
 
 // watch subscribes to a thread's events as user. Everyone, the new watcher
-// included, then gets the current presence.
-func (s *Service) watch(id, user string) chan *bandav1.Event {
-	ch := make(chan *bandav1.Event, 256)
+// included, then gets the current presence. behind gets a value when an
+// event didn't fit into the channel.
+func (s *Service) watch(id, user string) (ch chan *bandav1.Event, behind chan struct{}) {
+	ch, behind = make(chan *bandav1.Event, s.WatchBuffer), make(chan struct{}, 1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.watchers[id] == nil {
-		s.watchers[id] = map[chan *bandav1.Event]struct{}{}
+		s.watchers[id] = map[chan *bandav1.Event]chan struct{}{}
 	}
-	s.watchers[id][ch] = struct{}{}
+	s.watchers[id][ch] = behind
 	if s.present[id] == nil {
 		s.present[id] = map[string]int{}
 	}
 	s.present[id][user]++
 	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
 	s.presenceChanged()
-	return ch
+	return ch, behind
 }
 
 func (s *Service) unwatch(id, user string, ch chan *bandav1.Event) {
@@ -128,8 +143,8 @@ func (s *Service) SendTyping(ctx context.Context, req *bandav1.TypingRequest) (*
 	return &bandav1.TypingResponse{}, nil
 }
 
-// broadcast fans events out. A watcher that cannot keep up is dropped and
-// reconnects from its last seq.
+// broadcast fans events out. A watcher that cannot keep up misses them and
+// catches up from the store.
 // ponytail: in-memory fan-out, single API replica; Postgres LISTEN/NOTIFY for more.
 func (s *Service) broadcast(id string, events []*bandav1.Event) {
 	s.mu.Lock()
@@ -140,16 +155,16 @@ func (s *Service) broadcast(id string, events []*bandav1.Event) {
 }
 
 func (s *Service) broadcastLocked(id string, events []*bandav1.Event) {
-	for ch := range s.watchers[id] {
+	for ch, behind := range s.watchers[id] {
 		for _, e := range events {
 			select {
 			case ch <- e:
-				continue
 			default:
+				select {
+				case behind <- struct{}{}:
+				default:
+				}
 			}
-			delete(s.watchers[id], ch)
-			close(ch)
-			break
 		}
 	}
 }

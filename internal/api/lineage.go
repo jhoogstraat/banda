@@ -92,7 +92,7 @@ const maxLineage = 200
 
 // lineage posts a LineageUpdate about child into its parent's chat.
 func (s *Service) lineage(ctx context.Context, child store.Thread, actor string, status bandav1.Status, text string) {
-	_, events, err := s.store.Update(ctx, child.ParentID, func(*store.Thread) ([]*bandav1.Event, error) {
+	_, events, err := s.store.Update(ctx, child.ParentID, func(*store.Store, *store.Thread) ([]*bandav1.Event, error) {
 		return []*bandav1.Event{{Actor: actor, Kind: &bandav1.Event_LineageUpdate{LineageUpdate: &bandav1.LineageUpdate{
 			ThreadId: child.ID, Title: child.Title, Status: status, Text: text}}}}, nil
 	})

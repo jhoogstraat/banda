@@ -36,9 +36,13 @@ type Service struct {
 	// SuspendPause holds every suspend between the thread's status and its
 	// environment, so tests can race it. Zero outside tests.
 	SuspendPause time.Duration
+	// WatchBuffer is how many events a WatchThread stream may lag behind
+	// before it catches up from the store.
+	WatchBuffer int
 
-	mu       sync.Mutex
-	watchers map[string]map[chan *bandav1.Event]struct{}
+	mu sync.Mutex
+	// watchers holds each WatchThread's channel and its behind signal (see watch).
+	watchers map[string]map[chan *bandav1.Event]chan struct{}
 	// present counts each thread's open WatchThread streams per user.
 	present map[string]map[string]int
 	// runners and terminals are keyed by thread id, or loginKey for login
@@ -75,7 +79,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 	s := &Service{
 		store:     st,
 		sandboxes: sb,
-		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
+		watchers:  map[string]map[chan *bandav1.Event]chan struct{}{},
 		present:   map[string]map[string]int{},
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
@@ -90,6 +94,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		LoginIdle:          10 * time.Minute,
 		MaxSubthreadDepth:  3,
 		MaxAgentThreads:    8,
+		WatchBuffer:        256,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}
@@ -106,7 +111,7 @@ func (s *Service) apply(ctx context.Context, id string, a thread.Action, events 
 // applyBecause is apply with a reason for the status change.
 func (s *Service) applyBecause(ctx context.Context, id string, a thread.Action, reason string, events ...*bandav1.Event) (thread.Effect, error) {
 	var effect thread.Effect
-	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	_, stored, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if a == nil {
 			return events, nil
 		}
@@ -147,7 +152,7 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 		time.Sleep(s.SuspendPause)
 		// Under the thread's lock: a post or wake since Suspend wins, and its
 		// environment stays up.
-		_, _, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		_, _, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 			if t.Status != thread.Suspended {
 				return nil, errResumed
 			}

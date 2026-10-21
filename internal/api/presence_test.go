@@ -14,12 +14,12 @@ func TestPresence(t *testing.T) {
 		e := <-ch
 		return e.GetPresenceChanged().GetUserIds()
 	}
-	alice := s.watch("t", "alice")
+	alice, _ := s.watch("t", "alice")
 	if u := got(alice); !slices.Equal(u, []string{"alice"}) {
 		t.Fatalf("alice joins: %v", u)
 	}
-	bob1 := s.watch("t", "bob")
-	bob2 := s.watch("t", "bob") // a second tab
+	bob1, _ := s.watch("t", "bob")
+	bob2, _ := s.watch("t", "bob") // a second tab
 	for _, want := range [][]string{{"alice", "bob"}, {"alice", "bob"}} {
 		if u := got(alice); !slices.Equal(u, want) {
 			t.Fatalf("bob joins: %v", u)
