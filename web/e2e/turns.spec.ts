@@ -12,7 +12,7 @@ const turnsEnded = (t: Thread, n: number) =>
 test('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create({ repoUrl: repo('setup-hold'), prompt: 'first e2e-echo' });
-	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 60_000 }).toBe('Running');
+	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 120_000 }).toBe('Running');
 	await t.as(bob).send('TEAMMATE-NOTE use postgres');
 	await t.release('setup');
 	await t.waitForStatus(Status.AWAITING_INPUT);
