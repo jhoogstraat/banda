@@ -77,9 +77,8 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 		return s.waitForLogin(ctx, notice, loginStatus)
 	}
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
-		err := errors.New("API key mode is on but no API key is stored. Set one in Settings, then retry.")
-		s.report("login", "Use the API key", bandav1.SetupState_SETUP_STATE_FAILED, err.Error())
-		return err
+		s.report("login", "Use the API key", bandav1.SetupState_SETUP_STATE_FAILED, "API key mode is on but no API key is stored. Set one in Settings, then retry.")
+		return errors.New("no API key is stored")
 	}
 	s.report("login", "Use the API key", bandav1.SetupState_SETUP_STATE_SKIPPED, "Using the API key instead of a subscription login.")
 	return nil

@@ -13,10 +13,10 @@ func TestReadFile(t *testing.T) {
 	dir, outside := t.TempDir(), t.TempDir()
 	secret := filepath.Join(outside, "secret")
 	for p, c := range map[string]string{
-		filepath.Join(dir, "a.txt"):         "hello",
-		filepath.Join(dir, "bin"):           "a\x00b",
-		filepath.Join(dir, "big"):           strings.Repeat("x", maxFile+1),
-		secret:                              "sk-ant-oat01-AbC_d-123456789",
+		filepath.Join(dir, "a.txt"): "hello",
+		filepath.Join(dir, "bin"):   "a\x00b",
+		filepath.Join(dir, "big"):   strings.Repeat("x", maxFile+1),
+		secret:                      "sk-ant-oat01-AbC_d-123456789",
 	} {
 		if err := os.WriteFile(p, []byte(c), 0o600); err != nil {
 			t.Fatal(err)
