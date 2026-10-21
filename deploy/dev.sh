@@ -69,7 +69,16 @@ lock() {
 	trap 'free 8790; free 8791; rm -rf "$E2E_LOCK"' EXIT
 }
 
+# Environments of earlier runs still point at the e2e API, which is gone: with the lock held,
+# pause them (volumes kept) before they fill the node's pod limit.
+e2e_leftovers() {
+	kc -n banda get sandbox -o json | jq -r '.items[] | select(.spec.operatingMode == "Running")
+		| select(any(.spec.podTemplate.spec.containers[0].env[]?; .name == "BANDA_API_URL" and (.value | endswith(":8790")))) | .metadata.name' |
+		while read -r sb; do kc -n banda patch sandbox "$sb" --type merge -p '{"spec":{"operatingMode":"Suspended"}}' >/dev/null; done
+}
+
 e2e() {
+	e2e_leftovers
 	TARGET=fake SANDBOX_IMAGE=localhost/banda-sandbox:fake mise run image
 	free 8790
 	DEV_AUTH=1 SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 PREVIEW_ADDR=:8791 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
