@@ -19,7 +19,16 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter({ fallback: 'index.html' })
-		})
+		}),
+		{
+			// Previewed apps are on the same site: no framing Banda (FrameAncestors in internal/api/preview.go).
+			name: 'banda-no-frames',
+			configureServer: (server) =>
+				void server.middlewares.use((_req, res, next) => {
+					res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+					next();
+				})
+		}
 	],
 	// Connect paths look like /banda.v1.ThreadService/WatchThread -> the Go API, as does the OIDC login flow.
 	// /dex reaches the dev Dex, so LAN clients sign in through this one port.

@@ -33,6 +33,7 @@ func TestPreviewProxy(t *testing.T) {
 			http.Redirect(w, r, "http://"+r.Host+"/home", http.StatusFound)
 		default:
 			http.SetCookie(w, &http.Cookie{Name: "banda_session", Value: "evil"})
+			http.SetCookie(w, &http.Cookie{Name: "__Host-banda_session", Value: "evil", Path: "/", Secure: true})
 			http.SetCookie(w, &http.Cookie{Name: "app", Value: "1"})
 			io.WriteString(w, r.Host+" "+r.Header.Get("Cookie")+" "+r.Header.Get("Origin"))
 		}
@@ -99,7 +100,7 @@ func TestPreviewProxy(t *testing.T) {
 	}
 	cookie, _, _ = strings.Cut(cookie, ";")
 
-	res, body := get("/assets/app.js", cookie+"; banda_session=secret; app=1", "Origin", preview.URL)
+	res, body := get("/assets/app.js", cookie+"; banda_session=secret; __Host-banda_session=secret; app=1", "Origin", preview.URL)
 	if want := "localhost:" + port + " app=1 http://localhost:" + port; body != want {
 		t.Errorf("app saw %q, want %q: Banda's cookies stripped, Host and Origin local", body, want)
 	}

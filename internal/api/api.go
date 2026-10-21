@@ -11,6 +11,7 @@ import (
 	"maps"
 	"math"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -92,6 +93,9 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 	if req.RepoUrl == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
 	}
+	if err := checkRepoURL(req.RepoUrl); err != nil {
+		return nil, err
+	}
 	t := store.Thread{
 		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
 		Title:         title(req.Prompt),
@@ -114,10 +118,22 @@ func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (st
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
+	if err := checkRepoURL(t.RepoURL); err != nil {
+		return t, err
+	}
 	t.Title, t.PendingPrompt = title(prompt), prompt
 	t.Status, t.Mode = thread.Starting, thread.AgentMode
 	t.Model, t.Effort = or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	return s.start(ctx, t, &bandav1.Message{Text: prompt})
+}
+
+// checkRepoURL refuses credentials in an https URL: everyone sees a thread's
+// repository, forks reuse it, and the runner redacts only GIT_TOKEN.
+func checkRepoURL(repo string) error {
+	if u, err := url.Parse(repo); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.User != nil {
+		return connect.NewError(connect.CodeInvalidArgument, "the repository URL must not contain credentials: add a GIT_TOKEN secret in Settings instead")
+	}
+	return nil
 }
 
 // start stores a new thread, posts its first message (if any) as the owner

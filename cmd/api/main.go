@@ -95,6 +95,7 @@ func main() {
 func spa(dir string) http.Handler {
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", api.FrameAncestors)
 		if _, err := os.Stat(filepath.Join(dir, filepath.Clean("/"+r.URL.Path))); err != nil {
 			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
 			return

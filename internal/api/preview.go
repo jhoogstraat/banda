@@ -42,6 +42,12 @@ const (
 
 var errNotRunning = errors.New("the environment is not running")
 
+// FrameAncestors is the CSP that keeps Banda's pages out of frames. Previewed
+// apps are on the same site, so in a frame of theirs Banda would be signed in
+// and could be clickjacked (Approve, Trust, Allow always). web/vite.config.ts
+// sends the same.
+const FrameAncestors = "frame-ancestors 'none'"
+
 // PreviewConfig is where the preview origin listens (Addr, e.g. ":8788") and
 // where browsers reach it: URL, or else the host they use for Banda on Addr's port.
 type PreviewConfig struct {
@@ -183,7 +189,7 @@ func (s *Service) proxyPreview(w http.ResponseWriter, r *http.Request) {
 			pr.Out.URL.Scheme, pr.Out.URL.Host, pr.Out.Host = "http", net.JoinHostPort(id, port), local
 			pr.Out.Header.Del("Cookie") // Banda's session cookie must not reach the sandbox
 			for _, c := range pr.In.Cookies() {
-				if !strings.HasPrefix(c.Name, "banda_") {
+				if !bandaCookie(c.Name) {
 					pr.Out.Header.Add("Cookie", c.String())
 				}
 			}
@@ -195,7 +201,7 @@ func (s *Service) proxyPreview(w http.ResponseWriter, r *http.Request) {
 			cookies := res.Header.Values("Set-Cookie")
 			res.Header.Del("Set-Cookie")
 			for _, c := range cookies {
-				if !strings.HasPrefix(strings.TrimSpace(c), "banda_") {
+				if !bandaCookie(strings.TrimSpace(c)) {
 					res.Header.Add("Set-Cookie", c)
 				}
 			}
@@ -213,6 +219,12 @@ func (s *Service) proxyPreview(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+// bandaCookie tells Banda's own cookies (or a Set-Cookie line of one), which
+// never pass the preview proxy.
+func bandaCookie(name string) bool {
+	return strings.HasPrefix(strings.TrimPrefix(name, "__Host-"), "banda_")
 }
 
 // dialPreview opens a tunnel to "<thread>:<port>" through the thread's runner.

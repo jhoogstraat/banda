@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+)
 
 func TestRedact(t *testing.T) {
 	t.Setenv("GIT_TOKEN", "ghp_secretsecret")
@@ -23,5 +28,16 @@ func TestRedactUserSecrets(t *testing.T) {
 	want := `url=[redacted] pw=[redacted] key=[redacted] abc {"value":"[redacted]"}`
 	if got := redact(in); got != want {
 		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// A permission card shows the command it asks for, so it is redacted like the tool call.
+func TestScrubPermissionRequest(t *testing.T) {
+	t.Setenv("GIT_TOKEN", "ghp_secretsecret")
+	e := &bandav1.Event{Kind: &bandav1.Event_PermissionRequested{PermissionRequested: &bandav1.PermissionRequested{
+		ToolName: "Bash", InputJson: `{"command":"git push https://x:ghp_secretsecret@host"}`, Reason: "uses ghp_secretsecret"}}}
+	scrub(e)
+	if r := e.GetPermissionRequested(); strings.Contains(r.InputJson+r.Reason, "ghp_") {
+		t.Errorf("not redacted: %v", r)
 	}
 }

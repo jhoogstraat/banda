@@ -36,3 +36,28 @@ func TestLocalPath(t *testing.T) {
 		}
 	}
 }
+
+// A previewed app on the same host can plant its owner's session with a
+// narrower path, which the browser sends before the viewer's own.
+func TestSessionCookieShadowing(t *testing.T) {
+	o := &OIDC{signer: signer("secret")}
+	exp := time.Now().Add(time.Hour)
+	alice, mallory := o.sign("alice", exp), o.sign("mallory", exp)
+	for header, want := range map[string]string{
+		"banda_session=" + alice:                                "alice",
+		"banda_session=forged; banda_session=" + alice:          "alice",
+		"banda_session=" + alice + "; banda_session=" + alice:   "alice",
+		"banda_session=" + mallory + "; banda_session=" + alice: "",
+		"banda_preview=" + alice + "; other=1":                  "",
+	} {
+		if got, _ := o.session(header); got != want {
+			t.Errorf("session(%q) = %q, want %q", header, got, want)
+		}
+	}
+
+	// Over https only a __Host- cookie counts: other hosts of the site can't set one.
+	o.secure = true
+	if got, _ := o.session("banda_session=" + mallory + "; __Host-banda_session=" + alice); got != "alice" {
+		t.Errorf("https session = %q, want alice", got)
+	}
+}

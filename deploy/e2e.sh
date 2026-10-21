@@ -75,6 +75,9 @@ echo "$S" | jq -e '(.secrets | map(.name) | index("E2E_SECRET")) and .accounts[0
 echo "$S" | grep -q "$SECRET" && fail "settings return a secret value"
 ok "secrets: set, reserved and invalid names and subscription tokens refused, values never returned"
 
+call ThreadService/CreateThread '{"repoUrl":"https://x-access-token:ghp_e2e@github.com/acme/app.git","prompt":"e2e"}' >/dev/null 2>&1 && fail "a repository URL with a token was accepted"
+ok "a repository URL with credentials is refused"
+
 new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}"
 FIRST=$ID
 wait_for STATUS_AWAITING_INPUT
@@ -478,6 +481,8 @@ wait_for STATUS_AWAITING_INPUT
 [ "$(permitted)" = 1 ] && [ "$(thread permissionPending)" != true ]
 answer '"decision":"PERMISSION_DECISION_ALLOW"' 2>/dev/null && fail "answered a request twice"
 ok "ask mode: the agent waits for the owner's answer (the thread shows it pending), then runs the command"
+[ "$(sql "select count(*) from events where thread_id='$ID' and body::text like '%$SECRET%'")" = 0 ] || fail "a permission request stored a secret"
+ok "permission requests are redacted"
 
 ask "e2e-ask deny"
 answer '"decision":"PERMISSION_DECISION_DENY","message":"not now"'
