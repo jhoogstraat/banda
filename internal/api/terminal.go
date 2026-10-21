@@ -8,7 +8,6 @@ import (
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
-	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
 )
 
@@ -102,18 +101,6 @@ func (s *Service) toTerminal(key string, msg *bandav1.ConnectResponse) error {
 		return connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")
 	}
 	return nil
-}
-
-// owned returns the thread if the caller owns it.
-func (s *Service) owned(ctx context.Context, id string) (store.Thread, error) {
-	t, err := s.store.Get(ctx, id)
-	if err != nil {
-		return t, cerr(err)
-	}
-	if t.OwnerID != user(ctx) {
-		return t, cerr(thread.ErrForbidden)
-	}
-	return t, nil
 }
 
 // waitRunner waits for the runner connected as key to connect, up to 90 s: enough

@@ -118,11 +118,8 @@ func (s *Service) previewChanged(id string) {
 }
 
 func (s *Service) previewable(ctx context.Context, id string) error {
-	if strings.HasPrefix(id, "login:") { // a loginKey, not a thread
-		return connect.NewError(connect.CodeNotFound, "thread not found")
-	}
-	_, err := s.store.Get(ctx, id)
-	return cerr(err)
+	_, err := s.store.Get(ctx, id) // also refuses a loginKey
+	return err
 }
 
 // previewOrigin is Preview.URL, or else the caller's host on the preview port.

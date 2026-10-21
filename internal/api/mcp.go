@@ -3,7 +3,6 @@ package api
 import (
 	"cmp"
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect/v2"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -40,15 +40,14 @@ func (s *Service) MCPHandler() http.Handler {
 		DisableLocalhostProtection: true,
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t, err := s.store.Get(r.Context(), r.Header.Get("X-Banda-Thread"))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		t, err := s.runnerThread(r.Context(), r.Header.Get("X-Banda-Thread"), token)
+		if connect.CodeOf(err) == connect.CodeUnauthenticated {
+			http.Error(w, "unknown thread or bad token", http.StatusUnauthorized)
+			return
+		} else if err != nil {
 			slog.Error("mcp auth", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(token)) != 1 {
-			http.Error(w, "unknown thread or bad token", http.StatusUnauthorized)
 			return
 		}
 		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, t)))
@@ -203,7 +202,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 				if err != nil {
 					return nil, nil, err
 				}
-				if t.OwnerID != caller.OwnerID {
+				if t.CheckOwner(caller.OwnerID) != nil {
 					return nil, nil, errors.New("mention_agent is only allowed in threads owned by the same person as this thread")
 				}
 			}

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/subtle"
 	"log/slog"
 	"time"
 
@@ -44,9 +43,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 		id = loginKey(owner)
 	} else {
-		t, err := s.store.Get(ctx, id)
-		if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(hello.Token)) != 1 {
-			return connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
+		t, err := s.runnerThread(ctx, id, hello.Token)
+		if err != nil {
+			return err
 		}
 		owner = t.OwnerID
 		// The pod's environment has the settings it was created with; a

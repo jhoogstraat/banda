@@ -28,7 +28,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	}
 	before, err := s.store.Get(ctx, id)
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	unseen, err := s.store.Events(ctx, id, before.DeliveredSeq)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		return events, nil
 	})
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	s.broadcast(id, stored)
 	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
@@ -150,7 +150,7 @@ func (s *Service) resolve(ctx context.Context, id string, seq int64, approve boo
 		return out, nil
 	})
 	if err != nil {
-		return cerr(err)
+		return err
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {

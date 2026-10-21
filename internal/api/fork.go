@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -32,7 +31,7 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 	}
 	src, err := s.store.Get(ctx, req.ThreadId)
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	events, err := s.store.Events(ctx, src.ID, 0)
 	if err != nil {
@@ -140,12 +139,9 @@ func (s *Service) RaceCompare(ctx context.Context, req *bandav1.RaceCompareReque
 // other tries (which pauses them) and unsettles the pick.
 func (s *Service) RacePick(ctx context.Context, req *bandav1.RacePickRequest) (*bandav1.RacePickResponse, error) {
 	by := user(ctx)
-	won, err := s.store.Get(ctx, req.ThreadId)
+	won, err := s.owned(ctx, req.ThreadId)
 	if err != nil {
-		return nil, cerr(err)
-	}
-	if won.OwnerID != by {
-		return nil, cerr(thread.ErrForbidden)
+		return nil, err
 	}
 	if won.RaceID == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, "the thread is not part of a race")
@@ -159,7 +155,7 @@ func (s *Service) RacePick(ctx context.Context, req *bandav1.RacePickRequest) (*
 		if _, err := s.apply(ctx, t.ID, nil, note); err != nil {
 			return nil, err
 		}
-		if t.OwnerID != by {
+		if t.CheckOwner(by) != nil {
 			continue
 		}
 		if err := s.store.SetSettled(ctx, by, t.ID, t.ID != won.ID); err != nil {
@@ -177,9 +173,9 @@ func (s *Service) RacePick(ctx context.Context, req *bandav1.RacePickRequest) (*
 // starts as that copy and is only replaced after its first turn, which comes
 // after the checkout that asks for it.
 func (s *Service) ForkPatch(ctx context.Context, req *bandav1.ForkPatchRequest) (*bandav1.ForkPatchResponse, error) {
-	t, err := s.store.Get(ctx, req.ThreadId)
-	if err != nil || subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(req.Token)) != 1 {
-		return nil, connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
+	t, err := s.runnerThread(ctx, req.ThreadId, req.Token)
+	if err != nil {
+		return nil, err
 	}
 	if t.ForkedFrom == "" {
 		return &bandav1.ForkPatchResponse{}, nil

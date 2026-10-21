@@ -46,14 +46,14 @@ func (s *Service) PermissionSetMode(ctx context.Context, req *bandav1.Permission
 		return nil, connect.NewError(connect.CodeInvalidArgument, "unknown permission mode")
 	}
 	t, _, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
-		if t.OwnerID != user(ctx) {
-			return nil, thread.ErrForbidden
+		if err := t.CheckOwner(user(ctx)); err != nil {
+			return nil, err
 		}
 		t.PermissionMode = mode
 		return nil, nil
 	})
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	s.configure(t) // not running: the runner gets it when it is ready
 	return &bandav1.PermissionSetModeResponse{}, nil
@@ -79,7 +79,7 @@ func (s *Service) PermissionAnswer(ctx context.Context, req *bandav1.PermissionA
 		return []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_PermissionResolved{PermissionResolved: res}}}, err
 	})
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	s.broadcast(id, events)
 	s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Permission{Permission: cmd}})
@@ -95,7 +95,7 @@ func resolve(t *store.Thread, by string, req *bandav1.PermissionAnswerRequest) (
 		return nil, nil, errNoPermission
 	}
 	plan := tool == exitPlanMode
-	if by != t.OwnerID && (plan || !t.Trusted) {
+	if plan && t.CheckOwner(by) != nil || !t.Trusts(by) {
 		return nil, nil, thread.ErrForbidden
 	}
 	res := &bandav1.PermissionResolved{Id: req.RequestId, Decision: d, Message: req.Message}

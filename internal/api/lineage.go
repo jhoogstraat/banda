@@ -13,7 +13,7 @@ import (
 func (s *Service) SpawnThread(ctx context.Context, req *bandav1.SpawnThreadRequest) (*bandav1.SpawnThreadResponse, error) {
 	parent, err := s.store.Get(ctx, req.ParentId)
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort)
 	if err != nil {

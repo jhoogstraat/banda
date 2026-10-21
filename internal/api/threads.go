@@ -130,7 +130,7 @@ func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsReque
 func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) (*bandav1.GetThreadResponse, error) {
 	t, err := s.store.GetFor(ctx, req.ThreadId, user(ctx))
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	return &bandav1.GetThreadResponse{Thread: toProto(t)}, nil
 }
@@ -166,8 +166,8 @@ func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*ba
 func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSettingsRequest) (*bandav1.SetAgentSettingsResponse, error) {
 	var changed *bandav1.AgentSettings
 	_, events, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
-		if t.OwnerID != user(ctx) {
-			return nil, thread.ErrForbidden
+		if err := t.CheckOwner(user(ctx)); err != nil {
+			return nil, err
 		}
 		if or(req.Model, t.Model) == t.Model && or(req.Effort, t.Effort) == t.Effort {
 			return nil, nil
@@ -177,7 +177,7 @@ func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSet
 		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: changed}}}, nil
 	})
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	s.broadcast(req.ThreadId, events)
 	if changed != nil { // without a runner the next start picks them up from the pod template

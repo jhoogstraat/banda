@@ -77,8 +77,8 @@ func (s *Service) scheduleDelete(ctx context.Context, id string) {
 // cancelDelete keeps the environment when its owner unsettles the thread
 // before it was deleted.
 func (s *Service) cancelDelete(ctx context.Context, id string) {
-	t, err := s.store.Get(ctx, id)
-	if err != nil || t.OwnerID != user(ctx) || t.EnvDeleteAt == nil || !t.EnvDeleteAt.After(time.Now()) {
+	t, err := s.owned(ctx, id)
+	if err != nil || t.EnvDeleteAt == nil || !t.EnvDeleteAt.After(time.Now()) {
 		return
 	}
 	if err := s.sandboxes.ScheduleDelete(ctx, id, nil); err != nil {
@@ -93,7 +93,7 @@ func (s *Service) cancelDelete(ctx context.Context, id string) {
 func (s *Service) EnvironmentRecreate(ctx context.Context, req *bandav1.EnvironmentRecreateRequest) (*bandav1.EnvironmentRecreateResponse, error) {
 	t, err := s.store.Get(ctx, req.ThreadId)
 	if err != nil {
-		return nil, cerr(err)
+		return nil, err
 	}
 	if t.EnvDeleteAt == nil || t.EnvDeleteAt.After(time.Now()) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment was not deleted")
@@ -109,8 +109,7 @@ func (s *Service) EnvironmentRecreate(ctx context.Context, req *bandav1.Environm
 // suspendIfOwner pauses the environment when its owner snoozes or settles
 // the thread. Unsnoozing resumes lazily, on the next prompt.
 func (s *Service) suspendIfOwner(ctx context.Context, id string) {
-	t, err := s.store.Get(ctx, id)
-	if err != nil || t.OwnerID != user(ctx) {
+	if _, err := s.owned(ctx, id); err != nil {
 		return
 	}
 	if effect, err := s.apply(ctx, id, thread.Suspend{}); err == nil {
@@ -149,12 +148,8 @@ func (s *Service) SuspendIdle(ctx context.Context, idle time.Duration) {
 }
 
 func (s *Service) Push(ctx context.Context, req *bandav1.PushRequest) (*bandav1.PushResponse, error) {
-	t, err := s.store.Get(ctx, req.ThreadId)
-	if err != nil {
-		return nil, cerr(err)
-	}
-	if t.OwnerID != user(ctx) {
-		return nil, cerr(thread.ErrForbidden)
+	if _, err := s.owned(ctx, req.ThreadId); err != nil {
+		return nil, err
 	}
 	if !s.sendRunner(req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Push{Push: &bandav1.Push{}}}) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment is not running")

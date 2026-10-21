@@ -5,14 +5,12 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -101,7 +99,7 @@ func (s *Service) applyBecause(ctx context.Context, id string, a thread.Action, 
 		return out, nil
 	})
 	if err != nil {
-		return thread.None, cerr(err)
+		return thread.None, err
 	}
 	s.broadcast(id, stored)
 	return effect, nil
@@ -139,20 +137,6 @@ func stateEvents(old, next thread.State) []*bandav1.Event {
 			ModeChanged: &bandav1.ModeChanged{Mode: modeToProto[next.Mode]}}})
 	}
 	return out
-}
-
-func cerr(err error) error {
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return connect.NewError(connect.CodeNotFound, err.Error())
-	case errors.Is(err, thread.ErrForbidden):
-		return connect.NewError(connect.CodePermissionDenied, err.Error())
-	case errors.Is(err, thread.ErrNotReady):
-		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
-	case errors.Is(err, thread.ErrNoRequest):
-		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
-	}
-	return err
 }
 
 var (

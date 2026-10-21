@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -33,8 +32,8 @@ func (s *Service) ReadFile(ctx context.Context, req *bandav1.ReadFileRequest) (*
 // fileRequest asks the thread's runner and waits for its answer. It does not
 // wake a paused environment.
 func (s *Service) fileRequest(ctx context.Context, id string, req *bandav1.FileRequest) (*bandav1.FileResponse, error) {
-	if strings.HasPrefix(id, "login:") { // a loginKey, not a thread
-		return nil, connect.NewError(connect.CodeNotFound, "thread not found")
+	if _, err := s.store.Get(ctx, id); err != nil { // also refuses a loginKey
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

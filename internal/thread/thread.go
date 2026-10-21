@@ -53,6 +53,18 @@ var (
 	ErrNoRequest = errors.New("no turn request is waiting")
 )
 
+// CheckOwner returns ErrForbidden unless by owns the thread.
+func (s State) CheckOwner(by string) error {
+	if by != s.OwnerID {
+		return ErrForbidden
+	}
+	return nil
+}
+
+// Trusts reports whether by may run the agent without the owner's approval:
+// the owner, or anyone once the owner trusts teammates.
+func (s State) Trusts(by string) bool { return by == s.OwnerID || s.Trusted }
+
 type Action interface{ action() }
 
 // Send is a message posted to the thread by a user.
@@ -130,15 +142,15 @@ func Apply(s State, a Action) (State, Effect, error) {
 			s.Mode = ChatMode
 			return s, None, nil
 		}
-		if a.By != s.OwnerID && !a.OwnersAgent && !s.Trusted {
+		if !s.Trusts(a.By) && !a.OwnersAgent {
 			s.Requests++
 			return s, RequestTurn, nil
 		}
 		return startTurn(s)
 
 	case Approve:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		if s.Requests == 0 {
 			return s, None, ErrNoRequest
@@ -150,8 +162,8 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return next, eff, err
 
 	case Decline:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		if s.Requests == 0 {
 			return s, None, ErrNoRequest
@@ -160,15 +172,15 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, None, nil
 
 	case Trust:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		s.Trusted = a.Trusted
 		return s, None, nil
 
 	case Interrupt:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		if s.Status != Working {
 			return s, None, nil
@@ -177,15 +189,15 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, StopTurn, nil
 
 	case SetMode:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		s.Mode = a.Mode
 		return s, None, nil
 
 	case Retry:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		if s.Status != Errored {
 			return s, None, nil
@@ -230,8 +242,8 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, SuspendEnv, nil
 
 	case Wake:
-		if a.By != s.OwnerID {
-			return s, None, ErrForbidden
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
 		}
 		if s.Status != Suspended {
 			return s, None, nil
