@@ -156,7 +156,7 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 			if t.Status != thread.Suspended {
 				return nil, errResumed
 			}
-			t.EnvPushed = pushed
+			t.EnvPushed = pushed && t.RepoURL != "" // without a repository the work lives only in the volume
 			return nil, s.sandboxes.Suspend(ctx, id)
 		})
 		if err == nil {
