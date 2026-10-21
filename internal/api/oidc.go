@@ -84,7 +84,7 @@ func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
 
 func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 	var flow url.Values
-	c, err := r.Cookie(flowCookie)
+	c, err := r.Cookie(o.name(flowCookie))
 	if err == nil {
 		flow, err = url.ParseQuery(c.Value)
 	}
@@ -144,8 +144,18 @@ func (o *OIDC) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+// name prefixes cookies with __Host- over https, so that no other host of the
+// site (a preview origin on a sibling subdomain) can set them for Banda's.
+// ponytail: plain http has no such guard; see PLAN.md, Preview.
+func (o *OIDC) name(cookie string) string {
+	if o.secure {
+		return "__Host-" + cookie
+	}
+	return cookie
+}
+
 func (o *OIDC) cookie(name, value string, maxAge int) *http.Cookie {
-	return &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: o.secure}
+	return &http.Cookie{Name: o.name(name), Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: o.secure}
 }
 
 // signer signs short values, e.g. a session: base64url("value|expiry") + "." +
@@ -188,14 +198,29 @@ func (o *OIDC) Interceptor() connect.ServerInterceptor {
 				return next(ctx, spec, stream)
 			}
 			if info, ok := connect.CallInfoForServerContext(ctx); ok {
-				cookies, _ := http.ParseCookie(info.RequestHeader().Get("Cookie"))
-				for _, c := range cookies {
-					if id, ok := o.verify(c.Value, time.Now()); c.Name == sessionCookie && ok {
-						return next(WithUser(ctx, id), spec, stream)
-					}
+				if id, ok := o.session(info.RequestHeader().Get("Cookie")); ok {
+					return next(WithUser(ctx, id), spec, stream)
 				}
 			}
 			return connect.NewError(connect.CodeUnauthenticated, "sign in required")
 		}
 	}
+}
+
+// session returns the user of the session cookie in a Cookie header. Code on
+// the same host (a previewed app on another port) can add a banda_session of
+// its own with a narrower path, which browsers send first: a request with
+// sessions of two users is refused rather than run as the planted one.
+func (o *OIDC) session(header string) (string, bool) {
+	cookies, _ := http.ParseCookie(header)
+	user := ""
+	for _, c := range cookies {
+		if id, ok := o.verify(c.Value, time.Now()); c.Name == o.name(sessionCookie) && ok {
+			if user != "" && id != user {
+				return "", false
+			}
+			user = id
+		}
+	}
+	return user, user != ""
 }
