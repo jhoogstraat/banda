@@ -48,6 +48,13 @@ func (s *Store) SetSettled(ctx context.Context, viewerID, threadID string, settl
 	return err
 }
 
+// MarkRead marks the thread read for the viewer up to its latest event.
+func (s *Store) MarkRead(ctx context.Context, viewerID, threadID string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO thread_views (user_id, thread_id, seen_seq) SELECT $1, id, last_seq FROM threads WHERE id = $2
+		ON CONFLICT (user_id, thread_id) DO UPDATE SET seen_seq = greatest(thread_views.seen_seq, excluded.seen_seq)`, viewerID, threadID)
+	return err
+}
+
 // Mention records that the users were mentioned by the event at seq, and
 // marks the poster's own open mentions in the thread as answered.
 func (s *Store) Mention(ctx context.Context, threadID string, seq int64, poster string, mentioned []string) error {

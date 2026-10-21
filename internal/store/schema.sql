@@ -81,3 +81,6 @@ CREATE TABLE IF NOT EXISTS secrets (
 
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
+
+-- The last event seq each viewer has seen; later events make the thread unread.
+ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
