@@ -55,6 +55,8 @@ const (
 	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
+	// ThreadServiceHistoryProcedure is the procedure name of the ThreadService's History RPC.
+	ThreadServiceHistoryProcedure = "/banda.v1.ThreadService/History"
 	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
 	// RPC.
 	ThreadServiceListMentionedProcedure = "/banda.v1.ThreadService/ListMentioned"
@@ -87,6 +89,8 @@ const (
 	ThreadServiceInboxMarkReadProcedure = "/banda.v1.ThreadService/InboxMarkRead"
 	// ThreadServiceSendTypingProcedure is the procedure name of the ThreadService's SendTyping RPC.
 	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
+	// ThreadServiceTeamWatchProcedure is the procedure name of the ThreadService's TeamWatch RPC.
+	ThreadServiceTeamWatchProcedure = "/banda.v1.ThreadService/TeamWatch"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -200,6 +204,13 @@ var (
 			Procedure:  ThreadServiceWatchThreadProcedure,
 		}
 	})
+	threadServiceHistorySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("History"),
+			Procedure:  ThreadServiceHistoryProcedure,
+		}
+	})
 	threadServiceListMentionedSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -298,6 +309,13 @@ var (
 			Procedure:  ThreadServiceSendTypingProcedure,
 		}
 	})
+	threadServiceTeamWatchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("TeamWatch"),
+			Procedure:  ThreadServiceTeamWatchProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -317,8 +335,11 @@ type ThreadServiceClient interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
-	// Replays stored events with seq > after_seq, then streams live events.
+	// Replays stored events with seq > after_seq (or the last `tail`), then
+	// streams live events. Large payloads are cut (Event.truncated).
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
+	// Older stored events, for paging back from a tail, or one event in full.
+	History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
 	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
 	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
@@ -353,6 +374,10 @@ type ThreadServiceClient interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Everyone's recent threads that their owners haven't settled, with their
+	// last activity and who is looking at them: sent at once, then again
+	// (coalesced) whenever one changes.
+	TeamWatch(context.Context, *v1.TeamWatchRequest) (ThreadServiceTeamWatchClientStream, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -444,6 +469,26 @@ func (s ThreadServiceInboxWatchClientStream) Close() error {
 	return s.stream.Close()
 }
 
+// ThreadServiceTeamWatchClientStream is the client stream for the ThreadService's TeamWatch RPC.
+type ThreadServiceTeamWatchClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s ThreadServiceTeamWatchClientStream) Receive() (*v1.TeamWatchResponse, error) {
+	var res v1.TeamWatchResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s ThreadServiceTeamWatchClientStream) Close() error {
+	return s.stream.Close()
+}
+
 // ThreadServiceHandler is an implementation of the banda.v1.ThreadService service.
 type ThreadServiceHandler interface {
 	CreateThread(context.Context, *v1.CreateThreadRequest) (*v1.CreateThreadResponse, error)
@@ -461,8 +506,11 @@ type ThreadServiceHandler interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
-	// Replays stored events with seq > after_seq, then streams live events.
+	// Replays stored events with seq > after_seq (or the last `tail`), then
+	// streams live events. Large payloads are cut (Event.truncated).
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
+	// Older stored events, for paging back from a tail, or one event in full.
+	History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
 	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
 	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
@@ -497,6 +545,10 @@ type ThreadServiceHandler interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Everyone's recent threads that their owners haven't settled, with their
+	// last activity and who is looking at them: sent at once, then again
+	// (coalesced) whenever one changes.
+	TeamWatch(context.Context, *v1.TeamWatchRequest, ThreadServiceTeamWatchServerStream) error
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -516,6 +568,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
 		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
+		connect.Method{Spec: threadServiceHistorySpec(), Handler: adapter.history},
 		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
 		connect.Method{Spec: threadServiceSettleSpec(), Handler: adapter.settle},
@@ -530,6 +583,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
+		connect.Method{Spec: threadServiceTeamWatchSpec(), Handler: adapter.teamWatch},
 	)
 }
 
@@ -596,6 +650,21 @@ func (s ThreadServiceInboxWatchServerStream) Send(res *v1.InboxWatchResponse) er
 	return s.stream.Send(res)
 }
 
+// ThreadServiceTeamWatchServerStream is the server stream for the ThreadService's TeamWatch RPC.
+type ThreadServiceTeamWatchServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s ThreadServiceTeamWatchServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s ThreadServiceTeamWatchServerStream) Send(res *v1.TeamWatchResponse) error {
+	return s.stream.Send(res)
+}
+
 // UnimplementedThreadServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedThreadServiceHandler struct{}
 
@@ -645,6 +714,10 @@ func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.WatchThread is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.History is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
@@ -701,6 +774,10 @@ func (UnimplementedThreadServiceHandler) InboxMarkRead(context.Context, *v1.Inbo
 
 func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SendTyping is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) TeamWatch(context.Context, *v1.TeamWatchRequest, ThreadServiceTeamWatchServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.TeamWatch is not implemented")
 }
 
 type threadServiceClient struct {
@@ -801,6 +878,14 @@ func (c *threadServiceClient) WatchThread(ctx context.Context, req *v1.WatchThre
 		return ThreadServiceWatchThreadClientStream{}, err
 	}
 	return ThreadServiceWatchThreadClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) History(ctx context.Context, req *v1.HistoryRequest) (*v1.HistoryResponse, error) {
+	var res v1.HistoryResponse
+	if err := c.client.CallUnary(ctx, threadServiceHistorySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *threadServiceClient) ListMentioned(ctx context.Context, req *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
@@ -913,6 +998,14 @@ func (c *threadServiceClient) SendTyping(ctx context.Context, req *v1.TypingRequ
 		return nil, err
 	}
 	return &res, nil
+}
+
+func (c *threadServiceClient) TeamWatch(ctx context.Context, req *v1.TeamWatchRequest) (ThreadServiceTeamWatchClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, threadServiceTeamWatchSpec(), req)
+	if err != nil {
+		return ThreadServiceTeamWatchClientStream{}, err
+	}
+	return ThreadServiceTeamWatchClientStream{stream: stream}, nil
 }
 
 type threadServiceHandler struct{ svc ThreadServiceHandler }
@@ -1055,6 +1148,18 @@ func (h threadServiceHandler) watchThread(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	return h.svc.WatchThread(ctx, &req, ThreadServiceWatchThreadServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) history(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HistoryRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.History(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
 
 func (h threadServiceHandler) listMentioned(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
@@ -1211,6 +1316,14 @@ func (h threadServiceHandler) sendTyping(ctx context.Context, _ connect.Spec, st
 		return err
 	}
 	return stream.Send(res)
+}
+
+func (h threadServiceHandler) teamWatch(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TeamWatchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.TeamWatch(ctx, &req, ThreadServiceTeamWatchServerStream{stream: stream})
 }
 
 var (

@@ -17,6 +17,7 @@ export const shortcuts: [string, string][] = [
 	['C', 'New thread'],
 	['J / K', 'Next / previous thread'],
 	['Alt+↑ / ↓', 'Next / previous thread'],
+	['G T', 'Team board'],
 	['G S', 'Settings'],
 	['/', 'Focus the message box'],
 	[`${mod}B`, 'Toggle the sidebar'],
@@ -45,7 +46,7 @@ function step(by: number) {
 	goto(`/t/${list[i < 0 ? 0 : (i + by + list.length) % list.length].id}`);
 }
 
-let g = 0; // when "g" was pressed, for "g s"
+let g = 0; // when "g" was pressed, for "g s" and "g t"
 
 // The window keydown handler. Single keys never fire while typing (inputs, the prompt box, the terminal's textarea).
 export function onkeydown(e: KeyboardEvent) {
@@ -65,9 +66,9 @@ export function onkeydown(e: KeyboardEvent) {
 	if (e.altKey) {
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') step(e.key === 'ArrowDown' ? 1 : -1);
 		else return;
-	} else if (e.key === 's' && Date.now() - g < 1000) {
+	} else if ((e.key === 's' || e.key === 't') && Date.now() - g < 1000) {
 		g = 0;
-		goto('/settings');
+		goto(e.key === 's' ? '/settings' : '/team');
 	} else if (e.key === 'g') g = Date.now();
 	else if (e.key === 'c') newThread();
 	else if (e.key === 'j' || e.key === 'k') step(e.key === 'j' ? 1 : -1);

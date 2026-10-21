@@ -6,6 +6,8 @@ API=${API:-http://localhost:8787}
 REPO=${REPO:-https://github.com/octocat/Hello-World.git}
 BASE=${BASE:-master}
 
+# buf itself, so that $! of a backgrounded stream is the stream (mise exec leaves it orphaned).
+BUF=$(mise which buf)
 kc() { mise exec -- kubectl --context kind-banda -n banda "$@"; }
 call() { curl -sf -X POST "$API/banda.v1.$1" -H 'Content-Type: application/json' -H "X-Banda-User: ${3:-dev}" -d "$2"; }
 thread() { call ThreadService/GetThread "{\"threadId\":\"$ID\"}" | jq -r ".thread.$1"; }
@@ -98,7 +100,7 @@ ok "a teammate's post switches to chat mode"
 call ThreadService/InboxMarkRead "{\"threadId\":\"$ID\"}" >/dev/null
 [ "$(thread unread)" = null ] || fail "still unread after InboxMarkRead"
 INBOX=$(mktemp)
-mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
+"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
 INBOX_PID=$!
 for _ in $(seq 30); do [ -s "$INBOX" ] && break; sleep 0.5; done
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@carol over to you\",\"mentionedUserIds\":[\"carol\"]}}" bob >/dev/null
@@ -108,6 +110,21 @@ kill $INBOX_PID
 mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")"
 [ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
+
+TEAM=$(mktemp)
+"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/TeamWatch" >"$TEAM" 2>/dev/null &
+TEAM_PID=$!
+for _ in $(seq 30); do [ -s "$TEAM" ] && break; sleep 0.5; done
+BOB=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: bob on the board"}' bob | jq -r .thread.id)
+# The latest activity of bob's thread in carol's last team snapshot starts with $1.
+board() { jq -se --arg id "$BOB" --arg want "$1" 'last.threads | map(select(.id == $id))[0].activity.text // "" | startswith($want)' "$TEAM" >/dev/null 2>&1; }
+for _ in $(seq 10); do board "e2e: bob on the board" && break; sleep 0.5; done
+board "e2e: bob on the board" || { kill $TEAM_PID; fail "bob's new thread is not on carol's board: $(tail -c 2000 "$TEAM")"; }
+for _ in $(seq 60); do board "errored: Setup failed" && break; sleep 1; done
+kill $TEAM_PID
+board "errored: Setup failed" || fail "the board does not show bob's error"
+call ThreadService/Snooze "{\"threadId\":\"$BOB\",\"until\":\"2099-01-01T00:00:00Z\"}" bob >/dev/null
+ok "bob's new thread shows up live on carol's team board, then its error"
 
 # Bob asks the agent $1, with the attachment ids $2 (a JSON list).
 ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true,\"attachments\":${2:-[]}}}" bob >/dev/null; }
@@ -127,7 +144,8 @@ call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/de
 ok "a teammate's @agent post waits for the owner; approving runs it as the teammate's turn"
 said "Received 1 image blocks (image/png) and 1 text files" || fail "the agent did not get bob's image and text file"
 sql "select body->'message'->'attachments'->0->>'name' from events where thread_id='$ID' and body->'message'->'attachments' is not null order by seq limit 1" | grep -qx dot.png
-ok "attachments: a chat message's image is folded into the next prompt as an image block, an approved request's text file is inlined"
+call ThreadService/History "{\"threadId\":\"$ID\",\"beforeSeq\":\"1000000\",\"limit\":500}" | jq -e '[.events[].message.attachments[]?.name] | index("dot.png")' >/dev/null || fail "older history lost the attachments"
+ok "attachments: a chat message's image is folded into the next prompt as an image block, an approved request's text file is inlined; older pages keep them"
 
 H=$(curl -sfD - -o "$FILES/got.png" "$API/files/$PNG")
 cmp -s "$FILES/dot.png" "$FILES/got.png" && echo "$H" | grep -qi '^content-type: image/png' && echo "$H" | grep -qi '^x-content-type-options: nosniff' && echo "$H" | grep -qi "^content-security-policy: default-src 'none'; sandbox" || fail "GET /files: $H"
@@ -259,11 +277,13 @@ sleep 5
 [ "$(thread status)" = STATUS_ERRORED ] && [ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo still-up\"}" | grep -q still-up
 ok "a failing .banda/setup.sh errors the thread with its redacted output; the runner stays up for the terminal"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
 ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}' | jq -r .thread.id)
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps setup DONE)" = 1 ]
 ok "a .banda/setup.sh that leaves a background process running succeeds"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
 U=e2e-$RANDOM$RANDOM
 call SettingsService/SetAuthMethod '{"harness":"claude","authMethod":"AUTH_METHOD_API_KEY"}' "$U" >/dev/null 2>&1 && fail "API key mode without a key"
@@ -297,6 +317,25 @@ sleep 15
 [ "$(steps checkout FAILED)" = 1 ]
 ok "a bad base branch errors once, without a crash loop"
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+
+# Long threads: a seeded 1200-event thread opens with a tail; older pages and full payloads load on request.
+LONG=$("$(dirname "$0")/long-thread.sh" 1200)
+# The stored events WatchThread replays for request body $1, as JSON lines (the stream stays open: cut after 3 s).
+replay() {
+	{ printf '\0'; printf '%08x' "${#1}" | xxd -r -p; printf %s "$1"; } |
+		curl -s --max-time 3 -X POST "$API/banda.v1.ThreadService/WatchThread" -H 'Content-Type: application/connect+json' -H 'X-Banda-User: dev' --data-binary @- |
+		LC_ALL=C tr -c '[:print:]' '\n' | grep -o '{"event":.*}' | jq -cR 'fromjson? | .event | select(.seq)' || true
+}
+R=$(replay "{\"threadId\":\"$LONG\",\"tail\":200}")
+[ "$(echo "$R" | jq -s 'map(select(.context | not)) | [length, (map(.seq | tonumber) | min)] | join(" ")' -r)" = "200 1001" ] || fail "tail replay: $(echo "$R" | wc -l) events"
+echo "$R" | jq -se 'map(select(.context))[0] | .toolCall.name == "TodoWrite" and (.seq | tonumber) < 1001' >/dev/null || fail "no context plan before the tail"
+echo "$R" | jq -se 'map(select(.truncated))[0].toolResult.output | length <= 4096' >/dev/null || fail "large outputs are not cut in the stream"
+H=$(call ThreadService/History "{\"threadId\":\"$LONG\",\"beforeSeq\":1001,\"limit\":500}")
+[ "$(echo "$H" | jq -r '[(.events | length), .events[0].seq, .events[-1].seq] | join(" ")')" = "500 501 1000" ] || fail "older page: $(echo "$H" | jq -c '[(.events | length), .events[0].seq]')"
+F=$(call ThreadService/History "{\"threadId\":\"$LONG\",\"beforeSeq\":1056,\"limit\":1,\"full\":true}")
+echo "$F" | jq -e '.events[0] | .seq == "1055" and (.toolResult.output | length) > 4096 and (.truncated | not)' >/dev/null || fail "full event: $(echo "$F" | jq -c '.events[0].seq')"
+sql "delete from threads where id='$LONG'" >/dev/null
+ok "long threads: a tail replays the last events with the plan from before it and cut outputs; older pages and full events load"
 
 rm -r "$FILES"
 echo "all checks passed"

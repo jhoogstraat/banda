@@ -102,3 +102,12 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 -- Attachment ids of the images that go with pending_prompt.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS pending_images text[] NOT NULL DEFAULT '{}';
+
+-- The latest notable event, summarized for the team board (protojson of
+-- banda.v1.TeamActivity).
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS activity jsonb;
+
+CREATE INDEX IF NOT EXISTS threads_updated ON threads (updated_at DESC);
+
+-- Finds the latest plan before a tail without scanning the thread.
+CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'toolCall'->>'name' = 'TodoWrite';
