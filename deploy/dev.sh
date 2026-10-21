@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local dev stack. Run through mise, which provides the tools and env:
 #   mise run up     Podman machine, kind cluster, API and web (PUBLIC_HOST, default: LAN address)
-#   mise run e2e    fake-agent end-to-end check on :8790, next to the normal API
+#   mise run e2e    fake-agent end-to-end check on :8790 (preview :8791), next to the normal API
 #   mise run down   stop the servers and the kind node
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -47,7 +47,7 @@ servers() {
 	export PUBLIC_HOST=${PUBLIC_HOST:-$(ipconfig getifaddr en0 || echo localhost)}
 	local h=$PUBLIC_HOST
 	mise run dex
-	free 8787; free 5173
+	free 8787; free 8788; free 5173
 	start web mise run web
 	# The API discovers Dex through the web server, so it starts second.
 	until_ok web curl -sf "http://$h:5173/dex/.well-known/openid-configuration"
@@ -66,13 +66,13 @@ lock() {
 		sleep 5
 	done
 	echo $$ >"$E2E_LOCK/pid"
-	trap 'free 8790; rm -rf "$E2E_LOCK"' EXIT
+	trap 'free 8790; free 8791; rm -rf "$E2E_LOCK"' EXIT
 }
 
 e2e() {
 	TARGET=fake SANDBOX_IMAGE=localhost/banda-sandbox:fake mise run image
 	free 8790
-	DEV_AUTH=1 SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
+	DEV_AUTH=1 SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 PREVIEW_ADDR=:8791 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
 	until_ok e2e-api listening 8790
 	API=http://localhost:8790 deploy/e2e.sh
 }
@@ -80,6 +80,6 @@ e2e() {
 case ${1:-} in
 up) machine; cluster; servers ;;
 e2e) lock; machine; cluster; e2e ;;
-down) free 8787; free 5173; free 8790; podman stop banda-control-plane ;;
+down) free 8787; free 8788; free 5173; free 8790; free 8791; podman stop banda-control-plane ;;
 *) echo "usage: $0 up|e2e|down" >&2; exit 2 ;;
 esac

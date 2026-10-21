@@ -37,3 +37,23 @@ func TestAgentPrompt(t *testing.T) {
 		t.Errorf("review:\n%q\nwant\n%q", got, want)
 	}
 }
+
+func TestOpenRequest(t *testing.T) {
+	req := func(seq int64) *bandav1.Event {
+		return &bandav1.Event{Seq: seq, Actor: "u2", Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{}}}
+	}
+	resolved := func(seq, of int64) *bandav1.Event {
+		return &bandav1.Event{Seq: seq, Kind: &bandav1.Event_TurnRequestResolved{TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: of}}}
+	}
+	msg := &bandav1.Event{Seq: 3, Kind: &bandav1.Event_Message{Message: &bandav1.Message{}}}
+	events := []*bandav1.Event{req(1), req(2), msg, resolved(4, 1)}
+	if openRequest(events, 2) != events[1] {
+		t.Error("an open request was not found")
+	}
+	if openRequest(events, 1) != nil {
+		t.Error("a resolved request is still open")
+	}
+	if openRequest(events, 3) != nil {
+		t.Error("a message is not a request")
+	}
+}

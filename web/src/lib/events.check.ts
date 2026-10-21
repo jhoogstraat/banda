@@ -83,6 +83,15 @@ if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should ex
 apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
 if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
 
+const asks = newChat();
+apply(asks, { seq: 7n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent go' } } } } as Event);
+apply(asks, { seq: 8n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent again' } } } } as Event);
+apply(asks, { seq: 9n, actor: 'ann', kind: { case: 'turnRequestResolved', value: { requestSeq: 7n, approved: false, note: 'no' } } } as Event);
+const [first, second] = asks.items;
+if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
+	throw new Error('a resolution should attach to its request');
+if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
+
 const [f] = parseDiff('diff --git a/x.go b/x.go\n--- a/x.go\n+++ b/x.go\n@@ -3,4 +3,4 @@ func\n a\n-b\n-c\n+B\n d\n\\ No newline at end of file\n');
 if (f.path !== 'x.go' || f.add !== 1 || f.del !== 2 || f.lines.map((l) => `${l.old ?? ''}/${l.new ?? ''}`).join() !== '/,3/3,4/,5/,/4,6/5,/')
 	throw new Error('diff lines should be numbered in both versions');

@@ -48,6 +48,11 @@
 			</span>
 		{:else}<StatusDot status={t.status} />{/if}
 		<span class="truncate {unread(t) ? 'font-semibold text-sidebar-foreground' : ''}">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
+		{#if t.turnRequests && !byline}
+			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-400" title="Teammates ask to run the agent">
+				{t.turnRequests} ask{t.turnRequests > 1 ? 's' : ''}
+			</span>
+		{/if}
 		{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
 		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {unread(t) ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>
 	</a>
