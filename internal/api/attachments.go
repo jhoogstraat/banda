@@ -43,6 +43,12 @@ func (s *Service) FilesHandler(user func(*http.Request) string) http.Handler {
 			return
 		}
 		if r.Method == http.MethodPost && r.URL.Path == "/files" {
+			// A text/plain upload needs no CORS preflight: refuse one from a
+			// previewed app (same site, so with the viewer's cookie).
+			if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+				http.Error(w, "uploads only from Banda", http.StatusForbidden)
+				return
+			}
 			s.upload(w, r, by)
 			return
 		}
