@@ -35,7 +35,9 @@ type Thread struct {
 	RunnerToken   string
 	Diff          string
 	DeliveredSeq  int64
-	LastSeq       int64 // read-only; Update maintains it
+	LastSeq       int64      // read-only; Update maintains it
+	AutoPush      string     // bandav1.AutoPushState name; see SetAutoPush
+	EnvDeleteAt   *time.Time // see SetEnvDeleteAt
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 
@@ -64,12 +66,13 @@ func Open(ctx context.Context, url string) (*Store, error) {
 }
 
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at, auto_push, env_delete_at`
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
 	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt)
+		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
+		&t.AutoPush, &t.EnvDeleteAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -132,7 +135,7 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
 		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, '', t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
-		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
+		t.updated_at, t.auto_push, t.env_delete_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -145,7 +148,7 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 		var activity []byte
 		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
 			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
-			&t.SnoozedUntil, &t.Settled, &t.Unread, &activity); err != nil {
+			&t.AutoPush, &t.EnvDeleteAt, &t.SnoozedUntil, &t.Settled, &t.Unread, &activity); err != nil {
 			return nil, err
 		}
 		if activity != nil {
@@ -248,4 +251,15 @@ func (s *Store) events(ctx context.Context, query string, args ...any) ([]*banda
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) SetAutoPush(ctx context.Context, id, state string) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET auto_push = $2 WHERE id = $1`, id, state)
+	return err
+}
+
+// SetEnvDeleteAt records when the environment is deleted; nil when it isn't.
+func (s *Store) SetEnvDeleteAt(ctx context.Context, id string, at *time.Time) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET env_delete_at = $2 WHERE id = $1`, id, at)
+	return err
 }

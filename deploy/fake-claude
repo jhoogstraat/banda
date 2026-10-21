@@ -3,7 +3,7 @@
 # stream-json turns like the real CLI, creating one file per prompt (holding
 # the prompt's stream-json line). Replies name the --model and --effort it was
 # started with. A prompt that mentions "preview" starts a web server on :5173
-# instead (the Browser tab).
+# instead (the Browser tab). One that says "commit" also commits.
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -36,6 +36,7 @@ JSON
       ;;
     *'"type":"user"'*)
       n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); printf 'hello %s\n%s\n' "$n" "$line" > "hello$n.txt"; sleep 1
+      case "$line" in *commit*) { git add -A && git commit -qm "hello $n"; } >&2 ;; esac
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}

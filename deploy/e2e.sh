@@ -32,6 +32,15 @@ BUF=$(mise which buf)
 TMP=$(mktemp -d)
 # Events of thread $ID with the setup step id $1 in state $2.
 steps() { sql "select count(*) from events where thread_id='$ID' and body->'setupStep'->>'id'='$1' and body->'setupStep'->>'state'='SETUP_STATE_$2'"; }
+# new_thread <CreateThread json> [user]: sets ID; the thread's environment is deleted on exit.
+IDS=()
+new_thread() { ID=$(call ThreadService/CreateThread "$1" "${2:-dev}" | jq -r .thread.id); IDS+=("$ID"); }
+# Clean up even on failure: this run's sandboxes (their volumes go with them) and the git server.
+cleanup() {
+	for id in ${IDS[@]+"${IDS[@]}"}; do kc delete sandbox "t-$id" --ignore-not-found --wait=false >/dev/null; done
+	kc delete pod,service e2e-git --ignore-not-found --wait=false >/dev/null
+}
+trap cleanup EXIT
 login_state() {
 	for _ in $(seq 30); do [ "$(call SettingsService/GetSettings '{}' | jq -r '.accounts[0].loginState')" = "$1" ] && return; sleep 1; done
 	fail "login state is not $1"
@@ -58,7 +67,8 @@ echo "$S" | jq -e '(.secrets | map(.name) | index("E2E_SECRET")) and .accounts[0
 echo "$S" | grep -q "$SECRET" && fail "settings return a secret value"
 ok "secrets: set, reserved and invalid names and subscription tokens refused, values never returned"
 
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}"
+FIRST=$ID
 wait_for STATUS_AWAITING_INPUT
 thread diff | grep -q hello1.txt
 ok "thread $ID: sandbox started, first turn ran, diff has its file"
@@ -241,7 +251,7 @@ thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
 ok "secrets are redacted from the diff"
 
-ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: never runs"}' | jq -r .thread.id)
+new_thread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: never runs"}'
 wait_for STATUS_ERRORED
 [ "$(steps setup FAILED)" = 1 ]
 sql "select body->'setupStep'->>'output' from events where thread_id='$ID' and body->'setupStep'->>'state'='SETUP_STATE_FAILED'" | grep -q 'setup sees \[redacted\]'
@@ -252,7 +262,7 @@ term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\
 ok "a failing .banda/setup.sh errors the thread with its redacted output; the runner stays up for the terminal"
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
-ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}' | jq -r .thread.id)
+new_thread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}'
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps setup DONE)" = 1 ]
 ok "a .banda/setup.sh that leaves a background process running succeeds"
@@ -264,7 +274,7 @@ call SettingsService/SetAuthMethod "{\"harness\":\"claude\",\"authMethod\":\"AUT
 S=$(call SettingsService/GetSettings '{}' "$U")
 echo "$S" | jq -e '.accounts[0] | .authMethod == "AUTH_METHOD_API_KEY" and .apiKeySet' >/dev/null
 echo "$S" | grep -q "$SECRET" && fail "settings return the API key"
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: api key\"}" "$U" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: api key\"}" "$U"
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps login SKIPPED)" = 1 ]
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo key-\${#ANTHROPIC_API_KEY}\"}" "$U" | grep -q "key-$((${#SECRET} + 4))"
@@ -283,7 +293,7 @@ ok "no secret value reached the database"
 
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}"
 wait_for STATUS_ERRORED
 sleep 15
 [ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
@@ -309,5 +319,49 @@ F=$(call ThreadService/History "{\"threadId\":\"$LONG\",\"beforeSeq\":1056,\"lim
 echo "$F" | jq -e '.events[0] | .seq == "1055" and (.toolResult.output | length) > 4096 and (.truncated | not)' >/dev/null || fail "full event: $(echo "$F" | jq -c '.events[0].seq')"
 sql "delete from threads where id='$LONG'" >/dev/null
 ok "long threads: a tail replays the last events with the plan from before it and cut outputs; older pages and full events load"
+# A pushable origin for this run: a git daemon accepting anonymous pushes.
+kc delete pod,service e2e-git --ignore-not-found >/dev/null
+kc run e2e-git --image=localhost/banda-sandbox:fake --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
+	'mkdir -p /tmp/git && git clone -q --bare /opt/e2e/setup-bg.git /tmp/git/push.git && exec git daemon --reuseaddr --base-path=/tmp/git --export-all --enable=receive-pack /tmp/git' >/dev/null
+kc wait --for=condition=Ready pod/e2e-git --timeout=120s >/dev/null
+origin() { kc exec e2e-git -- git --git-dir=/tmp/git/push.git "$@"; }
+auto_push() {
+	for _ in $(seq 30); do [ "$(thread autoPush)" = "$1" ] && return; sleep 1; done
+	fail "auto-push state is $(thread autoPush), not $1"
+}
+sandbox() { kc get sandbox "t-$ID" -o jsonpath="{.spec.$1}"; }
+
+new_thread '{"repoUrl":"git://e2e-git/push.git","baseBranch":"main","prompt":"e2e: commit a file"}'
+wait_for STATUS_AWAITING_INPUT
+auto_push AUTO_PUSH_STATE_PUSHED
+origin log --format=%s "banda/$ID" | grep -qx "hello 1"
+ok "auto-push: a turn's commits reach origin, and the thread's work counts as pushed"
+
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+[ "$(sandbox shutdownPolicy)" = Delete ] && [ -n "$(sandbox shutdownTime)" ] || fail "settling did not schedule the deletion"
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":false}" >/dev/null
+# The CRD defaults the policy back to Retain.
+[ -z "$(sandbox shutdownTime)" ] && [ "$(sandbox shutdownPolicy)" != Delete ] || fail "unsettling did not cancel the deletion"
+ok "settling a pushed thread schedules its environment's deletion; unsettling cancels it"
+
+# The e2e API deletes settled environments after DELETE_SETTLED_AFTER=20s.
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+for _ in $(seq 60); do kc get sandbox "t-$ID" >/dev/null 2>&1 || break; sleep 2; done
+! kc get sandbox "t-$ID" >/dev/null 2>&1 || fail "the settled environment was not deleted"
+for _ in $(seq 30); do kc get pvc "home-t-$ID" >/dev/null 2>&1 || break; sleep 2; done
+! kc get pvc "home-t-$ID" >/dev/null 2>&1 || fail "the deleted environment's volume is still there"
+[ "$(thread environmentDeleted)" = true ]
+call ThreadService/EnvironmentRecreate "{\"threadId\":\"$ID\"}" bob >/dev/null 2>&1 && fail "bob recreated the environment"
+call ThreadService/EnvironmentRecreate "{\"threadId\":\"$ID\"}" >/dev/null
+wait_for STATUS_AWAITING_INPUT
+[ "$(thread environmentDeleted)" = null ]
+call ThreadService/ListFiles "{\"threadId\":\"$ID\"}" | jq -e '.paths | index("hello1.txt")' >/dev/null || fail "the recreated checkout lacks the pushed commit"
+ok "after the delay the environment and its volume are deleted; the owner recreates it from the pushed branch"
+
+ID=$FIRST
+[ "$(thread autoPush)" = AUTO_PUSH_STATE_UNAVAILABLE ]
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+[ -z "$(sandbox shutdownTime)" ] || fail "an environment whose work isn't on origin was scheduled for deletion"
+ok "a thread that can't push (https without a token) reports it, and settling it keeps its environment"
 
 echo "all checks passed"

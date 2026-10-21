@@ -91,14 +91,16 @@ func (c *Client) EnsureLogin(ctx context.Context, owner, token string) error {
 
 // start creates the Sandbox if needed; otherwise it resumes it with the
 // current pod template (settings may have changed) and deletes the pod so
-// the controller recreates it from that, on the same volumes.
+// the controller recreates it from that, on the same volumes. A scheduled
+// deletion is cancelled: the environment is in use again.
 func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 	sandboxes := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace)
 	_, err := sandboxes.Create(ctx, sb, metav1.CreateOptions{})
 	if !apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	patch, err := json.Marshal(map[string]any{"spec": map[string]any{"operatingMode": "Running", "podTemplate": sb.Spec.PodTemplate}})
+	patch, err := json.Marshal(map[string]any{"spec": map[string]any{"operatingMode": "Running", "podTemplate": sb.Spec.PodTemplate,
+		"shutdownTime": nil, "shutdownPolicy": nil}})
 	if err != nil {
 		return err
 	}
@@ -185,6 +187,25 @@ func (c *Client) Suspend(ctx context.Context, threadID string) error {
 
 func (c *Client) SuspendLogin(ctx context.Context, owner string) error {
 	return c.suspend(ctx, "login-"+hash(owner))
+}
+
+// ScheduleDelete makes the controller delete the thread's Sandbox, and with
+// it the home volume, at the given time. Nil cancels that. A Sandbox that is
+// already gone is fine.
+func (c *Client) ScheduleDelete(ctx context.Context, threadID string, at *time.Time) error {
+	spec := map[string]any{"shutdownTime": nil, "shutdownPolicy": nil}
+	if at != nil {
+		spec = map[string]any{"shutdownTime": at.UTC().Format(time.RFC3339), "shutdownPolicy": sbv1.ShutdownPolicyDelete}
+	}
+	patch, err := json.Marshal(map[string]any{"spec": spec})
+	if err != nil {
+		return err
+	}
+	_, err = c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace).Patch(ctx, "t-"+threadID, types.MergePatchType, patch, metav1.PatchOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) suspend(ctx context.Context, name string) error {

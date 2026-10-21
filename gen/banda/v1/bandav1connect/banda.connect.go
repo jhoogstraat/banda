@@ -66,6 +66,9 @@ const (
 	ThreadServiceSettleProcedure = "/banda.v1.ThreadService/Settle"
 	// ThreadServicePushProcedure is the procedure name of the ThreadService's Push RPC.
 	ThreadServicePushProcedure = "/banda.v1.ThreadService/Push"
+	// ThreadServiceEnvironmentRecreateProcedure is the procedure name of the ThreadService's
+	// EnvironmentRecreate RPC.
+	ThreadServiceEnvironmentRecreateProcedure = "/banda.v1.ThreadService/EnvironmentRecreate"
 	// ThreadServiceOpenTerminalProcedure is the procedure name of the ThreadService's OpenTerminal RPC.
 	ThreadServiceOpenTerminalProcedure = "/banda.v1.ThreadService/OpenTerminal"
 	// ThreadServiceWriteTerminalProcedure is the procedure name of the ThreadService's WriteTerminal
@@ -239,6 +242,13 @@ var (
 			Procedure:  ThreadServicePushProcedure,
 		}
 	})
+	threadServiceEnvironmentRecreateSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("EnvironmentRecreate"),
+			Procedure:  ThreadServiceEnvironmentRecreateProcedure,
+		}
+	})
 	threadServiceOpenTerminalSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -350,6 +360,9 @@ type ThreadServiceClient interface {
 	// Pushes the thread branch to origin (owner only). The result arrives as a
 	// notice event.
 	Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error)
+	// Provisions a fresh environment for a thread whose settled environment was
+	// deleted, from its pushed branch (owner only).
+	EnvironmentRecreate(context.Context, *v1.EnvironmentRecreateRequest) (*v1.EnvironmentRecreateResponse, error)
 	// A terminal in the thread's environment (owner only). Output streams until
 	// the process exits; opening again replaces the previous terminal.
 	OpenTerminal(context.Context, *v1.OpenTerminalRequest) (ThreadServiceOpenTerminalClientStream, error)
@@ -521,6 +534,9 @@ type ThreadServiceHandler interface {
 	// Pushes the thread branch to origin (owner only). The result arrives as a
 	// notice event.
 	Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error)
+	// Provisions a fresh environment for a thread whose settled environment was
+	// deleted, from its pushed branch (owner only).
+	EnvironmentRecreate(context.Context, *v1.EnvironmentRecreateRequest) (*v1.EnvironmentRecreateResponse, error)
 	// A terminal in the thread's environment (owner only). Output streams until
 	// the process exits; opening again replaces the previous terminal.
 	OpenTerminal(context.Context, *v1.OpenTerminalRequest, ThreadServiceOpenTerminalServerStream) error
@@ -573,6 +589,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
 		connect.Method{Spec: threadServiceSettleSpec(), Handler: adapter.settle},
 		connect.Method{Spec: threadServicePushSpec(), Handler: adapter.push},
+		connect.Method{Spec: threadServiceEnvironmentRecreateSpec(), Handler: adapter.environmentRecreate},
 		connect.Method{Spec: threadServiceOpenTerminalSpec(), Handler: adapter.openTerminal},
 		connect.Method{Spec: threadServiceWriteTerminalSpec(), Handler: adapter.writeTerminal},
 		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
@@ -734,6 +751,10 @@ func (UnimplementedThreadServiceHandler) Settle(context.Context, *v1.SettleReque
 
 func (UnimplementedThreadServiceHandler) Push(context.Context, *v1.PushRequest) (*v1.PushResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Push is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) EnvironmentRecreate(context.Context, *v1.EnvironmentRecreateRequest) (*v1.EnvironmentRecreateResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.EnvironmentRecreate is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) OpenTerminal(context.Context, *v1.OpenTerminalRequest, ThreadServiceOpenTerminalServerStream) error {
@@ -915,6 +936,14 @@ func (c *threadServiceClient) Settle(ctx context.Context, req *v1.SettleRequest)
 func (c *threadServiceClient) Push(ctx context.Context, req *v1.PushRequest) (*v1.PushResponse, error) {
 	var res v1.PushResponse
 	if err := c.client.CallUnary(ctx, threadServicePushSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) EnvironmentRecreate(ctx context.Context, req *v1.EnvironmentRecreateRequest) (*v1.EnvironmentRecreateResponse, error) {
+	var res v1.EnvironmentRecreateResponse
+	if err := c.client.CallUnary(ctx, threadServiceEnvironmentRecreateSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1204,6 +1233,18 @@ func (h threadServiceHandler) push(ctx context.Context, _ connect.Spec, stream c
 		return err
 	}
 	res, err := h.svc.Push(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) environmentRecreate(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.EnvironmentRecreateRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.EnvironmentRecreate(ctx, &req)
 	if err != nil {
 		return err
 	}

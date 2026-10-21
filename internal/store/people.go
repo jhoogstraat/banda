@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type User struct {
@@ -46,6 +49,16 @@ func (s *Store) SetSettled(ctx context.Context, viewerID, threadID string, settl
 		VALUES ($1, $2, CASE WHEN $3 THEN now() END)
 		ON CONFLICT (user_id, thread_id) DO UPDATE SET settled_at = excluded.settled_at`, viewerID, threadID, settled)
 	return err
+}
+
+// SettledAt is when the viewer settled the thread; nil if they haven't.
+func (s *Store) SettledAt(ctx context.Context, viewerID, threadID string) (*time.Time, error) {
+	var at *time.Time
+	err := s.db.QueryRow(ctx, `SELECT settled_at FROM thread_views WHERE user_id = $1 AND thread_id = $2`, viewerID, threadID).Scan(&at)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return at, err
 }
 
 // MarkRead marks the thread read for the viewer up to its latest event.

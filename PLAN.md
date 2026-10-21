@@ -40,6 +40,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Presence | Derived from open `WatchThread` streams, per user, broadcast as the full set (seq 0) on every join and when a user's last stream ends. Typing is a unary `SendTyping` the composer calls at most every 2.5 s; clients drop it after 5 s or when that person posts. The agent's "typing" is its status: the activity line above the composer replaces the old Working indicator. No sidebar indicator yet: it would need presence on `Thread`. |
 | Diff review | Comments on diff line ranges are collected in the Diff tab (kept in the browser until sent) and posted as one message with structured `review` comments: path, lines (numbered in the branch, or in the base for removed-only ranges), quoted diff lines, text. The agent gets them as markdown. "Ask @agent" (default on for the owner) mentions the agent; the owner's review without it is a note that starts no turn and keeps the mode. A teammate's review asking @agent is a turn request like any teammate post. Posted comments show in the diff where their last line is unchanged. |
 | Team board | `/team` shows everyone's threads from the last 7 days that their owners haven't settled, one column per person, with live status, last activity, who has the thread open and unread for me. One `TeamWatch` stream per open board, sharing the inbox's watchers, re-sent whole (coalesced, 1 s) on any stored event or presence change. The last activity (`threads.activity`) is summarized when events are stored, never by scanning them. Lists carry no diffs; only GetThread does. |
+| Never losing work | After every turn that changed the diff, the runner pushes the thread branch (committed work only; it never commits for the agent) and reports where the work lives: `pushed` (origin has everything), `unpushed` (uncommitted changes, or the push failed) or `unavailable` (an https remote without a token, SSH, a refused push: the work only lives in the volume). Changes of that state appear as a quiet line in the chat. A settled environment is deleted 7 days after its owner settled the thread (`DELETE_SETTLED_AFTER`), only if suspended and `pushed`: agent-sandbox `shutdownTime` + `shutdownPolicy: Delete`, which takes the home volume with it. Unsettling, a prompt or any other start cancels it. A deleted thread offers its owner "Recreate environment" (a prompt does the same): a fresh checkout continues from the pushed branch, and Claude Code resumes its session, since transcripts live on the owner's Claude volume. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 | Model and effort | The owner can change them at any time from the composer chips; the chat records it as a divider. `claude` takes them only as start flags, so the runner restarts it with `--resume` once no turn is running (closing its stdin, so it exits by itself), never cutting a turn short. Prompts sent before the change still run on the old settings. A paused environment starts with the new ones. |
 
@@ -127,7 +128,7 @@ Snooze and settle are per viewer. **Sidebar sections**, computed per viewer:
 
 ## Environment lifecycle
 
-Only the owner's own actions drive the environment. Implemented as below, except deleting settled sandboxes.
+Only the owner's own actions drive the environment. Implemented as below.
 
 | Thread state | Environment action |
 |---|---|
@@ -137,7 +138,8 @@ Only the owner's own actions drive the environment. Implemented as below, except
 | `awaiting_input`, idle ≥ 30 min | `operatingMode: Suspended`: the pod is deleted, the PVCs stay (a one-minute ticker in banda-api) |
 | owner posts or opens the env | `operatingMode: Running`; the runner restarts `claude --resume <session>` |
 | owner snoozes | suspend now, resume lazily |
-| owner settles | suspend (later: `shutdownTime` = now + 7 days with `shutdownPolicy: Delete`, once branches are pushed by default) |
+| owner settles | suspend; if all work is pushed, `shutdownTime` = settle time + 7 days with `shutdownPolicy: Delete` (unsettle or any start removes it) |
+| deleted (settled, pushed) | owner recreates or posts: a new `Sandbox` and volume, checked out from the pushed branch |
 | `errored` → Retry | delete the pod; the controller recreates it on the same PVC |
 
 Every start (create, resume, retry) applies the current pod template, so settings changes (secrets, auth method) take effect then. A user's login environment starts when they open its terminal and is suspended after 10 min without one.
@@ -164,6 +166,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Browser tab (everyone): the app running in the sandbox, with a port picker (dev server picked by default), path bar, reload and open in a new tab; WebSockets pass through for HMR. Paused environments say so; the owner can wake them.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
+- Auto-push after every turn that changed the diff; the Push button becomes "Open a pull request" once a GitHub branch is pushed. Settled, pushed environments are deleted after 7 days and can be recreated from the branch. e2e cleans up its sandboxes (also on failure) and tests against an in-cluster git daemon; `mise run clean` deletes sandboxes of threads untouched for `CLEAN_HOURS` (dev only).
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
 - Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents.
@@ -179,7 +182,6 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 
 **Not yet**
 - Permission prompts (`--permission-prompt-tool stdio`); turns run with `--dangerously-skip-permissions` inside the sandbox.
-- Deleting settled sandboxes (`shutdownTime`): waits until branches are pushed by default, so no work is lost.
 - Preview: one preview cookie per browser, so two windows previewing different threads share the one opened last until reloaded; per-thread origins would need wildcard DNS. The preview origin shares the host (and so cookies) with Banda, and the previewed apps of all threads share it with each other: for a hardened setup, point `PREVIEW_URL` at a sibling subdomain. The address bar can't follow navigation inside the frame (cross-origin).
 - Codex and other harnesses (check their subscription terms first).
 - Several API replicas (needs `LISTEN/NOTIFY` fan-out).

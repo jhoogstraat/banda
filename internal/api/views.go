@@ -46,13 +46,68 @@ func (s *Service) Settle(ctx context.Context, req *bandav1.SettleRequest) (*band
 	s.pokeInbox(user(ctx))
 	if req.Settled {
 		s.suspendIfOwner(ctx, req.ThreadId)
+		s.scheduleDelete(ctx, req.ThreadId) // also when it was suspended already
+	} else {
+		s.cancelDelete(ctx, req.ThreadId)
 	}
 	return &bandav1.SettleResponse{}, nil
 }
 
+// scheduleDelete has a suspended environment deleted DeleteSettledAfter its
+// owner settled the thread, but only if all its work is on origin.
+func (s *Service) scheduleDelete(ctx context.Context, id string) {
+	t, err := s.store.Get(ctx, id)
+	if err != nil || t.Status != thread.Suspended || t.AutoPush != bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String() {
+		return
+	}
+	settled, err := s.store.SettledAt(ctx, t.OwnerID, id)
+	if err != nil || settled == nil {
+		return
+	}
+	at := settled.Add(s.DeleteSettledAfter)
+	if err := s.sandboxes.ScheduleDelete(ctx, id, &at); err != nil {
+		slog.Error("schedule environment deletion", "thread", id, "err", err)
+		return
+	}
+	if err := s.store.SetEnvDeleteAt(ctx, id, &at); err != nil {
+		slog.Error("store environment deletion", "thread", id, "err", err)
+	}
+}
+
+// cancelDelete keeps the environment when its owner unsettles the thread
+// before it was deleted.
+func (s *Service) cancelDelete(ctx context.Context, id string) {
+	t, err := s.store.Get(ctx, id)
+	if err != nil || t.OwnerID != user(ctx) || t.EnvDeleteAt == nil || !t.EnvDeleteAt.After(time.Now()) {
+		return
+	}
+	if err := s.sandboxes.ScheduleDelete(ctx, id, nil); err != nil {
+		slog.Error("cancel environment deletion", "thread", id, "err", err)
+		return
+	}
+	if err := s.store.SetEnvDeleteAt(ctx, id, nil); err != nil {
+		slog.Error("store environment deletion", "thread", id, "err", err)
+	}
+}
+
+func (s *Service) EnvironmentRecreate(ctx context.Context, req *bandav1.EnvironmentRecreateRequest) (*bandav1.EnvironmentRecreateResponse, error) {
+	t, err := s.store.Get(ctx, req.ThreadId)
+	if err != nil {
+		return nil, cerr(err)
+	}
+	if t.EnvDeleteAt == nil || t.EnvDeleteAt.After(time.Now()) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the environment was not deleted")
+	}
+	effect, err := s.apply(ctx, req.ThreadId, thread.Wake{By: user(ctx)})
+	if err != nil {
+		return nil, err
+	}
+	s.do(ctx, req.ThreadId, effect)
+	return &bandav1.EnvironmentRecreateResponse{}, nil
+}
+
 // suspendIfOwner pauses the environment when its owner snoozes or settles
 // the thread. Unsnoozing resumes lazily, on the next prompt.
-// ponytail: settled sandboxes are never deleted; add shutdownTime once branches are pushed by default.
 func (s *Service) suspendIfOwner(ctx context.Context, id string) {
 	t, err := s.store.Get(ctx, id)
 	if err != nil || t.OwnerID != user(ctx) {

@@ -18,6 +18,7 @@ export type Item = { key: number } & (
 	| { kind: 'turn'; turn: TurnEnded }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
+	| { kind: 'push'; text: string; pushed: boolean }
 	| { kind: 'setup'; steps: SetupStep[] }
 );
 
@@ -173,6 +174,10 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'typing':
 			chat.typing[e.actor] = Date.now();
+			break;
+		case 'autoPush':
+			// 1 is AutoPushState.PUSHED.
+			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === 1 });
 			break;
 		case 'modeChanged':
 			chat.items.push({ key, kind: 'mode', mode: k.value.mode });

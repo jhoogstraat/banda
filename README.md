@@ -18,11 +18,13 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
 4. `mise run down` stops the servers and the kind node.
 
+Every thread leaves a sandbox behind until it is settled and pushed. `mise run clean` deletes the sandboxes, and their volumes, of threads nobody touched for `CLEAN_HOURS` (default 24); a later prompt starts a fresh checkout.
+
 In the app, Cmd/Ctrl-K opens the command palette and `?` lists the keyboard shortcuts.
 
 `mise run image` rebuilds the sandbox image after changing `cmd/runner` or `deploy/sandbox.Dockerfile`; `mise run gen` regenerates `gen/` from `proto/`. Server logs are in `/tmp/banda-run/`.
 
-For private repos, add a `GIT_TOKEN` secret in Settings. Secrets are environment variables in all your threads, applied when a thread's environment next starts, and redacted from everything the agent reports. A shared fallback for everyone:
+For private repos, and for the auto-push after every turn on https remotes, add a `GIT_TOKEN` secret in Settings. Secrets are environment variables in all your threads, applied when a thread's environment next starts, and redacted from everything the agent reports. A shared fallback for everyone:
 
 ```sh
 kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
@@ -45,13 +47,13 @@ To use another OIDC provider, set these before `mise run api` (or when running `
 | `PUBLIC_URL` | Origin the browser uses, default `http://localhost:5173`. |
 | `SESSION_SECRET` | Signs the session cookie. If empty, a random one is used and sessions end when the API restarts. |
 
-Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build).
+Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`), `DELETE_SETTLED_AFTER` (default `168h`: settled environments whose work is pushed), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build).
 
 The Browser tab shows apps running in a thread's environment from a second origin: `PREVIEW_ADDR` (default `:8788`) is where the API serves it, `PREVIEW_URL` the URL browsers use for it, by default the host they reach Banda on with that port. Keep it on the same site as Banda (another port, or a sibling subdomain such as `preview.banda.example.com`): the preview signs in with a SameSite cookie.
 
 ## Tests
 
-- `mise run test`: Go unit tests (state machine, inbox and team fan-out, team activity summaries, agent prompt and review rendering, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps, preview tunnel, ports and proxy). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, that 20k tool calls stay fast, and that history loaded in pages matches a full replay) and diff parsing, `node web/src/lib/inbox.check.ts` which inbox changes notify.
+- `mise run test`: Go unit tests (state machine, inbox and team fan-out, team activity summaries, agent prompt and review rendering, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs and auto-push against a local origin, secret names, redaction, setup steps, preview tunnel, ports and proxy). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, autoPush lines, that 20k tool calls stay fast, and that history loaded in pages matches a full replay) and diff parsing, `node web/src/lib/inbox.check.ts` which inbox changes notify.
 - `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790` (preview `:8791`), next to the normal one.
 - `deploy/long-thread.sh [N]` seeds a suspended thread with N events (default 20000) straight into Postgres and prints its id, to try or measure long threads without running an agent.
 

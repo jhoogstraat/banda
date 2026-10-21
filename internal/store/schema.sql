@@ -97,3 +97,7 @@ CREATE INDEX IF NOT EXISTS threads_updated ON threads (updated_at DESC);
 
 -- Finds the latest plan before a tail without scanning the thread.
 CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'toolCall'->>'name' = 'TodoWrite';
+-- Where the thread's work lives (bandav1.AutoPushState name), as its runner last reported.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS auto_push text NOT NULL DEFAULT '';
+-- When the settled environment is (or was) deleted; null when none is scheduled.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;

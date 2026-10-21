@@ -61,6 +61,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("IDLE_SUSPEND_AFTER: %v", err)
 	}
+	if svc.DeleteSettledAfter, err = time.ParseDuration(env("DELETE_SETTLED_AFTER", "168h")); err != nil {
+		log.Fatalf("DELETE_SETTLED_AFTER: %v", err)
+	}
 	go svc.SuspendIdle(ctx, idle)
 	svc.Preview = api.PreviewConfig{Addr: env("PREVIEW_ADDR", ":8788"), URL: os.Getenv("PREVIEW_URL")}
 	go func() {
