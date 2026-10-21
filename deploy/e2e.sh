@@ -47,6 +47,11 @@ new_thread() { ID=$(call ThreadService/CreateThread "$1" "${2:-dev}" | jq -r .th
 cleanup() {
 	for id in ${IDS[@]+"${IDS[@]}"}; do kc delete sandbox "t-$id" --ignore-not-found --wait=false >/dev/null; done
 	kc delete pod,service e2e-git --ignore-not-found --wait=false >/dev/null
+	# The throwaway API key user's Claude volume, secrets and login environment.
+	if [ -n "${U:-}" ]; then
+		local h; h=$(printf %s "$U" | shasum -a 256 | cut -c1-16)
+		kc delete "pvc/claude-$h" "secret/banda-env-$h" "secret/banda-auth-$h" "sandbox/login-$h" --ignore-not-found --wait=false >/dev/null
+	fi
 }
 trap cleanup EXIT
 login_state() {
