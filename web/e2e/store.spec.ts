@@ -1,7 +1,7 @@
 // The store under load: no pool deadlocks, long threads stay fast, no needless events, slow watchers catch up.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { DB, expect, listen, Status, test } from './fixtures.ts';
+import { DB, expect, listen, sql, Status, test } from './fixtures.ts';
 
 // B4: Update's closure once queried the pool while its transaction held a connection and the thread's lock.
 test('with a one-connection pool, approving a teammate’s turn does not deadlock', async ({ as, startApi }) => {
@@ -68,4 +68,14 @@ test('a watcher that falls behind catches up from the store: the same events as 
 	watch.stop();
 	expect(seen().filter((e) => e.seq > 0n).map((e) => e.seq)).toEqual(stored);
 	expect(seen().filter((e) => e.kind.case === 'agentTextDelta').length).toBeLessThan(2000); // it did fall behind
+});
+
+// Applying the schema takes table locks even when nothing changes: a starting API waited for (or deadlocked with) live traffic.
+test('an API starts while another holds a lock on its tables: a current schema is not applied again', async ({ startApi }) => {
+	const api = await startApi();
+	void sql(`BEGIN; LOCK TABLE threads IN ACCESS SHARE MODE; SELECT pg_sleep(120); COMMIT`, api.db).catch(() => {});
+	const locked = `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation WHERE c.relname = 'threads' AND l.granted`;
+	await expect.poll(() => sql(locked, api.db)).not.toBe('0');
+	await api.restart(); // gives up after 30 s
+	await sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE '%pg_sleep(120)%' AND pid <> pg_backend_pid()`, api.db);
 });

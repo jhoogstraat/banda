@@ -4,8 +4,10 @@ package store
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -71,28 +73,41 @@ type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// Open connects and applies the schema.
+// Open connects and applies the schema unless the database has it already.
 // ponytail: idempotent schema file, switch to versioned migrations once a column changes.
 func Open(ctx context.Context, url string) (*Store, error) {
 	db, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	// One statement list is one transaction; the lock keeps APIs starting together from deadlocking on it.
-	// Its ALTERs lock tables even when there is nothing to change, so it can still deadlock with another
-	// API's traffic, and Postgres may pick it as the victim: try again.
-	for try := 1; ; try++ {
-		_, err = db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema)
-		var pe *pgconn.PgError
-		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
-			break
-		}
+	// Its ALTERs lock tables even when there is nothing to change, so applying it to a live database can
+	// deadlock with the traffic of another API on it: skip it when it's current.
+	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(schema)))
+	var applied string
+	if db.QueryRow(ctx, `SELECT hash FROM schema_applied`).Scan(&applied); applied != sum {
+		err = applySchema(ctx, db, sum)
 	}
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
 	return &Store{db}, nil
+}
+
+// applySchema applies the schema and records its hash. One statement list is one transaction; the lock
+// keeps APIs starting together from deadlocking on it. It can still deadlock with another API's traffic,
+// and Postgres may pick it as the victim: try again.
+func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
+	for try := 1; ; try++ {
+		_, err := db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema+`
+			CREATE TABLE IF NOT EXISTS schema_applied (hash text NOT NULL);
+			DELETE FROM schema_applied;
+			INSERT INTO schema_applied VALUES ('`+sum+`');`)
+		var pe *pgconn.PgError
+		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
+			return err
+		}
+	}
 }
 
 // cols are the thread columns Get, Update and the lists read; fields says where
