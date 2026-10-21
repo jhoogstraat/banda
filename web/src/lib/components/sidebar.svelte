@@ -6,6 +6,7 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
@@ -103,6 +104,7 @@
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
+			<IconButton icon={UsersIcon} label="Team" keys="G T" href="/team" variant={page.url.pathname === '/team' ? 'secondary' : 'ghost'} />
 			<IconButton icon={SquarePenIcon} label="New thread" keys="C" onclick={() => (newOpen = true)} />
 		</div>
 	</Sidebar.Header>

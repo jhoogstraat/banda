@@ -6,6 +6,8 @@ API=${API:-http://localhost:8787}
 REPO=${REPO:-https://github.com/octocat/Hello-World.git}
 BASE=${BASE:-master}
 
+# buf itself, so that $! of a backgrounded stream is the stream (mise exec leaves it orphaned).
+BUF=$(mise which buf)
 kc() { mise exec -- kubectl --context kind-banda -n banda "$@"; }
 call() { curl -sf -X POST "$API/banda.v1.$1" -H 'Content-Type: application/json' -H "X-Banda-User: ${3:-dev}" -d "$2"; }
 thread() { call ThreadService/GetThread "{\"threadId\":\"$ID\"}" | jq -r ".thread.$1"; }
@@ -89,7 +91,7 @@ ok "a teammate's post switches to chat mode"
 call ThreadService/InboxMarkRead "{\"threadId\":\"$ID\"}" >/dev/null
 [ "$(thread unread)" = null ] || fail "still unread after InboxMarkRead"
 INBOX=$(mktemp)
-mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
+"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
 INBOX_PID=$!
 for _ in $(seq 30); do [ -s "$INBOX" ] && break; sleep 0.5; done
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@carol over to you\",\"mentionedUserIds\":[\"carol\"]}}" bob >/dev/null
@@ -101,7 +103,7 @@ mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
 TEAM=$(mktemp)
-mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/TeamWatch" >"$TEAM" 2>/dev/null &
+"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/TeamWatch" >"$TEAM" 2>/dev/null &
 TEAM_PID=$!
 for _ in $(seq 30); do [ -s "$TEAM" ] && break; sleep 0.5; done
 BOB=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: bob on the board"}' bob | jq -r .thread.id)

@@ -12,6 +12,7 @@ import (
 // that don't change what a passer-by should see (deltas, tool results, diffs).
 func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 	var text string
+	actor := e.Actor
 	switch k := e.Kind.(type) {
 	case *bandav1.Event_Message:
 		text = k.Message.Text
@@ -32,8 +33,9 @@ func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 		if k.StatusChanged.Status != bandav1.Status_STATUS_ERRORED {
 			return nil
 		}
-		text = strings.TrimSuffix("errored: "+k.StatusChanged.Reason, ": ")
+		text, actor = strings.TrimSuffix("errored: "+k.StatusChanged.Reason, ": "), "system"
 	case *bandav1.Event_SetupStep:
+		actor = "system" // the runner reports setup, not the agent
 		switch k.SetupStep.State {
 		case bandav1.SetupState_SETUP_STATE_RUNNING:
 			text = "setting up: " + k.SetupStep.Title
@@ -47,7 +49,7 @@ func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 	default:
 		return nil
 	}
-	return &bandav1.TeamActivity{Actor: e.Actor, Text: snippet(text), Time: e.Time}
+	return &bandav1.TeamActivity{Actor: actor, Text: snippet(text), Time: e.Time}
 }
 
 // toolSummary is the tool name and its main argument: "Edit src/x.ts".
