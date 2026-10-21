@@ -26,12 +26,19 @@ func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event,
 	name := func(id string) string { return actorName(names, id) }
 	var b strings.Builder
 	for _, e := range unseen {
+		line := ""
 		if m := e.GetMessage(); m != nil {
-			if b.Len() == 0 {
-				b.WriteString("Messages posted in this thread since your last turn:\n")
-			}
-			fmt.Fprintf(&b, "%s: %s\n", name(e.Actor), m.Text)
+			line = name(e.Actor) + ": " + m.Text
+		} else if u := e.GetLineageUpdate(); u != nil {
+			line = lineageLine(u)
 		}
+		if line == "" {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("Messages posted in this thread since your last turn:\n")
+		}
+		b.WriteString(line + "\n")
 	}
 	if b.Len() == 0 && by == owner {
 		return text
@@ -41,4 +48,15 @@ func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event,
 	}
 	fmt.Fprintf(&b, "%s: %s", name(by), text)
 	return b.String()
+}
+
+// lineageLine describes a sub-thread update for the agent and transcripts.
+func lineageLine(u *bandav1.LineageUpdate) string {
+	what := map[bandav1.Status]string{bandav1.Status_STATUS_STARTING: "was spawned",
+		bandav1.Status_STATUS_AWAITING_INPUT: "finished", bandav1.Status_STATUS_ERRORED: "failed"}[u.Status]
+	line := fmt.Sprintf("[Sub-thread %s %q %s]", u.ThreadId, u.Title, what)
+	if u.Text != "" {
+		line += " " + u.Text
+	}
+	return line
 }

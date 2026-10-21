@@ -88,3 +88,7 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+
+-- The thread a sub-thread was spawned from ('' for none).
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS parent_id text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS threads_parent ON threads (parent_id) WHERE parent_id <> '';

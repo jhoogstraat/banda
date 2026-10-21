@@ -84,34 +84,39 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 }
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
-	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
+	if req.RepoUrl == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
 	}
-	id := strings.ToLower(rand.Text())
-	t := store.Thread{
-		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-		ID:            id,
-		Title:         title(req.Prompt),
-		RepoURL:       req.RepoUrl,
-		BaseBranch:    or(req.BaseBranch, "main"),
-		Branch:        "banda/" + id,
-		Model:         or(req.Model, "claude-opus-5-5"),
-		Effort:        or(req.Effort, "high"),
-		PendingPrompt: req.Prompt,
-		RunnerToken:   rand.Text(),
-	}
-	if err := s.store.Create(ctx, t); err != nil {
-		return nil, err
-	}
-	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		return []*bandav1.Event{messageEvent(t.OwnerID, &bandav1.Message{Text: req.Prompt})}, nil
-	})
+	t, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: user(ctx)}, RepoURL: req.RepoUrl,
+		BaseBranch: or(req.BaseBranch, "main"), Model: req.Model, Effort: req.Effort}, req.Prompt)
 	if err != nil {
 		return nil, err
 	}
+	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+}
+
+// create stores a new thread (owner, repo, base, model, effort and parent
+// taken from t) with its first prompt, and starts its environment.
+func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (store.Thread, error) {
+	if strings.TrimSpace(prompt) == "" {
+		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
+	}
+	id := strings.ToLower(rand.Text())
+	t.ID, t.Title, t.Branch, t.PendingPrompt, t.RunnerToken = id, title(prompt), "banda/"+id, prompt, rand.Text()
+	t.Status, t.Mode = thread.Starting, thread.AgentMode
+	t.Model, t.Effort = or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
+	if err := s.store.Create(ctx, t); err != nil {
+		return t, err
+	}
+	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		return []*bandav1.Event{messageEvent(t.OwnerID, &bandav1.Message{Text: prompt})}, nil
+	})
+	if err != nil {
+		return t, err
+	}
 	s.broadcast(id, events)
 	s.provision(ctx, t)
-	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+	return t, nil
 }
 
 func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
@@ -701,6 +706,7 @@ func (s *Service) broadcast(id string, events []*bandav1.Event) {
 	defer s.mu.Unlock()
 	s.inboxChanged(id, events)
 	s.broadcastLocked(id, events)
+	s.reportToParent(id, events)
 }
 
 func (s *Service) broadcastLocked(id string, events []*bandav1.Event) {
@@ -763,21 +769,23 @@ var (
 
 func toProto(t store.Thread) *bandav1.Thread {
 	p := &bandav1.Thread{
-		Id:         t.ID,
-		OwnerId:    t.OwnerID,
-		Title:      t.Title,
-		RepoUrl:    t.RepoURL,
-		Branch:     t.Branch,
-		Model:      t.Model,
-		Effort:     t.Effort,
-		Status:     statusToProto[t.Status],
-		Mode:       modeToProto[t.Mode],
-		Diff:       t.Diff,
-		CreatedAt:  timestamppb.New(t.CreatedAt),
-		UpdatedAt:  timestamppb.New(t.UpdatedAt),
-		BaseBranch: t.BaseBranch,
-		Settled:    t.Settled,
-		Unread:     t.Unread,
+		Id:          t.ID,
+		OwnerId:     t.OwnerID,
+		Title:       t.Title,
+		RepoUrl:     t.RepoURL,
+		Branch:      t.Branch,
+		Model:       t.Model,
+		Effort:      t.Effort,
+		Status:      statusToProto[t.Status],
+		Mode:        modeToProto[t.Mode],
+		Diff:        t.Diff,
+		CreatedAt:   timestamppb.New(t.CreatedAt),
+		UpdatedAt:   timestamppb.New(t.UpdatedAt),
+		BaseBranch:  t.BaseBranch,
+		Settled:     t.Settled,
+		Unread:      t.Unread,
+		ParentId:    t.ParentID,
+		ParentTitle: t.ParentTitle,
 
 		TurnRequests: int32(t.Requests),
 		Trusted:      t.Trusted,

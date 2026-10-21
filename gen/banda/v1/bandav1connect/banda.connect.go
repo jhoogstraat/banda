@@ -50,6 +50,11 @@ const (
 	ThreadServiceDeclineTurnProcedure = "/banda.v1.ThreadService/DeclineTurn"
 	// ThreadServiceTrustProcedure is the procedure name of the ThreadService's Trust RPC.
 	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
+	// ThreadServiceSpawnThreadProcedure is the procedure name of the ThreadService's SpawnThread RPC.
+	ThreadServiceSpawnThreadProcedure = "/banda.v1.ThreadService/SpawnThread"
+	// ThreadServiceLineageChildrenProcedure is the procedure name of the ThreadService's
+	// LineageChildren RPC.
+	ThreadServiceLineageChildrenProcedure = "/banda.v1.ThreadService/LineageChildren"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
 	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
@@ -183,6 +188,20 @@ var (
 			Procedure:  ThreadServiceTrustProcedure,
 		}
 	})
+	threadServiceSpawnThreadSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SpawnThread"),
+			Procedure:  ThreadServiceSpawnThreadProcedure,
+		}
+	})
+	threadServiceLineageChildrenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("LineageChildren"),
+			Procedure:  ThreadServiceLineageChildrenProcedure,
+		}
+	})
 	threadServiceWatchThreadSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -304,6 +323,11 @@ type ThreadServiceClient interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
+	// A sub-thread of parent_id, owned by the caller. It starts from the
+	// parent's branch if that was pushed, else from the parent's base branch.
+	SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error)
+	// The sub-threads of a thread, oldest first.
+	LineageChildren(context.Context, *v1.LineageChildrenRequest) (*v1.LineageChildrenResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -445,6 +469,11 @@ type ThreadServiceHandler interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
+	// A sub-thread of parent_id, owned by the caller. It starts from the
+	// parent's branch if that was pushed, else from the parent's base branch.
+	SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error)
+	// The sub-threads of a thread, oldest first.
+	LineageChildren(context.Context, *v1.LineageChildrenRequest) (*v1.LineageChildrenResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -498,6 +527,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceApproveTurnSpec(), Handler: adapter.approveTurn},
 		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
 		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
+		connect.Method{Spec: threadServiceSpawnThreadSpec(), Handler: adapter.spawnThread},
+		connect.Method{Spec: threadServiceLineageChildrenSpec(), Handler: adapter.lineageChildren},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
 		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
@@ -620,6 +651,14 @@ func (UnimplementedThreadServiceHandler) DeclineTurn(context.Context, *v1.Declin
 
 func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Trust is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SpawnThread is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) LineageChildren(context.Context, *v1.LineageChildrenRequest) (*v1.LineageChildrenResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.LineageChildren is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
@@ -761,6 +800,22 @@ func (c *threadServiceClient) DeclineTurn(ctx context.Context, req *v1.DeclineTu
 func (c *threadServiceClient) Trust(ctx context.Context, req *v1.TrustRequest) (*v1.TrustResponse, error) {
 	var res v1.TrustResponse
 	if err := c.client.CallUnary(ctx, threadServiceTrustSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) SpawnThread(ctx context.Context, req *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error) {
+	var res v1.SpawnThreadResponse
+	if err := c.client.CallUnary(ctx, threadServiceSpawnThreadSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) LineageChildren(ctx context.Context, req *v1.LineageChildrenRequest) (*v1.LineageChildrenResponse, error) {
+	var res v1.LineageChildrenResponse
+	if err := c.client.CallUnary(ctx, threadServiceLineageChildrenSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1002,6 +1057,30 @@ func (h threadServiceHandler) trust(ctx context.Context, _ connect.Spec, stream 
 		return err
 	}
 	res, err := h.svc.Trust(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) spawnThread(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SpawnThreadRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SpawnThread(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) lineageChildren(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.LineageChildrenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.LineageChildren(ctx, &req)
 	if err != nil {
 		return err
 	}

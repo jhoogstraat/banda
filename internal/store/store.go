@@ -35,6 +35,7 @@ type Thread struct {
 	RunnerToken   string
 	Diff          string
 	DeliveredSeq  int64
+	ParentID      string
 	LastSeq       int64 // read-only; Update maintains it
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -43,6 +44,7 @@ type Thread struct {
 	SnoozedUntil *time.Time
 	Settled      bool
 	Unread       bool
+	ParentTitle  string
 }
 
 type Store struct{ db *pgxpool.Pool }
@@ -62,12 +64,12 @@ func Open(ctx context.Context, url string) (*Store, error) {
 }
 
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, parent_id, created_at, updated_at`
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
 	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt)
+		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.ParentID, &t.CreatedAt, &t.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -76,9 +78,9 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_token) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		effort, status, mode, pending_prompt, runner_token, parent_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerToken)
+		t.PendingPrompt, t.RunnerToken, t.ParentID)
 	return err
 }
 
@@ -110,6 +112,31 @@ func (s *Store) GetFor(ctx context.Context, id, viewerID string) (Thread, error)
 	return threads[0], nil
 }
 
+// Children returns the threads spawned from parentID with viewerID's view.
+func (s *Store) Children(ctx context.Context, parentID, viewerID string) ([]Thread, error) {
+	return s.listWithView(ctx, `t.parent_id = $2`, viewerID, parentID)
+}
+
+// LastAgentText is the thread's latest agent text, or "".
+func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
+	var text string
+	err := s.db.QueryRow(ctx, `SELECT coalesce(body->'agentText'->>'text', '') FROM events
+		WHERE thread_id = $1 AND body ? 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return text, err
+}
+
+// Pushed reports whether the thread's branch was ever pushed to origin (the
+// runner's "Pushed `<branch>` ..." notice).
+func (s *Store) Pushed(ctx context.Context, t Thread) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1
+		AND starts_with(body->'notice'->>'text', $2))`, t.ID, "Pushed `"+t.Branch+"`").Scan(&ok)
+	return ok, err
+}
+
 // ListMentioned returns other users' threads in which the viewer has an
 // unanswered mention.
 func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, error) {
@@ -120,8 +147,9 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 // listWithView lists threads matching where; $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
-		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
-		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0)
+		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.parent_id, t.created_at,
+		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0),
+		coalesce((SELECT p.title FROM threads p WHERE p.id = t.parent_id), '')
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -132,8 +160,8 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	for rows.Next() {
 		var t Thread
 		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
-			&t.SnoozedUntil, &t.Settled, &t.Unread); err != nil {
+			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.ParentID, &t.CreatedAt, &t.UpdatedAt,
+			&t.SnoozedUntil, &t.Settled, &t.Unread, &t.ParentTitle); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
