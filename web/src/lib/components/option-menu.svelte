@@ -1,3 +1,8 @@
+<script lang="ts" module>
+	export const models = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+	export const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
+</script>
+
 <script lang="ts">
 	import type { Component } from 'svelte';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';

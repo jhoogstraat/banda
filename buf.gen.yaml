@@ -5,12 +5,12 @@ managed:
     - file_option: go_package_prefix
       value: github.com/jhoogstraat/banda/gen
 plugins:
-  - remote: buf.build/protocolbuffers/go
+  - local: protoc-gen-go
     out: gen
     opt: paths=source_relative
-  - remote: buf.build/connectrpc/go
+  - local: protoc-gen-connect-go
     out: gen
     opt: paths=source_relative
-  - remote: buf.build/bufbuild/es
+  - local: protoc-gen-es
     out: web/src/lib/gen
     opt: target=ts

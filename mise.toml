@@ -7,6 +7,10 @@ kind = "latest"
 kubectl = "latest"
 podman = "6"
 jq = "latest"
+# Code generators for `mise run gen`, local so parallel checkouts don't hit buf's remote plugin rate limit.
+"go:google.golang.org/protobuf/cmd/protoc-gen-go" = "1.36.12"
+"go:connectrpc.com/connect/v2/cmd/protoc-gen-connect-go" = "2.0.1"
+"npm:@bufbuild/protoc-gen-es" = "2.16.0"
 
 [env]
 # Podman, not Docker: kind creates its node in the shared default machine, through its root connection.

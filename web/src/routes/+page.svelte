@@ -8,7 +8,7 @@
 	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
-	import OptionMenu from '#lib/components/option-menu.svelte';
+	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import RepoPicker from '#lib/components/repo-picker.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -106,13 +106,8 @@
 				<PromptInput.Toolbar>
 					<PromptInput.Tools class="min-w-0 flex-wrap">
 						<RepoPicker bind:repoUrl bind:baseBranch />
-						<OptionMenu
-							label="Model"
-							icon={CpuIcon}
-							bind:value={model}
-							options={['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']}
-						/>
-						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={['low', 'medium', 'high', 'xhigh', 'max']} />
+						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
+						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
 					</PromptInput.Tools>
 					<PromptInput.Submit status={busy ? 'submitted' : undefined} />
 				</PromptInput.Toolbar>
