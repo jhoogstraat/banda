@@ -34,6 +34,9 @@ service ThreadService {
   // running environment. Fails while it is not running.
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  // Tells the thread's watchers that the caller is typing. The composer calls
+  // it every few seconds while typing; clients forget it after a few seconds.
+  rpc SendTyping(TypingRequest) returns (TypingResponse);
 }
 
 service UserService {
@@ -130,6 +133,10 @@ message Event {
     DiffChanged diff_changed = 19;
     Notice notice = 20;
     SetupStep setup_step = 21;
+    // Ephemeral (seq 0): who is watching the thread.
+    PresenceChanged presence_changed = 22;
+    // Ephemeral (seq 0): the actor is typing in the composer.
+    Typing typing = 23;
   }
 }
 
@@ -197,6 +204,21 @@ message SetupStep {
   // Redacted, truncated output; set when the step has finished.
   string output = 4;
 }
+
+// Sent whenever someone starts watching the thread or the last tab of a user
+// stops.
+message PresenceChanged {
+  // Every user with at least one open WatchThread stream, sorted.
+  repeated string user_ids = 1;
+}
+
+message Typing {}
+
+message TypingRequest {
+  string thread_id = 1;
+}
+
+message TypingResponse {}
 
 enum SetupState {
   SETUP_STATE_UNSPECIFIED = 0;

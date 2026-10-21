@@ -67,6 +67,8 @@ const (
 	ThreadServiceListFilesProcedure = "/banda.v1.ThreadService/ListFiles"
 	// ThreadServiceReadFileProcedure is the procedure name of the ThreadService's ReadFile RPC.
 	ThreadServiceReadFileProcedure = "/banda.v1.ThreadService/ReadFile"
+	// ThreadServiceSendTypingProcedure is the procedure name of the ThreadService's SendTyping RPC.
+	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -215,6 +217,13 @@ var (
 			Procedure:  ThreadServiceReadFileProcedure,
 		}
 	})
+	threadServiceSendTypingSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SendTyping"),
+			Procedure:  ThreadServiceSendTypingProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -247,6 +256,9 @@ type ThreadServiceClient interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// Tells the thread's watchers that the caller is typing. The composer calls
+	// it every few seconds while typing; clients forget it after a few seconds.
+	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -327,6 +339,9 @@ type ThreadServiceHandler interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// Tells the thread's watchers that the caller is typing. The composer calls
+	// it every few seconds while typing; clients forget it after a few seconds.
+	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -351,6 +366,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
 		connect.Method{Spec: threadServiceListFilesSpec(), Handler: adapter.listFiles},
 		connect.Method{Spec: threadServiceReadFileSpec(), Handler: adapter.readFile},
+		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
 	)
 }
 
@@ -455,6 +471,10 @@ func (UnimplementedThreadServiceHandler) ListFiles(context.Context, *v1.ListFile
 
 func (UnimplementedThreadServiceHandler) ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ReadFile is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SendTyping is not implemented")
 }
 
 type threadServiceClient struct {
@@ -592,6 +612,14 @@ func (c *threadServiceClient) ListFiles(ctx context.Context, req *v1.ListFilesRe
 func (c *threadServiceClient) ReadFile(ctx context.Context, req *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	var res v1.ReadFileResponse
 	if err := c.client.CallUnary(ctx, threadServiceReadFileSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) SendTyping(ctx context.Context, req *v1.TypingRequest) (*v1.TypingResponse, error) {
+	var res v1.TypingResponse
+	if err := c.client.CallUnary(ctx, threadServiceSendTypingSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -789,6 +817,18 @@ func (h threadServiceHandler) readFile(ctx context.Context, _ connect.Spec, stre
 		return err
 	}
 	res, err := h.svc.ReadFile(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) sendTyping(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TypingRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SendTyping(ctx, &req)
 	if err != nil {
 		return err
 	}
