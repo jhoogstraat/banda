@@ -118,6 +118,41 @@ test('B5: settling a thread whose agent waits for permission denies it with a re
 	expect((await t.get()).permissionPending).toBe(false);
 });
 
+for (const [how, prompt, mode] of [
+	['snoozing', 'e2e-ask please', PermissionMode.ASK],
+	['settling', 'e2e-plan please', PermissionMode.PLAN],
+] as const) {
+	test(`${how} a thread whose agent waits for ${prompt.startsWith('e2e-plan') ? 'plan approval' : 'permission'} denies it, interrupts the turn and suspends`, async ({ as }) => {
+		const alice = as('alice');
+		const t = await alice.create({ prompt: 'e2e: permissions' });
+		await t.waitForStatus(Status.AWAITING_INPUT);
+		await alice.threads.permissionSetMode({ threadId: t.id, mode });
+		await t.send(prompt);
+		await t.waitFor('to ask', (i) => i.permissionPending, 30_000);
+		await (how === 'snoozing' ? t.snooze() : settle(t));
+		await t.waitForStatus(Status.SUSPENDED, 60_000);
+		await t.podGone();
+		const resolved = (await t.of('permissionResolved')).at(-1)!;
+		expect(resolved.decision).toBe(PermissionDecision.DENY);
+		expect(resolved.message).toMatch(how === 'snoozing' ? /snoozed/ : /settled/);
+		expect((await t.get()).permissionPending).toBe(false);
+	});
+}
+
+test('settling a working thread whose agent asks afterwards denies the request, interrupts the turn and suspends', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e: permissions' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.ASK });
+	await t.send('e2e-hold:late e2e-ask please');
+	await t.waitForStatus(Status.WORKING);
+	await settle(t);
+	await t.release('late');
+	await t.waitForStatus(Status.SUSPENDED, 60_000);
+	await t.podGone();
+	expect((await t.of('permissionResolved')).at(-1)!.message).toMatch(/settled/);
+});
+
 test('B6: a terminal open during Retry ends; the thread is then idle-suspended with the page open; Reopen wakes it', async ({ as, startApi }) => {
 	test.setTimeout(360_000);
 	const api = await startApi({ IDLE_SUSPEND_AFTER: '90s', IDLE_SWEEP_EVERY: '1s' }); // longer than a start under load

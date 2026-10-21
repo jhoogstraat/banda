@@ -103,7 +103,13 @@
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
-			<Input bind:value={reason} placeholder={plan ? 'What to change (optional)' : 'Reason (optional)'} class="h-8 min-w-0 flex-1 text-xs" aria-label="Reason" />
+			<Input
+				bind:value={reason}
+				placeholder={plan ? 'What to change (optional)' : 'Reason (optional)'}
+				class="h-8 min-w-0 flex-1 text-xs"
+				aria-label="Reason"
+				onkeydown={(e) => e.key === 'Enter' && !busy && answer(PermissionDecision.DENY)}
+			/>
 			<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.DENY)}><XIcon /> {plan ? 'Keep planning' : 'Deny'}</Button>
 		</div>
 	{:else}

@@ -7,7 +7,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { projectName, threads, unread, userName } from '#lib/threads.svelte.js';
+	import { projectName, threads, unread, userName, waiting } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	// Everyone's recent, unsettled threads, live from TeamWatch.
@@ -51,7 +51,8 @@
 	const busy = (list: Thread[]) => list.filter((t) => t.status === Status.WORKING || t.status === Status.STARTING).length;
 
 	function doing(t: Thread) {
-		if (t.status === Status.AWAITING_INPUT) return `Waiting for ${t.ownerId === me ? 'you' : userName(t.ownerId)}`;
+		if (waiting(t)) return waiting(t);
+		if (t.status === Status.AWAITING_INPUT) return `Ready for ${t.ownerId === me ? 'you' : userName(t.ownerId)}`;
 		if (t.status === Status.SUSPENDED) return 'Paused';
 		const a = t.activity;
 		if (!a?.text) return t.status === Status.ERRORED ? 'Errored' : '';
@@ -109,7 +110,7 @@
 								: ''}"
 						>
 							<div class="flex items-center gap-2">
-								<StatusDot status={t.status} />
+								<StatusDot status={t.status} waiting={waiting(t)} />
 								<span class="truncate {unread(t) ? 'font-semibold' : ''}">{t.title || 'Untitled thread'}</span>
 								{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
 							</div>

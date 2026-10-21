@@ -128,7 +128,13 @@
 		{:else if owner}
 						<div class="flex flex-wrap items-center gap-2">
 				<Button size="sm" onclick={() => act(api.approveTurn({ threadId, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
-				<Input bind:value={note} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
+				<Input
+					bind:value={note}
+					placeholder="Note (optional)"
+					class="h-8 min-w-0 flex-1 text-xs"
+					aria-label="Decline note"
+					onkeydown={(e) => e.key === 'Enter' && act(api.declineTurn({ threadId, requestSeq: item.seq, note }))}
+				/>
 				<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId, requestSeq: item.seq, note }))}>
 					<XIcon /> Decline
 				</Button>

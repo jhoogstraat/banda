@@ -15,7 +15,7 @@
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { userName } from '#lib/threads.svelte.js';
+	import { userName, waiting } from '#lib/threads.svelte.js';
 
 	// here: the others with the thread open. interrupt, toggleMode and push are the command palette's too.
 	let {
@@ -49,7 +49,7 @@
 
 <PageHeader>
 	<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
-	{#if thread}<StatusDot status={thread.status} label />{/if}
+	{#if thread}<StatusDot status={thread.status} label waiting={waiting(thread)} />{/if}
 	{#if thread?.parentId}
 		<a href="/t/{thread.parentId}" class="flex min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground" title="Spawned from {thread.parentTitle}">
 			<CornerLeftUpIcon class="size-3.5 shrink-0" /><span class="truncate">from {thread.parentTitle || 'its parent'}</span>

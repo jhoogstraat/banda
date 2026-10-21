@@ -188,6 +188,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * The tools the pending permission requests are for, sorted ("ExitPlanMode"
+   * for a plan).
+   *
+   * @generated from field: repeated string permission_tools = 31;
+   */
+  permissionTools: string[];
 };
 
 /**
@@ -2448,6 +2456,21 @@ export declare type InboxWatchResponse = Message$1<"banda.v1.InboxWatchResponse"
    * @generated from field: repeated banda.v1.Thread mentioned = 2;
    */
   mentioned: Thread[];
+
+  /**
+   * What the caller can decide now, oldest first.
+   *
+   * @generated from field: repeated banda.v1.Decision decisions = 3;
+   */
+  decisions: Decision[];
+
+  /**
+   * The caller signs in to Claude with their subscription and an environment
+   * reported them logged out.
+   *
+   * @generated from field: bool login_needed = 4;
+   */
+  loginNeeded: boolean;
 };
 
 /**
@@ -2455,6 +2478,35 @@ export declare type InboxWatchResponse = Message$1<"banda.v1.InboxWatchResponse"
  * Use `create(InboxWatchResponseSchema)` to create a new message.
  */
 export declare const InboxWatchResponseSchema: GenMessage<InboxWatchResponse>;
+
+/**
+ * A pending permission request the caller may answer (their thread, or a
+ * thread that trusts teammates; plans only the owner), or a teammate's turn
+ * request in the caller's thread.
+ *
+ * @generated from message banda.v1.Decision
+ */
+export declare type Decision = Message$1<"banda.v1.Decision"> & {
+  /**
+   * Without its diff.
+   *
+   * @generated from field: banda.v1.Thread thread = 1;
+   */
+  thread?: Thread | undefined;
+
+  /**
+   * The PermissionRequested or TurnRequest event.
+   *
+   * @generated from field: banda.v1.Event request = 2;
+   */
+  request?: Event | undefined;
+};
+
+/**
+ * Describes the message banda.v1.Decision.
+ * Use `create(DecisionSchema)` to create a new message.
+ */
+export declare const DecisionSchema: GenMessage<Decision>;
 
 /**
  * @generated from message banda.v1.InboxMarkReadRequest

@@ -281,6 +281,25 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 		WHERE m.thread_id = t.id AND m.user_id = $1 AND m.answered_at IS NULL)`, viewerID)
 }
 
+// Threads returns the given threads with viewerID's view, without diffs.
+func (s *Store) Threads(ctx context.Context, ids []string, viewerID string) ([]Thread, error) {
+	return s.listWithView(ctx, `t.id = ANY($2)`, viewerID, ids)
+}
+
+// Decisions returns the pending requests viewerID can answer, oldest first:
+// permission requests in their threads or in threads that trust teammates
+// (plans only in their own), and turn requests in their threads.
+func (s *Store) Decisions(ctx context.Context, viewerID string) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT e.body FROM threads t JOIN events e ON e.thread_id = t.id
+		WHERE ((t.permissions <> '{}' AND (t.owner_id = $1 OR t.trusted)) OR (t.requests > 0 AND t.owner_id = $1))
+		AND e.kind IN ('permissionRequested', 'turnRequest') AND CASE e.kind
+		WHEN 'permissionRequested' THEN t.permissions ? (e.body->'permissionRequested'->>'id')
+			AND (t.owner_id = $1 OR e.body->'permissionRequested'->>'toolName' <> 'ExitPlanMode')
+		ELSE t.owner_id = $1 AND NOT EXISTS (SELECT 1 FROM events r WHERE r.thread_id = t.id AND r.kind = 'turnRequestResolved'
+			AND r.body->'turnRequestResolved'->>'requestSeq' = e.seq::text) END
+		ORDER BY (e.body->>'time')::timestamptz, e.seq`, viewerID)
+}
+
 // listWithView lists threads matching where, without diffs (they are large);
 // $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {

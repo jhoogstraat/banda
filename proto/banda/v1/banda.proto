@@ -189,6 +189,9 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // The tools the pending permission requests are for, sorted ("ExitPlanMode"
+  // for a plan).
+  repeated string permission_tools = 31;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -803,6 +806,21 @@ message InboxWatchResponse {
   // As ListThreads and ListMentioned return them.
   repeated Thread threads = 1;
   repeated Thread mentioned = 2;
+  // What the caller can decide now, oldest first.
+  repeated Decision decisions = 3;
+  // The caller signs in to Claude with their subscription and an environment
+  // reported them logged out.
+  bool login_needed = 4;
+}
+
+// A pending permission request the caller may answer (their thread, or a
+// thread that trusts teammates; plans only the owner), or a teammate's turn
+// request in the caller's thread.
+message Decision {
+  // Without its diff.
+  Thread thread = 1;
+  // The PermissionRequested or TurnRequest event.
+  Event request = 2;
 }
 
 message InboxMarkReadRequest {

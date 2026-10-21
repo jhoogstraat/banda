@@ -188,6 +188,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if err := s.store.SetLogin(bg, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
 				slog.Error("store login status", "user", owner, "err", err)
 			}
+			s.pokeInbox(owner) // a login needed is in their inbox
 		case *bandav1.ConnectRequest_Pushed:
 			s.mu.Lock()
 			if ch := s.pushes[id]; ch != nil {
