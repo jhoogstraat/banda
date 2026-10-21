@@ -35,13 +35,32 @@ cluster() {
 	if ! kind get clusters 2>/dev/null | grep -qx banda; then
 		mise run cluster
 		mise run image
-		return
+	else
+		podman start banda-control-plane >/dev/null
+		for _ in $(seq 60); do kc get nodes >/dev/null 2>&1 && break; sleep 2; done
+		kc -n agent-sandbox-system rollout status deployment/agent-sandbox-controller --timeout=300s
+		kc -n banda rollout status statefulset/postgres --timeout=300s
+		kc -n banda rollout status deployment/dex --timeout=300s
 	fi
-	podman start banda-control-plane >/dev/null
-	for _ in $(seq 60); do kc get nodes >/dev/null 2>&1 && break; sleep 2; done
-	kc -n agent-sandbox-system rollout status deployment/agent-sandbox-controller --timeout=300s
-	kc -n banda rollout status statefulset/postgres --timeout=300s
-	kc -n banda rollout status deployment/dex --timeout=300s
+	# Again on every start, so clusters made before a policy get it.
+	kc apply -f deploy/postgres.yaml >/dev/null
+	kc -n banda apply -f deploy/sandbox-policy.yaml >/dev/null
+	host_api banda 8700 8999 # mise run api, and other checkouts' on ports of their own
+}
+
+# host_api <namespace> <port> [<end port>]: lets the namespace's sandboxes reach an API on this machine,
+# at host.containers.internal (Podman's address for it), on that port only: Postgres, the kind API server
+# and everything else on the host stay out of reach (deploy/sandbox-policy.yaml).
+host_api() {
+	kc -n "$1" apply -f - >/dev/null <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: host-api-$2}
+spec:
+  podSelector: {matchExpressions: [{key: banda.dev/sandbox, operator: Exists}]}
+  policyTypes: [Egress]
+  egress: [{to: [{ipBlock: {cidr: 192.168.127.254/32}}], ports: [{port: $2${3:+, endPort: $3}}]}]
+EOF
 }
 
 servers() {
@@ -82,6 +101,16 @@ e2e() {
 	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
 	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
 	kc create ns "$ns" >/dev/null
+	kc -n "$ns" apply -f deploy/sandbox-policy.yaml >/dev/null
+	kc -n "$ns" apply -f - >/dev/null <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: sandboxes-to-e2e-git}
+spec:
+  podSelector: {matchExpressions: [{key: banda.dev/sandbox, operator: Exists}]}
+  policyTypes: [Egress]
+  egress: [{to: [{podSelector: {matchLabels: {run: e2e-git}}}], ports: [{port: 9418}]}]
+EOF
 	local p pp op opp dp
 	read -r p pp op opp dp < <(node -e 'const n = require("net"); Promise.all([1, 2, 3, 4, 5].map(() => new Promise((r) => { const s = n.createServer().listen(0, () => r(s)); })))
 		.then((ss) => { console.log(ss.map((s) => s.address().port).join(" ")); ss.forEach((s) => s.close()); })')
@@ -99,6 +128,7 @@ e2e() {
 	wait $api
 	wait $web || { tail -30 "$LOG/web.log"; exit 1; }
 	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
+	host_api "$ns" "$p"; host_api "$ns" "$op"
 	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
 	local api_pid=$PID
 	OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
@@ -140,6 +170,7 @@ case ${1:-} in
 up) machine; cluster; servers ;;
 e2e) shift; machine; cluster; e2e "$@" ;;
 clean) clean ;;
+host-api) shift; host_api "$@" ;; # the e2e harness, for an API of a test's own
 down) free 8787; free 8788; free 5173; podman stop banda-control-plane ;;
 *) echo "usage: $0 up|e2e|clean|down" >&2; exit 2 ;;
 esac

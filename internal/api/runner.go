@@ -26,6 +26,7 @@ type runner struct {
 	// listens there. ports is guarded by Service.mu.
 	tunnels *tunnel.Mux
 	ports   []*bandav1.PreviewPort
+	pong    chan struct{}
 }
 
 func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServiceConnectServerStream) error {
@@ -39,7 +40,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 	}
 	// id is the thread, or for a login environment its loginKey.
 	id, owner, login := hello.ThreadId, hello.LoginUserId, hello.LoginUserId != ""
-	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{})}
+	r := &runner{ch: make(chan *bandav1.ConnectResponse, 16), done: make(chan struct{}), pong: make(chan struct{}, 1)}
 	if login {
 		if !s.store.CheckLoginToken(ctx, owner, hello.Token) {
 			return connect.NewError(connect.CodeUnauthenticated, "unknown user or bad token")
@@ -54,6 +55,16 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		// The pod's environment has the settings it was created with; a
 		// container restart in the same pod would miss later changes.
 		r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_AgentSettings{AgentSettings: agentSettings(t)}}
+	}
+
+	// The token alone doesn't replace a runner that still answers: that one
+	// is the pod's. A restarted container finds its old stream gone, or dead
+	// and not answering.
+	s.mu.Lock()
+	old := s.runners[id]
+	s.mu.Unlock()
+	if old != nil && old.answers() {
+		return connect.NewError(connect.CodeAlreadyExists, "a runner is already connected for this environment")
 	}
 
 	r.tunnels = tunnel.NewMux(func(t *bandav1.HttpTunnel) error {
@@ -180,6 +191,11 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			s.fileResponse(k.FileResponse)
 		case *bandav1.ConnectRequest_HttpTunnel:
 			r.tunnels.Deliver(k.HttpTunnel)
+		case *bandav1.ConnectRequest_Pong:
+			select {
+			case r.pong <- struct{}{}:
+			default:
+			}
 		case *bandav1.ConnectRequest_PreviewPorts:
 			s.mu.Lock()
 			r.ports = k.PreviewPorts.Ports
@@ -285,6 +301,24 @@ func (s *Service) sendRunner(id string, msg *bandav1.ConnectResponse) bool {
 	r := s.runners[id]
 	s.mu.Unlock()
 	return r != nil && r.send(msg)
+}
+
+// answers reports whether the runner answers a ping within 5 seconds.
+func (r *runner) answers() bool {
+	select {
+	case <-r.pong: // a late answer to an earlier ping
+	default:
+	}
+	if !r.send(&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Ping{Ping: &bandav1.Ping{}}}) {
+		return false
+	}
+	select {
+	case <-r.pong:
+		return true
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+	}
+	return false
 }
 
 func (r *runner) send(msg *bandav1.ConnectResponse) bool {

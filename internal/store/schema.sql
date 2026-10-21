@@ -81,6 +81,14 @@ CREATE TABLE IF NOT EXISTS secrets (
 
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
+-- Runner tokens are kept as SHA-256 hashes only (pods read theirs from a
+-- Secret), so reading the database doesn't let anyone act as a runner. The
+-- plain tokens of before 2026-10-21 become hashes.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS runner_hash text NOT NULL DEFAULT '';
+ALTER TABLE threads ALTER COLUMN runner_token SET DEFAULT '';
+UPDATE threads SET runner_hash = encode(sha256(convert_to(runner_token, 'UTF8')), 'hex'), runner_token = '' WHERE runner_token <> '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS login_hash text;
+UPDATE users SET login_hash = encode(sha256(convert_to(login_token, 'UTF8')), 'hex'), login_token = NULL WHERE login_token IS NOT NULL;
 
 -- Teammate turn requests waiting for the owner, and whether teammates may
 -- start turns without approval.

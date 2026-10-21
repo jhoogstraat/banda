@@ -35,7 +35,7 @@ type Thread struct {
 	Effort        string
 	PendingPrompt string
 	PendingImages []string // attachment ids of pending_prompt's images
-	RunnerToken   string
+	RunnerHash    string   // see TokenHash
 	Diff          string
 	DeliveredSeq  int64
 	LastSeq       int64      // read-only; Update maintains it
@@ -90,13 +90,13 @@ func Open(ctx context.Context, url string) (*Store, error) {
 // cols are the thread columns Get, Update and the lists read; fields says where
 // each goes, in the same order. A new column goes into both, nowhere else.
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted,
+	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
 	auto_push, env_delete_at, pending_images, parent_id`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
-		&t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
+		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
 		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID}
 }
@@ -125,10 +125,10 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_token, permission_mode, diff, forked_from, fork_turn, race_id, parent_id)
+		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerToken, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
+		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
 	return err
 }
 

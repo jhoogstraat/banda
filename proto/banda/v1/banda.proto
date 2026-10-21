@@ -900,8 +900,16 @@ message ConnectRequest {
     HttpTunnel http_tunnel = 8;
     // The listening ports, sent at start and whenever they change.
     PreviewPorts preview_ports = 9;
+    // Answers a Ping.
+    Pong pong = 10;
   }
 }
+
+// The API asks a connected runner whether it still answers before letting
+// another connection with the same token replace it.
+message Ping {}
+
+message Pong {}
 
 message Hello {
   // Set by thread environments.
@@ -954,6 +962,7 @@ message ConnectResponse {
     AgentSettings agent_settings = 9;
     HttpTunnel http_tunnel = 11;
     PermissionCommand permission = 14;
+    Ping ping = 15;
   }
 }
 

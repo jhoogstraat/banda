@@ -2838,6 +2838,14 @@ export declare type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
      */
     value: PreviewPorts;
     case: "previewPorts";
+  } | {
+    /**
+     * Answers a Ping.
+     *
+     * @generated from field: banda.v1.Pong pong = 10;
+     */
+    value: Pong;
+    case: "pong";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2846,6 +2854,33 @@ export declare type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
  * Use `create(ConnectRequestSchema)` to create a new message.
  */
 export declare const ConnectRequestSchema: GenMessage<ConnectRequest>;
+
+/**
+ * The API asks a connected runner whether it still answers before letting
+ * another connection with the same token replace it.
+ *
+ * @generated from message banda.v1.Ping
+ */
+export declare type Ping = Message$1<"banda.v1.Ping"> & {
+};
+
+/**
+ * Describes the message banda.v1.Ping.
+ * Use `create(PingSchema)` to create a new message.
+ */
+export declare const PingSchema: GenMessage<Ping>;
+
+/**
+ * @generated from message banda.v1.Pong
+ */
+export declare type Pong = Message$1<"banda.v1.Pong"> & {
+};
+
+/**
+ * Describes the message banda.v1.Pong.
+ * Use `create(PongSchema)` to create a new message.
+ */
+export declare const PongSchema: GenMessage<Pong>;
 
 /**
  * @generated from message banda.v1.Hello
@@ -3070,6 +3105,12 @@ export declare type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
      */
     value: PermissionCommand;
     case: "permission";
+  } | {
+    /**
+     * @generated from field: banda.v1.Ping ping = 15;
+     */
+    value: Ping;
+    case: "ping";
   } | { case: undefined; value?: undefined };
 };
 

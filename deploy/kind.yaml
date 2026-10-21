@@ -10,3 +10,8 @@ nodes:
       - containerPort: 30556
         hostPort: 5556
         listenAddress: 127.0.0.1
+kubeadmConfigPatches:
+  # A fork bomb in one sandbox can't take the node's PIDs from the others.
+  - |
+    kind: KubeletConfiguration
+    podPidsLimit: 4096

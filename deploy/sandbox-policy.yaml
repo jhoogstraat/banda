@@ -1,0 +1,28 @@
+# Sandboxes (thread and login environments, label banda.dev/sandbox) run
+# untrusted code: a repo's setup, tests and dev servers, and the agent. They
+# reach DNS, the internet (package mirrors, git hosts, Anthropic) and the
+# API's runner port, nothing else in the cluster or on private networks, and
+# nothing connects to them: runners dial out, previews and terminals go
+# through their connection. An API running outside the cluster (dev) gets a
+# policy of its own: see host_api in deploy/dev.sh. A git host on a private
+# network needs one too.
+# Apply it to every namespace with sandboxes: kubectl apply -n <ns> -f deploy/sandbox-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandboxes
+spec:
+  podSelector:
+    matchExpressions: [{key: banda.dev/sandbox, operator: Exists}]
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to: [{namespaceSelector: {}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to: [{podSelector: {matchLabels: {app: banda-api}}}] # deploy/banda.yaml
+      ports: [{port: 8787}]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            # Pods, services, nodes (their kubelet and NodePorts), the host and
+            # the LAN, cloud metadata.
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]

@@ -31,7 +31,7 @@ func (s *Service) owned(ctx context.Context, id string) (store.Thread, error) {
 // runnerThread returns the thread if token is its runner token.
 func (s *Service) runnerThread(ctx context.Context, id, token string) (store.Thread, error) {
 	t, err := s.store.Get(ctx, id)
-	if errors.Is(err, store.ErrNotFound) || err == nil && subtle.ConstantTimeCompare([]byte(t.RunnerToken), []byte(token)) != 1 {
+	if errors.Is(err, store.ErrNotFound) || err == nil && (t.RunnerHash == "" || subtle.ConstantTimeCompare([]byte(t.RunnerHash), []byte(store.TokenHash(token))) != 1) {
 		return t, connect.NewError(connect.CodeUnauthenticated, "unknown thread or bad token")
 	}
 	return t, err

@@ -63,30 +63,65 @@ func New(cfg Config) (*Client, error) {
 	return &Client{cfg, sbx, kube}, nil
 }
 
-// Ensure gives the thread a freshly started pod. authMethod is the owner's:
-// "subscription" or "api_key"; secrets are the names of the owner's secrets,
-// which the runner redacts.
-func (c *Client) Ensure(ctx context.Context, t store.Thread, authMethod string, secrets []string) error {
+// Ensure gives the thread a freshly started pod, with token as its runner
+// token. authMethod is the owner's: "subscription" or "api_key"; secrets are
+// the names of the owner's secrets, which the runner redacts.
+func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod string, secrets []string) error {
 	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID)
+	if err == nil {
+		err = c.putToken(ctx, "t-"+t.ID, token)
+	}
 	if err != nil {
 		return err
 	}
 	return c.start(ctx, c.sandbox("t-"+t.ID, claim, t, authMethod, secrets))
 }
 
-// EnsureLogin gives the user's login environment a freshly started pod.
-// A pod that is still starting is kept, so opening the terminal twice
-// doesn't restart it.
-func (c *Client) EnsureLogin(ctx context.Context, owner, token string) error {
+// EnsureLogin gives the user's login environment a freshly started pod, with
+// a runner token from newToken. A pod that is still starting is kept, so
+// opening the terminal twice doesn't restart it.
+func (c *Client) EnsureLogin(ctx context.Context, owner string, newToken func() (string, error)) error {
 	claim, err := c.ensureClaudeVolume(ctx, owner)
 	if err != nil {
 		return err
 	}
-	pod, err := c.kube.CoreV1().Pods(c.cfg.Namespace).Get(ctx, "login-"+hash(owner), metav1.GetOptions{})
+	name := "login-" + hash(owner)
+	pod, err := c.kube.CoreV1().Pods(c.cfg.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil && pod.DeletionTimestamp == nil && time.Since(pod.CreationTimestamp.Time) < time.Minute {
 		return nil
 	}
-	return c.start(ctx, c.loginSandbox(owner, claim, token))
+	token, err := newToken()
+	if err == nil {
+		err = c.putToken(ctx, name, token)
+	}
+	if err != nil {
+		return err
+	}
+	return c.start(ctx, c.loginSandbox(owner, claim))
+}
+
+// putToken keeps a sandbox's runner token in a Secret of its own, which its
+// pod reads; neither the Sandbox nor the database holds it.
+// ponytail: the Secret outlives a deleted Sandbox (one per thread, holding a token that opens nothing without its pod).
+func (c *Client) putToken(ctx context.Context, sandbox, token string) error {
+	return c.patchSecret(ctx, sandbox+"-token", "runner-token", map[string][]byte{"BANDA_RUNNER_TOKEN": []byte(token)})
+}
+
+func tokenEnv(sandbox string) corev1.EnvVar {
+	return corev1.EnvVar{Name: "BANDA_RUNNER_TOKEN", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: sandbox + "-token"}, Key: "BANDA_RUNNER_TOKEN"}}}
+}
+
+// limits bound what one sandbox takes from the node its neighbours share.
+// Requests stay small: most environments idle between turns.
+// ponytail: fixed sizes, make them settings when a team needs bigger builds; pids need the kubelet's podPidsLimit (deploy/kind.yaml).
+func limits(cpu, memory, disk string) corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("50m"), corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("128Mi")},
+		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(cpu), corev1.ResourceMemory: resource.MustParse(memory),
+			corev1.ResourceEphemeralStorage: resource.MustParse(disk)},
+	}
 }
 
 // start creates the Sandbox if needed; otherwise it resumes it with the
@@ -124,16 +159,16 @@ func authSecret(owner string) string { return "banda-auth-" + hash(owner) }
 
 // SetSecret sets the user's environment variable; a nil value removes it.
 func (c *Client) SetSecret(ctx context.Context, owner, name string, value []byte) error {
-	return c.patchSecret(ctx, envSecret(owner), map[string][]byte{name: value})
+	return c.patchSecret(ctx, envSecret(owner), "user-secret", map[string][]byte{name: value})
 }
 
 func (c *Client) SetAPIKey(ctx context.Context, owner, key string) error {
-	return c.patchSecret(ctx, authSecret(owner), map[string][]byte{"ANTHROPIC_API_KEY": []byte(key)})
+	return c.patchSecret(ctx, authSecret(owner), "user-secret", map[string][]byte{"ANTHROPIC_API_KEY": []byte(key)})
 }
 
-// patchSecret merges data into a Secret, creating it if needed. Nil values
-// remove keys.
-func (c *Client) patchSecret(ctx context.Context, name string, data map[string][]byte) error {
+// patchSecret merges data into a Secret, creating it if needed with the
+// label banda.dev/<label>. Nil values remove keys.
+func (c *Client) patchSecret(ctx context.Context, name, label string, data map[string][]byte) error {
 	secrets := c.kube.CoreV1().Secrets(c.cfg.Namespace)
 	patch, err := json.Marshal(map[string]any{"data": data})
 	if err != nil {
@@ -148,7 +183,7 @@ func (c *Client) patchSecret(ctx context.Context, name string, data map[string][
 		return nil
 	}
 	_, err = secrets.Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"banda.dev/user-secret": "true"}},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"banda.dev/" + label: "true"}},
 		Data:       data,
 	}, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) { // a concurrent first write won
@@ -220,7 +255,6 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"CLAUDE_CONFIG_DIR":            claudeDir,
 		"CLAUDE_CODE_PROJECT_DIR_NAME": t.ID, // keeps each thread's transcripts apart in the shared dir
 		"BANDA_THREAD_ID":              t.ID,
-		"BANDA_RUNNER_TOKEN":           t.RunnerToken, // ponytail: plain env on the CR, move to a per-thread Secret before sharing the cluster
 		"BANDA_API_URL":                c.cfg.APIURL,
 		"BANDA_REPO_URL":               t.RepoURL,
 		"BANDA_BASE_BRANCH":            t.BaseBranch,
@@ -230,7 +264,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_AUTH_METHOD":            authMethod,
 		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
 	}
-	var vars []corev1.EnvVar
+	vars := []corev1.EnvVar{tokenEnv(name)}
 	for k, v := range env {
 		vars = append(vars, corev1.EnvVar{Name: k, Value: v})
 	}
@@ -245,8 +279,9 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		envFrom = append(envFrom, from(authSecret(t.OwnerID)))
 	}
 	uid := int64(1000)
-	grace := int64(90) // the runner stops claude gracefully; killing it mid token refresh logs the user out
-	labels := map[string]string{"banda.dev/thread": t.ID}
+	grace := int64(90)                                                                   // the runner stops claude gracefully; killing it mid token refresh logs the user out
+	labels := map[string]string{"banda.dev/thread": t.ID, "banda.dev/sandbox": "thread"} // see deploy/sandbox-policy.yaml
+	no := false                                                                          // runners never call the Kubernetes API
 
 	return &sbv1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
@@ -257,6 +292,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 					Spec: corev1.PodSpec{
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
+						AutomountServiceAccountToken:  &no,
 						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim)},
 						Containers: []corev1.Container{{
 							Name:            "runner",
@@ -264,6 +300,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             vars,
 							EnvFrom:         envFrom,
+							Resources:       limits("4", "8Gi", "10Gi"),
 							VolumeMounts:    []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
 						}},
 					},
@@ -280,12 +317,14 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 
 // loginSandbox runs the runner in login mode: no checkout, no claude session,
 // no secrets. It mounts only the user's Claude config volume.
-func (c *Client) loginSandbox(owner, claudeClaim, token string) *sbv1.Sandbox {
+func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 	uid := int64(1000)
 	grace := int64(90)
-	labels := map[string]string{"banda.dev/login": hash(owner)}
+	no := false
+	name := "login-" + hash(owner)
+	labels := map[string]string{"banda.dev/login": hash(owner), "banda.dev/sandbox": "login"}
 	return &sbv1.Sandbox{
-		ObjectMeta: metav1.ObjectMeta{Name: "login-" + hash(owner), Labels: labels},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
 		Spec: sbv1.SandboxSpec{
 			SandboxBlueprint: sbv1.SandboxBlueprint{
 				PodTemplate: sbv1.PodTemplate{
@@ -293,6 +332,7 @@ func (c *Client) loginSandbox(owner, claudeClaim, token string) *sbv1.Sandbox {
 					Spec: corev1.PodSpec{
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
+						AutomountServiceAccountToken:  &no,
 						Volumes: []corev1.Volume{claudeVolume(claudeClaim),
 							{Name: "home", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
 						Containers: []corev1.Container{{
@@ -304,8 +344,9 @@ func (c *Client) loginSandbox(owner, claudeClaim, token string) *sbv1.Sandbox {
 								{Name: "CLAUDE_CONFIG_DIR", Value: claudeDir},
 								{Name: "BANDA_API_URL", Value: c.cfg.APIURL},
 								{Name: "BANDA_LOGIN_USER_ID", Value: owner},
-								{Name: "BANDA_RUNNER_TOKEN", Value: token}, // ponytail: plain env on the CR, like the thread token
+								tokenEnv(name),
 							},
+							Resources:    limits("1", "1Gi", "1Gi"),
 							VolumeMounts: []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
 						}},
 					},

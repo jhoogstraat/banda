@@ -205,7 +205,7 @@ func checkout(ctx context.Context) error {
 			`!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
 	}
 	if _, err := os.Stat(filepath.Join(work, ".git")); err != nil {
-		steps = append(steps, []string{"clone", "--branch", os.Getenv("BANDA_BASE_BRANCH"), os.Getenv("BANDA_REPO_URL"), work})
+		steps = append(steps, []string{"clone", "--branch=" + os.Getenv("BANDA_BASE_BRANCH"), "--", os.Getenv("BANDA_REPO_URL"), work})
 	}
 	for _, args := range steps {
 		if err := git(args...); err != nil {

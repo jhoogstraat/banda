@@ -421,6 +421,7 @@ export class Api {
 
 	async start() {
 		const port = Number(new URL(this.url || 'http://x').port) || (await freePort());
+		await run('../deploy/dev.sh', ['host-api', NAMESPACE, String(port)]); // its sandboxes may reach it (deploy/sandbox-policy.yaml)
 		this.url = `http://localhost:${port}`;
 		this.log = `${DIR}/api-${port}.log`;
 		const out = openSync(this.log, 'a');

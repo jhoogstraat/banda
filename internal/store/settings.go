@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -71,18 +73,30 @@ func (s *Store) DeleteSecret(ctx context.Context, userID, name string) error {
 	return err
 }
 
-// LoginToken returns the user's login environment token, creating the user
-// and the token if needed.
-func (s *Store) LoginToken(ctx context.Context, userID string) (string, error) {
-	var token string
-	err := s.db.QueryRow(ctx, `INSERT INTO users (id, name, login_token) VALUES ($1, $1, $2)
-		ON CONFLICT (id) DO UPDATE SET login_token = COALESCE(users.login_token, excluded.login_token)
-		RETURNING login_token`, userID, rand.Text()).Scan(&token)
+// NewLoginToken gives the user's login environment a new runner token,
+// creating the user if needed. Only its hash is kept.
+func (s *Store) NewLoginToken(ctx context.Context, userID string) (string, error) {
+	token := rand.Text()
+	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, login_hash) VALUES ($1, $1, $2)
+		ON CONFLICT (id) DO UPDATE SET login_hash = excluded.login_hash`, userID, TokenHash(token))
 	return token, err
 }
 
 func (s *Store) CheckLoginToken(ctx context.Context, userID, token string) bool {
 	var want *string
-	s.db.QueryRow(ctx, `SELECT login_token FROM users WHERE id = $1`, userID).Scan(&want)
-	return want != nil && token != "" && subtle.ConstantTimeCompare([]byte(*want), []byte(token)) == 1
+	s.db.QueryRow(ctx, `SELECT login_hash FROM users WHERE id = $1`, userID).Scan(&want)
+	return want != nil && token != "" && subtle.ConstantTimeCompare([]byte(*want), []byte(TokenHash(token))) == 1
+}
+
+// NewRunnerToken gives the thread a new runner token. Only its hash is kept.
+func (s *Store) NewRunnerToken(ctx context.Context, id string) (string, error) {
+	token := rand.Text()
+	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = $2 WHERE id = $1`, id, TokenHash(token))
+	return token, err
+}
+
+// TokenHash is what the database keeps of a runner token.
+func TokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }

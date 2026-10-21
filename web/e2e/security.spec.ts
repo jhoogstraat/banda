@@ -24,7 +24,7 @@ const mcpStatus = async (api: string, threadId: string, token: string) =>
 	).status;
 
 test.describe('network', () => {
-	test.fail('F1, F4: a sandbox reaches the API, the git server and the internet, and nothing else in the cluster or on the host', async ({ as }) => {
+	test('F1, F4: a sandbox reaches the API, the git server and the internet, and nothing else in the cluster or on the host', async ({ as }) => {
 		const alice = as('alice');
 		const [a, b] = [await alice.create(), await as('bob').create()];
 		await a.waitForStatus(Status.AWAITING_INPUT);
@@ -51,7 +51,7 @@ test.describe('network', () => {
 		for (const [what, [host, port]] of Object.entries(closed)) expect(await reaches(a.pod, host, port), what).toBe(false);
 	});
 
-	test.fail('F1: Postgres accepts connections only from the API, not from other pods', async () => {
+	test('F1: Postgres accepts connections only from the API, not from other pods', async () => {
 		expect(await reaches('e2e-git', 'postgres.banda.svc.cluster.local', 5432)).toBe(false);
 	});
 });
@@ -73,7 +73,7 @@ test.describe('pods', () => {
 		return token;
 	}
 
-	test.fail('F6, F9, F2: thread and login pods have resource limits, no service account token, and their runner token from a Secret', async ({ as }) => {
+	test('F6, F9, F2: thread and login pods have resource limits, no service account token, and their runner token from a Secret', async ({ as }) => {
 		const alice = as('alice');
 		const t = await alice.create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
@@ -84,7 +84,7 @@ test.describe('pods', () => {
 });
 
 test.describe('tokens', () => {
-	test.fail('F2: nothing the database holds for a thread or its owner works as their runner token', async ({ as }) => {
+	test('F2: nothing the database holds for a thread or its owner works as their runner token', async ({ as }) => {
 		const alice = as('alice');
 		const t = await alice.create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
@@ -104,7 +104,7 @@ test.describe('tokens', () => {
 	/** Runs a second runner in the thread's pod, with its environment (and so its token), for up to 15 s. */
 	const secondRunner = (t: Thread, home = '/tmp/second') => kexec(t.pod, `mkdir -p ${home}; HOME=${home} timeout 15 runner 2>&1; echo exit=$?`);
 
-	test.fail('F2: a second runner with the thread’s token can’t take over a live runner', async ({ as }) => {
+	test('F2: a second runner with the thread’s token can’t take over a live runner', async ({ as }) => {
 		const t = await as('alice').create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
 		const out = await secondRunner(t);
@@ -126,7 +126,7 @@ test.describe('tokens', () => {
 });
 
 test.describe('repository URLs', () => {
-	test.fail('F7: only plain git URLs are accepted; transports, options and control characters are refused', async ({ as }) => {
+	test('F7: only plain git URLs are accepted; transports, options and control characters are refused', async ({ as }) => {
 		const alice = as('alice');
 		for (const url of [
 			'ext::sh -c touch% /tmp/pwned',
@@ -134,7 +134,7 @@ test.describe('repository URLs', () => {
 			'-u',
 			'fd::17',
 			'https::example.com/a.git',
-			'git@github.com:acme/app.git',
+			'-oProxyCommand=x@host:path',
 			'ftp://example.com/a.git',
 			'https://example.com/a.git\n--upload-pack=x',
 			'https://example.com/a\tb.git',

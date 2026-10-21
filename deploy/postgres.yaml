@@ -58,3 +58,23 @@ spec:
   ports:
     - port: 5432
       nodePort: 30432
+---
+# Only the API reaches Postgres: in the cluster (deploy/banda.yaml), or on
+# this machine through the NodePort (from Podman's network, not a pod). No
+# other pod does, not even through the NodePort.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  namespace: banda
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: banda-api}}
+        - ipBlock: {cidr: 0.0.0.0/0, except: [10.244.0.0/16]} # kind's pod network
+      ports:
+        - port: 5432

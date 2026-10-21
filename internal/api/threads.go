@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"log/slog"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 
 	"connectrpc.com/connect/v2"
@@ -41,17 +43,29 @@ func (s *Service) create(ctx context.Context, t store.Thread, by, prompt string)
 	return s.start(ctx, t, by, &bandav1.Message{Text: prompt})
 }
 
-// checkRepoURL refuses credentials in an https URL: everyone sees a thread's
-// repository, forks reuse it, and the runner redacts only GIT_TOKEN.
+// scpLike is git's short ssh form, user@host:path.
+var scpLike = regexp.MustCompile(`^\w[\w.~-]*@\w[\w.-]*:[\w./~-]+$`)
+
+// checkRepoURL accepts only URLs that git clones plainly: anything else may
+// reach git as a transport that runs commands (ext::) or as an option. It
+// refuses credentials in an https URL: everyone sees a thread's repository,
+// forks reuse it, and the runner redacts only GIT_TOKEN.
 func checkRepoURL(repo string) error {
-	if u, err := url.Parse(repo); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.User != nil {
+	if scpLike.MatchString(repo) {
+		return nil
+	}
+	u, err := url.Parse(repo) // refuses control characters
+	if err != nil || !slices.Contains([]string{"https", "http", "ssh", "git", "file"}, u.Scheme) || u.Opaque != "" || u.Host == "" && u.Scheme != "file" {
+		return connect.NewError(connect.CodeInvalidArgument, "the repository must be an https, http, ssh, git or file URL, or user@host:path")
+	}
+	if (u.Scheme == "https" || u.Scheme == "http") && u.User != nil {
 		return connect.NewError(connect.CodeInvalidArgument, "the repository URL must not contain credentials: add a GIT_TOKEN secret in Settings instead")
 	}
 	return nil
 }
 
 // start stores a new thread, posts its first message (if any) as `by` (the
-// owner, or the agent that spawned it) and provisions its environment. It sets the id, branch and runner token,
+// owner, or the agent that spawned it) and provisions its environment. It sets the id and branch,
 // and the defaults for what t leaves empty.
 func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
 	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
@@ -62,7 +76,6 @@ func (s *Service) start(ctx context.Context, t store.Thread, by string, first *b
 	}
 	t.ID = strings.ToLower(rand.Text())
 	t.Branch = "banda/" + t.ID
-	t.RunnerToken = rand.Text()
 	if err := s.store.Create(ctx, t); err != nil {
 		return t, err
 	}
@@ -98,12 +111,16 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	if err == nil {
 		secrets, err = s.store.Secrets(ctx, t.OwnerID)
 	}
+	var token string // a new one for every pod: an old pod's can't connect any more
+	if err == nil {
+		token, err = s.store.NewRunnerToken(ctx, t.ID)
+	}
 	if err == nil {
 		var names []string
 		for _, sec := range secrets {
 			names = append(names, sec.Name)
 		}
-		err = s.sandboxes.Ensure(ctx, t, st.AuthMethod, names)
+		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, names)
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)

@@ -143,11 +143,8 @@ func (s *Service) OpenLoginTerminal(ctx context.Context, req *bandav1.OpenLoginT
 	_, up := s.runners[loginKey(u)]
 	s.mu.Unlock()
 	if !up { // suspended, never started, or stuck: a fresh pod
-		token, err := s.store.LoginToken(ctx, u)
-		if err != nil {
-			return err
-		}
-		if err := s.sandboxes.EnsureLogin(ctx, u, token); err != nil {
+		newToken := func() (string, error) { return s.store.NewLoginToken(ctx, u) }
+		if err := s.sandboxes.EnsureLogin(ctx, u, newToken); err != nil {
 			return err
 		}
 	}

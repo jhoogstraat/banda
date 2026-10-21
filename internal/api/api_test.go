@@ -15,6 +15,7 @@ import (
 )
 
 // Every teammate sees a thread's repository URL, so it can't carry a token.
+// Only plain git URLs: no transports that run commands, no options for git.
 func TestCheckRepoURL(t *testing.T) {
 	for repo, ok := range map[string]bool{
 		"https://github.com/acme/app.git":                    true,
@@ -24,6 +25,18 @@ func TestCheckRepoURL(t *testing.T) {
 		"https://x-access-token:ghp_abc@github.com/acme/app": false,
 		"https://ghp_abc@github.com/acme/app":                false,
 		"http://user:pw@git.local/app":                       false,
+		"file:///opt/e2e/plain.git":                          true,
+		"ext::sh -c touch% /tmp/pwned":                       false,
+		"--upload-pack=touch /tmp/pwned":                     false,
+		"-oProxyCommand=x@host:path":                         false,
+		"git@-oProxyCommand=x:path":                          false,
+		"git@-oProxyCommand:path":                            false,
+		"fd::17":                                             false,
+		"https::example.com/a.git":                           false,
+		"https:///a.git":                                     false,
+		"ftp://example.com/a.git":                            false,
+		"https://example.com/a.git\n--upload-pack=x":         false,
+		"git@github.com:acme/app.git\n-x":                    false,
 	} {
 		if err := checkRepoURL(repo); (err == nil) != ok {
 			t.Errorf("checkRepoURL(%q) = %v", repo, err)

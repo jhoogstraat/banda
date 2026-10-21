@@ -115,9 +115,12 @@ func run(ctx context.Context) error {
 		for {
 			msg, err := stream.Receive()
 			if err != nil {
+				log.Print("API connection: ", err)
 				return
 			}
 			switch k := msg.Kind.(type) {
+			case *bandav1.ConnectResponse_Ping:
+				go sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Pong{Pong: &bandav1.Pong{}}})
 			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop, *bandav1.ConnectResponse_Permission:
 				queueCmd(msg)
 			case *bandav1.ConnectResponse_AgentSettings:
