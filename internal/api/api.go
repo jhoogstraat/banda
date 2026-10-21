@@ -118,9 +118,6 @@ func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (st
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
-	if err := checkRepoURL(t.RepoURL); err != nil {
-		return t, err
-	}
 	t.Title, t.PendingPrompt = title(prompt), prompt
 	t.Status, t.Mode = thread.Starting, thread.AgentMode
 	t.Model, t.Effort = or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
@@ -139,6 +136,10 @@ func checkRepoURL(repo string) error {
 // start stores a new thread, posts its first message (if any) as the owner
 // and provisions its environment. It sets the id, branch and runner token.
 func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Message) (store.Thread, error) {
+	// Here, so forks of a thread created with a credentialed URL are refused too.
+	if err := checkRepoURL(t.RepoURL); err != nil {
+		return t, err
+	}
 	t.ID = strings.ToLower(rand.Text())
 	t.Branch = "banda/" + t.ID
 	t.RunnerToken = rand.Text()
