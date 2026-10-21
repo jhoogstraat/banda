@@ -17,11 +17,15 @@
 
 	$effect(() => {
 		const ctrl = new AbortController();
-		loadThreads().catch(() => {});
+		// Until it loads, the app doesn't know who is signed in (and so who owns what): retry.
+		let retry: ReturnType<typeof setTimeout>;
+		const load = () => loadThreads().catch(() => (retry = setTimeout(load, 2000)));
+		load();
 		watchInbox(ctrl.signal);
 		const timer = setInterval(() => (threads.now = Date.now()), 30_000);
 		return () => {
 			ctrl.abort();
+			clearTimeout(retry);
 			clearInterval(timer);
 		};
 	});

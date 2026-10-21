@@ -1,0 +1,246 @@
+// The thread page in a browser: the chat, its cards, the right pane and the header's actions, as each user sees them.
+import { devices, type Page } from '@playwright/test';
+import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { expect, repo, Status, test, type Thread, type User } from './fixtures.ts';
+
+const composer = (page: Page) => page.getByPlaceholder('Message the agent. Use @agent to mention it in chat mode.');
+
+/** The thread's page as user, once its header shows the thread. */
+async function open(user: User, t: Thread, options?: Parameters<User['page']>[0]) {
+	const page = await user.page(options);
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByRole('heading', { name: (await t.get()).title })).toBeVisible();
+	return page;
+}
+
+async function post(page: Page, text: string) {
+	await composer(page).fill(text);
+	await composer(page).press('Enter');
+	await expect(composer(page)).toHaveValue('');
+}
+
+test('a turn streams in: the working agent, its running tool call, then the folded tool rows with their output and the turn’s cost', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e-hold:stream' });
+	const page = await open(alice, t);
+	await expect(page.getByText('Holding stream')).toBeVisible({ timeout: 90_000 });
+	await expect(page.getByText('Agent is working…')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Interrupt the agent' })).toBeVisible();
+	await expect(page.getByRole('button', { name: /wait for stream/ })).toBeVisible();
+
+	await t.release('stream');
+	await expect(page.getByText('Created hello1.txt with claude-opus-5-5 · high')).toBeVisible();
+	await expect(page.getByText(/Turn finished in \d+\.\ds · \$0\.0100/)).toBeVisible();
+	await expect(page.getByText('Agent is working…')).toBeHidden();
+	const tools = page.getByRole('button', { name: /^Used 6 tools/ });
+	await tools.click();
+	await page.getByRole('button', { name: /cat hello1\.txt/ }).click();
+	await expect(page.getByText(/\$ cat hello1\.txt\s+hello 1/)).toBeVisible();
+});
+
+test('permission and plan cards: the owner allows a call asked before it streamed (B15) and approves a plan; the teammate waits', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.ASK });
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+
+	await test.step('a call asked for before it streamed: one card with its command; allowed, the call gets its output', async () => {
+		await t.send('e2e-ask-first');
+		const card = page.getByRole('group', { name: 'Permission for Bash' });
+		await expect(card.getByText('$ echo e2e-permitted >> permitted.txt')).toBeVisible();
+		await expect(page.getByText('Agent is waiting for permission')).toBeVisible();
+		await expect(bobPage.getByText(`Waiting for ${alice.id} to answer`)).toBeVisible();
+		await expect(bobPage.getByRole('button', { name: 'Allow once' })).toHaveCount(0);
+		await card.getByRole('button', { name: 'Allow once' }).click();
+		await expect(card.getByText(`Allowed once by ${alice.id}`)).toBeVisible();
+		await expect(bobPage.getByText(`Allowed once by ${alice.id}`)).toBeVisible();
+		await expect(page.getByText('Ran it')).toBeVisible();
+		await page.getByRole('button', { name: /echo e2e-permitted/ }).click();
+		await expect(page.getByText(/\$ echo e2e-permitted >> permitted\.txt\s+ran/)).toBeVisible();
+	});
+
+	await test.step('a plan: only the owner approves it, choosing how the agent works from then on', async () => {
+		await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.PLAN });
+		await t.send('e2e-plan');
+		await expect(page.getByText('The agent has a plan and asks to start working')).toBeVisible();
+		await expect(page.getByText('Write plan.txt')).toBeVisible();
+		await expect(bobPage.getByText(`Waiting for ${alice.id} to answer`)).toBeVisible();
+		await page.getByRole('button', { name: 'Approve, accept edits' }).click();
+		await expect(page.getByText('Plan approved', { exact: true })).toBeVisible();
+		await expect(bobPage.getByText(`Plan approved by ${alice.id}, now: accept edits`)).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Permissions: Accept edits' })).toBeVisible();
+	});
+});
+
+test('turn requests: bob asks the agent and waits; alice approves one, which runs, and declines another with a note', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+
+	await post(bobPage, '@agent e2e: from bob');
+	await expect(bobPage.getByText(`Waiting for ${alice.id} to approve`)).toBeVisible();
+	await expect(page.getByText(`${bob.id} asks the agent:`)).toBeVisible();
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await expect(bobPage.getByText(`Approved by ${alice.id}`)).toBeVisible();
+	await expect(bobPage.getByText('Created hello2.txt')).toBeVisible({ timeout: 60_000 });
+
+	await post(bobPage, '@agent not this one');
+	await page.getByRole('textbox', { name: 'Decline note' }).fill('not now');
+	await page.getByRole('button', { name: 'Decline', exact: true }).click();
+	await expect(bobPage.getByText(`Declined by ${alice.id}: not now`)).toBeVisible();
+	expect(await t.of('turnEnded')).toHaveLength(2);
+});
+
+test('review: alice comments on a line of the diff and sends the review; the chat shows it and the agent addresses it', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	const file = page.locator('[data-file="hello1.txt"]');
+	await file.getByRole('button', { name: 'Comment on line 1' }).click();
+	await page.getByPlaceholder('Comment on this line').fill('e2e: say hello back');
+	await page.getByRole('button', { name: 'Add to review' }).click();
+	await expect(page.getByText('1 pending comment')).toBeVisible();
+	await page.getByRole('button', { name: 'Send review' }).click();
+	await expect(page.getByText('1 pending comment')).toBeHidden();
+	await expect(page.getByRole('button', { name: 'hello1.txt:1' })).toBeVisible(); // the review card in the chat
+	await expect(file.getByText('e2e: say hello back')).toBeVisible(); // and posted at its line
+	await expect(page.getByText('Created hello2.txt')).toBeVisible({ timeout: 60_000 });
+});
+
+test('the right pane: the files tab reads the checkout, the owner’s terminal runs commands, the browser tab frames the agent’s dev server', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create({ prompt: 'start the preview' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.turn(() => t.send('e2e: a file'));
+	const page = await open(alice, t);
+
+	await test.step('files', async () => {
+		await page.getByRole('tab', { name: 'Files' }).click();
+		const files = page.getByRole('tabpanel', { name: 'Files' });
+		await files.getByRole('button', { name: 'hello1.txt', exact: true }).click();
+		await expect(files).toContainText('hello 1');
+		await files.getByRole('button', { name: 'Back to the files' }).click();
+		await expect(files.getByRole('button', { name: 'README', exact: true })).toBeVisible();
+	});
+	await test.step('terminal', async () => {
+		await page.getByRole('tab', { name: 'Terminal' }).click();
+		const term = page.locator('.xterm');
+		await expect(term).toContainText('$', { timeout: 30_000 }); // the prompt
+		await term.click();
+		await page.keyboard.type('echo e2e-$((6*7))\n');
+		await expect(term).toContainText('e2e-42');
+	});
+	await test.step('browser', async () => {
+		await page.getByRole('tab', { name: 'Browser' }).click();
+		const frame = page.frameLocator('iframe[title="Preview of port 5173"]');
+		await expect(frame.getByText('e2e-preview-page')).toBeVisible();
+	});
+	await test.step('a teammate gets no terminal', async () => {
+		const bobPage = await open(bob, t);
+		await bobPage.getByRole('tab', { name: 'Terminal' }).click();
+		await expect(bobPage.getByText('Only the thread owner can open the terminal.')).toBeVisible();
+	});
+});
+
+test('the model chip switches the model; a switch that fails to save goes back to the saved model (B19)', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await page.getByRole('button', { name: 'Model: claude-opus-5-5' }).click();
+	await page.getByRole('menuitemradio', { name: 'claude-sonnet-5-5' }).click();
+	await expect(page.getByText(`${alice.id} switched to claude-sonnet-5-5 · high`)).toBeVisible();
+	expect((await t.get()).model).toBe('claude-sonnet-5-5');
+
+	await page.route('**/banda.v1.ThreadService/SetAgentSettings', (route) => route.abort());
+	await page.getByRole('button', { name: 'Model: claude-sonnet-5-5' }).click();
+	await page.getByRole('menuitemradio', { name: 'claude-haiku-5-5' }).click();
+	await expect(page.getByRole('alert')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Model: claude-sonnet-5-5' })).toBeVisible();
+	expect((await t.get()).model).toBe('claude-sonnet-5-5');
+});
+
+test('settle and snooze from the header; the sidebar files the thread under Settled, then Snoozed', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	const title = (await t.get()).title;
+	const section = (name: string) => page.getByRole('group', { name, exact: true });
+
+	await page.getByRole('button', { name: 'Settle', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Unsettle' })).toBeVisible();
+	await section('Settled').locator('summary').click();
+	await expect(section('Settled').getByRole('link', { name: title })).toBeVisible();
+	await page.getByRole('button', { name: 'Unsettle' }).click();
+	await expect(page.getByRole('button', { name: 'Settle', exact: true })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+	await page.getByRole('menuitem', { name: '1 hour' }).click();
+	await expect(page.getByRole('button', { name: /^Snoozed until / })).toBeVisible();
+	await section('Snoozed').locator('summary').click();
+	await expect(section('Snoozed').getByRole('link', { name: title })).toBeVisible();
+});
+
+test('the pull request link replaces Push once the agent’s work is pushed, without a reload (B17)', async ({ as }) => {
+	const alice = as('alice');
+	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'e2e' }); // https remotes push only with a token
+	const t = await alice.create({ repoUrl: 'https://github.com/e2e/plain.git', prompt: 'e2e: commit' });
+	await t.holdPush(); // so the push ends after the page's refreshes for the turn
+	const page = await open(alice, t);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible({ timeout: 90_000 });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await page.waitForTimeout(1000);
+	await expect(page.getByRole('button', { name: 'Push the branch to origin' })).toBeVisible();
+	await t.releasePush();
+	await expect(page.getByText(/Pushed banda\/\w+ to origin\./)).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Open a pull request' })).toHaveAttribute('href', /^https:\/\/github\.com\/e2e\/plain\/compare\/main\.\.\./);
+});
+
+test('a thread page whose first loads fail (the thread, who is signed in) shows the thread to its owner once retries succeed (B21)', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await alice.page();
+	// Longer than the replay's refresh: only a retry brings the thread.
+	const down = Date.now() + 3000;
+	let failed = 0;
+	await page.route(/\/banda\.v1\.(ThreadService\/GetThread|UserService\/Me)$/, (route) =>
+		Date.now() < down ? (failed++, route.fulfill({ status: 503, body: 'down' })) : route.fallback()
+	);
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	await expect(page.getByRole('heading', { name: (await t.get()).title })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Model: claude-opus-5-5' })).toBeVisible();
+	expect(failed).toBeGreaterThan(0);
+});
+
+test('a thread that doesn’t exist says so, with no composer to post into (B21)', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/t/nosuchthread');
+	await expect(page.getByText('Thread not found')).toBeVisible();
+	await expect(composer(page)).toHaveCount(0);
+	await expect(page.getByText('reconnecting…')).toBeHidden();
+});
+
+test('phone: the sidebar is a drawer that lists the thread and closes once one is opened', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ repoUrl: repo(), prompt: 'e2e: on the phone' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const { defaultBrowserType: _, ...phone } = devices['iPhone 13'];
+	const page = await alice.page(phone);
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+	const drawer = page.getByRole('dialog');
+	await drawer.getByRole('link', { name: /e2e: on the phone/ }).click();
+	await expect(page).toHaveURL(`/t/${t.id}`);
+	await expect(drawer).toBeHidden();
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
+	await expect(page.getByRole('tab', { name: 'Diff' })).toBeVisible();
+	await page.getByRole('button', { name: 'Close the pane' }).click();
+	await expect(composer(page)).toBeVisible();
+});

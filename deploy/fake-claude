@@ -5,8 +5,9 @@
 # started with. A prompt that mentions "preview" starts a web server on :5173
 # instead (the Browser tab). One that says "commit" also commits. "e2e-ask"
 # runs a Bash command (its description holds $E2E_SECRET, for redaction) that
-# asks for permission first (unless the mode bypasses), "e2e-plan" proposes a
-# plan in plan mode (ExitPlanMode); both act on the answer.
+# asks for permission first (unless the mode bypasses), "e2e-ask-first" asks
+# before it streams the call, "e2e-plan" proposes a plan in plan mode
+# (ExitPlanMode); they act on the answer.
 #
 # Directives a test puts anywhere in a prompt, one case each in the loop below
 # (web/e2e/fixtures.ts has helpers for them):
@@ -62,11 +63,14 @@ ask() {
     esac
   done
 }
-# tool <id> <name> <input json> <output>: a tool call and its result, after asking if needed.
+# tool <id> <name> <input json> <output>: a tool call and its result, after asking if needed
+# (before the call is streamed if $first is set).
 tool() {
-  echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"$1\",\"name\":\"$2\",\"input\":$3}]},\"parent_tool_use_id\":null}"
+  local use="{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"$1\",\"name\":\"$2\",\"input\":$3}]},\"parent_tool_use_id\":null}"
+  [ -n "$first" ] || echo "$use"
   answer='"behavior":"allow"'
   [ "$mode" = bypassPermissions ] || ask "$2" "$1" "$3"
+  [ -z "$first" ] || echo "$use"
   if [[ $answer == *'"behavior":"allow"'* ]]; then
     ok=1 err=false out=$4
   else
@@ -179,6 +183,7 @@ while next; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-ask*'"type":"user"'*)
+      first=; [[ $line == *e2e-ask-first* ]] && first=1
       tool "toolu_ask$RANDOM" Bash '{"command":"echo e2e-permitted >> permitted.txt","description":"Append a line, not '"${E2E_SECRET:-}"'"}' ran
       if [ -n "$ok" ]; then echo e2e-permitted >> permitted.txt; say "Ran it"; else say "Not allowed: $out"; fi
       ;;

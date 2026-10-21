@@ -180,6 +180,7 @@
 										<button
 											class="group/num flex w-[4.5rem] shrink-0 cursor-pointer select-none text-right text-muted-foreground/60 hover:text-foreground"
 											title="Comment (drag or shift-click for a range)"
+											aria-label="Comment on line {n}"
 											onpointerdown={(e) => down(e, f.path, i)}
 											onpointerenter={() => over(f.path, i)}
 										>

@@ -49,7 +49,8 @@ export type Item = { key: number } & (
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
-// subagent calls by parent id, turn request resolutions by request seq, permission answers by request id. `planSeq` is the seq of the TodoWrite behind `plan`.
+// subagent calls by parent id, turn request resolutions by request seq, permission answers by request id,
+// and live permission cards whose call comes next, by call id. `planSeq` is the seq of the TodoWrite behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
@@ -64,6 +65,7 @@ export type Chat = {
 		calls: Map<string, Tool[]>;
 		resolved: Map<bigint, TurnRequestResolved & { by: string }>;
 		answers: Map<string, PermissionResolved & { by: string }>;
+		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
 	};
 	present: string[];
 	typing: Record<string, number>;
@@ -76,7 +78,7 @@ export const newChat = (): Chat => ({
 	planSeq: 0n,
 	seq: 0n,
 	tools: new Map(),
-	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map() },
+	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map(), cards: new Map() },
 	present: [],
 	typing: {}
 });
@@ -179,6 +181,11 @@ export function apply(chat: Chat, e: Event) {
 				}
 			} else tool = step(chat, tool, key) as Tool;
 			chat.tools.set(call.id, tool);
+			const card = chat.orphans.cards.get(call.id);
+			if (card) {
+				card.tool = tool;
+				chat.orphans.cards.delete(call.id);
+			}
 			if (call.name === 'TodoWrite' && !call.parentToolCallId) setPlan(chat, call, e.seq);
 			break;
 		}
@@ -191,7 +198,10 @@ export function apply(chat: Chat, e: Event) {
 		case 'permissionRequested': {
 			const r = k.value;
 			const call = { id: r.toolCallId, name: r.toolName, inputJson: r.inputJson } as ToolCall;
-			chat.items.push({ key, kind: 'permission', req: r, tool: chat.tools.get(r.toolCallId) ?? { kind: 'tool', call, children: [], seq: 0n } });
+			const tool = chat.tools.get(r.toolCallId);
+			chat.items.push({ key, kind: 'permission', req: r, tool: tool ?? { kind: 'tool', call, children: [], seq: 0n } });
+			// The CLI may ask before it streams the call: the card points at it once it arrives.
+			if (!tool) chat.orphans.cards.set(r.toolCallId, chat.items.at(-1) as Extract<Item, { kind: 'permission' }>);
 			break;
 		}
 		case 'permissionResolved': {
@@ -273,7 +283,10 @@ export function prepend(chat: Chat, events: Event[]) {
 	}
 	// A permission card made before its call was loaded points at the call now.
 	for (const item of chat.items)
-		if (item.kind === 'permission' && !item.tool.seq) item.tool = chat.tools.get(item.req.toolCallId) ?? item.tool;
+		if (item.kind === 'permission' && !item.tool.seq && chat.tools.has(item.req.toolCallId)) {
+			item.tool = chat.tools.get(item.req.toolCallId)!;
+			chat.orphans.cards.delete(item.req.toolCallId);
+		}
 	for (const [id, o] of chat.orphans.results) {
 		const tool = chat.tools.get(id);
 		if (!tool) continue;

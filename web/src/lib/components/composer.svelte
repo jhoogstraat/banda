@@ -59,7 +59,7 @@
 			<span class="truncate">{typingText}</span>
 		{/if}
 	</div>
-	{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
+	{#if error}<p role="alert" class="mb-2 text-sm text-destructive">{error}</p>{/if}
 	{#if thread}<ThreadBanners {thread} {act} />{/if}
 	<Plan plan={chat.plan} />
 	<PromptInput.Root onSubmit={send} multiple maxFiles={5} maxFileSize={5 << 20} onError={(e) => (error = e.message)}>
