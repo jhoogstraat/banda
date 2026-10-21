@@ -32,9 +32,13 @@ type Service struct {
 	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
 	// MaxAgentThreads how many sub-threads started by agents may run per owner.
 	MaxSubthreadDepth, MaxAgentThreads int
+	// WatchBuffer is how many events a WatchThread stream may lag behind
+	// before it catches up from the store.
+	WatchBuffer int
 
-	mu       sync.Mutex
-	watchers map[string]map[chan *bandav1.Event]struct{}
+	mu sync.Mutex
+	// watchers holds each WatchThread's channel and its behind signal (see watch).
+	watchers map[string]map[chan *bandav1.Event]chan struct{}
 	// present counts each thread's open WatchThread streams per user.
 	present map[string]map[string]int
 	// runners and terminals are keyed by thread id, or loginKey for login
@@ -65,7 +69,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 	s := &Service{
 		store:     st,
 		sandboxes: sb,
-		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
+		watchers:  map[string]map[chan *bandav1.Event]chan struct{}{},
 		present:   map[string]map[string]int{},
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
@@ -78,6 +82,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		LoginIdle:          10 * time.Minute,
 		MaxSubthreadDepth:  3,
 		MaxAgentThreads:    8,
+		WatchBuffer:        256,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}

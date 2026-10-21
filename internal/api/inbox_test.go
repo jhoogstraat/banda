@@ -41,7 +41,7 @@ func TestInboxChanged(t *testing.T) {
 	if woken(shown) || !woken(other) || woken(team) {
 		t.Error("pokeInbox woke the wrong user")
 	}
-	ch := s.watch("t1", "dave")
+	ch, _ := s.watch("t1", "dave")
 	if woken(shown) || woken(other) || !woken(team) {
 		t.Error("presence should wake only team watchers")
 	}

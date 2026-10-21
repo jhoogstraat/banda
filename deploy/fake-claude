@@ -24,6 +24,7 @@
 #   e2e-crash:<name>  makes a tool call and exits 1 mid-turn, without a result,
 #                     once per thread: a redelivered prompt runs normally.
 #   e2e-cost:<usd>    the turn's result reports this total_cost_usd (default 0.01).
+#   e2e-deltas:<n>    first streams n text deltas in a burst.
 #   e2e-noop          replies and ends the turn, changing no file.
 #   e2e-mcp:<tool>:<base64 JSON arguments>
 #                     calls that tool of the Banda MCP server, as the agent
@@ -161,6 +162,11 @@ while next; do
     [[ $line =~ e2e-cost:([0-9.]+) ]] && cost=${BASH_REMATCH[1]}
     if [[ $line == *e2e-echo* ]]; then
       text "Received: $(prompt "$line")"
+    fi
+    if [[ $line =~ e2e-deltas:([0-9]+) ]]; then
+      for ((i = 0; i < BASH_REMATCH[1]; i++)); do
+        echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}},"parent_tool_use_id":null}'
+      done
     fi
     if [[ $line =~ e2e-crash:([A-Za-z0-9_-]+) ]] && [ ! -e ~/e2e-crashed/"${BASH_REMATCH[1]}" ]; then
       mkdir -p ~/e2e-crashed && touch ~/e2e-crashed/"${BASH_REMATCH[1]}"
