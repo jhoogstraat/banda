@@ -122,9 +122,15 @@ export const describe = (events: Event[]) =>
 export type User = ReturnType<typeof newUser>;
 
 function newUser(id: string, browser: () => Promise<Browser>, api = API) {
-	const as: Interceptor = (next) => (req) => {
+	const as: Interceptor = (next) => async (req) => {
 		req.header.set('X-Banda-User', id);
-		return next(req);
+		try {
+			return await next(req);
+		} catch (e) {
+			// Say which call failed, and why underneath (a bare "[unknown]" is a network error).
+			if (e instanceof Error) e.message += ` (${req.method.name} as ${id}${e.cause ? `: ${e.cause}` : ''})`;
+			throw e;
+		}
 	};
 	const transport = createConnectTransport({ baseUrl: api, interceptors: [as] });
 	let context: Promise<BrowserContext> | undefined;
