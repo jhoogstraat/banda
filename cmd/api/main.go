@@ -62,6 +62,12 @@ func main() {
 		log.Fatalf("IDLE_SUSPEND_AFTER: %v", err)
 	}
 	go svc.SuspendIdle(ctx, idle)
+	svc.Preview = api.PreviewConfig{Addr: env("PREVIEW_ADDR", ":8788"), URL: os.Getenv("PREVIEW_URL")}
+	go func() {
+		preview := &http.Server{Addr: svc.Preview.Addr, Handler: svc.PreviewHandler(), ReadHeaderTimeout: 10 * time.Second}
+		log.Printf("preview on %s", preview.Addr)
+		log.Printf("preview disabled: %v", preview.ListenAndServe()) // e.g. the port is taken: the rest still works
+	}()
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
 	if sso != nil {

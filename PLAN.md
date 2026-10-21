@@ -33,6 +33,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Preview | The Browser tab frames what listens on a port in the thread's pod, for everyone. The runner reports listening ports (`/proc/net/tcp{,6}`, above 1023, with the owning process) and dials `localhost:<port>` for tunnels the API opens over its stream (`HttpTunnel`, 8 chunks of 32 KiB in flight per direction), so the API still never reaches into pods. The API serves the preview on **its own origin** (`PREVIEW_ADDR`, default `:8788`; `PREVIEW_URL` overrides the browser-facing URL) and a reverse proxy, WebSockets (Vite HMR) included, forwards through the tunnel. A separate origin keeps apps' absolute paths (`/assets/x.js`) and client routers working, which a path prefix breaks, and keeps the app from scripting Banda. A cookie on that origin selects thread and port; `PreviewOpen` hands a signed token valid for a minute that `/__banda/open` trades for it, so only signed-in users get one. Rejected: path prefixes (break absolute paths and routers), subdomains (wildcard DNS, no LAN IPs), service workers (need a secure context, so not on a LAN address). Upstream sees `Host: localhost:<port>` (dev servers' allowed hosts); Banda's cookies are stripped both ways. Never wakes a paused environment; the owner can. |
 | Agent activity | The chat reads as prose: tool calls and thinking between two texts fold into one "Used N tools" row showing the latest action. Common tools render richly (Bash as a terminal with its exit code, edits as a mini diff, searches with match counts); unknown tools keep the generic view. A subagent's tool calls nest in its Task call; its own text is dropped, since the Task result repeats it. The latest TodoWrite list is pinned above the composer as the plan while items are open. |
 | Live inbox | The sidebar is one server stream per tab (`InboxWatch`): the caller's own and mentioned threads, re-sent whole (coalesced, 250 ms) when one of them gets an event, a thread is created, or the caller's own view changes. Unread is per viewer: events after `thread_views.seen_seq`, which opening a thread or posting in it moves forward. The tab title counts unread threads in Mentioned and Needs input. Browser notifications (asked once from a bell in the account footer) for my thread needing input or failing, unless snoozed or settled, and for new mentions; never for the thread on screen. |
 | Presence | Derived from open `WatchThread` streams, per user, broadcast as the full set (seq 0) on every join and when a user's last stream ends. Typing is a unary `SendTyping` the composer calls at most every 2.5 s; clients drop it after 5 s or when that person posts. The agent's "typing" is its status: the activity line above the composer replaces the old Working indicator. No sidebar indicator yet: it would need presence on `Thread`. |
@@ -78,6 +79,7 @@ Kubernetes (agent-sandbox) ── one Sandbox pod per thread:
 - **web** (`web/`): SvelteKit, `adapter-static`, with [ai-elements for Svelte](https://github.com/sikandarjodd/ai-elements). 3 panes: sidebar, chat, and a right pane (diff for now).
 - **Contract**: `proto/banda/v1/banda.proto`. buf generates the Go code (`gen/`) and the TS code (`web/src/lib/gen/`).
 - **MCP** (`internal/api/mcp.go`): the Banda MCP server, passed to every `claude` via `--mcp-config`.
+- **Preview**: a second listener of banda-api (`PREVIEW_ADDR`) proxies HTTP and WebSockets to ports in the pod through tunnels over the runner's stream (`internal/tunnel`).
 - **Terminal**: the runner opens a PTY on request and streams it through the same dial-in stream; the web client renders it with xterm.js.
 - ponytail: one API replica with in-memory fan-out. Switch to Postgres `LISTEN/NOTIFY` when we need a second replica.
 
@@ -152,6 +154,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Live inbox: the sidebar updates itself over `InboxWatch`; unread threads are bold with a dot; mentioned threads show the owner's avatar with a live status dot; browser notifications and an `(n) Banda` tab title for what needs me.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
+- Browser tab (everyone): the app running in the sandbox, with a port picker (dev server picked by default), path bar, reload and open in a new tab; WebSockets pass through for HMR. Paused environments say so; the owner can wake them.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
@@ -169,7 +172,8 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 **Not yet**
 - Permission prompts (`--permission-prompt-tool stdio`); turns run with `--dangerously-skip-permissions` inside the sandbox.
 - Deleting settled sandboxes (`shutdownTime`): waits until branches are pushed by default, so no work is lost.
-- A browser pane in the right pane; changing model or effort mid-thread.
+- Changing model or effort mid-thread.
+- Preview: one preview cookie per browser, so two windows previewing different threads share the one opened last until reloaded; per-thread origins would need wildcard DNS. The preview origin shares the host (and so cookies) with Banda, and the previewed apps of all threads share it with each other: for a hardened setup, point `PREVIEW_URL` at a sibling subdomain. The address bar can't follow navigation inside the frame (cross-origin).
 - Codex and other harnesses (check their subscription terms first).
 - Several API replicas (needs `LISTEN/NOTIFY` fan-out).
 

@@ -73,6 +73,10 @@ const (
 	ThreadServiceListFilesProcedure = "/banda.v1.ThreadService/ListFiles"
 	// ThreadServiceReadFileProcedure is the procedure name of the ThreadService's ReadFile RPC.
 	ThreadServiceReadFileProcedure = "/banda.v1.ThreadService/ReadFile"
+	// ThreadServicePreviewWatchProcedure is the procedure name of the ThreadService's PreviewWatch RPC.
+	ThreadServicePreviewWatchProcedure = "/banda.v1.ThreadService/PreviewWatch"
+	// ThreadServicePreviewOpenProcedure is the procedure name of the ThreadService's PreviewOpen RPC.
+	ThreadServicePreviewOpenProcedure = "/banda.v1.ThreadService/PreviewOpen"
 	// ThreadServiceInboxWatchProcedure is the procedure name of the ThreadService's InboxWatch RPC.
 	ThreadServiceInboxWatchProcedure = "/banda.v1.ThreadService/InboxWatch"
 	// ThreadServiceInboxMarkReadProcedure is the procedure name of the ThreadService's InboxMarkRead
@@ -249,6 +253,20 @@ var (
 			Procedure:  ThreadServiceReadFileProcedure,
 		}
 	})
+	threadServicePreviewWatchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PreviewWatch"),
+			Procedure:  ThreadServicePreviewWatchProcedure,
+		}
+	})
+	threadServicePreviewOpenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PreviewOpen"),
+			Procedure:  ThreadServicePreviewOpenProcedure,
+		}
+	})
 	threadServiceInboxWatchSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -307,6 +325,13 @@ type ThreadServiceClient interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// The TCP ports listening in the thread's environment (everyone): the
+	// current state, then every change. Never wakes a paused environment,
+	// except for the owner with `wake` set.
+	PreviewWatch(context.Context, *v1.PreviewWatchRequest) (ThreadServicePreviewWatchClientStream, error)
+	// A URL on the preview origin that shows what listens on `port`, through
+	// the runner. Opening it signs the browser in to the preview origin.
+	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
 	// The caller's sidebar: sent at once, then again whenever one of its
 	// threads changes or the caller is mentioned somewhere new.
 	InboxWatch(context.Context, *v1.InboxWatchRequest) (ThreadServiceInboxWatchClientStream, error)
@@ -365,6 +390,27 @@ func (s ThreadServiceOpenTerminalClientStream) Close() error {
 	return s.stream.Close()
 }
 
+// ThreadServicePreviewWatchClientStream is the client stream for the ThreadService's PreviewWatch
+// RPC.
+type ThreadServicePreviewWatchClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s ThreadServicePreviewWatchClientStream) Receive() (*v1.PreviewWatchResponse, error) {
+	var res v1.PreviewWatchResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s ThreadServicePreviewWatchClientStream) Close() error {
+	return s.stream.Close()
+}
+
 // ThreadServiceInboxWatchClientStream is the client stream for the ThreadService's InboxWatch RPC.
 type ThreadServiceInboxWatchClientStream struct {
 	stream connect.ClientStream
@@ -420,6 +466,13 @@ type ThreadServiceHandler interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// The TCP ports listening in the thread's environment (everyone): the
+	// current state, then every change. Never wakes a paused environment,
+	// except for the owner with `wake` set.
+	PreviewWatch(context.Context, *v1.PreviewWatchRequest, ThreadServicePreviewWatchServerStream) error
+	// A URL on the preview origin that shows what listens on `port`, through
+	// the runner. Opening it signs the browser in to the preview origin.
+	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
 	// The caller's sidebar: sent at once, then again whenever one of its
 	// threads changes or the caller is mentioned somewhere new.
 	InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error
@@ -455,6 +508,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
 		connect.Method{Spec: threadServiceListFilesSpec(), Handler: adapter.listFiles},
 		connect.Method{Spec: threadServiceReadFileSpec(), Handler: adapter.readFile},
+		connect.Method{Spec: threadServicePreviewWatchSpec(), Handler: adapter.previewWatch},
+		connect.Method{Spec: threadServicePreviewOpenSpec(), Handler: adapter.previewOpen},
 		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
@@ -490,6 +545,22 @@ func (s ThreadServiceOpenTerminalServerStream) SendHeaders() error {
 
 // Send sends a response message to the client.
 func (s ThreadServiceOpenTerminalServerStream) Send(res *v1.OpenTerminalResponse) error {
+	return s.stream.Send(res)
+}
+
+// ThreadServicePreviewWatchServerStream is the server stream for the ThreadService's PreviewWatch
+// RPC.
+type ThreadServicePreviewWatchServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s ThreadServicePreviewWatchServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s ThreadServicePreviewWatchServerStream) Send(res *v1.PreviewWatchResponse) error {
 	return s.stream.Send(res)
 }
 
@@ -589,6 +660,14 @@ func (UnimplementedThreadServiceHandler) ListFiles(context.Context, *v1.ListFile
 
 func (UnimplementedThreadServiceHandler) ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ReadFile is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PreviewWatch(context.Context, *v1.PreviewWatchRequest, ThreadServicePreviewWatchServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PreviewWatch is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PreviewOpen is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error {
@@ -762,6 +841,22 @@ func (c *threadServiceClient) ListFiles(ctx context.Context, req *v1.ListFilesRe
 func (c *threadServiceClient) ReadFile(ctx context.Context, req *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	var res v1.ReadFileResponse
 	if err := c.client.CallUnary(ctx, threadServiceReadFileSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PreviewWatch(ctx context.Context, req *v1.PreviewWatchRequest) (ThreadServicePreviewWatchClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, threadServicePreviewWatchSpec(), req)
+	if err != nil {
+		return ThreadServicePreviewWatchClientStream{}, err
+	}
+	return ThreadServicePreviewWatchClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) PreviewOpen(ctx context.Context, req *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
+	var res v1.PreviewOpenResponse
+	if err := c.client.CallUnary(ctx, threadServicePreviewOpenSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1019,6 +1114,26 @@ func (h threadServiceHandler) readFile(ctx context.Context, _ connect.Spec, stre
 		return err
 	}
 	res, err := h.svc.ReadFile(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) previewWatch(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PreviewWatchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.PreviewWatch(ctx, &req, ThreadServicePreviewWatchServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) previewOpen(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PreviewOpenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PreviewOpen(ctx, &req)
 	if err != nil {
 		return err
 	}

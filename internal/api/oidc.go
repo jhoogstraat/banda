@@ -38,8 +38,8 @@ type OIDC struct {
 	store    *store.Store
 	oauth    oauth2.Config
 	verifier *oidc.IDTokenVerifier
-	secret   []byte
-	secure   bool
+	signer
+	secure bool
 }
 
 func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) {
@@ -56,7 +56,7 @@ func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) 
 	return &OIDC{
 		store:    st,
 		verifier: p.Verifier(&oidc.Config{ClientID: c.ClientID}),
-		secret:   secret,
+		signer:   secret,
 		secure:   strings.HasPrefix(c.PublicURL, "https://"),
 		oauth: oauth2.Config{
 			ClientID:     c.ClientID,
@@ -148,23 +148,26 @@ func (o *OIDC) cookie(name, value string, maxAge int) *http.Cookie {
 	return &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: o.secure}
 }
 
-// sign returns base64url("id|expiry") + "." + base64url(HMAC-SHA256 of the first part).
-func (o *OIDC) sign(id string, exp time.Time) string {
-	msg := base64.RawURLEncoding.EncodeToString([]byte(id + "|" + strconv.FormatInt(exp.Unix(), 10)))
-	return msg + "." + base64.RawURLEncoding.EncodeToString(o.mac(msg))
+// signer signs short values, e.g. a session: base64url("value|expiry") + "." +
+// base64url(HMAC-SHA256 of the first part).
+type signer []byte
+
+func (k signer) sign(value string, exp time.Time) string {
+	msg := base64.RawURLEncoding.EncodeToString([]byte(value + "|" + strconv.FormatInt(exp.Unix(), 10)))
+	return msg + "." + base64.RawURLEncoding.EncodeToString(k.mac(msg))
 }
 
-func (o *OIDC) mac(msg string) []byte {
-	h := hmac.New(sha256.New, o.secret)
+func (k signer) mac(msg string) []byte {
+	h := hmac.New(sha256.New, k)
 	h.Write([]byte(msg))
 	return h.Sum(nil)
 }
 
-// verify returns the user id of an untampered, unexpired session value.
-func (o *OIDC) verify(value string, now time.Time) (string, bool) {
-	msg, sig, _ := strings.Cut(value, ".")
+// verify returns the value of an untampered, unexpired token.
+func (k signer) verify(token string, now time.Time) (string, bool) {
+	msg, sig, _ := strings.Cut(token, ".")
 	got, err := base64.RawURLEncoding.DecodeString(sig)
-	if err != nil || !hmac.Equal(got, o.mac(msg)) {
+	if err != nil || !hmac.Equal(got, k.mac(msg)) {
 		return "", false
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(msg)
