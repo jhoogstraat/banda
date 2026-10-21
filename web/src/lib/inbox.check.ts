@@ -1,5 +1,5 @@
 // Run: node src/lib/inbox.check.ts
-import { alerts, type Inbox } from './inbox.ts';
+import { alerts, families, type Inbox } from './inbox.ts';
 import type { Thread } from './gen/banda/v1/banda_pb.ts';
 
 const Status = { WORKING: 2, AWAITING_INPUT: 3, ERRORED: 4 };
@@ -36,4 +36,17 @@ const asking = (n: number, status = Status.WORKING) => ({ threads: [t('a', statu
 eq(titles(asking(0), asking(1)), ['a: A teammate asks to run your agent'], 'a new turn request alerts, even while working');
 eq(titles(asking(1), asking(1)), [], 'a pending request is not news');
 eq(titles(asking(2), asking(1)), [], 'a resolved request is quiet');
+const fam = families([
+	t('p', Status.WORKING),
+	t('c1', Status.WORKING, { parentId: 'p' }),
+	t('c2', Status.AWAITING_INPUT, { parentId: 'p' }),
+	t('g', Status.WORKING, { parentId: 'c1' }),
+	t('orphan', Status.WORKING, { parentId: 'gone' }),
+	t('s', Status.AWAITING_INPUT, { settled: true })
+]);
+eq(fam.needs.map((f) => f.thread.id), ['p'], 'a sub-thread needing input pulls its family into Needs input');
+eq(fam.needs[0].children.map((f) => f.thread.id), ['c1', 'c2'], 'sub-threads nest under their parent');
+eq(fam.needs[0].children[0].children.map((f) => f.thread.id), ['g'], 'sub-sub-threads nest too');
+eq(fam.working.map((f) => f.thread.id), ['orphan'], "a thread whose parent isn't listed is a root");
+eq(fam.settled.map((f) => f.thread.id), ['s'], 'others keep their own section');
 console.log('inbox ok');

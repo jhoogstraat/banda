@@ -90,4 +90,9 @@ const [first, second] = asks.items;
 if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
 	throw new Error('a resolution should attach to its request');
 if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
+
+const parent = newChat();
+apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: 3, text: 'Fixed it.' } }));
+const sub = parent.items[0];
+if (sub?.kind !== 'lineage' || sub.update.threadId !== 'c1' || sub.update.text !== 'Fixed it.') throw new Error('a lineage update should become a chat item');
 console.log('ok');

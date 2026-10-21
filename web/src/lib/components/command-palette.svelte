@@ -85,9 +85,10 @@
 		<Command.Group heading={query ? 'Threads' : 'Recent'}>
 			{#each query ? all : all.slice(0, 8) as t (t.id)}
 				{@const owner = userName(t.ownerId)}
-				<Command.Item value="{t.title} {projectName(t.repoUrl)} {owner} {t.id}" onSelect={() => run({ label: t.id, run: () => goto(`/t/${t.id}`) })}>
+				<Command.Item value="{t.title} {projectName(t.repoUrl)} {owner} {t.id} {t.parentTitle}" onSelect={() => run({ label: t.id, run: () => goto(`/t/${t.id}`) })}>
 					<StatusDot status={t.status} />
 					<span class="truncate">{t.title || 'Untitled thread'}</span>
+					{#if t.parentId}<span class="min-w-0 shrink truncate text-xs text-muted-foreground">↖ {t.parentTitle}</span>{/if}
 					<span class="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
 						{projectName(t.repoUrl)}
 						{#if t.ownerId !== threads.me?.id}<UserAvatar name={owner} class="size-4" />{/if}

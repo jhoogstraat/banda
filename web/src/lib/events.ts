@@ -1,5 +1,5 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
+import type { Event, Mode, SetupStep, ToolCall, ToolResult, LineageUpdate, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
 
 // A subagent's (Task's) calls nest in `children`.
 export type Tool = { kind: 'tool'; call: ToolCall; result?: ToolResult; children: Tool[] };
@@ -14,6 +14,8 @@ export type Item =
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
 	| { kind: 'request'; seq: bigint; actor: string; text: string; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
+	// A sub-thread was spawned, finished its turns or failed.
+	| { kind: 'lineage'; update: LineageUpdate }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'setup'; steps: SetupStep[] };
 
@@ -61,6 +63,9 @@ export function apply(chat: Chat, e: Event) {
 		case 'message':
 			delete chat.typing[e.actor];
 			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
+			break;
+		case 'lineageUpdate':
+			chat.items.push({ kind: 'lineage', update: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];
