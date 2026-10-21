@@ -1,9 +1,14 @@
 package api
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/store"
 )
 
 func TestTranscript(t *testing.T) {
@@ -45,5 +50,29 @@ func TestTranscript(t *testing.T) {
 	}
 	if got := transcript(names, nil, 50); got != "" {
 		t.Errorf("empty transcript: %q", got)
+	}
+}
+
+// The server's instructions, which Claude Code puts into the agent's system
+// prompt, name every tool.
+func TestMCPInstructions(t *testing.T) {
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	if _, err := (&Service{}).mcpServer(store.Thread{}).Connect(ctx, st, nil); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	tools, err := cs.ListTools(ctx, nil)
+	if err != nil || len(tools.Tools) < 6 {
+		t.Fatalf("tools: %v, %v", tools, err)
+	}
+	for _, tool := range tools.Tools {
+		if !strings.Contains(cs.InitializeResult().Instructions, tool.Name) {
+			t.Errorf("instructions %q lack %s", cs.InitializeResult().Instructions, tool.Name)
+		}
 	}
 }

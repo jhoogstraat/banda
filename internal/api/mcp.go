@@ -3,7 +3,6 @@ package api
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -50,7 +49,8 @@ func (s *Service) MCPHandler() http.Handler {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, t)))
+		ctx := WithUser(context.WithValue(r.Context(), callerKey{}, t), "agent:"+t.ID) // for logs; tools act as t.OwnerID
+		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -120,10 +120,28 @@ func textResult(s string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}
 }
 
-func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
-	srv := mcp.NewServer(&mcp.Implementation{Name: "banda", Version: "1"}, &mcp.ServerOptions{SchemaCache: mcpSchemas})
+// mcpTools collects a server's tools, so that its instructions name them all.
+type mcpTools struct {
+	names []string
+	add   []func(*mcp.Server)
+}
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "list_threads", Description: "List Banda threads (each one is a conversation with a coding agent in its own sandbox), most recently active first, at most 50. Every thread is visible to everyone."},
+// addTool adds a tool whose errors reach the agent as they would a client
+// (publicError).
+func addTool[In, Out any](ts *mcpTools, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	ts.names = append(ts.names, t.Name)
+	ts.add = append(ts.add, func(srv *mcp.Server) {
+		mcp.AddTool(srv, t, func(ctx context.Context, r *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+			res, out, err := h(ctx, r, in)
+			return res, out, publicError(ctx, "mcp/"+t.Name, err)
+		})
+	})
+}
+
+func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
+	ts := &mcpTools{}
+
+	addTool(ts, &mcp.Tool{Name: "list_threads", Description: "List Banda threads (each one is a conversation with a coding agent in its own sandbox), most recently active first, at most 50. Every thread is visible to everyone."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, listOut, error) {
 			owner := in.Owner
 			switch owner {
@@ -139,7 +157,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, s.threadInfos(ctx, threads), nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "list_children", Description: "List the sub-threads spawned from a thread (by create_thread or by a person), most recently active first. Their finished turns and failures are also reported in the parent thread's chat."},
+	addTool(ts, &mcp.Tool{Name: "list_children", Description: "List the sub-threads spawned from a thread (by create_thread or by a person), most recently active first. Their finished turns and failures are also reported in the parent thread's chat."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in childrenIn) (*mcp.CallToolResult, listOut, error) {
 			threads, err := s.store.Children(ctx, or(in.ThreadID, caller.ID), caller.OwnerID)
 			if err != nil {
@@ -148,7 +166,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, s.threadInfos(ctx, threads), nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "read_thread", Description: "Read another thread: its metadata and a compact transcript of its most recent events (messages with their authors, agent text, tool names, turn ends with errors, notices). Optionally include its current git diff."},
+	addTool(ts, &mcp.Tool{Name: "read_thread", Description: "Read another thread: its metadata and a compact transcript of its most recent events (messages with their authors, agent text, tool names, turn ends with errors, notices). Optionally include its current git diff."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, any, error) {
 			t, err := s.store.Get(ctx, in.ThreadID)
 			if err != nil {
@@ -179,7 +197,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return textResult(b.String()), nil, nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "search_threads", Description: "Full-text search across every Banda thread: what people wrote (messages, review comments), what agents said, and their tool calls (commands, file paths). Use it to find prior work and decisions, e.g. how something was set up before. Best matches first; read a hit's thread with read_thread."},
+	addTool(ts, &mcp.Tool{Name: "search_threads", Description: "Full-text search across every Banda thread: what people wrote (messages, review comments), what agents said, and their tool calls (commands, file paths). Use it to find prior work and decisions, e.g. how something was set up before. Best matches first; read a hit's thread with read_thread."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in searchIn) (*mcp.CallToolResult, searchOut, error) {
 			hits, err := s.store.Search(ctx, store.SearchQuery{Words: in.Query, Kind: in.Kind, Limit: cmp.Or(in.Limit, 20)})
 			if err != nil {
@@ -192,10 +210,10 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "post_message", Description: "Post a message into another thread, as this thread's agent. Without mention_agent the message only goes into the thread's chat for its people and agent to read, and the thread switches to chat mode. With mention_agent the thread's agent starts working on it; that is only allowed in threads owned by the same person as this thread, since the turn runs on their Claude subscription. You cannot post into this thread itself."},
+	addTool(ts, &mcp.Tool{Name: "post_message", Description: "Post a message into another thread, as this thread's agent. Without mention_agent the message only goes into the thread's chat for its people and agent to read, and the thread switches to chat mode. With mention_agent the thread's agent starts working on it; that is only allowed in threads owned by the same person as this thread, since the turn runs on their Claude subscription. You cannot post into this thread itself."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in postIn) (*mcp.CallToolResult, any, error) {
 			if in.ThreadID == caller.ID {
-				return nil, nil, errors.New("cannot post into your own thread")
+				return nil, nil, connect.NewError(connect.CodeInvalidArgument, "cannot post into your own thread")
 			}
 			if in.MentionAgent {
 				t, err := s.store.Get(ctx, in.ThreadID)
@@ -203,7 +221,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 					return nil, nil, err
 				}
 				if t.CheckOwner(caller.OwnerID) != nil {
-					return nil, nil, errors.New("mention_agent is only allowed in threads owned by the same person as this thread")
+					return nil, nil, connect.NewError(connect.CodePermissionDenied, "mention_agent is only allowed in threads owned by the same person as this thread")
 				}
 			}
 			_, err := s.SendMessage(WithUser(ctx, "agent:"+caller.ID), &bandav1.SendMessageRequest{ThreadId: in.ThreadID,
@@ -214,7 +232,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return textResult("Message posted."), nil, nil
 		})
 
-	mcp.AddTool(srv, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children."},
+	addTool(ts, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, createOut, error) {
 			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort)
 			if err != nil {
@@ -222,6 +240,13 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			}
 			return nil, createOut{child.ID}, nil
 		})
+
+	srv := mcp.NewServer(&mcp.Implementation{Name: "banda", Version: "1"}, &mcp.ServerOptions{SchemaCache: mcpSchemas,
+		Instructions: "Banda's tools (" + strings.Join(ts.names, ", ") + ") let you see the team's other threads, search them, " +
+			"post into them and start sub-threads of this one."})
+	for _, add := range ts.add {
+		add(srv)
+	}
 	return srv
 }
 

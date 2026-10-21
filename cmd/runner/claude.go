@@ -204,7 +204,7 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	}}})
 	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", fmt.Sprintf(
 		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
-			"The banda MCP tools (list_threads, read_thread, post_message, create_thread) let you see other threads, post into them and start new threads.",
+			"The banda MCP server's tools, listed in its instructions, let you see and search the team's other threads, post into them and start sub-threads.",
 		threadID, os.Getenv("BANDA_BRANCH")))
 	sid := sessionID(threadID)
 	if hasTranscript(sid) {
