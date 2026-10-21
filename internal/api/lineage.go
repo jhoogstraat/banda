@@ -74,13 +74,27 @@ func (s *Service) lineage(ctx context.Context, child store.Thread, actor string,
 }
 
 // reportToParent tells a sub-thread's parent when the sub-thread finished
-// its turns or failed. Called by broadcast for every batch of events.
+// its turns or failed. Called by broadcast, holding s.mu, for every batch of events.
 func (s *Service) reportToParent(id string, events []*bandav1.Event) {
 	status, text := lineageStatus(events)
 	if status == bandav1.Status_STATUS_UNSPECIFIED {
 		return
 	}
+	// After the report of the batch before, so "finished" and "failed" keep their order.
+	prev, done := s.reports[id], make(chan struct{})
+	s.reports[id] = done
 	go func() {
+		defer func() {
+			close(done)
+			s.mu.Lock()
+			if s.reports[id] == done {
+				delete(s.reports, id)
+			}
+			s.mu.Unlock()
+		}()
+		if prev != nil {
+			<-prev
+		}
 		ctx := context.Background()
 		t, err := s.store.Get(ctx, id)
 		if err != nil || t.ParentID == "" {

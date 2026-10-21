@@ -27,50 +27,53 @@ func actorName(names map[string]string, id string) string {
 // images are named in the text and returned as ids to send along, the latest
 // maxPromptImages of them.
 func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message, texts map[string]string) (string, []string) {
-	name := func(id string) string { return actorName(names, id) }
-	var images []string
-	body := func(m *bandav1.Message) string {
-		b := strings.Builder{}
-		b.WriteString(messageText(m))
-		for _, a := range m.Attachments {
-			if imageTypes[a.MediaType] {
-				images = append(images, a.Id)
-				fmt.Fprintf(&b, "\n[attached image: %s]", a.Name)
-				continue
-			}
-			fence := "```"
-			for strings.Contains(texts[a.Id], fence) {
-				fence += "`"
-			}
-			fmt.Fprintf(&b, "\n\nAttached file %s:\n%s\n%s\n%s", a.Name, fence, strings.TrimSuffix(texts[a.Id], "\n"), fence)
-		}
-		return b.String()
-	}
-	var b strings.Builder
-	for _, e := range unseen {
-		line := ""
-		if m := e.GetMessage(); m != nil {
-			line = name(e.Actor) + ": " + body(m)
-		} else if u := e.GetLineageUpdate(); u != nil {
-			line = lineageLine(u)
-		}
-		if line == "" {
-			continue
-		}
-		if b.Len() == 0 {
-			b.WriteString("Messages posted in this thread since your last turn:\n")
-		}
-		b.WriteString(line + "\n")
-	}
-	text := body(m)
-	images = lastImages(images)
-	if b.Len() == 0 && by == owner {
+	posted, images := postedSince(names, unseen, texts)
+	text, own := messageBody(m, texts)
+	images = lastImages(append(images, own...))
+	if posted == "" && by == owner {
 		return text, images
 	}
-	if b.Len() > 0 {
-		b.WriteString("\n")
+	if posted != "" {
+		posted = "Messages posted in this thread since your last turn:\n" + posted + "\n"
 	}
-	fmt.Fprintf(&b, "%s: %s", name(by), text)
+	return posted + actorName(names, by) + ": " + text, images
+}
+
+// postedSince lists the messages and sub-thread reports among events for the
+// agent, a line each, with the images attached to them.
+func postedSince(names map[string]string, events []*bandav1.Event, texts map[string]string) (string, []string) {
+	var b strings.Builder
+	var images []string
+	for _, e := range events {
+		if m := e.GetMessage(); m != nil {
+			text, own := messageBody(m, texts)
+			images = append(images, own...)
+			b.WriteString(actorName(names, e.Actor) + ": " + text + "\n")
+		} else if u := e.GetLineageUpdate(); u != nil {
+			b.WriteString(lineageLine(u) + "\n")
+		}
+	}
+	return b.String(), images
+}
+
+// messageBody is a message for the agent: its text with the text files
+// inlined and the images named, and the images' ids.
+func messageBody(m *bandav1.Message, texts map[string]string) (string, []string) {
+	var images []string
+	b := strings.Builder{}
+	b.WriteString(messageText(m))
+	for _, a := range m.Attachments {
+		if imageTypes[a.MediaType] {
+			images = append(images, a.Id)
+			fmt.Fprintf(&b, "\n[attached image: %s]", a.Name)
+			continue
+		}
+		fence := "```"
+		for strings.Contains(texts[a.Id], fence) {
+			fence += "`"
+		}
+		fmt.Fprintf(&b, "\n\nAttached file %s:\n%s\n%s\n%s", a.Name, fence, strings.TrimSuffix(texts[a.Id], "\n"), fence)
+	}
 	return b.String(), images
 }
 

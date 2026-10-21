@@ -47,6 +47,10 @@ type Service struct {
 	// runner came or went, or reported other ports (see PreviewWatch).
 	previews map[string]chan struct{}
 	inbox    map[*inboxWatcher]struct{}
+	// reports holds the latest lineage report of each thread until it is done.
+	reports map[string]chan struct{}
+	// deliveries holds a mutex per thread, see lockDelivery.
+	deliveries sync.Map
 
 	// Preview configures the preview origin (preview.go). Set before serving.
 	Preview      PreviewConfig
@@ -65,6 +69,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		files:     map[string]chan *bandav1.FileResponse{},
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
+		reports:   map[string]chan struct{}{},
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
 		LoginIdle:          10 * time.Minute,

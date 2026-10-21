@@ -18,19 +18,8 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 	if req.RepoUrl == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
 	}
-	if err := checkRepoURL(req.RepoUrl); err != nil {
-		return nil, err
-	}
-	t := store.Thread{
-		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-		Title:         title(req.Prompt),
-		RepoURL:       req.RepoUrl,
-		BaseBranch:    req.BaseBranch,
-		Model:         req.Model,
-		Effort:        req.Effort,
-		PendingPrompt: req.Prompt,
-	}
-	t, err := s.start(ctx, t, &bandav1.Message{Text: req.Prompt})
+	t, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: user(ctx)}, RepoURL: req.RepoUrl,
+		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort}, req.Prompt)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +66,7 @@ func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Mess
 		if first == nil {
 			return nil, nil
 		}
+		t.DeliveredSeq = t.LastSeq + 1 // the pending prompt holds it
 		return []*bandav1.Event{messageEvent(t.OwnerID, first)}, nil
 	})
 	if err != nil {

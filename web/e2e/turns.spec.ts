@@ -4,12 +4,12 @@ import { expect, kube, refused, repo, sql, Status, test, until, type Thread } fr
 
 const said = (text: string) => (e: { kind: { case?: string; value?: unknown } }) =>
 	e.kind.case === 'agentText' && (e.kind.value as { text: string }).text === text;
-const holding = (t: Thread, name: string) => t.waitForEvent(said(`Holding ${name}`), `the held turn ${name}`);
+const holding = (t: Thread, name: string) => t.waitForEvent(said(`Holding ${name}`), `the held turn ${name}`, 120_000); // a pod may take a while
 const notices = async (t: Thread) => (await t.of('notice')).map((n) => n.text).join('\n');
 const turnsEnded = (t: Thread, n: number) =>
 	until(async () => (await t.of('turnEnded')).length >= n, () => `${n} turns to end in ${t.id}`, 120_000);
 
-test.fail('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
+test('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create({ repoUrl: repo('setup-hold'), prompt: 'first e2e-echo' });
 	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 60_000 }).toBe('Running');
@@ -22,7 +22,7 @@ test.fail('B1(b): a teammate’s note posted while the thread starts reaches the
 	expect(prompts.join('\n')).toContain('TEAMMATE-NOTE');
 });
 
-test.fail('B1(a): teammates’ notes posted while the owner starts turns all reach the agent', async ({ as }) => {
+test('B1(a): teammates’ notes posted while the owner starts turns all reach the agent', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -47,7 +47,7 @@ test('B21: concurrent owner prompts reach the agent in the order they were poste
 	expect(await t.prompts()).toEqual(posted);
 });
 
-test.fail('B3: a prompt folded into the running turn ends with it, and a model change then applies', async ({ as }) => {
+test('B3: a prompt folded into the running turn ends with it, and a model change then applies', async ({ as }) => {
 	const t = await as('alice').create({ prompt: 'e2e-hold:h e2e-fold' });
 	await holding(t, 'h');
 	await t.send('folded e2e-echo');
@@ -73,7 +73,7 @@ test('B13: an interrupt ends only the running turn; the prompt queued behind it 
 	expect((await t.of('turnEnded')).map((e) => e.isError)).toEqual([true, false]);
 });
 
-test.fail('B9: an API restart mid-turn tells the chat and the parent that the turn and the prompt queued behind it were lost', async ({ as, startApi }) => {
+test('B9: an API restart mid-turn tells the chat and the parent that the turn and the prompt queued behind it were lost', async ({ as, startApi }) => {
 	const api = await startApi();
 	const alice = as('alice', api);
 	const parent = await alice.create();
@@ -93,7 +93,7 @@ test.fail('B9: an API restart mid-turn tells the chat and the parent that the tu
 	await t.turn(() => t.send('after the restart'));
 });
 
-test.fail('B9: a CLI crash mid-turn tells the chat its turn and the prompt queued behind it were lost; the thread recovers', async ({ as }) => {
+test('B9: a CLI crash mid-turn tells the chat its turn and the prompt queued behind it were lost; the thread recovers', async ({ as }) => {
 	const t = await as('alice').create({ prompt: 'e2e-hold:h' });
 	await holding(t, 'h');
 	await t.send('e2e-crash:c');
@@ -107,7 +107,7 @@ test.fail('B9: a CLI crash mid-turn tells the chat its turn and the prompt queue
 	expect(await t.reply()).toContain('Created hello');
 });
 
-test.fail('B14: a blank first prompt is refused; an agent’s post leaves no read state for its pseudo-user', async ({ as }) => {
+test('B14: a blank first prompt is refused; an agent’s post leaves no read state for its pseudo-user', async ({ as }) => {
 	const alice = as('alice');
 	expect(await refused(alice.create({ prompt: '   ' }))).toContain('prompt is required');
 	const [a, b] = [await alice.create(), await alice.create()];
@@ -117,7 +117,7 @@ test.fail('B14: a blank first prompt is refused; an agent’s post leaves no rea
 	expect(await sql(`select count(*) from thread_views where user_id like 'agent:%' and thread_id = '${b.id}'`)).toBe('0');
 });
 
-test.fail('B21: settings changes during a long setup leave the terminal working', async ({ as }) => {
+test('B21: settings changes during a long setup leave the terminal working', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create({ repoUrl: repo('setup-hold') });
 	await until(async () => (await t.terminal('echo up', 5000)).includes('up'), () => `a terminal in ${t.id}`, 90_000);
