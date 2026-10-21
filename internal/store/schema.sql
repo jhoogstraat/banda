@@ -92,3 +92,12 @@ ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAU
 -- The thread a sub-thread was spawned from ('' for none).
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS parent_id text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS threads_parent ON threads (parent_id) WHERE parent_id <> '';
+
+-- The latest notable event, summarized for the team board (protojson of
+-- banda.v1.TeamActivity).
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS activity jsonb;
+
+CREATE INDEX IF NOT EXISTS threads_updated ON threads (updated_at DESC);
+
+-- Finds the latest plan before a tail without scanning the thread.
+CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'toolCall'->>'name' = 'TodoWrite';

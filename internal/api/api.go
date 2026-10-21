@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"maps"
+	"math"
 	"net/http"
 	"slices"
 	"strings"
@@ -356,15 +357,30 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 
 	// Subscribe before replaying so nothing falls in between; skip duplicates.
 	last := req.AfterSeq
-	stored, err := s.store.Events(ctx, req.ThreadId, last)
+	var stored []*bandav1.Event
+	var err error
+	if last == 0 && req.Tail > 0 {
+		stored, err = s.store.Before(ctx, req.ThreadId, math.MaxInt64, int(req.Tail))
+		if err == nil && len(stored) > 0 && stored[0].Seq > 1 {
+			var plan *bandav1.Event
+			if plan, err = s.store.Plan(ctx, req.ThreadId, stored[0].Seq); plan != nil {
+				plan.Context = true
+				stored = append([]*bandav1.Event{plan}, stored...)
+			}
+		}
+	} else {
+		stored, err = s.store.Events(ctx, req.ThreadId, last)
+	}
 	if err != nil {
 		return err
 	}
 	for _, e := range stored {
-		if err := stream.Send(&bandav1.WatchThreadResponse{Event: e}); err != nil {
+		if err := stream.Send(&bandav1.WatchThreadResponse{Event: slim(e)}); err != nil {
 			return err
 		}
-		last = e.Seq
+		if !e.Context {
+			last = e.Seq
+		}
 	}
 	for {
 		select {
@@ -383,14 +399,14 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 					return err
 				}
 				for _, m := range missed {
-					if err := stream.Send(&bandav1.WatchThreadResponse{Event: m}); err != nil {
+					if err := stream.Send(&bandav1.WatchThreadResponse{Event: slim(m)}); err != nil {
 						return err
 					}
 					last = m.Seq
 				}
 				continue
 			}
-			if err := stream.Send(&bandav1.WatchThreadResponse{Event: e}); err != nil {
+			if err := stream.Send(&bandav1.WatchThreadResponse{Event: slim(e)}); err != nil {
 				return err
 			}
 			if e.Seq != 0 {
@@ -700,6 +716,7 @@ func (s *Service) watch(id, user string) chan *bandav1.Event {
 	}
 	s.present[id][user]++
 	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
+	s.presenceChanged()
 	return ch
 }
 
@@ -718,6 +735,7 @@ func (s *Service) unwatch(id, user string, ch chan *bandav1.Event) {
 		delete(s.present, id)
 	}
 	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
+	s.presenceChanged()
 }
 
 // presence is the ephemeral PresenceChanged event for a thread. Callers hold mu.
@@ -824,6 +842,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 
 		TurnRequests: int32(t.Requests),
 		Trusted:      t.Trusted,
+		Activity:     t.Activity,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

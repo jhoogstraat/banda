@@ -6,6 +6,7 @@
 	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import * as Command from '#lib/components/ui/command/index.js';
@@ -40,6 +41,7 @@
 
 	const global: Cmd[] = [
 		{ label: 'New thread', icon: SquarePenIcon, keys: 'C', run: newThread },
+		{ label: 'Go to Team', icon: UsersIcon, keys: 'G T', run: () => goto('/team') },
 		{ label: 'Go to Settings', icon: SettingsIcon, keys: 'G S', run: () => goto('/settings') },
 		{ label: 'Keyboard shortcuts', icon: KeyboardIcon, keys: '?', run: () => (ui.help = true) }
 	];
