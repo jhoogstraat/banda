@@ -106,3 +106,9 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS permission_mode text NOT NULL DEFAULT 'bypass';
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS permissions jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS allowed_tools text[] NOT NULL DEFAULT '{}';
+-- Forks start from another thread's changes after its turn fork_turn; the
+-- threads of a race (or of one Fork call) share race_id.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS forked_from text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS fork_turn int NOT NULL DEFAULT 0;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS race_id text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS threads_race ON threads (race_id) WHERE race_id <> '';

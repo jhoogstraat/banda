@@ -1,6 +1,12 @@
 <script lang="ts" module>
 	export const models = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 	export const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
+	// How many threads to start with one prompt; "Each model" races the models.
+	export const tryOptions = ['1 try', '2 tries', '3 tries', '4 tries', 'Each model'];
+	export const raceTries = (choice: string, model: string, effort: string) =>
+		choice === 'Each model'
+			? models.map((model) => ({ model, effort }))
+			: Array.from({ length: parseInt(choice) || 1 }, () => ({ model, effort }));
 </script>
 
 <script lang="ts">

@@ -158,7 +158,10 @@ func run(ctx context.Context) error {
 		return nil
 	}
 	go reportPorts(ctx, sendReq) // the preview works during setup and after it failed
-	if err := prepare(ctx, send, notice, loginStatus); err != nil {
+	forkPatch := func(ctx context.Context) (*bandav1.ForkPatchResponse, error) {
+		return api.ForkPatch(ctx, &bandav1.ForkPatchRequest{ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN")})
+	}
+	if err := prepare(ctx, send, notice, loginStatus, forkPatch); err != nil {
 		// Reported as a failed step. Stay connected without the agent so the
 		// owner can debug in the terminal; exiting would only crash-loop.
 		log.Print(err)

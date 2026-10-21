@@ -2,6 +2,7 @@ import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import type {
 	AgentSettings,
 	Event,
+	ForkNote,
 	Mode,
 	PermissionRequested,
 	PermissionResolved,
@@ -33,6 +34,7 @@ export type Item = { key: number } & (
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'push'; text: string; pushed: boolean }
+	| { kind: 'fork'; actor: string; note: ForkNote }
 	| { kind: 'setup'; steps: SetupStep[] }
 );
 
@@ -212,6 +214,9 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'agentSettings':
 			chat.items.push({ key, kind: 'settings', actor: e.actor, settings: k.value });
+			break;
+		case 'forkNote':
+			chat.items.push({ key, kind: 'fork', actor: e.actor, note: k.value });
 			break;
 	}
 }

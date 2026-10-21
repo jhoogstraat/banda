@@ -74,6 +74,16 @@ service ThreadService {
   // Sets which tool calls the agent must ask for (owner only). Applies to the
   // running agent at once.
   rpc PermissionSetMode(PermissionSetModeRequest) returns (PermissionSetModeResponse);
+  // Starts threads (one per try) from another thread's current changes and
+  // conversation, owned by the caller. Anyone who can see a thread can fork it.
+  rpc Fork(ForkRequest) returns (ForkResponse);
+  // Starts sibling threads with the same prompt, one per try.
+  rpc Race(RaceRequest) returns (RaceResponse);
+  // Status, cost, time and diff of threads, side by side.
+  rpc RaceCompare(RaceCompareRequest) returns (RaceCompareResponse);
+  // Keeps one thread of a race (owner only): settles its siblings for the
+  // caller and notes the pick in each.
+  rpc RacePick(RacePickRequest) returns (RacePickResponse);
 }
 
 service UserService {
@@ -104,6 +114,8 @@ service SettingsService {
 // never has to reach into pods.
 service RunnerService {
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+  // The changes a fork starts from, applied once after the first checkout.
+  rpc ForkPatch(ForkPatchRequest) returns (ForkPatchResponse);
 }
 
 enum Status {
@@ -160,6 +172,10 @@ message Thread {
   PermissionMode permission_mode = 24;
   // The agent waits for an answer to a permission request.
   bool permission_pending = 25;
+  // Set if the thread was forked from another one.
+  ForkOrigin forked_from = 28;
+  // Shared by the threads started together by one Race or Fork.
+  string race_id = 29;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -186,6 +202,12 @@ enum PermissionDecision {
   PERMISSION_DECISION_CANCELED = 4;
   // The environment restarted before an answer; that turn is gone.
   PERMISSION_DECISION_LOST = 5;
+}
+
+message ForkOrigin {
+  string thread_id = 1;
+  // Turns the source thread had finished when it was forked.
+  int32 turn = 2;
 }
 
 message User {
@@ -232,7 +254,19 @@ message Event {
     AutoPush auto_push = 29;
     PermissionRequested permission_requested = 30;
     PermissionResolved permission_resolved = 31;
+    // Links another thread: a fork of this one, or the pick of a race.
+    ForkNote fork_note = 33;
   }
+}
+
+message ForkNote {
+  // The fork, or the thread picked in the race.
+  string thread_id = 1;
+  string title = 2;
+  // false: `thread_id` was forked from this thread after `turn` turns.
+  // true: the actor picked `thread_id` (maybe this thread) in its race.
+  bool picked = 3;
+  int32 turn = 4;
 }
 
 message Message {
@@ -916,4 +950,71 @@ message HttpTunnel {
 
 message PreviewPorts {
   repeated PreviewPort ports = 1;
+}
+
+// One thread of a Race or Fork; empty fields keep the default (or the
+// forked thread's) model and effort.
+message RaceTry {
+  string model = 1;
+  string effort = 2;
+}
+
+message ForkRequest {
+  string thread_id = 1;
+  // Optional new instruction. Without one the fork sums up where things stand.
+  string prompt = 2;
+  // Empty: one fork with the source's model and effort. At most 4.
+  repeated RaceTry tries = 3;
+}
+
+message ForkResponse {
+  repeated Thread threads = 1;
+}
+
+message RaceRequest {
+  string repo_url = 1;
+  string base_branch = 2;
+  string prompt = 3;
+  // 2 to 4.
+  repeated RaceTry tries = 4;
+}
+
+message RaceResponse {
+  repeated Thread threads = 1;
+}
+
+message RaceCompareRequest {
+  // The threads of a race, and/or any threads by id.
+  string race_id = 1;
+  repeated string thread_ids = 2;
+}
+
+message RaceCompareResponse {
+  repeated RaceEntry entries = 1;
+}
+
+message RaceEntry {
+  Thread thread = 1;
+  // Totals over the thread's finished turns.
+  int32 turns = 2;
+  double cost_usd = 3;
+  int64 duration_ms = 4;
+}
+
+message RacePickRequest {
+  string thread_id = 1;
+}
+
+message RacePickResponse {}
+
+message ForkPatchRequest {
+  string thread_id = 1;
+  string token = 2;
+}
+
+message ForkPatchResponse {
+  // Empty if the thread is not a fork. A unified diff (git apply).
+  string patch = 1;
+  // The commit message for it.
+  string message = 2;
 }
