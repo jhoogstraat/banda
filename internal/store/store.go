@@ -61,12 +61,12 @@ func Open(ctx context.Context, url string) (*Store, error) {
 }
 
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, created_at, updated_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at`
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
 	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.CreatedAt, &t.UpdatedAt)
+		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -119,7 +119,7 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 // listWithView lists threads matching where; $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
-		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.created_at,
+		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
 		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
@@ -131,7 +131,7 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	for rows.Next() {
 		var t Thread
 		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.CreatedAt, &t.UpdatedAt,
+			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
 			&t.SnoozedUntil, &t.Settled); err != nil {
 			return nil, err
 		}
@@ -160,8 +160,8 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	}
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
-		turns=$8, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
-		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns).Scan(&seq, &t.UpdatedAt)
+		turns=$8, requests=$9, trusted=$10, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

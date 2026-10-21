@@ -44,6 +44,12 @@ const (
 	ThreadServiceSetModeProcedure = "/banda.v1.ThreadService/SetMode"
 	// ThreadServiceRetryProcedure is the procedure name of the ThreadService's Retry RPC.
 	ThreadServiceRetryProcedure = "/banda.v1.ThreadService/Retry"
+	// ThreadServiceApproveTurnProcedure is the procedure name of the ThreadService's ApproveTurn RPC.
+	ThreadServiceApproveTurnProcedure = "/banda.v1.ThreadService/ApproveTurn"
+	// ThreadServiceDeclineTurnProcedure is the procedure name of the ThreadService's DeclineTurn RPC.
+	ThreadServiceDeclineTurnProcedure = "/banda.v1.ThreadService/DeclineTurn"
+	// ThreadServiceTrustProcedure is the procedure name of the ThreadService's Trust RPC.
+	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
 	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
@@ -145,6 +151,27 @@ var (
 			Procedure:  ThreadServiceRetryProcedure,
 		}
 	})
+	threadServiceApproveTurnSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ApproveTurn"),
+			Procedure:  ThreadServiceApproveTurnProcedure,
+		}
+	})
+	threadServiceDeclineTurnSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("DeclineTurn"),
+			Procedure:  ThreadServiceDeclineTurnProcedure,
+		}
+	})
+	threadServiceTrustSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Trust"),
+			Procedure:  ThreadServiceTrustProcedure,
+		}
+	})
 	threadServiceWatchThreadSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -226,6 +253,11 @@ type ThreadServiceClient interface {
 	Interrupt(context.Context, *v1.InterruptRequest) (*v1.InterruptResponse, error)
 	SetMode(context.Context, *v1.SetModeRequest) (*v1.SetModeResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
+	// Owner only: runs a teammate's turn request as their turn, or drops it.
+	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
+	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
+	// Owner only: whether teammates can start turns without approval.
+	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -306,6 +338,11 @@ type ThreadServiceHandler interface {
 	Interrupt(context.Context, *v1.InterruptRequest) (*v1.InterruptResponse, error)
 	SetMode(context.Context, *v1.SetModeRequest) (*v1.SetModeResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
+	// Owner only: runs a teammate's turn request as their turn, or drops it.
+	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
+	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
+	// Owner only: whether teammates can start turns without approval.
+	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -341,6 +378,9 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceInterruptSpec(), Handler: adapter.interrupt},
 		connect.Method{Spec: threadServiceSetModeSpec(), Handler: adapter.setMode},
 		connect.Method{Spec: threadServiceRetrySpec(), Handler: adapter.retry},
+		connect.Method{Spec: threadServiceApproveTurnSpec(), Handler: adapter.approveTurn},
+		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
+		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
 		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
@@ -415,6 +455,18 @@ func (UnimplementedThreadServiceHandler) SetMode(context.Context, *v1.SetModeReq
 
 func (UnimplementedThreadServiceHandler) Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Retry is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ApproveTurn is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.DeclineTurn is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Trust is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
@@ -512,6 +564,30 @@ func (c *threadServiceClient) SetMode(ctx context.Context, req *v1.SetModeReques
 func (c *threadServiceClient) Retry(ctx context.Context, req *v1.RetryRequest) (*v1.RetryResponse, error) {
 	var res v1.RetryResponse
 	if err := c.client.CallUnary(ctx, threadServiceRetrySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ApproveTurn(ctx context.Context, req *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error) {
+	var res v1.ApproveTurnResponse
+	if err := c.client.CallUnary(ctx, threadServiceApproveTurnSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) DeclineTurn(ctx context.Context, req *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error) {
+	var res v1.DeclineTurnResponse
+	if err := c.client.CallUnary(ctx, threadServiceDeclineTurnSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Trust(ctx context.Context, req *v1.TrustRequest) (*v1.TrustResponse, error) {
+	var res v1.TrustResponse
+	if err := c.client.CallUnary(ctx, threadServiceTrustSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -677,6 +753,42 @@ func (h threadServiceHandler) retry(ctx context.Context, _ connect.Spec, stream 
 		return err
 	}
 	res, err := h.svc.Retry(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) approveTurn(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ApproveTurnRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ApproveTurn(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) declineTurn(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeclineTurnRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeclineTurn(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) trust(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TrustRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Trust(ctx, &req)
 	if err != nil {
 		return err
 	}

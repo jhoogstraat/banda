@@ -195,6 +195,14 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 		switch k := e.Kind.(type) {
 		case *bandav1.Event_Message:
 			lines = append(lines, actorName(names, e.Actor)+": "+k.Message.Text)
+		case *bandav1.Event_TurnRequest:
+			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+k.TurnRequest.GetMessage().GetText())
+		case *bandav1.Event_TurnRequestResolved:
+			line := actorName(names, e.Actor) + " approved a request"
+			if r := k.TurnRequestResolved; !r.Approved {
+				line = strings.TrimSuffix(actorName(names, e.Actor)+" declined a request: "+r.Note, ": ")
+			}
+			lines = append(lines, line)
 		case *bandav1.Event_AgentText:
 			lines = append(lines, "agent: "+k.AgentText.Text)
 		case *bandav1.Event_ToolCall:

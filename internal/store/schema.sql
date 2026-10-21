@@ -81,3 +81,8 @@ CREATE TABLE IF NOT EXISTS secrets (
 
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
+
+-- Teammate turn requests waiting for the owner, and whether teammates may
+-- start turns without approval.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
