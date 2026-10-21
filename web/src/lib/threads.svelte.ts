@@ -2,7 +2,7 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api, userApi } from './api';
 import { AutoPushState, type Thread, type User } from './gen/banda/v1/banda_pb';
-import { alerts, sectionOf, type Inbox } from './inbox';
+import { alerts, families, sectionOf, type Family, type Inbox } from './inbox';
 
 // `search` and `project` (a repo URL) filter the sidebar's threads.
 export const threads = $state({
@@ -12,6 +12,8 @@ export const threads = $state({
 	me: undefined as User | undefined,
 	search: '',
 	project: '',
+	// Sidebar families the user unfolded, by parent id.
+	expanded: {} as Record<string, boolean>,
 	// Ticks every 30 s so ages and snooze ends stay current.
 	now: Date.now(),
 	// Browser notification permission; 'default' until the user answers.
@@ -97,11 +99,15 @@ export function matches(t: Thread) {
 	);
 }
 
-export function sidebarSections() {
-	const s: Record<string, Thread[]> = { needs: [], working: [], snoozed: [], settled: [] };
-	for (const t of threads.list.filter(matches)) s[sectionOf(t, threads.now)].push(t);
-	return s;
-}
+export const sidebarSections = () => families(threads.list.filter(matches), threads.now);
+
+const contains = (f: Family, id?: string): boolean => f.children.some((c) => c.thread.id === id || contains(c, id));
+
+// Unfolded by the user, or by default while one of its sub-threads is on screen.
+export const unfolded = (f: Family) => threads.expanded[f.thread.id] ?? contains(f, page.params.id);
+
+// A family's threads as the sidebar shows them.
+export const visible = (f: Family): Thread[] => [f.thread, ...(unfolded(f) ? f.children.flatMap(visible) : [])];
 
 // The sidebar's threads top to bottom, for j/k.
-export const sidebarOrder = () => [threads.mentioned.filter(matches), ...Object.values(sidebarSections())].flat();
+export const sidebarOrder = () => [threads.mentioned.filter(matches), ...Object.values(sidebarSections()).flat().map(visible)].flat();

@@ -7,6 +7,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -33,6 +34,7 @@ type Thread struct {
 	Model         string
 	Effort        string
 	PendingPrompt string
+	PendingImages []string // attachment ids of pending_prompt's images
 	RunnerToken   string
 	Diff          string
 	DeliveredSeq  int64
@@ -46,6 +48,7 @@ type Thread struct {
 	ForkedFrom     string // the source thread of a fork
 	ForkTurn       int    // turns the source had finished then
 	RaceID         string // shared by threads started together
+	ParentID       string // the thread this one was spawned from
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -54,7 +57,8 @@ type Thread struct {
 	Settled      bool
 	Unread       bool
 	// Only set by the lists.
-	Activity *bandav1.TeamActivity
+	Activity    *bandav1.TeamActivity
+	ParentTitle string
 }
 
 type Store struct{ db *pgxpool.Pool }
@@ -73,14 +77,36 @@ func Open(ctx context.Context, url string) (*Store, error) {
 	return &Store{db}, nil
 }
 
+// cols are the thread columns Get, Update and the lists read; fields says where
+// each goes, in the same order. A new column goes into both, nowhere else.
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at, auto_push, env_delete_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted,
+	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
+	auto_push, env_delete_at, pending_images, parent_id`
+
+func fields(t *Thread) []any {
+	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
+		&t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
+		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID}
+}
+
+// listCols are cols of threads t for listWithView, without the diff (large).
+var listCols = func() string {
+	var out []string
+	for _, c := range strings.Split(cols, ",") {
+		c = "t." + strings.TrimSpace(c)
+		if c == "t.diff" {
+			c = "''"
+		}
+		out = append(out, c)
+	}
+	return strings.Join(out, ", ")
+}()
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
-	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt)
+	err := row.Scan(fields(&t)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -89,10 +115,10 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_token, permission_mode, diff, forked_from, fork_turn, race_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+		effort, status, mode, pending_prompt, runner_token, permission_mode, diff, forked_from, fork_turn, race_id, parent_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerToken, cmp.Or(t.PermissionMode, "bypass"), t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID)
+		t.PendingPrompt, t.RunnerToken, cmp.Or(t.PermissionMode, "bypass"), t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
 	return err
 }
 
@@ -171,6 +197,31 @@ func (s *Store) TurnTotals(ctx context.Context, ids []string) (map[string]TurnTo
 	return out, rows.Err()
 }
 
+// Children returns the threads spawned from parentID with viewerID's view.
+func (s *Store) Children(ctx context.Context, parentID, viewerID string) ([]Thread, error) {
+	return s.listWithView(ctx, `t.parent_id = $2`, viewerID, parentID)
+}
+
+// LastAgentText is the thread's latest agent text, or "".
+func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
+	var text string
+	err := s.db.QueryRow(ctx, `SELECT coalesce(body->'agentText'->>'text', '') FROM events
+		WHERE thread_id = $1 AND body ? 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return text, err
+}
+
+// Pushed reports whether the thread's branch was ever pushed to origin (the
+// runner's "Pushed `<branch>` ..." notice or auto-push detail).
+func (s *Store) Pushed(ctx context.Context, t Thread) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1
+		AND starts_with(coalesce(body->'notice'->>'text', body->'autoPush'->>'detail'), $2))`, t.ID, "Pushed `"+t.Branch+"`").Scan(&ok)
+	return ok, err
+}
+
 // ListMentioned returns other users' threads in which the viewer has an
 // unanswered mention.
 func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, error) {
@@ -181,9 +232,9 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 // listWithView lists threads matching where, without diffs (they are large);
 // $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
-	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
-		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, '', t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.permission_mode, t.permissions, t.allowed_tools, t.forked_from, t.fork_turn, t.race_id, t.created_at,
-		t.updated_at, t.auto_push, t.env_delete_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
+	rows, err := s.db.Query(ctx, `SELECT `+listCols+`,
+		v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity,
+		coalesce((SELECT p.title FROM threads p WHERE p.id = t.parent_id), '')
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -194,9 +245,7 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	for rows.Next() {
 		var t Thread
 		var activity []byte
-		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-			&t.AutoPush, &t.EnvDeleteAt, &t.SnoozedUntil, &t.Settled, &t.Unread, &activity); err != nil {
+		if err := rows.Scan(append(fields(&t), &t.SnoozedUntil, &t.Settled, &t.Unread, &activity, &t.ParentTitle)...); err != nil {
 			return nil, err
 		}
 		if activity != nil {
@@ -247,9 +296,9 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
-		last_seq=last_seq+$6, activity=coalesce($16, activity), updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

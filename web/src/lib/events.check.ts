@@ -84,7 +84,9 @@ apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'bob' });
 apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'carol' });
 if (typingNow(chat, Date.now()).join() !== 'bob,carol' || count() !== m) throw new Error('typing should be tracked per person');
 if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should expire');
-apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
+apply(chat, { ...ev({ case: 'message', value: { text: 'hi', attachments: [{ id: 'f1', name: 'shot.png', mediaType: 'image/png' }] } }), actor: 'bob' });
+const posted = chat.items.at(-1);
+if (posted?.kind !== 'message' || posted.attachments[0]?.id !== 'f1') throw new Error('a message should keep its attachments');
 if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
 
 const asks = newChat();
@@ -116,7 +118,7 @@ const add = (kind: unknown, extra = {}) => history.push({ ...ev(kind, BigInt(his
 const call = (id: string, name: string, parentToolCallId = '') => add({ case: 'toolCall', value: { id, name, inputJson: '{}', parentToolCallId } });
 const result = (id: string) => add({ case: 'toolResult', value: { toolCallId: id, output: `out ${id}` } });
 for (let t = 0; t < 4; t++) {
-	add({ case: 'message', value: { text: `turn ${t}` } }, { actor: 'dev' });
+	add({ case: 'message', value: { text: `turn ${t}`, attachments: [{ id: `shot${t}`, name: 'shot.png', mediaType: 'image/png' }] } }, { actor: 'dev' });
 	if (t !== 3) add({ case: 'toolCall', value: { id: `todo${t}`, name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } });
 	call(`r${t}`, 'Read');
 	if (t === 1) add({ case: 'permissionRequested', value: { id: 'p1', toolCallId: 'r1', toolName: 'Read', inputJson: '{}' } });
@@ -131,7 +133,7 @@ for (let t = 0; t < 4; t++) {
 	result(`task${t}`);
 	add({ case: 'agentText', value: { text: `done ${t}` } });
 	add({ case: 'turnEnded', value: { durationMs: 1n, costUsd: 0 } });
-	if (t === 1) add({ case: 'turnRequest', value: { message: { text: '@agent please' } } }, { actor: 'bob' });
+	if (t === 1) add({ case: 'turnRequest', value: { message: { text: '@agent please', attachments: [{ id: 'notes', name: 'notes.md', mediaType: 'text/plain' }] } } }, { actor: 'bob' });
 	if (t === 2) add({ case: 'turnRequestResolved', value: { requestSeq: BigInt(history.findIndex((e) => e.kind.case === 'turnRequest') + 1), approved: true } }, { actor: 'dev' });
 }
 const show = (c: Chat) => JSON.stringify({ items: c.items, plan: c.plan, planSeq: c.planSeq }, (_, v) => (typeof v === 'bigint' ? Number(v) : v));
@@ -152,6 +154,9 @@ for (let tail = 1; tail <= history.length; tail++) {
 		if (show(paged) !== show(whole)) throw new Error(`tail ${tail}, pages of ${size}: paged history differs from the full replay`);
 		for (let seq = 1n; seq <= history.length; seq++)
 			if (itemAt(paged, seq) !== itemAt(whole, seq)) throw new Error(`tail ${tail}, pages of ${size}: #${seq} maps to another item`);
+		const first = paged.items[0];
+		if (first.kind !== 'message' || first.attachments[0]?.id !== 'shot0' || !paged.items.some((i) => i.kind === 'request' && i.attachments[0]?.id === 'notes'))
+			throw new Error('attachments in older pages should render');
 		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size || paged.orphans.answers.size) throw new Error('every orphan should find its call');
 	}
 }
@@ -182,4 +187,9 @@ apply(jump, ev({ case: 'toolCall', value: { id: 'j1', name: 'Bash', inputJson: '
 apply(jump, ev({ case: 'toolCall', value: { id: 'j2', name: 'Read', inputJson: '{}' } }, 6n));
 if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 || itemAt(jump, 2n) !== -1 || itemAt(jump, 7n) !== -1)
 	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
+
+const parent = newChat();
+apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: 3, text: 'Fixed it.' } }));
+const sub = parent.items[0];
+if (sub?.kind !== 'lineage' || sub.update.threadId !== 'c1' || sub.update.text !== 'Fixed it.') throw new Error('a lineage update should become a chat item');
 console.log('ok');

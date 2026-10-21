@@ -1,6 +1,7 @@
 import { Code, ConnectError, createClient, type Interceptor } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { SettingsService, ThreadService, UserService } from './gen/banda/v1/banda_pb';
+import { fromJson } from '@bufbuild/protobuf';
+import { AttachmentSchema, SettingsService, ThreadService, UserService, type Attachment } from './gen/banda/v1/banda_pb';
 
 // Signed out (or session expired): sign in again and come back to this page.
 // ponytail: unary calls only. Streams report errors while iterating, but every page makes a unary call first.
@@ -19,3 +20,14 @@ const transport = createConnectTransport({ baseUrl: '/', interceptors: [signIn] 
 export const api = createClient(ThreadService, transport);
 export const userApi = createClient(UserService, transport);
 export const settingsApi = createClient(SettingsService, transport);
+
+// Uploads a file to attach to a message (see FilesHandler in internal/api).
+export async function upload(file: File): Promise<Attachment> {
+	const res = await fetch(`/files?name=${encodeURIComponent(file.name)}`, {
+		method: 'POST',
+		headers: { 'Content-Type': file.type || 'application/octet-stream' },
+		body: file
+	});
+	if (!res.ok) throw new Error(`${file.name}: ${(await res.text()).trim()}`);
+	return fromJson(AttachmentSchema, await res.json());
+}

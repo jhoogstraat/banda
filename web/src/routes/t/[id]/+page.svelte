@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
@@ -8,6 +9,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
+	import CornerLeftUpIcon from '@lucide/svelte/icons/corner-left-up';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
@@ -24,6 +26,7 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import {
 		Conversation,
@@ -35,6 +38,7 @@
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import Browser from '#lib/components/browser.svelte';
@@ -44,10 +48,14 @@
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
+	import MessageAttachments from '#lib/components/message-attachments.svelte';
+	import AttachButton from '#lib/components/attach-button.svelte';
 	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SidePane from '#lib/components/side-pane.svelte';
+	import SpawnDialog from '#lib/components/spawn-dialog.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
+	import SubThreads from '#lib/components/sub-threads.svelte';
 	import ThreadActions, { isSnoozed, presets, settle, snooze } from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
@@ -62,7 +70,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
-	import { api } from '#lib/api.js';
+	import { api, upload } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
@@ -97,6 +105,10 @@
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	let loginOpen = $state(false);
 	let forkOpen = $state(false);
+	let spawnOpen = $state(false);
+	// Bumped by lineage events, so the sub-thread strip refetches.
+	let lineage = $state(0);
+	const lineageVerb = { [Status.STARTING]: 'was spawned', [Status.AWAITING_INPUT]: 'finished', [Status.ERRORED]: 'failed' } as Partial<Record<Status, string>>;
 	let error = $state('');
 	// The reason of the latest status change, e.g. why the environment failed.
 	let reason = $state('');
@@ -202,6 +214,7 @@
 						markRead();
 					}
 					apply(chat, event);
+					if (event.kind.case === 'lineageUpdate') lineage++;
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionRequested', 'permissionResolved', 'forkNote'].includes(event.kind.case!)) refresh();
 				}
@@ -299,6 +312,8 @@
 				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
 		c.push({ label: 'Fork this thread', icon: GitForkIcon, run: () => (forkOpen = true) });
 		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
+		c.push({ label: 'Spawn sub-thread', icon: GitBranchPlusIcon, run: () => (spawnOpen = true) });
+		if (t.parentId) c.push({ label: `Go to parent: ${t.parentTitle}`, icon: CornerLeftUpIcon, run: () => goto(`/t/${t.parentId}`) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
 		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
@@ -327,10 +342,17 @@
 		};
 	}
 
-	async function send({ text }: { text: string }) {
-		if (!text.trim()) return;
-		// Throwing keeps the text in the prompt box so it can be retried.
-		if (!(await act(api.sendMessage({ threadId: id, message: message(text) })))) throw new Error(error);
+	async function send({ text, attachments: files }: PromptInputMessage) {
+		if (!text.trim() && !files.length) return;
+		let attachments;
+		try {
+			attachments = await Promise.all(files.map((f) => upload(f.file)));
+		} catch (e) {
+			error = (e as Error).message;
+			throw e;
+		}
+		// Throwing keeps the text and files in the prompt box so they can be retried.
+		if (!(await act(api.sendMessage({ threadId: id, message: { ...message(text), attachments } })))) throw new Error(error);
 		typedAt = 0;
 	}
 
@@ -380,6 +402,11 @@
 	<PageHeader>
 		<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
 		{#if thread}<StatusDot status={thread.status} label />{/if}
+		{#if thread?.parentId}
+			<a href="/t/{thread.parentId}" class="flex min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground" title="Spawned from {thread.parentTitle}">
+				<CornerLeftUpIcon class="size-3.5 shrink-0" /><span class="truncate">from {thread.parentTitle || 'its parent'}</span>
+			</a>
+		{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-0.5">
 			{#if here.length}
@@ -418,6 +445,7 @@
 					onclick={toggleMode}
 				/>
 				<IconButton icon={GitForkIcon} label="Fork: try another way from here" onclick={() => (forkOpen = true)} />
+				<IconButton icon={GitBranchPlusIcon} label="Spawn a sub-thread" onclick={() => (spawnOpen = true)} />
 				<ThreadActions {thread} {act} />
 			{/if}
 			{#if pr}
@@ -428,6 +456,7 @@
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
 		</div>
 	</PageHeader>
+	<SubThreads threadId={id} version={lineage} />
 
 	<Conversation class="min-h-0 flex-1">
 		<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
@@ -459,6 +488,7 @@
 											<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
 										</Message>
 									{/if}
+									{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}
 									{@render reviewCards(item.review)}
 								</div>
 							</div>
@@ -472,6 +502,7 @@
 									<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 								</div>
 								{#if item.text}<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>{/if}
+								{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}
 								{@render reviewCards(item.review)}
 								{#if item.resolved}
 									<p class="text-xs text-muted-foreground">
@@ -503,6 +534,13 @@
 							{:else}
 								{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`)}
 							{/if}
+						{:else if item.kind === 'lineage'}
+							{@const u = item.update}
+							<a href="/t/{u.threadId}" class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+								<GitBranchPlusIcon class="size-3.5 shrink-0" />
+								<StatusDot status={u.status} />
+								<span class="truncate"><span class="font-medium text-foreground">{u.title}</span> {lineageVerb[u.status]}{u.status === Status.STARTING && item.actor !== 'agent' ? ` by ${userName(item.actor)}` : ''}{u.text ? `: ${u.text}` : ''}</span>
+							</a>
 						{:else if item.kind === 'notice'}
 							<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 								<Response content={item.text} class="h-auto" />
@@ -614,13 +652,17 @@
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
 		<Plan plan={chat.plan} />
-		<PromptInput.Root onSubmit={send}>
+		<PromptInput.Root onSubmit={send} multiple maxFiles={5} maxFileSize={5 << 20} onError={(e) => (error = e.message)}>
 			<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
+				<PromptInput.Attachments class="px-2">
+					{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
+				</PromptInput.Attachments>
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar>
-					<div class="flex items-center gap-1.5 pl-2">
+					<div class="flex items-center gap-1.5 pl-1">
+						<AttachButton />
 						{#if thread && owner}
 							<!-- A running agent switches model and effort once its turns have ended, permissions at once. -->
 							<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />
@@ -681,3 +723,4 @@
 
 <LoginDialog bind:open={loginOpen} />
 {#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}
+{#if thread}<SpawnDialog bind:open={spawnOpen} {thread} />{/if}

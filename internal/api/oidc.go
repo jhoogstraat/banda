@@ -188,14 +188,24 @@ func (o *OIDC) Interceptor() connect.ServerInterceptor {
 				return next(ctx, spec, stream)
 			}
 			if info, ok := connect.CallInfoForServerContext(ctx); ok {
-				cookies, _ := http.ParseCookie(info.RequestHeader().Get("Cookie"))
-				for _, c := range cookies {
-					if id, ok := o.verify(c.Value, time.Now()); c.Name == sessionCookie && ok {
-						return next(WithUser(ctx, id), spec, stream)
-					}
+				if id := o.user(info.RequestHeader()); id != "" {
+					return next(WithUser(ctx, id), spec, stream)
 				}
 			}
 			return connect.NewError(connect.CodeUnauthenticated, "sign in required")
 		}
 	}
+}
+
+// User is the signed-in user of a plain HTTP request, or "".
+func (o *OIDC) User(r *http.Request) string { return o.user(r.Header) }
+
+func (o *OIDC) user(h header) string {
+	cookies, _ := http.ParseCookie(h.Get("Cookie"))
+	for _, c := range cookies {
+		if id, ok := o.verify(c.Value, time.Now()); c.Name == sessionCookie && ok {
+			return id
+		}
+	}
+	return ""
 }

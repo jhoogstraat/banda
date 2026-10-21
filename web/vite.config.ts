@@ -27,6 +27,7 @@ export default defineConfig({
 		proxy: {
 			'/banda.v1.': api,
 			'/auth': api,
+			'/files': api,
 			'/dex': 'http://localhost:5556'
 		}
 	}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -22,26 +23,76 @@ func actorName(names map[string]string, id string) string {
 // agentPrompt hands the agent the thread messages it hasn't seen yet (chat
 // between people, posts by other agents) and says who is asking when it
 // isn't the owner. A plain owner prompt is passed through unchanged.
-func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message) string {
-	text := messageText(m)
+// Attachments: text files (texts maps their ids to the content) are inlined,
+// images are named in the text and returned as ids to send along, the latest
+// maxPromptImages of them.
+func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message, texts map[string]string) (string, []string) {
 	name := func(id string) string { return actorName(names, id) }
+	var images []string
+	body := func(m *bandav1.Message) string {
+		b := strings.Builder{}
+		b.WriteString(messageText(m))
+		for _, a := range m.Attachments {
+			if imageTypes[a.MediaType] {
+				images = append(images, a.Id)
+				fmt.Fprintf(&b, "\n[attached image: %s]", a.Name)
+				continue
+			}
+			fence := "```"
+			for strings.Contains(texts[a.Id], fence) {
+				fence += "`"
+			}
+			fmt.Fprintf(&b, "\n\nAttached file %s:\n%s\n%s\n%s", a.Name, fence, strings.TrimSuffix(texts[a.Id], "\n"), fence)
+		}
+		return b.String()
+	}
 	var b strings.Builder
 	for _, e := range unseen {
+		line := ""
 		if m := e.GetMessage(); m != nil {
-			if b.Len() == 0 {
-				b.WriteString("Messages posted in this thread since your last turn:\n")
-			}
-			fmt.Fprintf(&b, "%s: %s\n", name(e.Actor), messageText(m))
+			line = name(e.Actor) + ": " + body(m)
+		} else if u := e.GetLineageUpdate(); u != nil {
+			line = lineageLine(u)
 		}
+		if line == "" {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("Messages posted in this thread since your last turn:\n")
+		}
+		b.WriteString(line + "\n")
 	}
+	text := body(m)
+	images = lastImages(images)
 	if b.Len() == 0 && by == owner {
-		return text
+		return text, images
 	}
 	if b.Len() > 0 {
 		b.WriteString("\n")
 	}
 	fmt.Fprintf(&b, "%s: %s", name(by), text)
-	return b.String()
+	return b.String(), images
+}
+
+// textAttachments loads the text files attached to messages, by id.
+func (s *Service) textAttachments(ctx context.Context, msgs []*bandav1.Message) (map[string]string, error) {
+	var ids []string
+	for _, m := range msgs {
+		for _, a := range m.GetAttachments() {
+			if !imageTypes[a.MediaType] {
+				ids = append(ids, a.Id)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	files, err := s.store.Attachments(ctx, ids, true)
+	texts := map[string]string{}
+	for _, f := range files {
+		texts[f.ID] = string(f.Data)
+	}
+	return texts, err
 }
 
 // messageText is a message as plain text, its review comments rendered as
@@ -76,4 +127,15 @@ func messageText(m *bandav1.Message) string {
 		fmt.Fprintf(&b, "\n\n%s, %s:\n%sdiff\n%s\n%s\n%s", c.Path, lines, fence, strings.TrimRight(c.Code, "\n"), fence, c.Body)
 	}
 	return b.String()
+}
+
+// lineageLine describes a sub-thread update for the agent and transcripts.
+func lineageLine(u *bandav1.LineageUpdate) string {
+	what := map[bandav1.Status]string{bandav1.Status_STATUS_STARTING: "was spawned",
+		bandav1.Status_STATUS_AWAITING_INPUT: "finished", bandav1.Status_STATUS_ERRORED: "failed"}[u.Status]
+	line := fmt.Sprintf("[Sub-thread %s %q %s]", u.ThreadId, u.Title, what)
+	if u.Text != "" {
+		line += " " + u.Text
+	}
+	return line
 }
