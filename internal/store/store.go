@@ -7,6 +7,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -73,14 +74,36 @@ func Open(ctx context.Context, url string) (*Store, error) {
 	return &Store{db}, nil
 }
 
+// cols are the thread columns Get, Update and the lists read; fields says where
+// each goes, in the same order. A new column goes into both, nowhere else.
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at, auto_push, env_delete_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted,
+	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
+	auto_push, env_delete_at`
+
+func fields(t *Thread) []any {
+	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
+		&t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
+		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
+		&t.AutoPush, &t.EnvDeleteAt}
+}
+
+// listCols are cols of threads t for listWithView, without the diff (large).
+var listCols = func() string {
+	var out []string
+	for _, c := range strings.Split(cols, ",") {
+		c = "t." + strings.TrimSpace(c)
+		if c == "t.diff" {
+			c = "''"
+		}
+		out = append(out, c)
+	}
+	return strings.Join(out, ", ")
+}()
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
-	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt)
+	err := row.Scan(fields(&t)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -181,9 +204,8 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 // listWithView lists threads matching where, without diffs (they are large);
 // $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
-	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
-		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, '', t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.permission_mode, t.permissions, t.allowed_tools, t.forked_from, t.fork_turn, t.race_id, t.created_at,
-		t.updated_at, t.auto_push, t.env_delete_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
+	rows, err := s.db.Query(ctx, `SELECT `+listCols+`,
+		v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -194,9 +216,7 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	for rows.Next() {
 		var t Thread
 		var activity []byte
-		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-			&t.AutoPush, &t.EnvDeleteAt, &t.SnoozedUntil, &t.Settled, &t.Unread, &activity); err != nil {
+		if err := rows.Scan(append(fields(&t), &t.SnoozedUntil, &t.Settled, &t.Unread, &activity)...); err != nil {
 			return nil, err
 		}
 		if activity != nil {
