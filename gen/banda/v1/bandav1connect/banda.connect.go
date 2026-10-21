@@ -111,6 +111,8 @@ const (
 	ThreadServiceRaceProcedure = "/banda.v1.ThreadService/Race"
 	// ThreadServiceRaceCompareProcedure is the procedure name of the ThreadService's RaceCompare RPC.
 	ThreadServiceRaceCompareProcedure = "/banda.v1.ThreadService/RaceCompare"
+	// ThreadServiceRaceListProcedure is the procedure name of the ThreadService's RaceList RPC.
+	ThreadServiceRaceListProcedure = "/banda.v1.ThreadService/RaceList"
 	// ThreadServiceRacePickProcedure is the procedure name of the ThreadService's RacePick RPC.
 	ThreadServiceRacePickProcedure = "/banda.v1.ThreadService/RacePick"
 	// ThreadServiceSearchProcedure is the procedure name of the ThreadService's Search RPC.
@@ -398,6 +400,13 @@ var (
 			Procedure:  ThreadServiceRaceCompareProcedure,
 		}
 	})
+	threadServiceRaceListSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("RaceList"),
+			Procedure:  ThreadServiceRaceListProcedure,
+		}
+	})
 	threadServiceRacePickSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -496,6 +505,9 @@ type ThreadServiceClient interface {
 	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
 	// Status, cost, time and diff of threads, side by side.
 	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Everyone's most recent races, newest first: the threads of each, without
+	// diffs.
+	RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error)
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
@@ -695,6 +707,9 @@ type ThreadServiceHandler interface {
 	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
 	// Status, cost, time and diff of threads, side by side.
 	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Everyone's most recent races, newest first: the threads of each, without
+	// diffs.
+	RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error)
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
@@ -744,6 +759,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceForkSpec(), Handler: adapter.fork},
 		connect.Method{Spec: threadServiceRaceSpec(), Handler: adapter.race},
 		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
+		connect.Method{Spec: threadServiceRaceListSpec(), Handler: adapter.raceList},
 		connect.Method{Spec: threadServiceRacePickSpec(), Handler: adapter.racePick},
 		connect.Method{Spec: threadServiceSearchSpec(), Handler: adapter.search},
 	)
@@ -972,6 +988,10 @@ func (UnimplementedThreadServiceHandler) Race(context.Context, *v1.RaceRequest) 
 
 func (UnimplementedThreadServiceHandler) RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RaceCompare is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RaceList is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error) {
@@ -1269,6 +1289,14 @@ func (c *threadServiceClient) Race(ctx context.Context, req *v1.RaceRequest) (*v
 func (c *threadServiceClient) RaceCompare(ctx context.Context, req *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error) {
 	var res v1.RaceCompareResponse
 	if err := c.client.CallUnary(ctx, threadServiceRaceCompareSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) RaceList(ctx context.Context, req *v1.RaceListRequest) (*v1.RaceListResponse, error) {
+	var res v1.RaceListResponse
+	if err := c.client.CallUnary(ctx, threadServiceRaceListSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1698,6 +1726,18 @@ func (h threadServiceHandler) raceCompare(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	res, err := h.svc.RaceCompare(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) raceList(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RaceListRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RaceList(ctx, &req)
 	if err != nil {
 		return err
 	}
