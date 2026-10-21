@@ -105,6 +105,12 @@ const (
 	// ThreadServicePermissionSetModeProcedure is the procedure name of the ThreadService's
 	// PermissionSetMode RPC.
 	ThreadServicePermissionSetModeProcedure = "/banda.v1.ThreadService/PermissionSetMode"
+	// ThreadServicePermissionVoteProcedure is the procedure name of the ThreadService's PermissionVote
+	// RPC.
+	ThreadServicePermissionVoteProcedure = "/banda.v1.ThreadService/PermissionVote"
+	// ThreadServicePermissionRevokeProcedure is the procedure name of the ThreadService's
+	// PermissionRevoke RPC.
+	ThreadServicePermissionRevokeProcedure = "/banda.v1.ThreadService/PermissionRevoke"
 	// ThreadServiceForkProcedure is the procedure name of the ThreadService's Fork RPC.
 	ThreadServiceForkProcedure = "/banda.v1.ThreadService/Fork"
 	// ThreadServiceRaceProcedure is the procedure name of the ThreadService's Race RPC.
@@ -377,6 +383,20 @@ var (
 			Procedure:  ThreadServicePermissionSetModeProcedure,
 		}
 	})
+	threadServicePermissionVoteSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionVote"),
+			Procedure:  ThreadServicePermissionVoteProcedure,
+		}
+	})
+	threadServicePermissionRevokeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionRevoke"),
+			Procedure:  ThreadServicePermissionRevokeProcedure,
+		}
+	})
 	threadServiceForkSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -489,6 +509,13 @@ type ThreadServiceClient interface {
 	// Sets which tool calls the agent must ask for (owner only). Applies to the
 	// running agent at once.
 	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
+	// Votes for answers to the agent's pending question (AskUserQuestion):
+	// anyone, shown on the card for whoever answers. A new vote replaces the
+	// caller's last one.
+	PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error)
+	// Removes a tool or rule from the thread's "always allow" list: the owner,
+	// or anyone in a trusted thread.
+	PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error)
 	// Starts threads (one per try) from another thread's current changes and
 	// conversation, owned by the caller. Anyone who can see a thread can fork it.
 	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
@@ -688,6 +715,13 @@ type ThreadServiceHandler interface {
 	// Sets which tool calls the agent must ask for (owner only). Applies to the
 	// running agent at once.
 	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
+	// Votes for answers to the agent's pending question (AskUserQuestion):
+	// anyone, shown on the card for whoever answers. A new vote replaces the
+	// caller's last one.
+	PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error)
+	// Removes a tool or rule from the thread's "always allow" list: the owner,
+	// or anyone in a trusted thread.
+	PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error)
 	// Starts threads (one per try) from another thread's current changes and
 	// conversation, owned by the caller. Anyone who can see a thread can fork it.
 	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
@@ -741,6 +775,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceTeamWatchSpec(), Handler: adapter.teamWatch},
 		connect.Method{Spec: threadServicePermissionAnswerSpec(), Handler: adapter.permissionAnswer},
 		connect.Method{Spec: threadServicePermissionSetModeSpec(), Handler: adapter.permissionSetMode},
+		connect.Method{Spec: threadServicePermissionVoteSpec(), Handler: adapter.permissionVote},
+		connect.Method{Spec: threadServicePermissionRevokeSpec(), Handler: adapter.permissionRevoke},
 		connect.Method{Spec: threadServiceForkSpec(), Handler: adapter.fork},
 		connect.Method{Spec: threadServiceRaceSpec(), Handler: adapter.race},
 		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
@@ -960,6 +996,14 @@ func (UnimplementedThreadServiceHandler) PermissionAnswer(context.Context, *v1.P
 
 func (UnimplementedThreadServiceHandler) PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionSetMode is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionVote is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionRevoke is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error) {
@@ -1245,6 +1289,22 @@ func (c *threadServiceClient) PermissionAnswer(ctx context.Context, req *v1.Perm
 func (c *threadServiceClient) PermissionSetMode(ctx context.Context, req *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error) {
 	var res v1.PermissionSetModeResponse
 	if err := c.client.CallUnary(ctx, threadServicePermissionSetModeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PermissionVote(ctx context.Context, req *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error) {
+	var res v1.PermissionVoteResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionVoteSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PermissionRevoke(ctx context.Context, req *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error) {
+	var res v1.PermissionRevokeResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionRevokeSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1662,6 +1722,30 @@ func (h threadServiceHandler) permissionSetMode(ctx context.Context, _ connect.S
 		return err
 	}
 	res, err := h.svc.PermissionSetMode(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) permissionVote(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionVoteRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionVote(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) permissionRevoke(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionRevokeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionRevoke(ctx, &req)
 	if err != nil {
 		return err
 	}

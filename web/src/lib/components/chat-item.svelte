@@ -21,6 +21,7 @@
 	import MentionText from '#lib/components/mention-text.svelte';
 	import MessageAttachments from '#lib/components/message-attachments.svelte';
 	import PermissionCard from '#lib/components/permission-card.svelte';
+	import QuestionCard from '#lib/components/question-card.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
@@ -28,7 +29,7 @@
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { api } from '#lib/api.js';
-	import { permissionLabel } from '#lib/permissions.js';
+	import { permissionLabel, ruleLabel } from '#lib/permissions.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
@@ -138,6 +139,8 @@
 			<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
 		{/if}
 	</div>
+{:else if item.kind === 'permission' && item.req.toolName === 'AskUserQuestion'}
+	<QuestionCard {item} {threadId} can={owner || !!thread?.trusted} ownerName={userName(thread?.ownerId ?? '')} {act} />
 {:else if item.kind === 'permission'}
 	<PermissionCard {item} {threadId} {owner} trusted={!!thread?.trusted} ownerName={userName(thread?.ownerId ?? '')} {act} />
 {:else if item.kind === 'text'}
@@ -205,7 +208,9 @@
 {:else if item.kind === 'settings'}
 	{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
 {:else if item.kind === 'permissionMode'}
-	{@render divider(`${userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
+	{@render divider(`${item.actor === 'agent' ? 'The agent' : userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
+{:else if item.kind === 'revoked'}
+	{@render divider(`${userName(item.actor)} no longer always allows ${ruleLabel(item.rule)}`)}
 {:else if item.kind === 'fork'}
 	{@const n = item.note}
 	<div class="flex items-center gap-3 text-xs text-muted-foreground">

@@ -147,6 +147,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if e.GetPermissionResolved() != nil {
 				e.Actor = "system" // the agent withdrew it
 			}
+			if e.GetPermissionModeChanged() != nil {
+				s.agentMode(bg, id, e)
+				continue
+			}
 			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
 				s.permissionEvent(bg, id, e)
 				if e.GetPermissionRequested() != nil { // asking keeps a parked thread's turn open

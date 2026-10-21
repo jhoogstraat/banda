@@ -48,7 +48,7 @@ export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = 
 	for (const t of next.threads) {
 		if (sectionOf(t) !== 'needs') continue;
 		if (t.turnRequests > (asks.get(t.id) ?? 0)) out.push({ thread: t, title: 'A teammate asks to run your agent' });
-		if (t.permissionPending && !asking.has(t.id)) out.push({ thread: t, title: 'Your agent asks for permission' });
+		if (t.permissionPending && !asking.has(t.id)) out.push({ thread: t, title: t.activity?.text.startsWith('asks: ') ? 'Your agent has a question' : 'Your agent asks for permission' });
 		if (was.get(t.id) === t.status) continue;
 		if (t.status === Status.AWAITING_INPUT) out.push({ thread: t, title: 'Your agent needs input' });
 		if (t.status === Status.ERRORED) out.push({ thread: t, title: 'Your thread failed' });

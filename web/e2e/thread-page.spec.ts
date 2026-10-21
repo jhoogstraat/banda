@@ -49,7 +49,7 @@ test('permission and plan cards: the owner allows a call asked before it streame
 		await t.send('e2e-ask-first');
 		const card = page.getByRole('group', { name: 'Permission for Bash' });
 		await expect(card.getByText('$ echo e2e-permitted >> permitted.txt')).toBeVisible();
-		await expect(page.getByText('Agent is waiting for permission')).toBeVisible();
+		await expect(page.getByText('Agent is waiting for an answer')).toBeVisible();
 		await expect(bobPage.getByText(`Waiting for ${alice.id} to answer`)).toBeVisible();
 		await expect(bobPage.getByRole('button', { name: 'Allow once' })).toHaveCount(0);
 		await card.getByRole('button', { name: 'Allow once' }).click();
@@ -71,6 +71,68 @@ test('permission and plan cards: the owner allows a call asked before it streame
 		await expect(bobPage.getByText(`Plan approved by ${alice.id}, now: accept edits`)).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Permissions: Accept edits' })).toBeVisible();
 	});
+});
+
+test('question, edit and rule cards: bob votes and alice answers; alice edits a command, always allows a narrower rule and takes it back', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+
+	await test.step('a question: bob votes, alice sees the vote, picks and types her own, and the agent gets her answers', async () => {
+		await t.send('e2e-question');
+		const bobCard = bobPage.getByRole('group', { name: 'Question' });
+		await bobCard.getByRole('radio', { name: /Postgres/ }).check();
+		await bobCard.getByRole('checkbox', { name: /Cache/ }).check();
+		await bobCard.getByRole('button', { name: 'Vote' }).click();
+		await expect(bobCard.getByText('Your vote is in.')).toBeVisible();
+		await expect(bobCard.getByRole('button', { name: 'Send answers' })).toHaveCount(0);
+		const card = page.getByRole('group', { name: 'Question' });
+		await expect(card.getByRole('radio', { name: new RegExp(`Postgres.*${bob.id}`) })).toBeVisible();
+		await expect(card.getByRole('button', { name: 'Send answers' })).toBeDisabled();
+		await card.getByRole('radio', { name: /SQLite/ }).check();
+		await card.getByRole('checkbox', { name: /Search/ }).check();
+		await card.getByRole('textbox', { name: 'Other answer: Extras' }).fill('Queues');
+		await card.getByRole('button', { name: 'Send answers' }).click();
+		await expect(page.getByText('Answers: {"Which database?":"SQLite","Which extras?":"Search, Queues"}')).toBeVisible();
+		await expect(bobCard.getByText(`Answered by ${alice.id}`)).toBeVisible();
+		await expect(bobCard.getByText('Search, Queues')).toBeVisible();
+	});
+
+	await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.ASK });
+	await test.step('alice edits a command before allowing it; bob sees what ran', async () => {
+		await t.send('e2e-ask edit');
+		const card = page.getByRole('group', { name: 'Permission for Bash' });
+		await expect(bobPage.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+		await card.getByRole('button', { name: 'Edit' }).click();
+		await card.getByRole('textbox', { name: 'Command' }).fill('echo e2e-edited >> permitted.txt');
+		await card.getByRole('button', { name: 'Allow with changes' }).click();
+		await expect(bobPage.getByText(`Allowed once by ${alice.id}, with changes`)).toBeVisible();
+		await expect(bobPage.getByText('$ echo e2e-edited >> permitted.txt')).toBeVisible();
+	});
+
+	await test.step('alice always allows "touch …", listed under Allowed, and takes it back', async () => {
+		await t.send(`e2e-ask e2e-cmd:${Buffer.from('touch a.txt').toString('base64')}`);
+		await page.getByRole('group', { name: 'Permission for Bash' }).last().getByRole('button', { name: 'Always allow touch …' }).click();
+		await expect(page.getByText(`touch … allowed in this thread by ${alice.id}`)).toBeVisible();
+		await bobPage.getByRole('button', { name: 'Allowed: 1' }).click();
+		await expect(bobPage.getByRole('menuitem', { name: 'Stop allowing touch …' })).toBeDisabled();
+		await bobPage.keyboard.press('Escape');
+		await page.getByRole('button', { name: 'Allowed: 1' }).click();
+		await page.getByRole('menuitem', { name: 'Stop allowing touch …' }).click();
+		await expect(bobPage.getByText(`${alice.id} no longer always allows touch …`)).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Allowed: 1' })).toHaveCount(0);
+	});
+});
+
+test('the agent entering plan mode itself shows in the header and the chat', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await post(page, 'e2e-enter-plan');
+	await expect(page.getByText('The agent switched to Plan')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Permissions: Plan' })).toBeVisible();
 });
 
 test('turn requests: bob asks the agent and waits; alice approves one, which runs, and declines another with a note', async ({ as }) => {

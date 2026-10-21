@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import ShieldQuestionIcon from '@lucide/svelte/icons/shield-question';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
@@ -7,15 +8,17 @@
 	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
 	import type { Item } from '#lib/events.js';
 	import { PermissionDecision, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
-	import { permissionLabel } from '#lib/permissions.js';
+	import { narrowRule, permissionLabel, ruleLabel } from '#lib/permissions.js';
 	import { userName } from '#lib/threads.svelte.js';
 	import { diff, input, rel } from '#lib/tools.js';
 
 	// The agent asking before a tool call, inline in the chat. The owner answers, or anyone once teammates are trusted;
-	// a plan (ExitPlanMode) only the owner approves, choosing how the agent works from then on.
+	// a plan (ExitPlanMode) only the owner approves, choosing how the agent works from then on. The owner may change a
+	// command or an edit before allowing it, and "always allow" offers a narrower rule than the whole tool where one fits.
 	let {
 		item,
 		threadId,
@@ -35,15 +38,25 @@
 	const tool = $derived(item.tool);
 	const name = $derived(item.req.toolName);
 	const plan = $derived(name === 'ExitPlanMode');
-	const args = $derived(input(tool));
-	const edits = $derived(diff(tool));
+	// The input it ran with, if the answer changed it.
+	const changed = $derived(item.resolved?.updatedInputJson ? JSON.parse(item.resolved.updatedInputJson) : undefined);
+	const args = $derived(changed ?? input(tool));
+	const edits = $derived(changed ? undefined : diff(tool));
 	const can = $derived(owner || (trusted && !plan));
+	const rule = $derived(narrowRule(name, args));
+	// The field the owner may change before allowing: the command, or the new text of an edit.
+	const field = $derived(name === 'Bash' ? 'command' : name === 'Edit' ? 'new_string' : name === 'Write' ? 'content' : '');
 	let reason = $state('');
 	let busy = $state(false);
+	let editing = $state(false);
+	let draft = $state('');
 
-	async function answer(decision: PermissionDecision, mode = PermissionMode.UNSPECIFIED) {
+	async function answer(decision: PermissionDecision, mode = PermissionMode.UNSPECIFIED, rule = '') {
 		busy = true;
-		await act(api.permissionAnswer({ threadId, requestId: item.req.id, decision, message: reason.trim(), mode }));
+		let updatedInputJson = '';
+		if (editing && decision !== PermissionDecision.DENY && draft !== args[field])
+			updatedInputJson = JSON.stringify({ ...JSON.parse(item.req.inputJson || '{}'), [field]: draft });
+		await act(api.permissionAnswer({ threadId, requestId: item.req.id, decision, message: reason.trim(), mode, rule, updatedInputJson }));
 		busy = false;
 	}
 
@@ -51,9 +64,9 @@
 		const by = userName(r.by);
 		switch (r.decision) {
 			case PermissionDecision.ALLOW:
-				return plan ? `Plan approved by ${by}, now: ${permissionLabel(r.mode).toLowerCase()}` : `Allowed once by ${by}`;
+				return plan ? `Plan approved by ${by}, now: ${permissionLabel(r.mode).toLowerCase()}` : `Allowed once by ${by}${changed ? ', with changes' : ''}`;
 			case PermissionDecision.ALLOW_ALWAYS:
-				return `${name} allowed in this thread by ${by}`;
+				return `${ruleLabel(r.rule || name)} allowed in this thread by ${by}${changed ? ', with changes' : ''}`;
 			case PermissionDecision.DENY:
 				return `${plan ? 'Sent back for more planning' : 'Denied'} by ${by}${r.message ? `: ${r.message}` : ''}`;
 			case PermissionDecision.CANCELED:
@@ -77,6 +90,9 @@
 		<div class="max-h-96 overflow-auto rounded-md bg-muted/30 px-3 py-2">
 			<Response content={args.plan || 'See the plan above.'} class="h-auto" />
 		</div>
+	{:else if editing && !item.resolved}
+		{#if field !== 'command'}<p class="font-mono text-xs text-muted-foreground">{rel(args.file_path)}</p>{/if}
+		<Textarea bind:value={draft} aria-label={field === 'command' ? 'Command' : 'New text'} class="min-h-20 font-mono text-xs" />
 	{:else if name === 'Bash'}
 		<pre class="overflow-x-auto rounded-md bg-zinc-950 p-3 font-mono text-xs whitespace-pre-wrap text-zinc-200"><span class="text-emerald-400">$</span> {args.command}</pre>
 	{:else if edits}
@@ -98,8 +114,12 @@
 				<Button size="sm" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW, PermissionMode.ACCEPT_EDITS)}><CheckIcon /> Approve, accept edits</Button>
 				<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW, PermissionMode.ASK)}>Approve, ask before each edit</Button>
 			{:else}
-				<Button size="sm" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> Allow once</Button>
+				<Button size="sm" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> {editing ? 'Allow with changes' : 'Allow once'}</Button>
+				{#if rule}<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW_ALWAYS, undefined, rule)}>Always allow {ruleLabel(rule)}</Button>{/if}
 				<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW_ALWAYS)}>Always allow {name} in this thread</Button>
+				{#if owner && field && !editing}
+					<Button size="sm" variant="ghost" disabled={busy} onclick={() => ((draft = args[field] ?? ''), (editing = true))}><PencilIcon /> Edit</Button>
+				{/if}
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">

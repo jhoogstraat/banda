@@ -253,6 +253,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Activity:           t.Activity,
 		PermissionMode:     permissionModeToProto[t.PermissionMode],
 		PermissionPending:  len(t.Permissions) > 0,
+		AllowedTools:       t.AllowedTools,
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
 	}

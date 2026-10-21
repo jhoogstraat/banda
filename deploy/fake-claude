@@ -7,7 +7,12 @@
 # runs a Bash command (its description holds $E2E_SECRET, for redaction) that
 # asks for permission first (unless the mode bypasses), "e2e-ask-first" asks
 # before it streams the call, "e2e-plan" proposes a plan in plan mode
-# (ExitPlanMode); they act on the answer.
+# (ExitPlanMode); they act on the answer. e2e-ask runs the command the answer
+# allowed (it may be edited), by default appending to permitted.txt;
+# "e2e-cmd:<base64 command>" asks for that one instead. "e2e-question" asks two
+# questions (AskUserQuestion, also in bypass mode, like the real CLI) and says
+# "Answers: <the answers' JSON>". "e2e-enter-plan" enters plan mode itself
+# (EnterPlanMode, which the real CLI allows without asking).
 #
 # Directives a test puts anywhere in a prompt, one case each in the loop below
 # (web/e2e/fixtures.ts has helpers for them):
@@ -71,7 +76,7 @@ tool() {
   local use="{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"$1\",\"name\":\"$2\",\"input\":$3}]},\"parent_tool_use_id\":null}"
   [ -n "$first" ] || echo "$use"
   answer='"behavior":"allow"'
-  [ "$mode" = bypassPermissions ] || ask "$2" "$1" "$3"
+  { [ "$mode" = bypassPermissions ] && [ "$2" != AskUserQuestion ]; } || ask "$2" "$1" "$3"
   [ -z "$first" ] || echo "$use"
   if [[ $answer == *'"behavior":"allow"'* ]]; then
     ok=1 err=false out=$4
@@ -190,10 +195,26 @@ while next; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;
+    *e2e-question*'"type":"user"'*)
+      tool "toolu_q$RANDOM" AskUserQuestion '{"questions":[{"question":"Which database?","header":"Database","options":[{"label":"Postgres","description":"The usual"},{"label":"SQLite","description":"One file"}],"multiSelect":false},{"question":"Which extras?","header":"Extras","options":[{"label":"Cache","description":"Faster reads"},{"label":"Search","description":"Full text"}],"multiSelect":true}]}' "User has answered your questions."
+      if [ -n "$ok" ]; then text "Answers: $(jq -c '.response.response.updatedInput.answers' <<<"$answer")"; else text "Not answered: $out"; fi
+      result
+      ;;
+    *e2e-enter-plan*'"type":"user"'*)
+      echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_enter","name":"EnterPlanMode","input":{}}]},"parent_tool_use_id":null}'
+      mode=plan
+      echo '{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_enter","type":"tool_result","content":"Entered plan mode.","is_error":false}]},"parent_tool_use_id":null}'
+      say "Planning now"
+      ;;
     *e2e-ask*'"type":"user"'*)
       first=; [[ $line == *e2e-ask-first* ]] && first=1
-      tool "toolu_ask$RANDOM" Bash '{"command":"echo e2e-permitted >> permitted.txt","description":"Append a line, not '"${E2E_SECRET:-}"'"}' ran
-      if [ -n "$ok" ]; then echo e2e-permitted >> permitted.txt; say "Ran it"; else say "Not allowed: $out"; fi
+      cmd='echo e2e-permitted >> permitted.txt'
+      [[ $line =~ e2e-cmd:([A-Za-z0-9+/=]+) ]] && cmd=$(base64 -d <<<"${BASH_REMATCH[1]}")
+      tool "toolu_ask$RANDOM" Bash "$(jq -cn --arg c "$cmd" --arg d "Append a line, not ${E2E_SECRET:-}" '{command:$c,description:$d}')" ran
+      if [ -n "$ok" ]; then
+        run=$(jq -r '.response.response.updatedInput.command // empty' <<<"$answer" 2>/dev/null)
+        bash -c "${run:-$cmd}"; say "Ran it"
+      else say "Not allowed: $out"; fi
       ;;
     *e2e-plan*'"type":"user"'*)
       if [ "$mode" != plan ]; then say "Not in plan mode ($mode)"; continue; fi
