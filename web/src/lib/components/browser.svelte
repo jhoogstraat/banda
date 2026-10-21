@@ -69,7 +69,12 @@
 		const w = window.open('', '_blank'); // before the await, or popup blockers step in
 		if (!w || !port) return;
 		w.opener = null;
-		w.location.href = (await api.previewOpen({ threadId, port, path })).url;
+		try {
+			w.location.href = (await api.previewOpen({ threadId, port, path })).url;
+		} catch (e) {
+			w.close();
+			error = ConnectError.from(e).rawMessage;
+		}
 	}
 </script>
 
