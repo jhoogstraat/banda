@@ -100,6 +100,21 @@ mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")
 [ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
+TEAM=$(mktemp)
+mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/TeamWatch" >"$TEAM" 2>/dev/null &
+TEAM_PID=$!
+for _ in $(seq 30); do [ -s "$TEAM" ] && break; sleep 0.5; done
+BOB=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: bob on the board"}' bob | jq -r .thread.id)
+# The latest activity of bob's thread in carol's last team snapshot starts with $1.
+board() { jq -se --arg id "$BOB" --arg want "$1" 'last.threads | map(select(.id == $id))[0].activity.text // "" | startswith($want)' "$TEAM" >/dev/null 2>&1; }
+for _ in $(seq 10); do board "e2e: bob on the board" && break; sleep 0.5; done
+board "e2e: bob on the board" || { kill $TEAM_PID; fail "bob's new thread is not on carol's board: $(tail -c 2000 "$TEAM")"; }
+for _ in $(seq 60); do board "errored: Setup failed" && break; sleep 1; done
+kill $TEAM_PID
+board "errored: Setup failed" || fail "the board does not show bob's error"
+call ThreadService/Snooze "{\"threadId\":\"$BOB\",\"until\":\"2099-01-01T00:00:00Z\"}" bob >/dev/null
+ok "bob's new thread shows up live on carol's team board, then its error"
+
 ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true}}" bob >/dev/null; }
 request() { sql "select seq from events where thread_id='$ID' and body ? 'turnRequest' order by seq desc limit 1"; }
 ask "one more"

@@ -43,6 +43,8 @@ type Thread struct {
 	SnoozedUntil *time.Time
 	Settled      bool
 	Unread       bool
+	// Only set by the lists.
+	Activity *bandav1.TeamActivity
 }
 
 type Store struct{ db *pgxpool.Pool }
@@ -107,7 +109,15 @@ func (s *Store) GetFor(ctx context.Context, id, viewerID string) (Thread, error)
 	if len(threads) == 0 {
 		return Thread{}, ErrNotFound
 	}
-	return threads[0], nil
+	t := threads[0]
+	return t, s.db.QueryRow(ctx, `SELECT diff FROM threads WHERE id = $1`, id).Scan(&t.Diff)
+}
+
+// Team returns everyone's threads updated after since that their owners
+// haven't settled, with viewerID's view.
+func (s *Store) Team(ctx context.Context, viewerID string, since time.Time) ([]Thread, error) {
+	return s.listWithView(ctx, `t.updated_at > $2 AND NOT EXISTS (SELECT 1 FROM thread_views o
+		WHERE o.thread_id = t.id AND o.user_id = t.owner_id AND o.settled_at IS NOT NULL)`, viewerID, since)
 }
 
 // ListMentioned returns other users' threads in which the viewer has an
@@ -117,11 +127,12 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 		WHERE m.thread_id = t.id AND m.user_id = $1 AND m.answered_at IS NULL)`, viewerID)
 }
 
-// listWithView lists threads matching where; $1 is always the viewer.
+// listWithView lists threads matching where, without diffs (they are large);
+// $1 is always the viewer.
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
-		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
-		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0)
+		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, '', t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
+		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -131,10 +142,17 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	var out []Thread
 	for rows.Next() {
 		var t Thread
+		var activity []byte
 		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
 			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
-			&t.SnoozedUntil, &t.Settled, &t.Unread); err != nil {
+			&t.SnoozedUntil, &t.Settled, &t.Unread, &activity); err != nil {
 			return nil, err
+		}
+		if activity != nil {
+			t.Activity = new(bandav1.TeamActivity)
+			if err := protojson.Unmarshal(activity, t.Activity); err != nil {
+				return nil, err
+			}
 		}
 		out = append(out, t)
 	}
@@ -159,10 +177,19 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	if err != nil {
 		return t, nil, err
 	}
+	var activity []byte // nil keeps the previous one
+	for _, e := range events {
+		if a := Activity(e); a != nil {
+			a.Time = timestamppb.Now()
+			if activity, err = protojson.Marshal(a); err != nil {
+				return t, nil, err
+			}
+		}
+	}
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
-		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
-		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort).Scan(&seq, &t.UpdatedAt)
+		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, last_seq=last_seq+$6, activity=coalesce($13, activity), updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort, activity).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}
