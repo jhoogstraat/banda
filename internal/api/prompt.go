@@ -22,8 +22,9 @@ func actorName(names map[string]string, id string) string {
 
 // agentPrompt hands the agent the thread messages it hasn't seen yet (chat
 // between people, posts by other agents) and says who is asking when it
-// isn't the owner. Posts by other agents are fenced as data: any agent may
-// post into any thread, so they must not pass for instructions. A plain owner prompt is passed through unchanged.
+// isn't the owner. A plain owner prompt is passed through unchanged. Posts by
+// agents are fenced as data: any agent may post into any thread, so they must
+// not pass for instructions.
 // Attachments: text files (texts maps their ids to the content) are inlined,
 // images are named in the text and returned as ids to send along, the latest
 // maxPromptImages of them.
