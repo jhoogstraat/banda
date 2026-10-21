@@ -827,6 +827,13 @@ export declare type TurnEnded = Message$1<"banda.v1.TurnEnded"> & {
    * @generated from field: double cost_usd = 4;
    */
   costUsd: number;
+
+  /**
+   * The prompts the turn ended: its own and those folded into it.
+   *
+   * @generated from field: int32 prompts = 5;
+   */
+  prompts: number;
 };
 
 /**

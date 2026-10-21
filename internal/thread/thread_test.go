@@ -68,6 +68,8 @@ func TestApply(t *testing.T) {
 			working(idle, 2), StartTurn, nil},
 		{"a queued turn keeps it working", working(idle, 2), TurnEnded{},
 			working(idle, 1), None, nil},
+		{"a turn with a prompt folded into it ends both", working(idle, 2), TurnEnded{Prompts: 2},
+			idle, None, nil},
 		{"chat while starting is fine", with(idle, func(s *State) { s.Status = Starting }), Send{By: "bob"},
 			with(chat, func(s *State) { s.Status = Starting }), None, nil},
 		{"prompt while starting", with(idle, func(s *State) { s.Status = Starting }), Send{By: "ann"},

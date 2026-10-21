@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -81,7 +82,13 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		s.mu.Unlock()
 		if mine && !login {
 			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
-			s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
+			_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
+				return envLost(t, 0), nil
+			})
+			if err != nil {
+				slog.Error("store lost environment", "thread", id, "err", err)
+			}
+			s.broadcast(id, events)
 		}
 	}()
 
@@ -99,6 +106,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 	}()
 
+	// What the runner sent before it went away still happened: store it all,
+	// though the stream's context ends with the stream.
+	bg := context.WithoutCancel(ctx)
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
@@ -106,7 +116,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 		switch k := msg.Kind.(type) {
 		case *bandav1.ConnectRequest_Ready:
-			if err := s.ready(ctx, id, r); err != nil {
+			if err := s.ready(bg, id, r); err != nil {
 				return err
 			}
 		case *bandav1.ConnectRequest_Event:
@@ -121,7 +131,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				continue
 			}
 			if ap := e.GetAutoPush(); ap != nil {
-				if err := s.store.SetAutoPush(ctx, id, ap.State.String()); err != nil {
+				if err := s.store.SetAutoPush(bg, id, ap.State.String()); err != nil {
 					slog.Error("store auto-push state", "thread", id, "err", err)
 				}
 			}
@@ -129,23 +139,23 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				e.Actor = "system" // the agent withdrew it
 			}
 			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
-				s.permissionEvent(ctx, id, e)
+				s.permissionEvent(bg, id, e)
 				continue
 			}
 			var action thread.Action
 			var reason string
-			if e.GetTurnEnded() != nil {
-				action = thread.TurnEnded{}
+			if te := e.GetTurnEnded(); te != nil {
+				action = thread.TurnEnded{Prompts: int(te.Prompts)}
 			}
 			// The runner stays up for debugging but won't start the agent.
 			if st := e.GetSetupStep(); st.GetState() == bandav1.SetupState_SETUP_STATE_FAILED {
 				action, reason = thread.EnvLost{}, "Setup failed: "+st.Title
 			}
-			if _, err := s.applyBecause(ctx, id, action, reason, e); err != nil {
+			if _, err := s.applyBecause(bg, id, action, reason, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
 			}
 			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
-				s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
+				s.settlePermissions(bg, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
 			s.mu.Lock()
@@ -163,7 +173,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			s.mu.Unlock()
 		case *bandav1.ConnectRequest_LoginStatus:
-			if err := s.store.SetLogin(ctx, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
+			if err := s.store.SetLogin(bg, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
 				slog.Error("store login status", "user", owner, "err", err)
 			}
 		case *bandav1.ConnectRequest_FileResponse:
@@ -178,7 +188,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
-			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			_, events, err := s.store.Update(bg, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 				t.Diff = k.Diff.Diff
 				return []*bandav1.Event{{Actor: "system", Kind: &bandav1.Event_DiffChanged{DiffChanged: &bandav1.DiffChanged{}}}}, nil
 			})
@@ -190,23 +200,43 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 	}
 }
 
-// ready marks the environment ready and hands over the initial prompt if it
-// has not been delivered yet.
+// ready marks the environment ready and hands over the pending prompt, with
+// what was posted since it was kept.
 func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	// A new claude process: requests of the one before are gone.
 	s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
+	names := s.names(ctx)
 	var prompt string
 	var images []string
-	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
-		if effect == thread.StartTurn {
-			prompt, t.PendingPrompt = t.PendingPrompt, ""
-			images, t.PendingImages = t.PendingImages, nil
-			t.DeliveredSeq = t.LastSeq
+	defer s.lockDelivery(id)()
+	var t store.Thread
+	var events []*bandav1.Event
+	err := retryStale(func() error {
+		u, err := s.readUnseen(ctx, id, nil)
+		if err != nil {
+			return err
 		}
-		events := stateEvents(t.State, next)
-		t.State = next
-		return events, nil
+		t, events, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
+			events := lostTurns(t.State, 0) // e.g. the API restarted mid-turn
+			if effect == thread.StartTurn {
+				// The pending prompt covers the events through DeliveredSeq.
+				if err := u.fresh(t); err != nil {
+					return nil, err
+				}
+				posted, more := postedSince(names, u.events, u.texts)
+				prompt, images = t.PendingPrompt, lastImages(append(t.PendingImages, more...))
+				if posted != "" {
+					prompt += "\n\nMessages posted in this thread since:\n" + posted
+				}
+				t.PendingPrompt, t.PendingImages = "", nil
+				t.DeliveredSeq = t.LastSeq
+			}
+			events = append(events, stateEvents(t.State, next)...)
+			t.State = next
+			return events, nil
+		})
+		return err
 	})
 	if err != nil {
 		return err
@@ -217,6 +247,35 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 		s.deliver(ctx, id, prompt, images)
 	}
 	return nil
+}
+
+// lostTurns reports the turns a thread in state st loses with its claude
+// process, but the kept ones whose prompt is pending: a notice, and a failed
+// turn end, which its parent hears of.
+func lostTurns(st thread.State, kept int) []*bandav1.Event {
+	n := st.Turns - kept
+	if st.Status != thread.Working || n < 1 {
+		return nil
+	}
+	text := "The agent stopped in the middle of a turn: the turn was lost"
+	if n == 2 {
+		text += ", and 1 prompt queued behind it"
+	} else if n > 2 {
+		text += fmt.Sprintf(", and %d prompts queued behind it", n-1)
+	}
+	return []*bandav1.Event{
+		{Actor: "system", Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text + ". Post again what is still needed."}}},
+		{Actor: "system", Kind: &bandav1.Event_TurnEnded{TurnEnded: &bandav1.TurnEnded{IsError: true, Error: "the agent stopped mid-turn"}}},
+	}
+}
+
+// envLost applies EnvLost to t (kept: see lostTurns) and returns the events to store.
+func envLost(t *store.Thread, kept int) []*bandav1.Event {
+	events := lostTurns(t.State, kept)
+	next, _, _ := thread.Apply(t.State, thread.EnvLost{})
+	events = append(events, stateEvents(t.State, next)...)
+	t.State = next
+	return events
 }
 
 // sendRunner reports false if no runner is connected for the thread, or it

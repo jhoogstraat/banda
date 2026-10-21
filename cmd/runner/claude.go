@@ -40,6 +40,8 @@ type line struct {
 	Result       string  `json:"result"`
 	DurationMS   int64   `json:"duration_ms"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
+	// The prompts still queued: all others written so far ran in this turn or before.
+	QueuedTurnCount int `json:"queued_turn_count"`
 	// system/api_retry
 	Error string `json:"error"`
 	// control_request (can_use_tool) and control_cancel_request
@@ -132,6 +134,13 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 			Id: l.RequestID, Decision: bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED}}})
 	}
 	return events, false, false
+}
+
+// queuedTurns is how many prompts the CLI still queues after a result.
+func queuedTurns(raw []byte) int {
+	var l line
+	json.Unmarshal(raw, &l)
+	return l.QueuedTurnCount
 }
 
 // unsupportedRequest reports the id of a control request from the CLI that

@@ -17,6 +17,10 @@
 #                     exists, then goes on with the prompt. It keeps reading
 #                     stdin: messages queue, permission modes apply, and an
 #                     interrupt ends the turn.
+#   e2e-fold          on a held turn: the messages that arrived while it was
+#                     held join the turn (each says "Folded a message into this
+#                     turn", and with e2e-echo "Received: …"), and only one
+#                     result follows, like the real CLI folding at a tool boundary.
 #   e2e-crash:<name>  makes a tool call and exits 1 mid-turn, without a result,
 #                     once per thread: a redelivered prompt runs normally.
 #   e2e-cost:<usd>    the turn's result reports this total_cost_usd (default 0.01).
@@ -24,6 +28,8 @@
 #                     calls that tool of the Banda MCP server, as the agent
 #                     would, and says "MCP <tool>: <result text>".
 # An interrupt gets a result only while a turn runs (a hold), like the real CLI.
+# Before each result it reads what was sent meanwhile, as the real CLI reads stdin
+# during a turn, and reports the prompts still waiting as queued_turn_count.
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -70,19 +76,35 @@ tool() {
 }
 say() {
   echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"$1\"}]},\"parent_tool_use_id\":null}"
-  echo '{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0}'
+  queued
+  echo '{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"queued_turn_count":'$nq'}'
 }
 # ack <control_request line>: a success control_response to it.
 ack() { echo "{\"type\":\"control_response\",\"response\":{\"subtype\":\"success\",\"request_id\":\"$(sed -n 's/.*"request_id":"\([^"]*\)".*/\1/p' <<<"$1")\"}}"; }
-interrupted() { echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}'; }
+interrupted() { queued; echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1,"queued_turn_count":'$nq'}'; }
 text() { jq -cn --arg t "$1" '{type:"assistant",message:{content:[{type:"text",text:$t}]},parent_tool_use_id:null}'; }
-result() { echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":10,\"total_cost_usd\":$cost}"; }
+result() { queued; echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":10,\"total_cost_usd\":$cost,\"queued_turn_count\":$nq}"; }
+# prompt <user line>: its text.
+prompt() { jq -r '.message.content | if type == "string" then . else map(select(.type == "text").text) | join("\n") end' <<<"$1"; }
 queue=()
-# next: the next line, from the messages queued during a hold first.
+# next: the next line, from the messages queued during a turn first.
 next() {
   if [ ${#queue[@]} -gt 0 ]; then line=${queue[0]}; queue=("${queue[@]:1}"); else IFS= read -r line; fi
 }
-# hold <name>: see e2e-hold above. Fails if interrupted.
+# queued: moves the lines sent so far into the queue and sets $nq to the
+# prompts among them, a result's queued_turn_count.
+queued() {
+  local l rest s
+  while :; do
+    IFS= read -r -t 0.05 l; s=$?
+    if [ $s = 0 ]; then queue+=("$l")
+    elif [ $s -gt 128 ] && [ -n "$l" ] && IFS= read -r rest; then queue+=("$l$rest") # a line cut by the timeout
+    else break; fi
+  done
+  nq=0
+  for l in "${queue[@]}"; do [[ $l == *'"type":"user"'* ]] && nq=$((nq + 1)); done
+}
+# hold <name> [fold]: see e2e-hold and e2e-fold above. Fails if interrupted.
 hold() {
   local l part= id=toolu_hold_$1
   echo "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s\",\"model\":\"$model\"}"
@@ -107,6 +129,18 @@ hold() {
     esac
   done
   echo "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"$id\",\"type\":\"tool_result\",\"content\":\"released\",\"is_error\":false}]},\"parent_tool_use_id\":null}"
+  [ -n "$2" ] || return 0
+  queued
+  local q kept=()
+  for q in "${queue[@]}"; do
+    if [[ $q == *'"type":"user"'* ]]; then
+      [[ $q == *e2e-echo* ]] && text "Received: $(prompt "$q")"
+      text "Folded a message into this turn"
+    else
+      kept+=("$q")
+    fi
+  done
+  queue=("${kept[@]}")
 }
 # mcp <tool> <base64 arguments>: see e2e-mcp above.
 mcp() {
@@ -125,14 +159,15 @@ while next; do
   if [[ $line == *'"type":"user"'* ]]; then
     [[ $line =~ e2e-cost:([0-9.]+) ]] && cost=${BASH_REMATCH[1]}
     if [[ $line == *e2e-echo* ]]; then
-      text "Received: $(jq -r '.message.content | if type == "string" then . else map(select(.type == "text").text) | join("\n") end' <<<"$line")"
+      text "Received: $(prompt "$line")"
     fi
     if [[ $line =~ e2e-crash:([A-Za-z0-9_-]+) ]] && [ ! -e ~/e2e-crashed/"${BASH_REMATCH[1]}" ]; then
       mkdir -p ~/e2e-crashed && touch ~/e2e-crashed/"${BASH_REMATCH[1]}"
       echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_crash","name":"Bash","input":{"command":"crash"}}]},"parent_tool_use_id":null}'
       exit 1
     fi
-    if [[ $line =~ e2e-hold:([A-Za-z0-9_-]+) ]]; then hold "${BASH_REMATCH[1]}" || continue; fi
+    fold=; [[ $line == *e2e-fold* ]] && fold=1
+    if [[ $line =~ e2e-hold:([A-Za-z0-9_-]+) ]]; then hold "${BASH_REMATCH[1]}" $fold || continue; fi
     if [[ $line =~ e2e-mcp:([a-z_]+):([A-Za-z0-9+/=]+) ]]; then
       mcp "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
       result
@@ -157,9 +192,10 @@ while next; do
       echo '<!doctype html><script src="/assets/app.js"></script><p>e2e-preview-page</p>' > ~/site/index.html
       echo 'console.log("e2e-preview-asset")' > ~/site/assets/app.js
       setsid python3 -m http.server 5173 -d ~/site </dev/null >/dev/null 2>&1 &
+      queued
       cat <<JSON
 {"type":"assistant","message":{"content":[{"type":"text","text":"Serving on :5173"}]},"parent_tool_use_id":null}
-{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"queued_turn_count":$nq}
 JSON
       ;;
     *'"type":"user"'*)
@@ -172,6 +208,7 @@ JSON
         types=$(grep -o '"media_type":"[^"]*"' <<<"$line" | cut -d'"' -f4 | tr '\n' ' ')
         echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Received $images image blocks (${types% }) and $files text files\"}]},\"parent_tool_use_id\":null}"
       fi
+      queued
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}
@@ -190,7 +227,7 @@ JSON
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"text","text":"Created hello$n.txt with $model · $effort"}]},"parent_tool_use_id":null}
-{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost,"queued_turn_count":$nq}
 JSON
       ;;
   esac

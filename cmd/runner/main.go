@@ -95,7 +95,9 @@ func run(ctx context.Context) error {
 	// while we wait for it; prompts and stops queue until claude is up.
 	// Losing the API stops claude gracefully and the runner exits.
 	// ponytail: no reconnect loop, the container restart is the reconnect.
-	cmds := make(chan *bandav1.ConnectResponse, 16)
+	// queueCmd never blocks: setup and the login wait can take long, and the
+	// terminal, files and previews keep working meanwhile.
+	queueCmd, cmds := unbounded[*bandav1.ConnectResponse]()
 	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT")}}
 	pushes := &pusher{report: send}
 	lastDiff := "" // the first turn after a start always pushes
@@ -117,12 +119,12 @@ func run(ctx context.Context) error {
 			}
 			switch k := msg.Kind.(type) {
 			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop, *bandav1.ConnectResponse_Permission:
-				cmds <- msg
+				queueCmd(msg)
 			case *bandav1.ConnectResponse_AgentSettings:
 				// Set now so a claude that hasn't started yet starts with them;
 				// queued so a running one restarts after the prompts sent before.
 				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort})
-				cmds <- msg
+				queueCmd(msg)
 			case *bandav1.ConnectResponse_Push:
 				go pushes.manualPush(ctx, notice)
 			case *bandav1.ConnectResponse_TerminalOpen:
@@ -243,6 +245,12 @@ func run(ctx context.Context) error {
 				}
 				events, turnEnded, authFailed := translate(raw)
 				for _, e := range events {
+					if te := e.GetTurnEnded(); te != nil {
+						// The CLI folds prompts into a running turn, so a result can end
+						// several: all written but those it still queues.
+						ended := max(pending-queuedTurns(raw), 0)
+						te.Prompts, pending = int32(ended), pending-ended
+					}
 					if r := e.GetPermissionRequested(); r != nil {
 						if auto := perms.ask(r); auto != nil { // always allowed in this thread
 							claude.write(auto)
@@ -272,7 +280,6 @@ func run(ctx context.Context) error {
 				if turnEnded {
 					authNoticed = false
 					perms.clear()
-					pending = max(0, pending-1) // an interrupt while idle ends no prompt
 					d := redact(diff(ctx))
 					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: d}}}); err != nil {
 						return err
@@ -319,4 +326,27 @@ func (w *wanted) set(s settings) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.s = s
+}
+
+// unbounded returns a send that never blocks for long and the channel it
+// feeds, in order. Its goroutine lives as long as the process.
+func unbounded[T any]() (func(T), <-chan T) {
+	in, out := make(chan T), make(chan T)
+	go func() {
+		var q []T
+		for {
+			var send chan T // nil, so never ready, while q is empty
+			var next T
+			if len(q) > 0 {
+				send, next = out, q[0]
+			}
+			select {
+			case v := <-in:
+				q = append(q, v)
+			case send <- next:
+				q = q[1:]
+			}
+		}
+	}()
+	return func(v T) { in <- v }, out
 }

@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"connectrpc.com/connect/v2"
 
@@ -26,55 +28,62 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	if err := s.checkAttachments(ctx, m, by); err != nil {
 		return nil, err
 	}
-	before, err := s.store.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	unseen, err := s.store.Events(ctx, id, before.DeliveredSeq)
-	if err != nil {
-		return nil, err
-	}
 	names := s.names(ctx)
-	texts, err := s.textAttachments(ctx, append(messages(unseen), m))
-	if err != nil {
-		return nil, err
-	}
 
 	var effect thread.Effect
 	var prompt string
 	var images []string
-	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		// Only MCP posts as "agent:<thread>", and it lets an agent start turns
-		// only in threads of its own owner.
-		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
-			MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
+	unlock := s.lockDelivery(id)
+	var stored []*bandav1.Event
+	err := retryStale(func() error {
+		u, err := s.readUnseen(ctx, id, m)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		effect = eff
-		posted := messageEvent(by, m)
-		if eff == thread.RequestTurn {
-			posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
-		}
-		prompt, images = turnPrompt(t, eff, names, unseen, by, m, texts)
-		events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
-		t.State = next
-		return events, nil
+		_, stored, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			// Only MCP posts as "agent:<thread>", and it lets an agent start turns
+			// only in threads of its own owner.
+			next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
+				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
+			if err != nil {
+				return nil, err
+			}
+			effect = eff
+			posted := messageEvent(by, m)
+			if eff == thread.RequestTurn {
+				posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
+			}
+			if eff == thread.StartTurn || eff == thread.Provision {
+				if err := u.fresh(t); err != nil {
+					return nil, err
+				}
+				prompt, images = turnPrompt(t, eff, names, u.events, by, m, u.texts)
+			}
+			events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
+			t.State = next
+			return events, nil
+		})
+		return err
 	})
 	if err != nil {
+		unlock()
 		return nil, err
 	}
 	s.broadcast(id, stored)
-	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
-		slog.Error("store mentions", "thread", id, "err", err)
-	}
-	if err := s.store.MarkRead(ctx, by, id); err != nil { // posting means having read it
-		slog.Error("mark read", "thread", id, "err", err)
-	}
-	s.pokeInbox(append([]string{by}, m.MentionedUserIds...)...)
 	if effect == thread.StartTurn {
 		s.deliver(ctx, id, prompt, images)
 	}
+	unlock()
+	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
+		slog.Error("store mentions", "thread", id, "err", err)
+	}
+	if !strings.HasPrefix(by, "agent:") { // an agent posting through MCP has no inbox
+		if err := s.store.MarkRead(ctx, by, id); err != nil { // posting means having read it
+			slog.Error("mark read", "thread", id, "err", err)
+		}
+		s.pokeInbox(by)
+	}
+	s.pokeInbox(m.MentionedUserIds...)
 	s.do(ctx, id, effect)
 	return &bandav1.SendMessageResponse{}, nil
 }
@@ -118,6 +127,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 	var effect thread.Effect
 	var prompt string
 	var images []string
+	unlock := s.lockDelivery(id)
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		var a thread.Action = thread.Decline{By: by}
 		if approve {
@@ -150,12 +160,14 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 		return out, nil
 	})
 	if err != nil {
+		unlock()
 		return err
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
 		s.deliver(ctx, id, prompt, images)
 	}
+	unlock()
 	s.do(ctx, id, effect)
 	return nil
 }
@@ -173,6 +185,66 @@ func openRequest(events []*bandav1.Event, seq int64) *bandav1.Event {
 		}
 	}
 	return r
+}
+
+// errStale: events were stored between reading a thread's unseen events and
+// locking it.
+var errStale = connect.NewError(connect.CodeUnavailable, "the thread is busy, try again")
+
+// unseen are a thread's events after its delivered seq, read before locking
+// it (a transaction must not wait for another connection), and the text files
+// they and m attach.
+type unseen struct {
+	events []*bandav1.Event
+	texts  map[string]string
+	last   int64 // the thread's last seq then
+}
+
+func (s *Service) readUnseen(ctx context.Context, id string, m *bandav1.Message) (unseen, error) {
+	t, err := s.store.Get(ctx, id)
+	if err != nil {
+		return unseen{}, err
+	}
+	u := unseen{last: t.LastSeq}
+	if u.events, err = s.store.Events(ctx, id, t.DeliveredSeq); err != nil {
+		return u, err
+	}
+	if n := len(u.events); n > 0 {
+		u.last = max(u.last, u.events[n-1].Seq)
+	}
+	msgs := messages(u.events)
+	if m != nil {
+		msgs = append(msgs, m)
+	}
+	u.texts, err = s.textAttachments(ctx, msgs)
+	return u, err
+}
+
+// fresh returns errStale if t, locked, has events u lacks: else u holds all
+// that is not delivered, and a prompt built from it can mark it so.
+func (u unseen) fresh(t *store.Thread) error {
+	if t.LastSeq != u.last {
+		return errStale
+	}
+	return nil
+}
+
+// retryStale runs update again while it returns errStale, a few times.
+func retryStale(update func() error) error {
+	for try := 1; ; try++ {
+		if err := update(); !errors.Is(err, errStale) || try == 10 {
+			return err
+		}
+	}
+}
+
+// lockDelivery locks a thread's deliveries: hold it from marking a prompt
+// delivered until deliver handed it over, so prompts reach claude in seq order.
+// Returns the unlock.
+func (s *Service) lockDelivery(id string) func() {
+	m, _ := s.deliveries.LoadOrStore(id, new(sync.Mutex))
+	m.(*sync.Mutex).Lock()
+	return m.(*sync.Mutex).Unlock
 }
 
 // deliver hands a prompt and its images (attachment ids) to the runner.
@@ -193,10 +265,7 @@ func (s *Service) deliver(ctx context.Context, id, prompt string, images []strin
 	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
 		t.PendingImages = lastImages(append(t.PendingImages, images...))
-		next, _, _ := thread.Apply(t.State, thread.EnvLost{})
-		events := stateEvents(t.State, next)
-		t.State = next
-		return events, nil
+		return envLost(t, 1), nil
 	})
 	if err != nil {
 		slog.Error("keep undelivered prompt", "thread", id, "err", err)

@@ -2201,11 +2201,13 @@ func (x *ToolResult) GetIsError() bool {
 }
 
 type TurnEnded struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	IsError       bool                   `protobuf:"varint,1,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	DurationMs    int64                  `protobuf:"varint,3,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
-	CostUsd       float64                `protobuf:"fixed64,4,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	IsError    bool                   `protobuf:"varint,1,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
+	Error      string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	DurationMs int64                  `protobuf:"varint,3,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	CostUsd    float64                `protobuf:"fixed64,4,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	// The prompts the turn ended: its own and those folded into it.
+	Prompts       int32 `protobuf:"varint,5,opt,name=prompts,proto3" json:"prompts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2264,6 +2266,13 @@ func (x *TurnEnded) GetDurationMs() int64 {
 func (x *TurnEnded) GetCostUsd() float64 {
 	if x != nil {
 		return x.CostUsd
+	}
+	return 0
+}
+
+func (x *TurnEnded) GetPrompts() int32 {
+	if x != nil {
+		return x.Prompts
 	}
 	return 0
 }
@@ -9403,13 +9412,14 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\ftool_call_id\x18\x01 \x01(\tR\n" +
 	"toolCallId\x12\x16\n" +
 	"\x06output\x18\x02 \x01(\tR\x06output\x12\x19\n" +
-	"\bis_error\x18\x03 \x01(\bR\aisError\"x\n" +
+	"\bis_error\x18\x03 \x01(\bR\aisError\"\x92\x01\n" +
 	"\tTurnEnded\x12\x19\n" +
 	"\bis_error\x18\x01 \x01(\bR\aisError\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1f\n" +
 	"\vduration_ms\x18\x03 \x01(\x03R\n" +
 	"durationMs\x12\x19\n" +
-	"\bcost_usd\x18\x04 \x01(\x01R\acostUsd\"Q\n" +
+	"\bcost_usd\x18\x04 \x01(\x01R\acostUsd\x12\x18\n" +
+	"\aprompts\x18\x05 \x01(\x05R\aprompts\"Q\n" +
 	"\rStatusChanged\x12(\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x10.banda.v1.StatusR\x06status\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"1\n" +

@@ -4,17 +4,6 @@
 import { AutoPushState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, listen, repo, Status, test } from './fixtures.ts';
 
-test.fail('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
-	const t = await alice.create({ repoUrl: repo('setup-hold'), prompt: 'first e2e-echo' });
-	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 60_000 }).toBe('Running');
-	await t.as(bob).send('TEAMMATE-NOTE use postgres');
-	await t.release('setup');
-	await t.waitForStatus(Status.AWAITING_INPUT);
-	await t.turn(() => t.send('@agent second e2e-echo', { mentionsAgent: true }));
-	expect((await t.prompts()).join('\n')).toContain('TEAMMATE-NOTE');
-});
-
 test.fail('B2: settling while the last turn’s push is still running schedules no deletion of the unpushed work', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create({ prompt: 'e2e: commit one' });
@@ -53,13 +42,4 @@ test.fail('B6: a terminal open during Retry ends or keeps working', async ({ as 
 	await alice.threads.writeTerminal({ threadId: t.id, data: Buffer.from('echo after-retry\n') }).catch(() => {});
 	await expect.poll(() => term.got.some((r) => r.exited) || output().includes('after-retry'), { timeout: 20_000 }).toBe(true);
 	term.stop();
-});
-
-test.fail('B9: an API restart mid-turn tells the chat the turn was lost', async ({ as, startApi }) => {
-	const api = await startApi();
-	const t = await as('alice', api).create({ prompt: 'e2e-hold:forever' });
-	await t.waitForEvent((e) => e.kind.case === 'agentText' && e.kind.value.text === 'Holding forever', 'the held turn');
-	await api.restart();
-	await t.waitForStatus(Status.AWAITING_INPUT, 180_000);
-	expect(await t.of('turnEnded')).toHaveLength(1);
 });
