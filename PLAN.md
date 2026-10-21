@@ -32,6 +32,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Diff review | Comments on diff line ranges are collected in the Diff tab (kept in the browser until sent) and posted as one message with structured `review` comments: path, lines (numbered in the branch, or in the base for removed-only ranges), quoted diff lines, text. The agent gets them as markdown. "Ask @agent" (default on for the owner) mentions the agent; the owner's review without it is a note that starts no turn and keeps the mode. Posted comments show in the diff where their last line is unchanged. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
@@ -145,6 +146,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - New thread is an empty chat: the first message creates the thread; repository, branch, model and effort are chips in the composer.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
+- Diff review: click or drag line numbers to comment, send the pending review as one message (optionally asking @agent); the chat shows each comment with its code and jumps to it in the diff, which marks comments that still apply. The diff has line numbers, a file list, per-file collapse (big files start closed) and sticky file headers.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.

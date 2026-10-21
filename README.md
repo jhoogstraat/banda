@@ -47,7 +47,7 @@ Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings:
 
 ## Tests
 
-- `mise run test`: Go unit tests (state machine, agent prompt, Claude stream mapping, sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer.
+- `mise run test`: Go unit tests (state machine, agent prompt and review rendering, Claude stream mapping, sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer and diff parsing.
 - `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790`, next to the normal one.
 
 ## Run the API in the cluster

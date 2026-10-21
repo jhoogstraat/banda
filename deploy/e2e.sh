@@ -67,6 +67,15 @@ call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" bob 
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null
 ok "only the owner ends chat mode"
 
+REVIEW='{"path":"hello1.txt","startLine":1,"endLine":1,"code":"+hello 1","body":"e2e: say hi instead"}'
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[{\"path\":\"x\",\"startLine\":1,\"endLine\":1,\"body\":\" \"}]}}" >/dev/null 2>&1 && fail "a review comment without text was accepted"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[$REVIEW]}}" >/dev/null
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread mode)" = MODE_AGENT ]
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent please address these review comments.\",\"mentionsAgent\":true,\"review\":[$REVIEW]}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"tail -1 ~/.fake-prompts\"}" | grep -q 'hello1.txt, line 1:.*+hello 1.*e2e: say hi instead' || fail "the agent did not get the review"
+ok "the owner's review is a note until it asks @agent; then the agent gets each comment with its code"
+
 kc exec "t-$ID" -- sh -c 'curl -sf -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"' | grep -q read_thread
 ok "the Banda MCP server is reachable from the sandbox"
 
@@ -96,7 +105,7 @@ ok "snoozing suspends the environment (pod gone, volumes kept)"
 
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-thread diff | grep -q hello3.txt
+thread diff | grep -q hello4.txt
 ok "a prompt resumes the environment with the checkout intact"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
