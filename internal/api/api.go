@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"maps"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
+	"github.com/jhoogstraat/banda/internal/tunnel"
 )
 
 type Service struct {
@@ -41,17 +43,29 @@ type Service struct {
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
 	files map[string]chan *bandav1.FileResponse
-	inbox map[*inboxWatcher]struct{}
+	// previews is closed and removed when a thread's preview changes: its
+	// runner came or went, or reported other ports (see PreviewWatch).
+	previews map[string]chan struct{}
+	inbox    map[*inboxWatcher]struct{}
+
+	// Preview configures the preview origin (preview.go). Set before serving.
+	Preview      PreviewConfig
+	previewKey   signer
+	previewProxy *http.Transport
 }
 
 // runner is a connected runner: commands go to ch until done is closed.
 type runner struct {
 	ch   chan *bandav1.ConnectResponse
 	done chan struct{}
+	// tunnels carries the preview's connections into the pod; ports is what
+	// listens there. ports is guarded by Service.mu.
+	tunnels *tunnel.Mux
+	ports   []*bandav1.PreviewPort
 }
 
 func New(st *store.Store, sb *sandbox.Client) *Service {
-	return &Service{
+	s := &Service{
 		store:     st,
 		sandboxes: sb,
 		watchers:  map[string]map[chan *bandav1.Event]struct{}{},
@@ -59,10 +73,14 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
+		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 
 		loginLastUsed: map[string]time.Time{},
+		previewKey:    signer(rand.Text()),
 	}
+	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}
+	return s
 }
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
@@ -135,25 +153,20 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	var effect thread.Effect
 	var prompt string
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0})
+		// Only MCP posts as "agent:<thread>", and it lets an agent start turns
+		// only in threads of its own owner.
+		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
+			MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:")})
 		if err != nil {
 			return nil, err
 		}
 		effect = eff
-		if eff == thread.StartTurn || eff == thread.Provision {
-			var fresh []*bandav1.Event
-			for _, e := range unseen {
-				if e.Seq > t.DeliveredSeq {
-					fresh = append(fresh, e)
-				}
-			}
-			prompt = agentPrompt(t.OwnerID, names, fresh, by, m.Text)
-			t.DeliveredSeq = t.LastSeq + 1 // the message stored below
-			if eff == thread.Provision {   // suspended: deliver once the environment is back
-				t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
-			}
+		posted := messageEvent(by, m)
+		if eff == thread.RequestTurn {
+			posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
 		}
-		events := append([]*bandav1.Event{messageEvent(by, m)}, stateEvents(t.State, next)...)
+		prompt = turnPrompt(t, eff, names, unseen, by, m.Text)
+		events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
 		t.State = next
 		return events, nil
 	})
@@ -173,6 +186,104 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	}
 	s.do(ctx, id, effect)
 	return &bandav1.SendMessageResponse{}, nil
+}
+
+// turnPrompt is the prompt for a turn by `by` that starts with the next
+// stored event, given the thread's events since at least its delivered seq.
+// It marks them delivered, and for a suspended thread (Provision) keeps the
+// prompt as pending. Other effects start no turn: it returns "".
+func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by, text string) string {
+	if eff != thread.StartTurn && eff != thread.Provision {
+		return ""
+	}
+	var fresh []*bandav1.Event
+	for _, e := range unseen {
+		if e.Seq > t.DeliveredSeq {
+			fresh = append(fresh, e)
+		}
+	}
+	prompt := agentPrompt(t.OwnerID, names, fresh, by, text)
+	t.DeliveredSeq = t.LastSeq + 1 // the event stored next
+	if eff == thread.Provision {   // suspended: deliver once the environment is back
+		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
+	}
+	return prompt
+}
+
+func (s *Service) ApproveTurn(ctx context.Context, req *bandav1.ApproveTurnRequest) (*bandav1.ApproveTurnResponse, error) {
+	return &bandav1.ApproveTurnResponse{}, s.resolve(ctx, req.ThreadId, req.RequestSeq, true, "")
+}
+
+func (s *Service) DeclineTurn(ctx context.Context, req *bandav1.DeclineTurnRequest) (*bandav1.DeclineTurnResponse, error) {
+	return &bandav1.DeclineTurnResponse{}, s.resolve(ctx, req.ThreadId, req.RequestSeq, false, strings.TrimSpace(req.Note))
+}
+
+// resolve approves or declines the turn request at seq. An approved request
+// runs as the requester's turn.
+func (s *Service) resolve(ctx context.Context, id string, seq int64, approve bool, note string) error {
+	by, names := user(ctx), s.names(ctx)
+	var effect thread.Effect
+	var prompt string
+	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+		var a thread.Action = thread.Decline{By: by}
+		if approve {
+			a = thread.Approve{By: by}
+		}
+		next, eff, err := thread.Apply(t.State, a)
+		if err != nil {
+			return nil, err
+		}
+		// Read under the thread's lock, so a request resolves only once.
+		events, err := s.store.Events(ctx, id, min(t.DeliveredSeq, seq-1))
+		if err != nil {
+			return nil, err
+		}
+		r := openRequest(events, seq)
+		if r == nil {
+			return nil, thread.ErrNoRequest
+		}
+		effect = eff
+		prompt = turnPrompt(t, eff, names, events, r.Actor, r.GetTurnRequest().GetMessage().GetText())
+		out := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_TurnRequestResolved{
+			TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: seq, Approved: approve, Note: note}}}},
+			stateEvents(t.State, next)...)
+		t.State = next
+		return out, nil
+	})
+	if err != nil {
+		return cerr(err)
+	}
+	s.broadcast(id, stored)
+	if effect == thread.StartTurn {
+		s.deliver(ctx, id, prompt)
+	}
+	s.do(ctx, id, effect)
+	return nil
+}
+
+// openRequest returns the TurnRequest event at seq if no later event
+// resolved it.
+func openRequest(events []*bandav1.Event, seq int64) *bandav1.Event {
+	var r *bandav1.Event
+	for _, e := range events {
+		if e.Seq == seq && e.GetTurnRequest() != nil {
+			r = e
+		}
+		if e.GetTurnRequestResolved().GetRequestSeq() == seq {
+			return nil
+		}
+	}
+	return r
+}
+
+func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav1.TrustResponse, error) {
+	text := "Teammates' turns need the owner's approval again."
+	if req.Trusted {
+		text = "Teammates can now run the agent without the owner's approval."
+	}
+	_, err := s.apply(ctx, req.ThreadId, thread.Trust{By: user(ctx), Trusted: req.Trusted},
+		&bandav1.Event{Actor: user(ctx), Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
+	return &bandav1.TrustResponse{}, err
 }
 
 func (s *Service) Interrupt(ctx context.Context, req *bandav1.InterruptRequest) (*bandav1.InterruptResponse, error) {
@@ -307,15 +418,24 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_AgentSettings{AgentSettings: agentSettings(t)}}
 	}
 
+	r.tunnels = tunnel.NewMux(func(t *bandav1.HttpTunnel) error {
+		if !r.send(&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_HttpTunnel{HttpTunnel: t}}) {
+			return errNotRunning
+		}
+		return nil
+	})
 	s.mu.Lock()
 	s.runners[id] = r
+	s.previewChanged(id)
 	s.mu.Unlock()
 	defer close(r.done)
+	defer r.tunnels.CloseAll()
 	defer func() {
 		s.mu.Lock()
 		mine := s.runners[id] == r
 		if mine {
 			delete(s.runners, id)
+			s.previewChanged(id)
 			if term := s.terminals[id]; term != nil { // the terminal dies with the runner
 				close(term)
 				delete(s.terminals, id)
@@ -395,6 +515,15 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 		case *bandav1.ConnectRequest_FileResponse:
 			s.fileResponse(k.FileResponse)
+		case *bandav1.ConnectRequest_HttpTunnel:
+			r.tunnels.Deliver(k.HttpTunnel)
+		case *bandav1.ConnectRequest_PreviewPorts:
+			s.mu.Lock()
+			r.ports = k.PreviewPorts.Ports
+			if s.runners[id] == r {
+				s.previewChanged(id)
+			}
+			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
 			_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 				t.Diff = k.Diff.Diff
@@ -487,6 +616,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	// Ensure replaces a running pod; its runner's disconnect is expected.
 	s.mu.Lock()
 	delete(s.runners, t.ID)
+	s.previewChanged(t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)
 	var secrets []store.Secret
@@ -532,9 +662,10 @@ func (s *Service) sendRunner(id string, msg *bandav1.ConnectResponse) bool {
 	s.mu.Lock()
 	r := s.runners[id]
 	s.mu.Unlock()
-	if r == nil {
-		return false
-	}
+	return r != nil && r.send(msg)
+}
+
+func (r *runner) send(msg *bandav1.ConnectResponse) bool {
 	select {
 	case r.ch <- msg:
 		return true
@@ -642,6 +773,8 @@ func cerr(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, err.Error())
 	case errors.Is(err, thread.ErrNotReady):
 		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
+	case errors.Is(err, thread.ErrNoRequest):
+		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	return err
 }
@@ -675,6 +808,9 @@ func toProto(t store.Thread) *bandav1.Thread {
 		BaseBranch: t.BaseBranch,
 		Settled:    t.Settled,
 		Unread:     t.Unread,
+
+		TurnRequests: int32(t.Requests),
+		Trusted:      t.Trusted,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

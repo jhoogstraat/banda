@@ -32,6 +32,7 @@
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
+	import Browser from '#lib/components/browser.svelte';
 	import DiffView from '#lib/components/diff-view.svelte';
 	import FileBrowser from '#lib/components/file-browser.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
@@ -51,6 +52,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
@@ -67,13 +69,15 @@
 	const chat = $state<Chat>(newChat());
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
-	// The terminal and the file browser mount when their tab is first opened and then stay alive.
+	// The terminal, the file browser and the browser mount when their tab is first opened and then stay alive.
 	let tab = $state('diff');
 	let termOpened = $state(false);
 	let filesOpened = $state(false);
+	let browserOpened = $state(false);
 	$effect(() => {
 		if (tab === 'terminal') termOpened = true;
 		if (tab === 'files') filesOpened = true;
+		if (tab === 'browser') browserOpened = true;
 	});
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	let loginOpen = $state(false);
@@ -82,6 +86,8 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// The owner's optional decline note per turn request seq.
+	const notes = $state<Record<string, string>>({});
 	// Ticks so typing expires; `others` drops the viewer from presence and typing.
 	let now = $state(Date.now());
 	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
@@ -137,7 +143,7 @@
 					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'agentSettings'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -314,6 +320,34 @@
 								</Message>
 							</div>
 						</div>
+					{:else if item.kind === 'request'}
+						{@const name = userName(item.actor)}
+						{@const ownerName = userName(thread?.ownerId ?? '')}
+						<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+							<div class="flex items-center gap-2">
+								<UserAvatar {name} class="size-5" />
+								<span><span class="font-medium">{name}</span> asks the agent:</span>
+								<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+							</div>
+							<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>
+							{#if item.resolved}
+								<p class="text-xs text-muted-foreground">
+									{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
+								</p>
+							{:else if owner}
+								{@const seq = String(item.seq)}
+								<div class="flex flex-wrap items-center gap-2">
+									<Button size="sm" onclick={() => act(api.approveTurn({ threadId: id, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
+									<Input bind:value={notes[seq]} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
+									<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId: id, requestSeq: item.seq, note: notes[seq] ?? '' }))}>
+										<XIcon /> Decline
+									</Button>
+								</div>
+								<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
+							{:else}
+								<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+							{/if}
+						</div>
 					{:else if item.kind === 'text'}
 						{@render agentText(item.text)}
 					{:else if item.kind === 'steps'}
@@ -436,6 +470,7 @@
 		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
 			<TabsTrigger value="diff">Diff</TabsTrigger>
 			<TabsTrigger value="files">Files</TabsTrigger>
+			<TabsTrigger value="browser">Browser</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
 			<IconButton icon={XIcon} label="Close the pane" class="ml-auto" onclick={() => (diffOpen = false)} />
 		</TabsList>
@@ -445,6 +480,12 @@
 		<TabsContent value="files" class="min-h-0 overflow-auto">
 			{#if filesOpened}<FileBrowser threadId={id} diff={thread?.diff ?? ''} />{/if}
 		</TabsContent>
+		{#if browserOpened}
+			<!-- Hidden rather than unmounted, so the framed app keeps its state. -->
+			<div class="min-h-0 flex-1 {tab === 'browser' ? '' : 'hidden'}">
+				<Browser threadId={id} status={thread?.status} {owner} />
+			</div>
+		{/if}
 		{#if owner && termOpened}
 			<div class="min-h-0 flex-1 {tab === 'terminal' ? '' : 'hidden'}">
 				<Terminal

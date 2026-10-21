@@ -61,6 +61,7 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8787
+            - containerPort: 8788 # the Browser tab's preview origin
           env:
             - {name: DATABASE_URL, value: "postgres://banda:banda@postgres:5432/banda"}
             - {name: SANDBOX_NAMESPACE, value: banda}
@@ -79,5 +80,5 @@ metadata:
 spec:
   selector: {app: banda-api}
   ports:
-    - port: 8787
-      targetPort: 8787
+    - {name: api, port: 8787, targetPort: 8787}
+    - {name: preview, port: 8788, targetPort: 8788}

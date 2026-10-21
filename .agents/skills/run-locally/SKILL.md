@@ -8,8 +8,8 @@ description: Boot Banda locally for testing, reachable from the LAN - Podman mac
 Everything goes through `deploy/dev.sh`, run as mise tasks from the repo root. Each task is idempotent: rerun it to restart.
 
 ```sh
-mise run up     # default Podman machine, kind cluster, API (:8787) and web (:5173), on the LAN address
-mise run e2e    # end-to-end check with the fake agent on :8790, next to the normal API
+mise run up     # default Podman machine, kind cluster, API (:8787, preview :8788) and web (:5173), on the LAN address
+mise run e2e    # end-to-end check with the fake agent on :8790 (preview :8791), next to the normal API
 mise run down   # stop the servers and the kind node; the shared Podman machine keeps running
 ```
 

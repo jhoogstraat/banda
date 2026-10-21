@@ -16,6 +16,11 @@ service ThreadService {
   // restarts with them once its turns have ended; a paused one starts with them.
   rpc SetAgentSettings(SetAgentSettingsRequest) returns (SetAgentSettingsResponse);
   rpc Retry(RetryRequest) returns (RetryResponse);
+  // Owner only: runs a teammate's turn request as their turn, or drops it.
+  rpc ApproveTurn(ApproveTurnRequest) returns (ApproveTurnResponse);
+  rpc DeclineTurn(DeclineTurnRequest) returns (DeclineTurnResponse);
+  // Owner only: whether teammates can start turns without approval.
+  rpc Trust(TrustRequest) returns (TrustResponse);
   // Replays stored events with seq > after_seq, then streams live events.
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
   // Other users' threads in which the caller is mentioned and hasn't answered.
@@ -37,6 +42,13 @@ service ThreadService {
   // running environment. Fails while it is not running.
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  // The TCP ports listening in the thread's environment (everyone): the
+  // current state, then every change. Never wakes a paused environment,
+  // except for the owner with `wake` set.
+  rpc PreviewWatch(PreviewWatchRequest) returns (stream PreviewWatchResponse);
+  // A URL on the preview origin that shows what listens on `port`, through
+  // the runner. Opening it signs the browser in to the preview origin.
+  rpc PreviewOpen(PreviewOpenRequest) returns (PreviewOpenResponse);
   // The caller's sidebar: sent at once, then again whenever one of its
   // threads changes or the caller is mentioned somewhere new.
   rpc InboxWatch(InboxWatchRequest) returns (stream InboxWatchResponse);
@@ -113,6 +125,10 @@ message Thread {
   // The caller's own view of the thread.
   google.protobuf.Timestamp snoozed_until = 14;
   bool settled = 15;
+  // Teammate turn requests waiting for the owner's approval.
+  int32 turn_requests = 18;
+  // Teammates start turns without the owner's approval.
+  bool trusted = 19;
   // The thread has events the caller hasn't seen (see InboxMarkRead).
   bool unread = 16;
 }
@@ -143,6 +159,8 @@ message Event {
     DiffChanged diff_changed = 19;
     Notice notice = 20;
     SetupStep setup_step = 21;
+    TurnRequest turn_request = 24;
+    TurnRequestResolved turn_request_resolved = 25;
     // Ephemeral (seq 0): who is watching the thread.
     PresenceChanged presence_changed = 22;
     // Ephemeral (seq 0): the actor is typing in the composer.
@@ -156,6 +174,19 @@ message Message {
   string text = 1;
   bool mentions_agent = 2;
   repeated string mentioned_user_ids = 3;
+}
+
+// A teammate's message to the agent, waiting for the owner's approval
+// (instead of a Message event). The actor is the teammate.
+message TurnRequest {
+  Message message = 1;
+}
+
+// The owner approved or declined the TurnRequest event at request_seq.
+message TurnRequestResolved {
+  int64 request_seq = 1;
+  bool approved = 2;
+  string note = 3;
 }
 
 message AgentText {
@@ -313,6 +344,30 @@ message RetryRequest {
 
 message RetryResponse {}
 
+message ApproveTurnRequest {
+  string thread_id = 1;
+  // Seq of the TurnRequest event.
+  int64 request_seq = 2;
+}
+
+message ApproveTurnResponse {}
+
+message DeclineTurnRequest {
+  string thread_id = 1;
+  int64 request_seq = 2;
+  // Optional, shown to the requester.
+  string note = 3;
+}
+
+message DeclineTurnResponse {}
+
+message TrustRequest {
+  string thread_id = 1;
+  bool trusted = 2;
+}
+
+message TrustResponse {}
+
 message ListMentionedRequest {}
 
 message ListMentionedResponse {
@@ -389,6 +444,34 @@ message ReadFileResponse {
   bool binary = 2;
   // The file is longer than the part in `content`.
   bool truncated = 3;
+}
+
+message PreviewWatchRequest {
+  string thread_id = 1;
+  bool wake = 2;
+}
+
+message PreviewWatchResponse {
+  // A runner is connected; without one there are no ports.
+  bool running = 1;
+  repeated PreviewPort ports = 2;
+}
+
+message PreviewPort {
+  uint32 port = 1;
+  // What listens, e.g. "vite", "next" or "http.server". May be empty.
+  string process = 2;
+}
+
+message PreviewOpenRequest {
+  string thread_id = 1;
+  uint32 port = 2;
+  // Where to start, e.g. "/" or "/login?x=1".
+  string path = 3;
+}
+
+message PreviewOpenResponse {
+  string url = 1;
 }
 
 message MeRequest {}
@@ -527,6 +610,9 @@ message ConnectRequest {
     FileResponse file_response = 6;
     // The harness login state, sent at start and whenever it changes.
     LoginStatus login_status = 7;
+    HttpTunnel http_tunnel = 8;
+    // The listening ports, sent at start and whenever they change.
+    PreviewPorts preview_ports = 9;
   }
 }
 
@@ -579,6 +665,7 @@ message ConnectResponse {
     // Sent on connect and on every change. The runner restarts the agent with
     // them when no turn is running.
     AgentSettings agent_settings = 9;
+    HttpTunnel http_tunnel = 11;
   }
 }
 
@@ -614,4 +701,23 @@ message FileRequest {
   string request_id = 1;
   string path = 2;
   bool list = 3;
+}
+
+// One message of a TCP connection relayed between the API's preview proxy and
+// a port in the sandbox, in either direction. The API opens it with `port`.
+// Flow control: a side sends at most 8 data messages that the other has not
+// acknowledged yet.
+message HttpTunnel {
+  string id = 1;
+  uint32 port = 2;
+  bytes data = 3;
+  // How many of the peer's data messages were consumed.
+  uint32 ack = 4;
+  // The connection ended; `error` says why, if it failed.
+  bool close = 5;
+  string error = 6;
+}
+
+message PreviewPorts {
+  repeated PreviewPort ports = 1;
 }

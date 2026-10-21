@@ -47,6 +47,12 @@ const (
 	ThreadServiceSetAgentSettingsProcedure = "/banda.v1.ThreadService/SetAgentSettings"
 	// ThreadServiceRetryProcedure is the procedure name of the ThreadService's Retry RPC.
 	ThreadServiceRetryProcedure = "/banda.v1.ThreadService/Retry"
+	// ThreadServiceApproveTurnProcedure is the procedure name of the ThreadService's ApproveTurn RPC.
+	ThreadServiceApproveTurnProcedure = "/banda.v1.ThreadService/ApproveTurn"
+	// ThreadServiceDeclineTurnProcedure is the procedure name of the ThreadService's DeclineTurn RPC.
+	ThreadServiceDeclineTurnProcedure = "/banda.v1.ThreadService/DeclineTurn"
+	// ThreadServiceTrustProcedure is the procedure name of the ThreadService's Trust RPC.
+	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
 	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
@@ -70,6 +76,10 @@ const (
 	ThreadServiceListFilesProcedure = "/banda.v1.ThreadService/ListFiles"
 	// ThreadServiceReadFileProcedure is the procedure name of the ThreadService's ReadFile RPC.
 	ThreadServiceReadFileProcedure = "/banda.v1.ThreadService/ReadFile"
+	// ThreadServicePreviewWatchProcedure is the procedure name of the ThreadService's PreviewWatch RPC.
+	ThreadServicePreviewWatchProcedure = "/banda.v1.ThreadService/PreviewWatch"
+	// ThreadServicePreviewOpenProcedure is the procedure name of the ThreadService's PreviewOpen RPC.
+	ThreadServicePreviewOpenProcedure = "/banda.v1.ThreadService/PreviewOpen"
 	// ThreadServiceInboxWatchProcedure is the procedure name of the ThreadService's InboxWatch RPC.
 	ThreadServiceInboxWatchProcedure = "/banda.v1.ThreadService/InboxWatch"
 	// ThreadServiceInboxMarkReadProcedure is the procedure name of the ThreadService's InboxMarkRead
@@ -162,6 +172,27 @@ var (
 			Procedure:  ThreadServiceRetryProcedure,
 		}
 	})
+	threadServiceApproveTurnSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ApproveTurn"),
+			Procedure:  ThreadServiceApproveTurnProcedure,
+		}
+	})
+	threadServiceDeclineTurnSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("DeclineTurn"),
+			Procedure:  ThreadServiceDeclineTurnProcedure,
+		}
+	})
+	threadServiceTrustSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Trust"),
+			Procedure:  ThreadServiceTrustProcedure,
+		}
+	})
 	threadServiceWatchThreadSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -232,6 +263,20 @@ var (
 			Procedure:  ThreadServiceReadFileProcedure,
 		}
 	})
+	threadServicePreviewWatchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PreviewWatch"),
+			Procedure:  ThreadServicePreviewWatchProcedure,
+		}
+	})
+	threadServicePreviewOpenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PreviewOpen"),
+			Procedure:  ThreadServicePreviewOpenProcedure,
+		}
+	})
 	threadServiceInboxWatchSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -267,6 +312,11 @@ type ThreadServiceClient interface {
 	// restarts with them once its turns have ended; a paused one starts with them.
 	SetAgentSettings(context.Context, *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
+	// Owner only: runs a teammate's turn request as their turn, or drops it.
+	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
+	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
+	// Owner only: whether teammates can start turns without approval.
+	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -288,6 +338,13 @@ type ThreadServiceClient interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// The TCP ports listening in the thread's environment (everyone): the
+	// current state, then every change. Never wakes a paused environment,
+	// except for the owner with `wake` set.
+	PreviewWatch(context.Context, *v1.PreviewWatchRequest) (ThreadServicePreviewWatchClientStream, error)
+	// A URL on the preview origin that shows what listens on `port`, through
+	// the runner. Opening it signs the browser in to the preview origin.
+	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
 	// The caller's sidebar: sent at once, then again whenever one of its
 	// threads changes or the caller is mentioned somewhere new.
 	InboxWatch(context.Context, *v1.InboxWatchRequest) (ThreadServiceInboxWatchClientStream, error)
@@ -346,6 +403,27 @@ func (s ThreadServiceOpenTerminalClientStream) Close() error {
 	return s.stream.Close()
 }
 
+// ThreadServicePreviewWatchClientStream is the client stream for the ThreadService's PreviewWatch
+// RPC.
+type ThreadServicePreviewWatchClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s ThreadServicePreviewWatchClientStream) Receive() (*v1.PreviewWatchResponse, error) {
+	var res v1.PreviewWatchResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s ThreadServicePreviewWatchClientStream) Close() error {
+	return s.stream.Close()
+}
+
 // ThreadServiceInboxWatchClientStream is the client stream for the ThreadService's InboxWatch RPC.
 type ThreadServiceInboxWatchClientStream struct {
 	stream connect.ClientStream
@@ -378,6 +456,11 @@ type ThreadServiceHandler interface {
 	// restarts with them once its turns have ended; a paused one starts with them.
 	SetAgentSettings(context.Context, *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
+	// Owner only: runs a teammate's turn request as their turn, or drops it.
+	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
+	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
+	// Owner only: whether teammates can start turns without approval.
+	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
 	// Replays stored events with seq > after_seq, then streams live events.
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
 	// Other users' threads in which the caller is mentioned and hasn't answered.
@@ -399,6 +482,13 @@ type ThreadServiceHandler interface {
 	// running environment. Fails while it is not running.
 	ListFiles(context.Context, *v1.ListFilesRequest) (*v1.ListFilesResponse, error)
 	ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error)
+	// The TCP ports listening in the thread's environment (everyone): the
+	// current state, then every change. Never wakes a paused environment,
+	// except for the owner with `wake` set.
+	PreviewWatch(context.Context, *v1.PreviewWatchRequest, ThreadServicePreviewWatchServerStream) error
+	// A URL on the preview origin that shows what listens on `port`, through
+	// the runner. Opening it signs the browser in to the preview origin.
+	PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error)
 	// The caller's sidebar: sent at once, then again whenever one of its
 	// threads changes or the caller is mentioned somewhere new.
 	InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error
@@ -422,6 +512,9 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceSetModeSpec(), Handler: adapter.setMode},
 		connect.Method{Spec: threadServiceSetAgentSettingsSpec(), Handler: adapter.setAgentSettings},
 		connect.Method{Spec: threadServiceRetrySpec(), Handler: adapter.retry},
+		connect.Method{Spec: threadServiceApproveTurnSpec(), Handler: adapter.approveTurn},
+		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
+		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
 		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
@@ -432,6 +525,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceResizeTerminalSpec(), Handler: adapter.resizeTerminal},
 		connect.Method{Spec: threadServiceListFilesSpec(), Handler: adapter.listFiles},
 		connect.Method{Spec: threadServiceReadFileSpec(), Handler: adapter.readFile},
+		connect.Method{Spec: threadServicePreviewWatchSpec(), Handler: adapter.previewWatch},
+		connect.Method{Spec: threadServicePreviewOpenSpec(), Handler: adapter.previewOpen},
 		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
@@ -467,6 +562,22 @@ func (s ThreadServiceOpenTerminalServerStream) SendHeaders() error {
 
 // Send sends a response message to the client.
 func (s ThreadServiceOpenTerminalServerStream) Send(res *v1.OpenTerminalResponse) error {
+	return s.stream.Send(res)
+}
+
+// ThreadServicePreviewWatchServerStream is the server stream for the ThreadService's PreviewWatch
+// RPC.
+type ThreadServicePreviewWatchServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s ThreadServicePreviewWatchServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s ThreadServicePreviewWatchServerStream) Send(res *v1.PreviewWatchResponse) error {
 	return s.stream.Send(res)
 }
 
@@ -520,6 +631,18 @@ func (UnimplementedThreadServiceHandler) Retry(context.Context, *v1.RetryRequest
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Retry is not implemented")
 }
 
+func (UnimplementedThreadServiceHandler) ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ApproveTurn is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.DeclineTurn is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Trust is not implemented")
+}
+
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.WatchThread is not implemented")
 }
@@ -558,6 +681,14 @@ func (UnimplementedThreadServiceHandler) ListFiles(context.Context, *v1.ListFile
 
 func (UnimplementedThreadServiceHandler) ReadFile(context.Context, *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ReadFile is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PreviewWatch(context.Context, *v1.PreviewWatchRequest, ThreadServicePreviewWatchServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PreviewWatch is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PreviewOpen(context.Context, *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PreviewOpen is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) InboxWatch(context.Context, *v1.InboxWatchRequest, ThreadServiceInboxWatchServerStream) error {
@@ -640,6 +771,30 @@ func (c *threadServiceClient) Retry(ctx context.Context, req *v1.RetryRequest) (
 	return &res, nil
 }
 
+func (c *threadServiceClient) ApproveTurn(ctx context.Context, req *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error) {
+	var res v1.ApproveTurnResponse
+	if err := c.client.CallUnary(ctx, threadServiceApproveTurnSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) DeclineTurn(ctx context.Context, req *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error) {
+	var res v1.DeclineTurnResponse
+	if err := c.client.CallUnary(ctx, threadServiceDeclineTurnSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Trust(ctx context.Context, req *v1.TrustRequest) (*v1.TrustResponse, error) {
+	var res v1.TrustResponse
+	if err := c.client.CallUnary(ctx, threadServiceTrustSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func (c *threadServiceClient) WatchThread(ctx context.Context, req *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error) {
 	stream, err := c.client.CallServerStream(ctx, threadServiceWatchThreadSpec(), req)
 	if err != nil {
@@ -715,6 +870,22 @@ func (c *threadServiceClient) ListFiles(ctx context.Context, req *v1.ListFilesRe
 func (c *threadServiceClient) ReadFile(ctx context.Context, req *v1.ReadFileRequest) (*v1.ReadFileResponse, error) {
 	var res v1.ReadFileResponse
 	if err := c.client.CallUnary(ctx, threadServiceReadFileSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PreviewWatch(ctx context.Context, req *v1.PreviewWatchRequest) (ThreadServicePreviewWatchClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, threadServicePreviewWatchSpec(), req)
+	if err != nil {
+		return ThreadServicePreviewWatchClientStream{}, err
+	}
+	return ThreadServicePreviewWatchClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) PreviewOpen(ctx context.Context, req *v1.PreviewOpenRequest) (*v1.PreviewOpenResponse, error) {
+	var res v1.PreviewOpenResponse
+	if err := c.client.CallUnary(ctx, threadServicePreviewOpenSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -842,6 +1013,42 @@ func (h threadServiceHandler) retry(ctx context.Context, _ connect.Spec, stream 
 	return stream.Send(res)
 }
 
+func (h threadServiceHandler) approveTurn(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ApproveTurnRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ApproveTurn(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) declineTurn(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeclineTurnRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeclineTurn(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) trust(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TrustRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Trust(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
 func (h threadServiceHandler) watchThread(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.WatchThreadRequest
 	if err := stream.Receive(&req); err != nil {
@@ -948,6 +1155,26 @@ func (h threadServiceHandler) readFile(ctx context.Context, _ connect.Spec, stre
 		return err
 	}
 	res, err := h.svc.ReadFile(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) previewWatch(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PreviewWatchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.PreviewWatch(ctx, &req, ThreadServicePreviewWatchServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) previewOpen(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PreviewOpenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PreviewOpen(ctx, &req)
 	if err != nil {
 		return err
 	}

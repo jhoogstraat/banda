@@ -1,7 +1,9 @@
 #!/bin/bash
 # Fake Claude Code for tests: logged in unless `auth logout` ran, and emits
-# stream-json turns like the real CLI, creating one file per prompt. Replies
-# name the --model and --effort it was started with.
+# stream-json turns like the real CLI, creating one file per prompt (holding
+# the prompt's stream-json line). Replies name the --model and --effort it was
+# started with. A prompt that mentions "preview" starts a web server on :5173
+# instead (the Browser tab).
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -22,8 +24,18 @@ done
 while IFS= read -r line; do
   case "$line" in
     *control_request*) echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}' ;;
+    *preview*'"type":"user"'*) # keys are sorted: the prompt comes first
+      mkdir -p ~/site/assets
+      echo '<!doctype html><script src="/assets/app.js"></script><p>e2e-preview-page</p>' > ~/site/index.html
+      echo 'console.log("e2e-preview-asset")' > ~/site/assets/app.js
+      setsid python3 -m http.server 5173 -d ~/site </dev/null >/dev/null 2>&1 &
+      cat <<JSON
+{"type":"assistant","message":{"content":[{"type":"text","text":"Serving on :5173"}]},"parent_tool_use_id":null}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0}
+JSON
+      ;;
     *'"type":"user"'*)
-      n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); echo "hello $n" > "hello$n.txt"; sleep 1
+      n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); printf 'hello %s\n%s\n' "$n" "$line" > "hello$n.txt"; sleep 1
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}

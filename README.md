@@ -47,11 +47,13 @@ To use another OIDC provider, set these before `mise run api` (or when running `
 
 Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build).
 
+The Browser tab shows apps running in a thread's environment from a second origin: `PREVIEW_ADDR` (default `:8788`) is where the API serves it, `PREVIEW_URL` the URL browsers use for it, by default the host they reach Banda on with that port. Keep it on the same site as Banda (another port, or a sibling subdomain such as `preview.banda.example.com`): the preview signs in with a SameSite cookie.
+
 ## Tests
 
-- `mise run test`: Go unit tests (state machine, inbox fan-out, agent prompt, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, and that 20k tool calls stay fast), `node web/src/lib/inbox.check.ts` which inbox changes notify.
-- `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790`, next to the normal one.
+- `mise run test`: Go unit tests (state machine, inbox fan-out, agent prompt, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps, preview tunnel, ports and proxy). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, and that 20k tool calls stay fast), `node web/src/lib/inbox.check.ts` which inbox changes notify.
+- `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790` (preview `:8791`), next to the normal one.
 
 ## Run the API in the cluster
 
-`mise run deploy` builds the API image (with the web build), loads it into kind and applies `deploy/banda.yaml`. Settings come from the optional Secret `banda-api` (the variables above). Run either `mise run api` or `mise run deploy`, not both. Reach it with `kubectl -n banda port-forward svc/banda-api 8787`.
+`mise run deploy` builds the API image (with the web build), loads it into kind and applies `deploy/banda.yaml`. Settings come from the optional Secret `banda-api` (the variables above). Run either `mise run api` or `mise run deploy`, not both. Reach it with `kubectl -n banda port-forward svc/banda-api 8787 8788`.

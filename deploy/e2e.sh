@@ -20,6 +20,14 @@ sql() { kc exec postgres-0 -- psql -U banda -tAc "$1"; }
 reply() { sql "select body->'agentText'->>'text' from events where thread_id='$ID' and body ? 'agentText' order by seq desc limit 1"; }
 # Output of a terminal stream (OpenTerminal, OpenLoginTerminal).
 term() { mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" | jq -r '.data // empty' | base64 -d; }
+# What a server stream sent within 4 s, one JSON object per message.
+stream() {
+	"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" >"$TMP/stream" 2>&1 &
+	local p=$!; sleep 4; kill $p 2>/dev/null || true; wait $p 2>/dev/null || true
+	jq -c 'select(.code == null)' "$TMP/stream" 2>/dev/null # drop the error our kill causes
+}
+BUF=$(mise which buf)
+TMP=$(mktemp -d)
 # Events of thread $ID with the setup step id $1 in state $2.
 steps() { sql "select count(*) from events where thread_id='$ID' and body->'setupStep'->>'id'='$1' and body->'setupStep'->>'state'='SETUP_STATE_$2'"; }
 login_state() {
@@ -92,10 +100,38 @@ mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")
 [ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
-call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent one more\",\"mentionsAgent\":true}}" bob >/dev/null
+ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true}}" bob >/dev/null; }
+request() { sql "select seq from events where thread_id='$ID' and body ? 'turnRequest' order by seq desc limit 1"; }
+ask "one more"
+sleep 2
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread turnRequests)" = 1 ] || fail "bob's request did not wait"
+thread diff | grep -q hello2.txt && fail "bob's request ran without approval"
+REQ=$(request)
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" bob >/dev/null 2>&1 && fail "bob approved his own request"
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-thread diff | grep -q hello2.txt
-ok "mentioning @agent in chat mode starts a turn"
+thread diff | grep -q 'bob: @agent one more' || fail "the approved turn did not run as bob's"
+[ "$(thread turnRequests)" = null ] || fail "the request is still open"
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/dev/null 2>&1 && fail "a request was approved twice"
+ok "a teammate's @agent post waits for the owner; approving runs it as the teammate's turn"
+
+ask "not this"
+REQ=$(request)
+call ThreadService/DeclineTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ,\"note\":\"not now\"}" >/dev/null
+sleep 2
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread turnRequests)" = null ] || fail "decline left the thread $(thread status)"
+thread diff | grep -q hello3.txt && fail "a declined request ran"
+[ "$(sql "select body->'turnRequestResolved'->>'note' from events where thread_id='$ID' and body ? 'turnRequestResolved' order by seq desc limit 1")" = "not now" ]
+ok "declining a request runs no turn and keeps the note"
+
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" bob >/dev/null 2>&1 && fail "bob trusted himself"
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" >/dev/null
+[ "$(thread trusted)" = true ]
+ask "trusted"
+sleep 1; wait_for STATUS_AWAITING_INPUT
+thread diff | grep -q 'bob: @agent trusted' || fail "bob's post in a trusted thread did not run"
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":false}" >/dev/null
+ok "in a trusted thread a teammate's @agent post runs directly"
 
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" bob >/dev/null 2>&1 && { echo "not ok - bob switched modes"; exit 1; }
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null
@@ -130,6 +166,20 @@ call ThreadService/ListFiles "{\"threadId\":\"$ID\"}" | jq -e '.paths | index("R
 call ThreadService/ReadFile "{\"threadId\":\"$ID\",\"path\":\"../.claude/.credentials.json\"}" >/dev/null 2>&1 && { echo "not ok - read outside the checkout"; exit 1; }
 ok "files are listed; paths outside the checkout are refused"
 
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"start the preview\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+for _ in $(seq 10); do stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.running and .ports == [{port: 5173, process: "http.server"}]' >/dev/null && break; done
+tail -1 <(stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob) | jq -e '.ports == [{port: 5173, process: "http.server"}]' >/dev/null || fail "preview ports: $(cat "$TMP/stream")"
+ok "the preview lists the dev server the agent started (port 5173, http.server), to teammates too"
+
+URL=$(call ThreadService/PreviewOpen "{\"threadId\":\"$ID\",\"port\":5173,\"path\":\"/\"}" bob | jq -r .url)
+PREVIEW=${URL%%/__banda/*}
+curl -sf -c "$TMP/jar" -b "$TMP/jar" -L "$URL" | grep -q e2e-preview-page
+curl -sf -b "$TMP/jar" "$PREVIEW/assets/app.js" | grep -q e2e-preview-asset
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$PREVIEW/assets/app.js")" = 401 ] || fail "the preview answers without its cookie"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$PREVIEW/__banda/open?token=forged&path=/")" = 401 ] || fail "a forged preview token was accepted"
+ok "the preview serves the page and its absolute-path asset on $PREVIEW, only with the cookie from PreviewOpen"
+
 call ThreadService/Push "{\"threadId\":\"$ID\"}" >/dev/null
 for _ in $(seq 20); do [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ] && break; sleep 1; done
 [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ]
@@ -141,11 +191,17 @@ for _ in $(seq 30); do kc get pod "t-$ID" >/dev/null 2>&1 || break; sleep 2; don
 ! kc get pod "t-$ID" >/dev/null 2>&1
 ok "snoozing suspends the environment (pod gone, volumes kept)"
 
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" | tail -1 | grep -qx '{}' || fail "preview of a paused environment: $(cat "$TMP/stream")"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar" "$PREVIEW/")" = 503 ]
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob >/dev/null; grep -q permission_denied "$TMP/stream" || fail "a teammate woke the preview: $(cat "$TMP/stream")"
+[ "$(thread status)" = STATUS_SUSPENDED ]
+ok "the preview of a paused environment says so and does not wake it; teammates can't wake it"
+
 call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"effort\":\"max\"}" >/dev/null
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
 reply | grep -q "with claude-sonnet-5-5 · max" || fail "settings changed while paused were not applied: $(reply)"
-thread diff | grep -q hello5.txt
+thread diff | grep -q hello6.txt
 ok "a prompt resumes the environment with the checkout intact and the settings changed while paused"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'

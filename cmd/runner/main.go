@@ -32,6 +32,7 @@ import (
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
+	"github.com/jhoogstraat/banda/internal/tunnel"
 )
 
 var (
@@ -106,6 +107,10 @@ func run(ctx context.Context) error {
 		term.exited = func() { loginStatus(loggedIn(ctx)) }
 	}
 	defer term.close()
+	tunnels := tunnel.NewMux(func(t *bandav1.HttpTunnel) error {
+		return sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_HttpTunnel{HttpTunnel: t}})
+	})
+	defer tunnels.CloseAll()
 	go func() {
 		defer cancel()
 		for {
@@ -135,6 +140,12 @@ func run(ctx context.Context) error {
 				if loginUser == "" { // a login environment has no checkout
 					go files(ctx, k.FileRequest, sendReq)
 				}
+			case *bandav1.ConnectResponse_HttpTunnel:
+				if t := k.HttpTunnel; t.Port != 0 && loginUser == "" { // the API opens a preview connection
+					go dialPort(ctx, tunnels.Open(t.Id), t.Port)
+				} else {
+					tunnels.Deliver(t)
+				}
 			}
 		}
 	}()
@@ -144,6 +155,7 @@ func run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+	go reportPorts(ctx, sendReq) // the preview works during setup and after it failed
 	if err := prepare(ctx, send, notice, loginStatus); err != nil {
 		// Reported as a failed step. Stay connected without the agent so the
 		// owner can debug in the terminal; exiting would only crash-loop.
