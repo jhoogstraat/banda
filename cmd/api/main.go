@@ -64,7 +64,14 @@ func main() {
 	if svc.DeleteSettledAfter, err = time.ParseDuration(env("DELETE_SETTLED_AFTER", "168h")); err != nil {
 		log.Fatalf("DELETE_SETTLED_AFTER: %v", err)
 	}
-	go svc.SuspendIdle(ctx, idle)
+	if svc.LoginIdle, err = time.ParseDuration(env("LOGIN_IDLE_AFTER", "10m")); err != nil {
+		log.Fatalf("LOGIN_IDLE_AFTER: %v", err)
+	}
+	every, err := time.ParseDuration(env("IDLE_SWEEP_EVERY", "1m"))
+	if err != nil {
+		log.Fatalf("IDLE_SWEEP_EVERY: %v", err)
+	}
+	go svc.SuspendIdle(ctx, idle, every)
 	svc.Preview = api.PreviewConfig{Addr: env("PREVIEW_ADDR", ":8788"), URL: os.Getenv("PREVIEW_URL")}
 	go func() {
 		preview := &http.Server{Addr: svc.Preview.Addr, Handler: svc.PreviewHandler(), ReadHeaderTimeout: 10 * time.Second}

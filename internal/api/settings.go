@@ -35,9 +35,6 @@ var (
 	oauthToken = regexp.MustCompile(`sk-ant-o[ar]t`)
 )
 
-// loginIdle is how long a login environment runs without a terminal.
-const loginIdle = 10 * time.Minute
-
 func checkSecretName(name string) error {
 	if !secretName.MatchString(name) {
 		return connect.NewError(connect.CodeInvalidArgument, "a secret name is an environment variable name: A-Z, 0-9 and _, not starting with a digit")
@@ -172,12 +169,12 @@ func (s *Service) loginUsed(userID string) {
 }
 
 // suspendIdleLogins suspends login environments that have had no terminal
-// for loginIdle. After an API restart every connected one counts as idle.
+// for LoginIdle. After an API restart every connected one counts as idle.
 func (s *Service) suspendIdleLogins(ctx context.Context) {
 	var idle []string
 	s.mu.Lock()
 	for key := range s.runners {
-		if u, ok := strings.CutPrefix(key, loginPrefix); ok && s.terminals[key] == nil && time.Since(s.loginLastUsed[u]) > loginIdle {
+		if u, ok := strings.CutPrefix(key, loginPrefix); ok && s.terminals[key] == nil && time.Since(s.loginLastUsed[u]) > s.LoginIdle {
 			idle = append(idle, u)
 		}
 	}

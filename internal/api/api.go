@@ -27,6 +27,8 @@ type Service struct {
 	// DeleteSettledAfter is how long after the owner settles a thread its
 	// pushed environment is kept.
 	DeleteSettledAfter time.Duration
+	// LoginIdle is how long a login environment runs without a terminal.
+	LoginIdle time.Duration
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -65,6 +67,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		inbox:     map[*inboxWatcher]struct{}{},
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
+		LoginIdle:          10 * time.Minute,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}

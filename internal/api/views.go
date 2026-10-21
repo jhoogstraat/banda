@@ -117,13 +117,14 @@ func (s *Service) suspendIfOwner(ctx context.Context, id string) {
 	}
 }
 
-// SuspendIdle suspends environments that have been idle for longer than idle.
-func (s *Service) SuspendIdle(ctx context.Context, idle time.Duration) {
+// SuspendIdle suspends environments that have been idle for longer than idle,
+// checking every so often.
+func (s *Service) SuspendIdle(ctx context.Context, idle, every time.Duration) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(time.Minute):
+		case <-time.After(every):
 		}
 		ids, err := s.store.Idle(ctx, time.Now().Add(-idle))
 		if err != nil {
