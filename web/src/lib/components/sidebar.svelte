@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { timestampMs } from '@bufbuild/protobuf/wkt';
+	import BellIcon from '@lucide/svelte/icons/bell';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -13,23 +13,14 @@
 	import NewThreadDialog from '#lib/components/new-thread-dialog.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
-	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { matches, projectName, projects, threads, userName } from '#lib/threads.svelte.js';
+	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { sectionOf } from '#lib/inbox.js';
+	import { askNotify, matches, projectName, projects, threads, unread, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
-
-	// Precedence: settled > snoozed > status.
-	const sectionOf = (t: Thread) =>
-		t.settled
-			? 'settled'
-			: t.snoozedUntil && timestampMs(t.snoozedUntil) > Date.now()
-				? 'snoozed'
-				: t.status === Status.STARTING || t.status === Status.WORKING
-					? 'working'
-					: 'needs';
 
 	const sections = $derived.by(() => {
 		const s: Record<string, Thread[]> = { needs: [], working: [], snoozed: [], settled: [] };
-		for (const t of threads.list.filter(matches)) s[sectionOf(t)].push(t);
+		for (const t of threads.list.filter(matches)) s[sectionOf(t, threads.now)].push(t);
 		return s;
 	});
 	const name = $derived(threads.me?.name ?? '');
@@ -55,9 +46,15 @@
 			? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
 			: ''}"
 	>
-		{#if byline}<UserAvatar name={userName(t.ownerId)} class="size-5" />{:else}<StatusDot status={t.status} />{/if}
-		<span class="truncate">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
-		<span class="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums">{ago(t.updatedAt)}</span>
+		{#if byline}
+			<span class="relative shrink-0">
+				<UserAvatar name={userName(t.ownerId)} class="size-5" />
+				<span class="absolute -right-0.5 -bottom-0.5 flex rounded-full bg-sidebar p-px"><StatusDot status={t.status} /></span>
+			</span>
+		{:else}<StatusDot status={t.status} />{/if}
+		<span class="truncate {unread(t) ? 'font-semibold text-sidebar-foreground' : ''}">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
+		{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
+		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {unread(t) ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>
 	</a>
 {/snippet}
 
@@ -122,6 +119,9 @@
 			<div class="truncate text-sm">{name}</div>
 			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
 		</div>
+		{#if threads.notify === 'default'}
+			<IconButton icon={BellIcon} label="Notify me when I'm mentioned or my agent needs me" onclick={askNotify} />
+		{/if}
 		<IconButton icon={SettingsIcon} label="Settings" href="/settings" variant={page.url.pathname === '/settings' ? 'secondary' : 'ghost'} />
 	</Sidebar.Footer>
 </Sidebar.Root>

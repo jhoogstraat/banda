@@ -50,7 +50,7 @@
 	import { api } from '#lib/api.js';
 	import { apply, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
+	import { threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -81,7 +81,6 @@
 	async function load() {
 		try {
 			thread = (await api.getThread({ threadId: id })).thread;
-			loadThreads().catch(() => {});
 		} catch (e) {
 			error = (e as Error).message;
 		}
@@ -94,6 +93,13 @@
 		timer = setTimeout(load, 200);
 	};
 
+	// Marks the thread read while it is on screen, after a burst of events or when the tab comes back.
+	let readTimer: ReturnType<typeof setTimeout>;
+	const markRead = () => {
+		clearTimeout(readTimer);
+		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
+	};
+
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
 		while (!signal.aborted) {
@@ -102,7 +108,10 @@
 				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq }, { signal })) {
 					if (!event) continue;
 					offline = false;
-					if (event.seq) seq = event.seq;
+					if (event.seq) {
+						seq = event.seq;
+						markRead();
+					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
@@ -122,6 +131,7 @@
 		return () => {
 			ctrl.abort();
 			clearTimeout(timer);
+			clearTimeout(readTimer);
 		};
 	});
 
@@ -149,6 +159,8 @@
 		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
 	}
 </script>
+
+<svelte:document onvisibilitychange={markRead} />
 
 {#snippet divider(text: string, tone = 'text-muted-foreground')}
 	<div class="flex items-center gap-3 text-xs {tone}">

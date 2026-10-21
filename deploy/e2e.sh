@@ -58,6 +58,20 @@ call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"ni
 [ "$(thread mode)" = MODE_CHAT ]
 ok "a teammate's post switches to chat mode"
 
+call ThreadService/InboxMarkRead "{\"threadId\":\"$ID\"}" >/dev/null
+[ "$(thread unread)" = null ] || fail "still unread after InboxMarkRead"
+INBOX=$(mktemp)
+mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
+INBOX_PID=$!
+for _ in $(seq 30); do [ -s "$INBOX" ] && break; sleep 0.5; done
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@carol over to you\",\"mentionedUserIds\":[\"carol\"]}}" bob >/dev/null
+mentioned() { jq -se --arg id "$ID" 'last | .mentioned // [] | map(.id) | index($id)' "$INBOX" >/dev/null 2>&1; }
+for _ in $(seq 20); do mentioned && break; sleep 0.5; done
+kill $INBOX_PID
+mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")"
+[ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
+ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
+
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent one more\",\"mentionsAgent\":true}}" bob >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
 thread diff | grep -q hello2.txt

@@ -10,8 +10,8 @@ export const initials = (name: string) =>
 		.toUpperCase();
 
 // Relative age of a timestamp: "now", "5m", "2h", "3d".
-export function ago(ts?: Timestamp) {
-	const s = ts ? (Date.now() - timestampMs(ts)) / 1000 : 0;
+export function ago(ts?: Timestamp, now = Date.now()) {
+	const s = ts ? (now - timestampMs(ts)) / 1000 : 0;
 	const [unit, size] = (
 		[["d", 86400], ["h", 3600], ["m", 60]] as const
 	).find(([, n]) => s >= n) ?? ["", 0];
