@@ -41,6 +41,7 @@ type Thread struct {
 	LastSeq       int64      // read-only; Update maintains it
 	AutoPush      string     // bandav1.AutoPushState name; see SetAutoPush
 	EnvDeleteAt   *time.Time // see SetEnvDeleteAt
+	EnvPushed     bool       // all work was on origin when the environment was suspended
 	// PermissionMode is "bypass", "ask", "accept_edits" or "plan".
 	PermissionMode string
 	Permissions    map[string]string // pending requests: id -> tool name
@@ -92,13 +93,13 @@ func Open(ctx context.Context, url string) (*Store, error) {
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id`
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -324,9 +325,9 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
-		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}
@@ -396,4 +397,20 @@ func (s *Store) SetAutoPush(ctx context.Context, id, state string) error {
 func (s *Store) SetEnvDeleteAt(ctx context.Context, id string, at *time.Time) error {
 	_, err := s.db.Exec(ctx, `UPDATE threads SET env_delete_at = $2 WHERE id = $1`, id, at)
 	return err
+}
+
+// ResetEnv forgets a deletion and what was pushed: the environment is (re)started.
+func (s *Store) ResetEnv(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET env_delete_at = NULL, env_pushed = false, env_deleted = false WHERE id = $1`, id)
+	return err
+}
+
+// ClaimDeleted returns the threads whose environment was deleted since the
+// last call, by any API.
+func (s *Store) ClaimDeleted(ctx context.Context) ([]string, error) {
+	rows, err := s.db.Query(ctx, `UPDATE threads SET env_deleted = true WHERE env_delete_at <= now() AND NOT env_deleted RETURNING id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
 }

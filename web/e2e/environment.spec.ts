@@ -70,10 +70,9 @@ test('a thread that can’t push reports it, and settling it keeps its environme
 	expect(await sandbox(t.id, 'shutdownTime')).toBe('');
 });
 
-// test.fail(): open bugs of the round-4 audit (B<n>), fixed in the next commit.
 const settle = (t: Thread) => t.user.threads.settle({ threadId: t.id, settled: true });
 
-test.fail('B2: settling while the last turn’s push is still running waits for it, then schedules the deletion of pushed work', async ({ as }) => {
+test('B2: settling while the last turn’s push is still running waits for it, then schedules the deletion of pushed work', async ({ as }) => {
 	const t = await as('alice').create({ prompt: 'e2e: commit one' });
 	await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 90_000);
 	await t.holdPush();
@@ -89,7 +88,7 @@ test.fail('B2: settling while the last turn’s push is still running waits for 
 	expect(await sandbox(t.id, 'shutdownTime')).not.toBe('');
 });
 
-test.fail('B2: a commit made in the terminal is pushed when the thread is settled; uncommitted work keeps the environment', async ({ as }) => {
+test('B2: a commit made in the terminal is pushed when the thread is settled; uncommitted work keeps the environment', async ({ as }) => {
 	const alice = as('alice');
 	const [committed, dirty] = await Promise.all([alice.create({ prompt: 'e2e: commit one' }), alice.create({ prompt: 'e2e: commit one' })]);
 	for (const t of [committed, dirty]) await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 150_000);
@@ -102,7 +101,7 @@ test.fail('B2: a commit made in the terminal is pushed when the thread is settle
 	expect((await sql(`select env_delete_at is null from threads where id = '${dirty.id}'`))).toBe('t');
 });
 
-test.fail('B5: settling a thread whose agent waits for permission denies it with a reason the agent sees, then suspends', async ({ as }) => {
+test('B5: settling a thread whose agent waits for permission denies it with a reason the agent sees, then suspends', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create({ prompt: 'e2e: permissions' });
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -119,7 +118,7 @@ test.fail('B5: settling a thread whose agent waits for permission denies it with
 	expect((await t.get()).permissionPending).toBe(false);
 });
 
-test.fail('B6: a terminal open during Retry ends; the thread is then idle-suspended with the page open; Reopen wakes it', async ({ as, startApi }) => {
+test('B6: a terminal open during Retry ends; the thread is then idle-suspended with the page open; Reopen wakes it', async ({ as, startApi }) => {
 	test.setTimeout(360_000);
 	const api = await startApi({ IDLE_SUSPEND_AFTER: '90s', IDLE_SWEEP_EVERY: '1s' }); // longer than a start under load
 	const alice = as('alice', api);
@@ -143,7 +142,7 @@ test.fail('B6: a terminal open during Retry ends; the thread is then idle-suspen
 	await expect(term).toContainText('after-42', { timeout: 90_000 });
 });
 
-test.fail('B8: a prompt posted while the thread is being suspended wins: the environment resumes and the agent answers', async ({ as, startApi }) => {
+test('B8: a prompt posted while the thread is being suspended wins: the environment resumes and the agent answers', async ({ as, startApi }) => {
 	// The pause holds every suspend between the thread's status and its environment. A snooze races the post
 	// here; the idle sweep suspends the same way.
 	const api = await startApi({ TEST_SUSPEND_PAUSE: '5s' });
@@ -165,7 +164,7 @@ test.fail('B8: a prompt posted while the thread is being suspended wins: the env
 	await t.waitFor('to answer', (i) => i.status === Status.AWAITING_INPUT && i.diff.includes('hello2.txt'));
 });
 
-test.fail('B18: the deletion of a settled environment reaches an open page: the banner appears without a reload', async ({ as }) => {
+test('B18: the deletion of a settled environment reaches an open page: the banner appears without a reload', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create({ prompt: 'e2e: commit a file' });
 	await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 150_000);

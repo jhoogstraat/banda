@@ -126,7 +126,13 @@ func run(ctx context.Context) error {
 				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort})
 				queueCmd(msg)
 			case *bandav1.ConnectResponse_Push:
-				go pushes.manualPush(ctx, notice)
+				if k.Push.Suspend {
+					go func() {
+						sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Pushed{Pushed: pushes.push(ctx)}})
+					}()
+				} else {
+					go pushes.manualPush(ctx, notice)
+				}
 			case *bandav1.ConnectResponse_TerminalOpen:
 				term.open(k.TerminalOpen)
 			case *bandav1.ConnectResponse_TerminalInput:

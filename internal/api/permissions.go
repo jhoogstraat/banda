@@ -157,23 +157,40 @@ func (s *Service) permissionEvent(ctx context.Context, id string, e *bandav1.Eve
 	s.broadcast(id, events)
 }
 
+// denyPermissions denies every pending request, with a reason the agent sees.
+func (s *Service) denyPermissions(ctx context.Context, id, reason string) {
+	for _, rid := range s.resolvePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_DENY, reason) {
+		s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Permission{Permission: &bandav1.PermissionCommand{
+			RequestId: rid, Decision: bandav1.PermissionDecision_PERMISSION_DECISION_DENY, Message: reason}}})
+	}
+}
+
 // settlePermissions resolves every pending request: CANCELED when the turn
 // ended without them, LOST when the environment went away and the request
 // with it.
 func (s *Service) settlePermissions(ctx context.Context, id string, d bandav1.PermissionDecision) {
+	s.resolvePermissions(ctx, id, d, "")
+}
+
+// resolvePermissions resolves every pending request as d and returns their ids.
+func (s *Service) resolvePermissions(ctx context.Context, id string, d bandav1.PermissionDecision, message string) []string {
 	if t, err := s.store.Get(ctx, id); err != nil || len(t.Permissions) == 0 {
-		return
+		return nil
 	}
+	var ids []string
 	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		var out []*bandav1.Event
-		for _, rid := range slices.Sorted(maps.Keys(t.Permissions)) {
-			out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_PermissionResolved{PermissionResolved: &bandav1.PermissionResolved{Id: rid, Decision: d}}})
+		ids = slices.Sorted(maps.Keys(t.Permissions))
+		for _, rid := range ids {
+			out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_PermissionResolved{PermissionResolved: &bandav1.PermissionResolved{Id: rid, Decision: d, Message: message}}})
 		}
 		t.Permissions = nil
 		return out, nil
 	})
 	if err != nil {
 		slog.Error("settle permissions", "thread", id, "err", err)
+		return nil
 	}
 	s.broadcast(id, events)
+	return ids
 }

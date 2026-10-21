@@ -34,7 +34,9 @@ func (s *Service) Snooze(ctx context.Context, req *bandav1.SnoozeRequest) (*band
 	}
 	s.pokeInbox(user(ctx))
 	if until != nil {
-		s.suspendIfOwner(ctx, req.ThreadId)
+		s.suspendIfOwner(ctx, req.ThreadId, "snoozed")
+	} else {
+		s.unpark(req.ThreadId)
 	}
 	return &bandav1.SnoozeResponse{}, nil
 }
@@ -45,19 +47,21 @@ func (s *Service) Settle(ctx context.Context, req *bandav1.SettleRequest) (*band
 	}
 	s.pokeInbox(user(ctx))
 	if req.Settled {
-		s.suspendIfOwner(ctx, req.ThreadId)
+		s.suspendIfOwner(ctx, req.ThreadId, "settled")
 		s.scheduleDelete(ctx, req.ThreadId) // also when it was suspended already
 	} else {
+		s.unpark(req.ThreadId)
 		s.cancelDelete(ctx, req.ThreadId)
 	}
 	return &bandav1.SettleResponse{}, nil
 }
 
 // scheduleDelete has a suspended environment deleted DeleteSettledAfter its
-// owner settled the thread, but only if all its work is on origin.
+// owner settled the thread, but only if all its work was on origin when it
+// was suspended.
 func (s *Service) scheduleDelete(ctx context.Context, id string) {
 	t, err := s.store.Get(ctx, id)
-	if err != nil || t.Status != thread.Suspended || t.AutoPush != bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String() {
+	if err != nil || t.Status != thread.Suspended || !t.EnvPushed {
 		return
 	}
 	settled, err := s.store.SettledAt(ctx, t.OwnerID, id)
@@ -108,10 +112,46 @@ func (s *Service) EnvironmentRecreate(ctx context.Context, req *bandav1.Environm
 
 // suspendIfOwner pauses the environment when its owner snoozes or settles
 // the thread. Unsnoozing resumes lazily, on the next prompt.
-func (s *Service) suspendIfOwner(ctx context.Context, id string) {
+func (s *Service) suspendIfOwner(ctx context.Context, id, how string) {
 	if _, err := s.owned(ctx, id); err != nil {
 		return
 	}
+	s.mu.Lock()
+	s.parking[id] = how
+	s.mu.Unlock()
+	s.park(ctx, id)
+}
+
+// unpark: the owner unsnoozed or unsettled the thread before it was suspended.
+func (s *Service) unpark(id string) {
+	s.mu.Lock()
+	delete(s.parking, id)
+	s.mu.Unlock()
+}
+
+// park suspends a thread its owner snoozed or settled. A running turn
+// finishes first (its end parks it again), unless it waits for a permission:
+// that would keep it open for good, out of the owner's inbox, so the request
+// is denied and the turn interrupted.
+func (s *Service) park(ctx context.Context, id string) {
+	s.mu.Lock()
+	how, ok := s.parking[id]
+	s.mu.Unlock()
+	if !ok {
+		return
+	}
+	t, err := s.store.Get(ctx, id)
+	if err != nil {
+		return
+	}
+	if t.Status == thread.Working {
+		if len(t.Permissions) > 0 {
+			s.denyPermissions(ctx, id, "The thread's owner "+how+" it, so it is being suspended.")
+			s.do(ctx, id, thread.StopTurn)
+		}
+		return
+	}
+	s.unpark(id)
 	if effect, err := s.apply(ctx, id, thread.Suspend{}); err == nil {
 		s.do(ctx, id, effect)
 	}
@@ -145,6 +185,22 @@ func (s *Service) SuspendIdle(ctx context.Context, idle, every time.Duration) {
 			}
 		}
 		s.suspendIdleLogins(ctx)
+		s.reportDeleted(ctx)
+	}
+}
+
+// reportDeleted tells the chats of environments deleted since the last sweep.
+func (s *Service) reportDeleted(ctx context.Context) {
+	ids, err := s.store.ClaimDeleted(ctx)
+	if err != nil {
+		slog.Error("find deleted environments", "err", err)
+	}
+	for _, id := range ids {
+		e := &bandav1.Event{Actor: "system", Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{
+			Text: "The settled thread's environment was deleted; its branch is on origin. Recreate it to continue."}}}
+		if _, err := s.apply(ctx, id, nil, e); err != nil {
+			slog.Error("report deleted environment", "thread", id, "err", err)
+		}
 	}
 }
 

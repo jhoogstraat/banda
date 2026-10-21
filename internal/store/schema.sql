@@ -118,6 +118,10 @@ CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'t
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS auto_push text NOT NULL DEFAULT '';
 -- When the settled environment is (or was) deleted; null when none is scheduled.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;
+-- The suspended environment's work was all on origin when it was suspended (see SuspendEnv).
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_pushed boolean NOT NULL DEFAULT false;
+-- The chat was told its environment was deleted.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_deleted boolean NOT NULL DEFAULT false;
 -- Which tool calls the agent asks for; its pending permission requests (id ->
 -- tool name); and the tools allowed without asking for the rest of the thread.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS permission_mode text NOT NULL DEFAULT 'bypass';
