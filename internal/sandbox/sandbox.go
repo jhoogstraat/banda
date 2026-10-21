@@ -12,11 +12,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"maps"
+	"net/netip"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -147,6 +150,67 @@ func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 		return nil
 	}
 	return err
+}
+
+// ParseCIDRs parses a comma-separated list of CIDRs (SANDBOX_EGRESS_ALLOW).
+// NetworkPolicies can't name hosts, so a host is an address with /32.
+func ParseCIDRs(s string) ([]netip.Prefix, error) {
+	var cidrs []netip.Prefix
+	for f := range strings.SplitSeq(s, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(f)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a CIDR such as 10.20.0.0/16, or 10.20.30.40/32 for one address", f)
+		}
+		if p != p.Masked() {
+			return nil, fmt.Errorf("%q has host bits set: did you mean %s?", f, p.Masked())
+		}
+		cidrs = append(cidrs, p)
+	}
+	return cidrs, nil
+}
+
+// AllowEgress lets the namespace's sandboxes reach cidrs (production, say) on
+// top of deploy/sandbox-policy.yaml, with a NetworkPolicy of its own;
+// policies add up, so the base stays as it is. None removes it. Banda's own
+// pods keep sandboxes out with ingress policies even when a range covers them.
+func (c *Client) AllowEgress(ctx context.Context, cidrs []netip.Prefix) error {
+	policies := c.kube.NetworkingV1().NetworkPolicies(c.cfg.Namespace)
+	if len(cidrs) == 0 { // never apply it empty: a rule without destinations allows them all
+		err := policies.Delete(ctx, egressPolicyName, metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	body, err := json.Marshal(egressPolicy(cidrs))
+	if err != nil {
+		return err
+	}
+	force := true
+	_, err = policies.Patch(ctx, egressPolicyName, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: "banda-api", Force: &force})
+	return err
+}
+
+const egressPolicyName = "sandboxes-allow"
+
+func egressPolicy(cidrs []netip.Prefix) *networkingv1.NetworkPolicy {
+	var to []networkingv1.NetworkPolicyPeer
+	for _, c := range cidrs {
+		to = append(to, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: c.String()}})
+	}
+	return &networkingv1.NetworkPolicy{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "networking.k8s.io/v1", Kind: "NetworkPolicy"},
+		ObjectMeta: metav1.ObjectMeta{Name: egressPolicyName},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "banda.dev/sandbox", Operator: metav1.LabelSelectorOpExists}}},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
+			Egress:      []networkingv1.NetworkPolicyEgressRule{{To: to}},
+		},
+	}
 }
 
 func hash(owner string) string {
