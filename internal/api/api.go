@@ -468,6 +468,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 		s.mu.Unlock()
 		if mine && !login {
+			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 			s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
 		}
 	}()
@@ -512,6 +513,13 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 					slog.Error("store auto-push state", "thread", id, "err", err)
 				}
 			}
+			if e.GetPermissionResolved() != nil {
+				e.Actor = "system" // the agent withdrew it
+			}
+			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
+				s.permissionEvent(ctx, id, e)
+				continue
+			}
 			var action thread.Action
 			var reason string
 			if e.GetTurnEnded() != nil {
@@ -523,6 +531,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			if _, err := s.applyBecause(ctx, id, action, reason, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
+			}
+			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
+				s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
 			s.mu.Lock()
@@ -570,8 +581,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 // ready marks the environment ready and hands over the initial prompt if it
 // has not been delivered yet.
 func (s *Service) ready(ctx context.Context, id string, r *runner) error {
+	// A new claude process: requests of the one before are gone.
+	s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 	var prompt string
-	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 		if effect == thread.StartTurn {
 			prompt, t.PendingPrompt = t.PendingPrompt, ""
@@ -585,6 +598,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 		return err
 	}
 	s.broadcast(id, events)
+	s.configure(t) // before the prompt, so its first tool call already asks as it should
 	if prompt != "" {
 		s.deliver(ctx, id, prompt)
 	}
@@ -853,6 +867,8 @@ func toProto(t store.Thread) *bandav1.Thread {
 		AutoPush:           bandav1.AutoPushState(bandav1.AutoPushState_value[t.AutoPush]),
 		EnvironmentDeleted: t.EnvDeleteAt != nil && !t.EnvDeleteAt.After(time.Now()),
 		Activity:           t.Activity,
+		PermissionMode:     permissionModeToProto[t.PermissionMode],
+		PermissionPending:  len(t.Permissions) > 0,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

@@ -36,4 +36,8 @@ const asking = (n: number, status = Status.WORKING) => ({ threads: [t('a', statu
 eq(titles(asking(0), asking(1)), ['a: A teammate asks to run your agent'], 'a new turn request alerts, even while working');
 eq(titles(asking(1), asking(1)), [], 'a pending request is not news');
 eq(titles(asking(2), asking(1)), [], 'a resolved request is quiet');
+const perm = (pending: boolean) => ({ threads: [t('a', Status.WORKING, { permissionPending: pending })], mentioned: [] });
+eq(titles(perm(false), perm(true)), ['a: Your agent asks for permission'], 'a permission request alerts while working');
+eq(titles(perm(true), perm(true)), [], 'a pending permission is not news');
+eq(titles(perm(true), perm(false)), [], 'an answered permission is quiet');
 console.log('inbox ok');

@@ -24,6 +24,8 @@ func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 		text = "thinking"
 	case *bandav1.Event_ToolCall:
 		text = toolSummary(k.ToolCall)
+	case *bandav1.Event_PermissionRequested:
+		text = "asks permission: " + k.PermissionRequested.ToolName
 	case *bandav1.Event_TurnEnded:
 		text = "finished the turn"
 		if k.TurnEnded.IsError {

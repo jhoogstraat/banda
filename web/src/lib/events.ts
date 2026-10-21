@@ -1,5 +1,17 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { AgentSettings, Event, Mode, ReviewComment, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
+import type {
+	AgentSettings,
+	Event,
+	Mode,
+	PermissionRequested,
+	PermissionResolved,
+	ReviewComment,
+	SetupStep,
+	ToolCall,
+	ToolResult,
+	TurnEnded,
+	TurnRequestResolved
+} from './gen/banda/v1/banda_pb.ts';
 
 // A subagent's (Task's) calls nest in `children`. `seq` and `resultSeq` are the events' seqs;
 // `cut` says the stream cut a large input or output (History with `full` loads it).
@@ -15,6 +27,8 @@ export type Item = { key: number } & (
 	| { kind: 'steps'; steps: Step[] }
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
 	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
+	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
+	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
@@ -25,7 +39,7 @@ export type Item = { key: number } & (
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
-// subagent calls by parent id, turn request resolutions by request seq. `planSeq` is the seq of the TodoWrite behind `plan`.
+// subagent calls by parent id, turn request resolutions by request seq, permission answers by request id. `planSeq` is the seq of the TodoWrite behind `plan`.
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
 	items: Item[];
@@ -37,6 +51,7 @@ export type Chat = {
 		results: Map<string, { result: ToolResult; seq: bigint; cut: boolean }>;
 		calls: Map<string, Tool[]>;
 		resolved: Map<bigint, TurnRequestResolved & { by: string }>;
+		answers: Map<string, PermissionResolved & { by: string }>;
 	};
 	present: string[];
 	typing: Record<string, number>;
@@ -48,7 +63,7 @@ export const newChat = (): Chat => ({
 	plan: [],
 	planSeq: 0n,
 	tools: new Map(),
-	orphans: { results: new Map(), calls: new Map(), resolved: new Map() },
+	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map() },
 	present: [],
 	typing: {}
 });
@@ -152,6 +167,19 @@ export function apply(chat: Chat, e: Event) {
 			else chat.orphans.results.set(k.value.toolCallId, { result: k.value, seq: e.seq, cut: e.truncated });
 			break;
 		}
+		case 'permissionRequested': {
+			const r = k.value;
+			const call = { id: r.toolCallId, name: r.toolName, inputJson: r.inputJson } as ToolCall;
+			chat.items.push({ key, kind: 'permission', req: r, tool: chat.tools.get(r.toolCallId) ?? { kind: 'tool', call, children: [], seq: 0n } });
+			break;
+		}
+		case 'permissionResolved': {
+			const id = k.value.id;
+			const req = chat.items.findLast((i): i is Extract<Item, { kind: 'permission' }> => i.kind === 'permission' && i.req.id === id);
+			if (req) req.resolved = { ...k.value, by: e.actor };
+			else chat.orphans.answers.set(id, { ...k.value, by: e.actor }); // its request is in older history
+			break;
+		}
 		case 'turnEnded':
 			chat.streaming = '';
 			chat.items.push({ key, kind: 'turn', turn: k.value });
@@ -213,7 +241,14 @@ export function prepend(chat: Chat, events: Event[]) {
 			item.resolved = chat.orphans.resolved.get(item.seq);
 			chat.orphans.resolved.delete(item.seq);
 		}
+		if (item.kind === 'permission' && chat.orphans.answers.has(item.req.id)) {
+			item.resolved = chat.orphans.answers.get(item.req.id);
+			chat.orphans.answers.delete(item.req.id);
+		}
 	}
+	// A permission card made before its call was loaded points at the call now.
+	for (const item of chat.items)
+		if (item.kind === 'permission' && !item.tool.seq) item.tool = chat.tools.get(item.req.toolCallId) ?? item.tool;
 	for (const [id, o] of chat.orphans.results) {
 		const tool = chat.tools.get(id);
 		if (!tool) continue;
@@ -229,6 +264,7 @@ export function prepend(chat: Chat, events: Event[]) {
 	}
 	// What waits in the older page waits for even older history.
 	for (const [seq, r] of old.orphans.resolved) chat.orphans.resolved.set(seq, r);
+	for (const [id, r] of old.orphans.answers) chat.orphans.answers.set(id, r);
 	for (const [id, o] of old.orphans.results) chat.orphans.results.set(id, o);
 	for (const [id, kids] of old.orphans.calls) chat.orphans.calls.set(id, [...kids, ...(chat.orphans.calls.get(id) ?? [])]);
 }

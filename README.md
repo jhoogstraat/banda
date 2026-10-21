@@ -30,6 +30,10 @@ For private repos, and for the auto-push after every turn on https remotes, add 
 kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 ```
 
+## Permissions
+
+The permission chip in the composer sets what the agent asks for in that thread: nothing (bypass, the default), edits and commands (ask), commands other than edits (accept edits), or everything until you approve its plan (plan). Requests appear in the chat; you answer them, or your teammates once you trust them. "Always allow" applies to that tool for the rest of the thread.
+
 ## Preparing a repo
 
 Before the agent starts, a thread installs the tools from the repo's `mise.toml`, `.mise.toml` or `.tool-versions` with [mise](https://mise.jdx.dev), then runs `.banda/setup.sh` with bash in the checkout (once per thread; again when the script changes; 15 min timeout). The chat shows each step. If one fails, the thread stops with its output; the terminal still works, and **Retry** runs the setup again.

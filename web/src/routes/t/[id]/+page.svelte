@@ -50,6 +50,8 @@
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
 	import Plan from '#lib/components/plan.svelte';
+	import PermissionCard from '#lib/components/permission-card.svelte';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -63,6 +65,7 @@
 	import { apply, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
+	import { permissionLabel, permissionModes } from '#lib/permissions.js';
 	import { prUrl, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
@@ -174,7 +177,7 @@
 					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionRequested', 'permissionResolved'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -455,6 +458,8 @@
 									<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
 								{/if}
 							</div>
+						{:else if item.kind === 'permission'}
+							<PermissionCard {item} threadId={id} {owner} trusted={!!thread?.trusted} ownerName={userName(thread?.ownerId ?? '')} {act} />
 						{:else if item.kind === 'text'}
 							{@render agentText(item.text)}
 						{:else if item.kind === 'steps'}
@@ -548,7 +553,9 @@
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
 		<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
 		<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
-			{#if thread?.status === Status.WORKING}
+			{#if thread?.permissionPending}
+				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for permission</span>
+			{:else if thread?.status === Status.WORKING}
 				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 			{/if}
 			{#if typingText}
@@ -568,12 +575,19 @@
 				<PromptInput.Toolbar>
 					<div class="flex items-center gap-1.5 pl-2">
 						{#if thread && owner}
-							<!-- A running agent switches once its turns have ended. -->
+							<!-- A running agent switches model and effort once its turns have ended, permissions at once. -->
 							<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />
 							<OptionMenu label="Effort" icon={BrainIcon} bind:value={() => thread!.effort, (effort) => setAgent({ effort })} options={efforts} />
+							<OptionMenu
+								label="Permissions"
+								icon={ShieldIcon}
+								options={Object.keys(permissionModes)}
+								bind:value={() => permissionLabel(thread!.permissionMode), (v) => act(api.permissionSetMode({ threadId: id, mode: permissionModes[v] }))}
+							/>
 						{:else if thread}
 							<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
 							<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
+							<Badge variant="outline" class="font-normal text-muted-foreground"><ShieldIcon /> {permissionLabel(thread.permissionMode)}</Badge>
 						{/if}
 					</div>
 					<PromptInput.Submit />

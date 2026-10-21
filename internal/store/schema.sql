@@ -101,3 +101,8 @@ CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'t
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS auto_push text NOT NULL DEFAULT '';
 -- When the settled environment is (or was) deleted; null when none is scheduled.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;
+-- Which tool calls the agent asks for; its pending permission requests (id ->
+-- tool name); and the tools allowed without asking for the rest of the thread.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permission_mode text NOT NULL DEFAULT 'bypass';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permissions jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS allowed_tools text[] NOT NULL DEFAULT '{}';

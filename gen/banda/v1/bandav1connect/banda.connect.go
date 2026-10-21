@@ -94,6 +94,12 @@ const (
 	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
 	// ThreadServiceTeamWatchProcedure is the procedure name of the ThreadService's TeamWatch RPC.
 	ThreadServiceTeamWatchProcedure = "/banda.v1.ThreadService/TeamWatch"
+	// ThreadServicePermissionAnswerProcedure is the procedure name of the ThreadService's
+	// PermissionAnswer RPC.
+	ThreadServicePermissionAnswerProcedure = "/banda.v1.ThreadService/PermissionAnswer"
+	// ThreadServicePermissionSetModeProcedure is the procedure name of the ThreadService's
+	// PermissionSetMode RPC.
+	ThreadServicePermissionSetModeProcedure = "/banda.v1.ThreadService/PermissionSetMode"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -326,6 +332,20 @@ var (
 			Procedure:  ThreadServiceTeamWatchProcedure,
 		}
 	})
+	threadServicePermissionAnswerSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionAnswer"),
+			Procedure:  ThreadServicePermissionAnswerProcedure,
+		}
+	})
+	threadServicePermissionSetModeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionSetMode"),
+			Procedure:  ThreadServicePermissionSetModeProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -391,6 +411,13 @@ type ThreadServiceClient interface {
 	// last activity and who is looking at them: sent at once, then again
 	// (coalesced) whenever one changes.
 	TeamWatch(context.Context, *v1.TeamWatchRequest) (ThreadServiceTeamWatchClientStream, error)
+	// Answers the agent's pending permission request: the owner, or anyone in
+	// a trusted thread. Approving a plan (ExitPlanMode) is for the owner only
+	// and switches the thread to `mode`.
+	PermissionAnswer(context.Context, *v1.PermissionAnswerRequest) (*v1.PermissionAnswerResponse, error)
+	// Sets which tool calls the agent must ask for (owner only). Applies to the
+	// running agent at once.
+	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -565,6 +592,13 @@ type ThreadServiceHandler interface {
 	// last activity and who is looking at them: sent at once, then again
 	// (coalesced) whenever one changes.
 	TeamWatch(context.Context, *v1.TeamWatchRequest, ThreadServiceTeamWatchServerStream) error
+	// Answers the agent's pending permission request: the owner, or anyone in
+	// a trusted thread. Approving a plan (ExitPlanMode) is for the owner only
+	// and switches the thread to `mode`.
+	PermissionAnswer(context.Context, *v1.PermissionAnswerRequest) (*v1.PermissionAnswerResponse, error)
+	// Sets which tool calls the agent must ask for (owner only). Applies to the
+	// running agent at once.
+	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -601,6 +635,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
 		connect.Method{Spec: threadServiceTeamWatchSpec(), Handler: adapter.teamWatch},
+		connect.Method{Spec: threadServicePermissionAnswerSpec(), Handler: adapter.permissionAnswer},
+		connect.Method{Spec: threadServicePermissionSetModeSpec(), Handler: adapter.permissionSetMode},
 	)
 }
 
@@ -799,6 +835,14 @@ func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingR
 
 func (UnimplementedThreadServiceHandler) TeamWatch(context.Context, *v1.TeamWatchRequest, ThreadServiceTeamWatchServerStream) error {
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.TeamWatch is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PermissionAnswer(context.Context, *v1.PermissionAnswerRequest) (*v1.PermissionAnswerResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionAnswer is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionSetMode is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1035,6 +1079,22 @@ func (c *threadServiceClient) TeamWatch(ctx context.Context, req *v1.TeamWatchRe
 		return ThreadServiceTeamWatchClientStream{}, err
 	}
 	return ThreadServiceTeamWatchClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) PermissionAnswer(ctx context.Context, req *v1.PermissionAnswerRequest) (*v1.PermissionAnswerResponse, error) {
+	var res v1.PermissionAnswerResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionAnswerSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PermissionSetMode(ctx context.Context, req *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error) {
+	var res v1.PermissionSetModeResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionSetModeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 type threadServiceHandler struct{ svc ThreadServiceHandler }
@@ -1365,6 +1425,30 @@ func (h threadServiceHandler) teamWatch(ctx context.Context, _ connect.Spec, str
 		return err
 	}
 	return h.svc.TeamWatch(ctx, &req, ThreadServiceTeamWatchServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) permissionAnswer(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionAnswerRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionAnswer(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) permissionSetMode(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionSetModeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionSetMode(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
 
 var (
