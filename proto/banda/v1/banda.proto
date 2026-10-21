@@ -72,6 +72,12 @@ service ThreadService {
   // last activity and who is looking at them: sent at once, then again
   // (coalesced) whenever one changes.
   rpc TeamWatch(TeamWatchRequest) returns (stream TeamWatchResponse);
+  // What happened since the caller last saw the brief (BriefSeen), or in the
+  // last day: teammates' finished turns, sub-threads, settled threads, and
+  // what waits for the caller now.
+  rpc Brief(BriefRequest) returns (BriefResponse);
+  // Marks the brief seen up to its `until`.
+  rpc BriefSeen(BriefSeenRequest) returns (BriefSeenResponse);
   // Answers the agent's pending permission request: the owner, or anyone in
   // a trusted thread. Approving a plan (ExitPlanMode) is for the owner only
   // and switches the thread to `mode`.
@@ -796,6 +802,39 @@ message TeamWatchResponse {
   // recently updated first. Without diffs.
   repeated Thread threads = 1;
 }
+
+message BriefRequest {}
+
+message BriefResponse {
+  google.protobuf.Timestamp since = 1;
+  // Pass to BriefSeen once the brief was seen.
+  google.protobuf.Timestamp until = 2;
+  // Teammates' threads whose agent finished a turn; text is the agent's last
+  // words (first line).
+  repeated BriefItem finished = 3;
+  // The caller's threads that need them (text: the last activity) and other
+  // threads with an unanswered mention of them.
+  repeated BriefItem waiting = 4;
+  // Sub-threads started; text is the parent's title.
+  repeated BriefItem spawned = 5;
+  // Teammates' threads their owners settled.
+  repeated BriefItem settled = 6;
+}
+
+// One line of the brief, newest first in each list.
+message BriefItem {
+  string thread_id = 1;
+  string title = 2;
+  string owner_id = 3;
+  string text = 4;
+  google.protobuf.Timestamp time = 5;
+}
+
+message BriefSeenRequest {
+  google.protobuf.Timestamp until = 1;
+}
+
+message BriefSeenResponse {}
 
 message InboxWatchRequest {}
 

@@ -333,12 +333,22 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 		return t, nil, err
 	}
 	var activity []byte // nil keeps the previous one
+	var summary *string // likewise
+	finished := false
 	for _, e := range events {
 		if a := Activity(e); a != nil {
 			a.Time = timestamppb.Now()
 			if activity, err = protojson.Marshal(a); err != nil {
 				return t, nil, err
 			}
+		}
+		switch k := e.Kind.(type) {
+		case *bandav1.Event_AgentText:
+			if s := snippet(k.AgentText.Text); s != "" {
+				summary = &s
+			}
+		case *bandav1.Event_TurnEnded:
+			finished = !k.TurnEnded.IsError
 		}
 	}
 	perms, tools := t.Permissions, t.AllowedTools
@@ -351,9 +361,10 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
-		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18,
+		summary=coalesce($19, summary), finished_at=CASE WHEN $20 THEN now() ELSE finished_at END, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, summary, finished).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

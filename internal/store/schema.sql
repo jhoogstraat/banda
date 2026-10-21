@@ -159,3 +159,9 @@ CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAG
   AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
 CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
+-- For the brief: the first line of the agent's latest text, when its last
+-- turn finished without an error, and when each user last read the brief.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS summary text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS finished_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS brief_seen_at timestamptz;
+CREATE INDEX IF NOT EXISTS thread_views_settled ON thread_views (settled_at) WHERE settled_at IS NOT NULL;

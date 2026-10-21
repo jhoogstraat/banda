@@ -47,7 +47,7 @@ test('team board: bob watches alice’s thread start, work and wait for her, liv
 	const t = await alice.create({ prompt: 'e2e-hold:board' });
 	const card = column(page, alice).getByRole('link', { name: /e2e-hold:board/ });
 	await expect(card).toBeVisible();
-	await expect(column(page, alice).getByText('1 working · 1')).toBeVisible(); // starting counts
+	await expect(column(page, alice).getByText('1 working', { exact: true })).toBeVisible(); // starting counts
 	await expect(card).toContainText('Agent: ', { timeout: 90_000 });
 	await t.release('board');
 	await expect(card).toContainText(`Waiting for ${alice.id}`);

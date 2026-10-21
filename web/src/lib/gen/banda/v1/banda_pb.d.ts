@@ -2422,6 +2422,137 @@ export declare type TeamWatchResponse = Message$1<"banda.v1.TeamWatchResponse"> 
 export declare const TeamWatchResponseSchema: GenMessage<TeamWatchResponse>;
 
 /**
+ * @generated from message banda.v1.BriefRequest
+ */
+export declare type BriefRequest = Message$1<"banda.v1.BriefRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.BriefRequest.
+ * Use `create(BriefRequestSchema)` to create a new message.
+ */
+export declare const BriefRequestSchema: GenMessage<BriefRequest>;
+
+/**
+ * @generated from message banda.v1.BriefResponse
+ */
+export declare type BriefResponse = Message$1<"banda.v1.BriefResponse"> & {
+  /**
+   * @generated from field: google.protobuf.Timestamp since = 1;
+   */
+  since?: Timestamp | undefined;
+
+  /**
+   * Pass to BriefSeen once the brief was seen.
+   *
+   * @generated from field: google.protobuf.Timestamp until = 2;
+   */
+  until?: Timestamp | undefined;
+
+  /**
+   * Teammates' threads whose agent finished a turn; text is the agent's last
+   * words (first line).
+   *
+   * @generated from field: repeated banda.v1.BriefItem finished = 3;
+   */
+  finished: BriefItem[];
+
+  /**
+   * The caller's threads that need them (text: the last activity) and other
+   * threads with an unanswered mention of them.
+   *
+   * @generated from field: repeated banda.v1.BriefItem waiting = 4;
+   */
+  waiting: BriefItem[];
+
+  /**
+   * Sub-threads started; text is the parent's title.
+   *
+   * @generated from field: repeated banda.v1.BriefItem spawned = 5;
+   */
+  spawned: BriefItem[];
+
+  /**
+   * Teammates' threads their owners settled.
+   *
+   * @generated from field: repeated banda.v1.BriefItem settled = 6;
+   */
+  settled: BriefItem[];
+};
+
+/**
+ * Describes the message banda.v1.BriefResponse.
+ * Use `create(BriefResponseSchema)` to create a new message.
+ */
+export declare const BriefResponseSchema: GenMessage<BriefResponse>;
+
+/**
+ * One line of the brief, newest first in each list.
+ *
+ * @generated from message banda.v1.BriefItem
+ */
+export declare type BriefItem = Message$1<"banda.v1.BriefItem"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string owner_id = 3;
+   */
+  ownerId: string;
+
+  /**
+   * @generated from field: string text = 4;
+   */
+  text: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp time = 5;
+   */
+  time?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.BriefItem.
+ * Use `create(BriefItemSchema)` to create a new message.
+ */
+export declare const BriefItemSchema: GenMessage<BriefItem>;
+
+/**
+ * @generated from message banda.v1.BriefSeenRequest
+ */
+export declare type BriefSeenRequest = Message$1<"banda.v1.BriefSeenRequest"> & {
+  /**
+   * @generated from field: google.protobuf.Timestamp until = 1;
+   */
+  until?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.BriefSeenRequest.
+ * Use `create(BriefSeenRequestSchema)` to create a new message.
+ */
+export declare const BriefSeenRequestSchema: GenMessage<BriefSeenRequest>;
+
+/**
+ * @generated from message banda.v1.BriefSeenResponse
+ */
+export declare type BriefSeenResponse = Message$1<"banda.v1.BriefSeenResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.BriefSeenResponse.
+ * Use `create(BriefSeenResponseSchema)` to create a new message.
+ */
+export declare const BriefSeenResponseSchema: GenMessage<BriefSeenResponse>;
+
+/**
  * @generated from message banda.v1.InboxWatchRequest
  */
 export declare type InboxWatchRequest = Message$1<"banda.v1.InboxWatchRequest"> & {
@@ -4487,6 +4618,28 @@ export declare const ThreadService: GenService<{
     methodKind: "server_streaming";
     input: typeof TeamWatchRequestSchema;
     output: typeof TeamWatchResponseSchema;
+  },
+  /**
+   * What happened since the caller last saw the brief (BriefSeen), or in the
+   * last day: teammates' finished turns, sub-threads, settled threads, and
+   * what waits for the caller now.
+   *
+   * @generated from rpc banda.v1.ThreadService.Brief
+   */
+  brief: {
+    methodKind: "unary";
+    input: typeof BriefRequestSchema;
+    output: typeof BriefResponseSchema;
+  },
+  /**
+   * Marks the brief seen up to its `until`.
+   *
+   * @generated from rpc banda.v1.ThreadService.BriefSeen
+   */
+  briefSeen: {
+    methodKind: "unary";
+    input: typeof BriefSeenRequestSchema;
+    output: typeof BriefSeenResponseSchema;
   },
   /**
    * Answers the agent's pending permission request: the owner, or anyone in
