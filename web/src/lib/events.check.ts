@@ -1,9 +1,9 @@
 // Run: node src/lib/events.check.ts
-import { apply, type Chat } from './events.ts';
+import { apply, newChat, typingNow } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
-const chat: Chat = { items: [], streaming: '' };
+const chat = newChat();
 const live = () => chat.streaming;
 const count = () => chat.items.length;
 
@@ -40,4 +40,14 @@ apply(chat, step('setup', 3));
 apply(chat, step('setup', 1)); // retry: only status changes in between, which add no item
 if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== 3)
 	throw new Error('a finished step running again should start a new checklist');
+
+const n = count();
+apply(chat, ev({ case: 'presenceChanged', value: { userIds: ['alice', 'bob'] } }, 0n));
+if (chat.present.join() !== 'alice,bob' || count() !== n) throw new Error('presence should replace the present set, not add items');
+apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'bob' });
+apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'carol' });
+if (typingNow(chat, Date.now()).join() !== 'bob,carol' || count() !== n) throw new Error('typing should be tracked per person');
+if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should expire');
+apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
+if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
 console.log('ok');

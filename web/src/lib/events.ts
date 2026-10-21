@@ -10,12 +10,23 @@ export type Item =
 	| { kind: 'setup'; steps: SetupStep[] };
 
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
-export type Chat = { items: Item[]; streaming: string };
+// `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
+export type Chat = { items: Item[]; streaming: string; present: string[]; typing: Record<string, number> };
+
+export const newChat = (): Chat => ({ items: [], streaming: '', present: [], typing: {} });
+
+// People who typed in the last `ms`, oldest first.
+export const typingNow = (chat: Chat, now: number, ms = 5000) =>
+	Object.entries(chat.typing)
+		.filter(([, t]) => now - t < ms)
+		.sort(([, a], [, b]) => a - b)
+		.map(([actor]) => actor);
 
 export function apply(chat: Chat, e: Event) {
 	const k = e.kind;
 	switch (k.case) {
 		case 'message':
+			delete chat.typing[e.actor];
 			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
 			break;
 		case 'agentText':
@@ -59,6 +70,12 @@ export function apply(chat: Chat, e: Event) {
 			else last.steps.push(step);
 			break;
 		}
+		case 'presenceChanged':
+			chat.present = k.value.userIds;
+			break;
+		case 'typing':
+			chat.typing[e.actor] = Date.now();
+			break;
 		case 'modeChanged':
 			chat.items.push({ kind: 'mode', mode: k.value.mode });
 			break;

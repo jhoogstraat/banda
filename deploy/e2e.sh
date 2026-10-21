@@ -54,6 +54,20 @@ ok "thread $ID: sandbox started, first turn ran, diff has its file"
 [ "$(steps checkout DONE)" = 1 ] && [ "$(steps setup SKIPPED)" = 1 ]
 ok "setup steps are reported: checkout done, no .banda/setup.sh"
 
+# Bob and carol watch the thread; carol types. Bob sees both present and carol typing.
+W=$(mktemp)
+BUF=$(mise which buf) # run directly, so kill ends the stream
+watch() { exec "$BUF" curl --schema proto --protocol connect -H "X-Banda-User: $1" --data "{\"threadId\":\"$ID\",\"afterSeq\":\"999999\"}" "$API/banda.v1.ThreadService/WatchThread"; }
+watch bob >"$W" & BOB=$!
+watch carol >/dev/null & CAROL=$!
+sleep 3
+call ThreadService/SendTyping "{\"threadId\":\"$ID\"}" carol >/dev/null
+sleep 1; kill $CAROL; sleep 1; kill $BOB
+jq -se 'map(.event) | any(.presenceChanged.userIds == ["bob","carol"]) and any(.typing and .actor == "carol") and (last.presenceChanged.userIds == ["bob"])' "$W" >/dev/null || fail "presence and typing: $(cat "$W")"
+[ "$(sql "select count(*) from events where thread_id='$ID' and (body ? 'presenceChanged' or body ? 'typing')")" = 0 ]
+rm "$W"
+ok "watchers see who is here and who is typing, and nothing of it is stored"
+
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"nice, carol what do you think?\"}}" bob >/dev/null
 [ "$(thread mode)" = MODE_CHAT ]
 ok "a teammate's post switches to chat mode"

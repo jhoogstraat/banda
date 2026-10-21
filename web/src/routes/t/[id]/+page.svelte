@@ -47,8 +47,9 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
-	import { apply, type Chat } from '#lib/events.js';
+	import { apply, newChat, typingNow } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
 
@@ -56,7 +57,7 @@
 	const id = page.params.id!;
 
 	let thread = $state<Thread>();
-	const chat = $state<Chat>({ items: [], streaming: '' });
+	const chat = $state(newChat());
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
 	// The terminal and the file browser mount when their tab is first opened and then stay alive.
@@ -74,6 +75,21 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// Ticks so typing expires; `others` drops the viewer from presence and typing.
+	let now = $state(Date.now());
+	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
+	const here = $derived(others(chat.present));
+	const typing = $derived(others(typingNow(chat, now)).map(userName));
+	const typingText = $derived(
+		typing.length > 2 ? `${typing.length} people are typing…` : typing.length ? `${typing.join(' and ')} ${typing.length > 1 ? 'are' : 'is'} typing…` : ''
+	);
+	// The composer reports typing at most every 2.5 s; posting resets it.
+	let typedAt = 0;
+	function typed() {
+		if (Date.now() - typedAt < 2500) return;
+		typedAt = Date.now();
+		api.sendTyping({ threadId: id }).catch(() => {});
+	}
 
 	const clock = (t?: Timestamp) =>
 		t ? timestampDate(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
@@ -119,9 +135,11 @@
 		const ctrl = new AbortController();
 		load();
 		watch(ctrl.signal);
+		const tick = setInterval(() => (now = Date.now()), 1000);
 		return () => {
 			ctrl.abort();
 			clearTimeout(timer);
+			clearInterval(tick);
 		};
 	});
 
@@ -147,6 +165,7 @@
 		};
 		// Throwing keeps the text in the prompt box so it can be retried.
 		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
+		typedAt = 0;
 	}
 </script>
 
@@ -170,6 +189,30 @@
 		{#if thread}<StatusDot status={thread.status} label />{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-0.5">
+			{#if here.length}
+				<div class="mr-1.5 flex -space-x-1.5" aria-label="Here now">
+					{#each here.slice(0, 4) as u (u)}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props}><UserAvatar name={userName(u)} class="size-6 ring-2 ring-background" /></span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{userName(u)} · here now</TooltipContent>
+						</Tooltip>
+					{/each}
+					{#if here.length > 4}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props} class="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-background">+{here.length - 4}</span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{here.slice(4).map(userName).join(', ')} · here now</TooltipContent>
+						</Tooltip>
+					{/if}
+				</div>
+			{/if}
 			{#if thread?.status === Status.WORKING}
 				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={() => act(api.interrupt({ threadId: id }))} />
 			{/if}
@@ -272,8 +315,6 @@
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 				{#if thread?.status === Status.STARTING}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
-				{:else if thread?.status === Status.WORKING}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> <span class="animate-pulse">Working…</span></div>
 				{:else if thread?.status === Status.SUSPENDED}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 				{:else if thread?.status === Status.ERRORED}
@@ -293,10 +334,21 @@
 	</Conversation>
 
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+		<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
+		<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+			{#if thread?.status === Status.WORKING}
+				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
+			{/if}
+			{#if typingText}
+				{#if thread?.status === Status.WORKING}<span>·</span>{/if}
+				<span class="flex gap-0.5"><span class="size-1 animate-bounce rounded-full bg-current"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:150ms]"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:300ms]"></span></span>
+				<span class="truncate">{typingText}</span>
+			{/if}
+		</div>
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
 		<PromptInput.Root onSubmit={send}>
-			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
+			<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>

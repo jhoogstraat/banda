@@ -32,6 +32,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Presence | Derived from open `WatchThread` streams, per user, broadcast as the full set (seq 0) on every join and when a user's last stream ends. Typing is a unary `SendTyping` the composer calls at most every 2.5 s; clients drop it after 5 s or when that person posts. The agent's "typing" is its status: the activity line above the composer replaces the old Working indicator. No sidebar indicator yet: it would need presence on `Thread`. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
@@ -150,6 +151,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
 - Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents.
+- Presence and typing: the thread header shows who else has the thread open (per user across tabs); a line above the composer shows the agent working or writing and who is typing. Both are ephemeral events, never stored.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`mise run deploy`, `deploy/banda.yaml`).
 
