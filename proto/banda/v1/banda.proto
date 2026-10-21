@@ -270,6 +270,8 @@ message Event {
     // Links another thread: a fork of this one, or the pick of a race.
     ForkNote fork_note = 33;
     LineageUpdate lineage_update = 32;
+    // The owner changed the permission mode; actor is the owner.
+    PermissionModeChanged permission_mode_changed = 34;
   }
 }
 
@@ -432,6 +434,8 @@ message CreateThreadRequest {
   string model = 3;
   string effort = 4;
   string prompt = 5;
+  // Unspecified: bypass.
+  PermissionMode permission_mode = 6;
 }
 
 message CreateThreadResponse {
@@ -869,6 +873,10 @@ message PermissionSetModeRequest {
 
 message PermissionSetModeResponse {}
 
+message PermissionModeChanged {
+  PermissionMode mode = 1;
+}
+
 message WatchThreadResponse {
   Event event = 1;
 }
@@ -1045,6 +1053,8 @@ message RaceRequest {
   string prompt = 3;
   // 2 to 4.
   repeated RaceTry tries = 4;
+  // Every try's; unspecified: bypass.
+  PermissionMode permission_mode = 5;
 }
 
 message RaceResponse {

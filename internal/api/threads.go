@@ -21,16 +21,21 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 	if err := checkRepoURL(req.RepoUrl); err != nil {
 		return nil, err
 	}
-	t := store.Thread{
-		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-		Title:         title(req.Prompt),
-		RepoURL:       req.RepoUrl,
-		BaseBranch:    req.BaseBranch,
-		Model:         req.Model,
-		Effort:        req.Effort,
-		PendingPrompt: req.Prompt,
+	mode, err := newPermissionMode(req.PermissionMode)
+	if err != nil {
+		return nil, err
 	}
-	t, err := s.start(ctx, t, &bandav1.Message{Text: req.Prompt})
+	t := store.Thread{
+		State:          thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
+		Title:          title(req.Prompt),
+		RepoURL:        req.RepoUrl,
+		BaseBranch:     req.BaseBranch,
+		Model:          req.Model,
+		Effort:         req.Effort,
+		PendingPrompt:  req.Prompt,
+		PermissionMode: mode,
+	}
+	t, err = s.start(ctx, t, user(ctx), &bandav1.Message{Text: req.Prompt})
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +43,14 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 }
 
 // create starts a thread (owner, repo, base, model, effort, permission mode and
-// parent taken from t, see start) with its first prompt.
-func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (store.Thread, error) {
+// parent taken from t, see start) with its first prompt, posted by `by`.
+func (s *Service) create(ctx context.Context, t store.Thread, by, prompt string) (store.Thread, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
 	t.Title, t.PendingPrompt = title(prompt), prompt
 	t.Status, t.Mode = thread.Starting, thread.AgentMode
-	return s.start(ctx, t, &bandav1.Message{Text: prompt})
+	return s.start(ctx, t, by, &bandav1.Message{Text: prompt})
 }
 
 // checkRepoURL refuses credentials in an https URL: everyone sees a thread's
@@ -57,10 +62,10 @@ func checkRepoURL(repo string) error {
 	return nil
 }
 
-// start stores a new thread, posts its first message (if any) as the owner
-// and provisions its environment. It sets the id, branch and runner token,
+// start stores a new thread, posts its first message (if any) as `by` (the
+// owner, or the agent that spawned it) and provisions its environment. It sets the id, branch and runner token,
 // and the defaults for what t leaves empty.
-func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Message) (store.Thread, error) {
+func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
 	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	t.PermissionMode = or(t.PermissionMode, "bypass")
 	// Here, so forks of a thread created with a credentialed URL are refused too.
@@ -77,7 +82,7 @@ func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Mess
 		if first == nil {
 			return nil, nil
 		}
-		return []*bandav1.Event{messageEvent(t.OwnerID, first)}, nil
+		return []*bandav1.Event{messageEvent(by, first)}, nil
 	})
 	if err != nil {
 		return t, err

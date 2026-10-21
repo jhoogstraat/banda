@@ -69,16 +69,12 @@
 		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
 		try {
 			const race = raceTries(tries, model, effort);
-			// Set before the environments are up: a runner gets the mode once it is ready, before the prompt.
-			const mode = permissionModes[permissions] ?? PermissionMode.BYPASS;
-			const ask = (ts: { id: string }[]) => Promise.all(mode === PermissionMode.BYPASS ? [] : ts.map((t) => api.permissionSetMode({ threadId: t.id, mode })));
+			const permissionMode = permissionModes[permissions] ?? PermissionMode.BYPASS;
 			if (race.length > 1) {
-				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race });
-				await ask(threads);
+				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race, permissionMode });
 				await goto(`/compare?race=${threads[0].raceId}`);
 			} else {
-				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
-				await ask([thread!]);
+				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text, permissionMode });
 				await goto(`/t/${thread!.id}`);
 			}
 		} catch (err) {

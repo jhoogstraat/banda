@@ -212,6 +212,25 @@ func (s *Store) Children(ctx context.Context, parentID, viewerID string) ([]Thre
 	return s.listWithView(ctx, `t.parent_id = $2`, viewerID, parentID)
 }
 
+// Depth is how many ancestors the thread has (parent_id links).
+func (s *Store) Depth(ctx context.Context, id string) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `WITH RECURSIVE up(id, parent_id) AS (
+		SELECT id, parent_id FROM threads WHERE id = $1
+		UNION ALL SELECT t.id, t.parent_id FROM threads t JOIN up ON t.id = up.parent_id)
+		SELECT count(*) - 1 FROM up`, id).Scan(&n)
+	return n, err
+}
+
+// AgentSpawned counts the owner's threads that an agent started (their first
+// message is by "agent:<thread>") and that are not suspended.
+func (s *Store) AgentSpawned(ctx context.Context, owner string) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `SELECT count(*) FROM threads t JOIN events e ON e.thread_id = t.id AND e.seq = 1
+		WHERE t.owner_id = $1 AND t.status <> 'suspended' AND e.body->>'actor' LIKE 'agent:%'`, owner).Scan(&n)
+	return n, err
+}
+
 // LastAgentText is the thread's latest agent text, or "".
 func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 	var text string

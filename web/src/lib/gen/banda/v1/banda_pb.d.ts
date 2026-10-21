@@ -434,6 +434,14 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: LineageUpdate;
     case: "lineageUpdate";
+  } | {
+    /**
+     * The owner changed the permission mode; actor is the owner.
+     *
+     * @generated from field: banda.v1.PermissionModeChanged permission_mode_changed = 34;
+     */
+    value: PermissionModeChanged;
+    case: "permissionModeChanged";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1021,6 +1029,13 @@ export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadReques
    * @generated from field: string prompt = 5;
    */
   prompt: string;
+
+  /**
+   * Unspecified: bypass.
+   *
+   * @generated from field: banda.v1.PermissionMode permission_mode = 6;
+   */
+  permissionMode: PermissionMode;
 };
 
 /**
@@ -2712,6 +2727,22 @@ export declare type PermissionSetModeResponse = Message$1<"banda.v1.PermissionSe
 export declare const PermissionSetModeResponseSchema: GenMessage<PermissionSetModeResponse>;
 
 /**
+ * @generated from message banda.v1.PermissionModeChanged
+ */
+export declare type PermissionModeChanged = Message$1<"banda.v1.PermissionModeChanged"> & {
+  /**
+   * @generated from field: banda.v1.PermissionMode mode = 1;
+   */
+  mode: PermissionMode;
+};
+
+/**
+ * Describes the message banda.v1.PermissionModeChanged.
+ * Use `create(PermissionModeChangedSchema)` to create a new message.
+ */
+export declare const PermissionModeChangedSchema: GenMessage<PermissionModeChanged>;
+
+/**
  * @generated from message banda.v1.WatchThreadResponse
  */
 export declare type WatchThreadResponse = Message$1<"banda.v1.WatchThreadResponse"> & {
@@ -3421,6 +3452,13 @@ export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
    * @generated from field: repeated banda.v1.RaceTry tries = 4;
    */
   tries: RaceTry[];
+
+  /**
+   * Every try's; unspecified: bypass.
+   *
+   * @generated from field: banda.v1.PermissionMode permission_mode = 5;
+   */
+  permissionMode: PermissionMode;
 };
 
 /**

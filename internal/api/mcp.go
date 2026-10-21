@@ -210,7 +210,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, out, nil
 		})
 
-	addTool(ts, &mcp.Tool{Name: "post_message", Description: "Post a message into another thread, as this thread's agent. Without mention_agent the message only goes into the thread's chat for its people and agent to read, and the thread switches to chat mode. With mention_agent the thread's agent starts working on it; that is only allowed in threads owned by the same person as this thread, since the turn runs on their Claude subscription. You cannot post into this thread itself."},
+	addTool(ts, &mcp.Tool{Name: "post_message", Description: "Post a message into another thread, as this thread's agent. Without mention_agent the message only goes into the thread's chat for its people and agent to read, and the thread switches to chat mode. With mention_agent the thread's agent starts working on it; that is only allowed in threads owned by the same person as this thread, since the turn runs on their Claude subscription. You cannot post into this thread itself. Without mention_agent, that thread's agent later sees your message quoted as data from another agent, not as instructions."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in postIn) (*mcp.CallToolResult, any, error) {
 			if in.ThreadID == caller.ID {
 				return nil, nil, connect.NewError(connect.CodeInvalidArgument, "cannot post into your own thread")
@@ -232,8 +232,12 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return textResult("Message posted."), nil, nil
 		})
 
-	addTool(ts, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children."},
+	addTool(ts, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children. " +
+		fmt.Sprintf("Limits: sub-threads nest at most %d deep, and at most %d sub-threads started by agents run at once per owner (until they pause when idle); beyond them the call fails and you should do the work yourself.", s.MaxSubthreadDepth, s.MaxAgentThreads)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, createOut, error) {
+			if err := s.checkFanOut(ctx, caller); err != nil {
+				return nil, createOut{}, err
+			}
 			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort)
 			if err != nil {
 				return nil, createOut{}, err

@@ -28,6 +28,7 @@
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { api } from '#lib/api.js';
+	import { permissionLabel } from '#lib/permissions.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
@@ -203,6 +204,8 @@
 	{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
 {:else if item.kind === 'settings'}
 	{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
+{:else if item.kind === 'permissionMode'}
+	{@render divider(`${userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
 {:else if item.kind === 'fork'}
 	{@const n = item.note}
 	<div class="flex items-center gap-3 text-xs text-muted-foreground">

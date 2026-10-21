@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+
+	"connectrpc.com/connect/v2"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/store"
@@ -47,14 +50,41 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 			base = parent.Branch
 		}
 	}
+	by := actor
+	if actor == "agent" { // the parent's agent wrote the prompt
+		by = "agent:" + parent.ID
+	}
 	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, ParentID: parent.ID, RepoURL: repo,
 		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort),
-		PermissionMode: parent.PermissionMode}, prompt) // an agent's sub-thread asks no less than it does
+		PermissionMode: parent.PermissionMode}, by, prompt) // an agent's sub-thread asks no less than it does
 	if err != nil {
 		return child, err
 	}
 	s.lineage(ctx, child, actor, bandav1.Status_STATUS_STARTING, "")
 	return child, nil
+}
+
+// checkFanOut refuses a sub-thread by parent's agent beyond the depth and
+// running-thread limits, saying what to do instead.
+// ponytail: check then create, so parallel calls can overshoot the running cap by a few.
+func (s *Service) checkFanOut(ctx context.Context, parent store.Thread) error {
+	depth, err := s.store.Depth(ctx, parent.ID)
+	if err != nil {
+		return err
+	}
+	if depth+1 > s.MaxSubthreadDepth {
+		return connect.NewError(connect.CodeResourceExhausted, fmt.Sprintf(
+			"sub-threads may nest only %d deep and this thread is at depth %d: do the work here, or ask the parent thread to split it", s.MaxSubthreadDepth, depth))
+	}
+	n, err := s.store.AgentSpawned(ctx, parent.OwnerID)
+	if err != nil {
+		return err
+	}
+	if n >= s.MaxAgentThreads {
+		return connect.NewError(connect.CodeResourceExhausted, fmt.Sprintf(
+			"the owner has at most %d running sub-threads started by agents: wait until some finish and are paused, or do the work here", s.MaxAgentThreads))
+	}
+	return nil
 }
 
 // maxLineage is how much of a reply or an error a LineageUpdate quotes.

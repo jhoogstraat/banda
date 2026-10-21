@@ -68,7 +68,7 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 			RaceID:        race,
 			// The same safety as the source; "always allow" grants stay with it.
 			PermissionMode: src.PermissionMode,
-		}, first)
+		}, by, first)
 		if err != nil {
 			return nil, err
 		}
@@ -92,19 +92,24 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 	if len(req.Tries) < 2 || len(req.Tries) > maxTries {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Sprintf("a race has 2 to %d tries", maxTries))
 	}
+	mode, err := newPermissionMode(req.PermissionMode)
+	if err != nil {
+		return nil, err
+	}
 	race := raceID(len(req.Tries))
 	res := &bandav1.RaceResponse{}
 	for i, try := range req.Tries {
 		t, err := s.start(ctx, store.Thread{
-			State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-			Title:         title(req.Prompt) + tryLabel(i, len(req.Tries)),
-			RepoURL:       req.RepoUrl,
-			BaseBranch:    req.BaseBranch,
-			Model:         try.Model,
-			Effort:        try.Effort,
-			PendingPrompt: req.Prompt,
-			RaceID:        race,
-		}, &bandav1.Message{Text: req.Prompt})
+			State:          thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
+			Title:          title(req.Prompt) + tryLabel(i, len(req.Tries)),
+			RepoURL:        req.RepoUrl,
+			BaseBranch:     req.BaseBranch,
+			Model:          try.Model,
+			Effort:         try.Effort,
+			PendingPrompt:  req.Prompt,
+			RaceID:         race,
+			PermissionMode: mode,
+		}, user(ctx), &bandav1.Message{Text: req.Prompt})
 		if err != nil {
 			return nil, err
 		}

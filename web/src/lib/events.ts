@@ -8,6 +8,7 @@ import {
 	type ForkNote,
 	type LineageUpdate,
 	type Mode,
+	type PermissionMode,
 	type PermissionRequested,
 	type PermissionResolved,
 	type ReviewComment,
@@ -39,6 +40,7 @@ export type Item = { key: number } & (
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
+	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
 	| { kind: 'push'; text: string; pushed: boolean }
 	| { kind: 'fork'; actor: string; note: ForkNote }
 	| { kind: 'setup'; steps: SetupStep[] }
@@ -229,6 +231,9 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'agentSettings':
 			chat.items.push({ key, kind: 'settings', actor: e.actor, settings: k.value });
+			break;
+		case 'permissionModeChanged':
+			chat.items.push({ key, kind: 'permissionMode', actor: e.actor, mode: k.value.mode });
 			break;
 		case 'forkNote':
 			chat.items.push({ key, kind: 'fork', actor: e.actor, note: k.value });

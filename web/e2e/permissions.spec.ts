@@ -1,6 +1,6 @@
 // Permission modes: the agent asks (deploy/fake-claude's e2e-ask and e2e-plan), and who may answer.
 import { PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { expect, refused, Status, test, type Thread, type User } from './fixtures.ts';
+import { expect, refused, repo, Status, test, type Thread, type User } from './fixtures.ts';
 
 /** A thread in the given permission mode, after its first turn. */
 async function threadIn(owner: User, mode: PermissionMode) {
@@ -107,4 +107,27 @@ test('a request pending when the environment restarts is marked lost', async ({ 
 	await t.waitForEvent((e) => e.kind.case === 'permissionResolved' && e.kind.value.decision === PermissionDecision.LOST, 'the lost request', 120_000);
 	expect((await t.of('permissionResolved')).filter((r) => r.decision === PermissionDecision.LOST)).toHaveLength(1);
 	expect((await t.get()).permissionPending).toBe(false);
+});
+
+test('B7: a thread or race created in ask mode asks before its first tool runs, with no second call', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e-ask first', permissionMode: PermissionMode.ASK });
+	expect((await t.get()).permissionMode).toBe(PermissionMode.ASK);
+	await t.waitFor('to ask for permission', (i) => i.permissionPending);
+	expect(await permitted(t)).toBe(0);
+	const { threads } = await alice.threads.race({ repoUrl: repo(), baseBranch: 'main', prompt: 'e2e: race', permissionMode: PermissionMode.PLAN, tries: [{}, {}] });
+	expect(threads.map((r) => r.permissionMode)).toEqual([PermissionMode.PLAN, PermissionMode.PLAN]);
+});
+
+test('B16: a mode change is in the chat and reaches a teammate’s open thread live', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	const page = await bob.page();
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByText('Bypass permissions')).toBeVisible();
+	await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.ASK });
+	await expect(page.getByText(`${alice.id} switched to Ask before edits and commands`)).toBeVisible({ timeout: 5000 });
+	await expect(page.getByText('Ask before edits and commands', { exact: true })).toBeVisible();
+	await alice.threads.permissionSetMode({ threadId: t.id, mode: PermissionMode.ASK }); // no change, no line
+	expect((await t.of('permissionModeChanged')).map((c) => c.mode)).toEqual([PermissionMode.ASK]);
 });

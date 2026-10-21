@@ -29,6 +29,9 @@ type Service struct {
 	DeleteSettledAfter time.Duration
 	// LoginIdle is how long a login environment runs without a terminal.
 	LoginIdle time.Duration
+	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
+	// MaxAgentThreads how many sub-threads started by agents may run per owner.
+	MaxSubthreadDepth, MaxAgentThreads int
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -68,6 +71,8 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
 		LoginIdle:          10 * time.Minute,
+		MaxSubthreadDepth:  3,
+		MaxAgentThreads:    8,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}

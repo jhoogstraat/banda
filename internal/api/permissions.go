@@ -40,21 +40,38 @@ var (
 	errNoPermission = connect.NewError(connect.CodeFailedPrecondition, "this permission request is no longer pending")
 )
 
+// newPermissionMode is the mode a new thread is created in: "" (the default)
+// when unspecified.
+func newPermissionMode(m bandav1.PermissionMode) (string, error) {
+	if m == bandav1.PermissionMode_PERMISSION_MODE_UNSPECIFIED {
+		return "", nil
+	}
+	mode, ok := permissionModeFromProto[m]
+	if !ok {
+		return "", connect.NewError(connect.CodeInvalidArgument, "unknown permission mode")
+	}
+	return mode, nil
+}
+
 func (s *Service) PermissionSetMode(ctx context.Context, req *bandav1.PermissionSetModeRequest) (*bandav1.PermissionSetModeResponse, error) {
 	mode, ok := permissionModeFromProto[req.Mode]
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "unknown permission mode")
 	}
-	t, _, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
+	t, events, err := s.store.Update(ctx, req.ThreadId, func(t *store.Thread) ([]*bandav1.Event, error) {
 		if err := t.CheckOwner(user(ctx)); err != nil {
 			return nil, err
 		}
+		if t.PermissionMode == mode {
+			return nil, nil
+		}
 		t.PermissionMode = mode
-		return nil, nil
+		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_PermissionModeChanged{PermissionModeChanged: &bandav1.PermissionModeChanged{Mode: req.Mode}}}}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	s.broadcast(req.ThreadId, events)
 	s.configure(t) // not running: the runner gets it when it is ready
 	return &bandav1.PermissionSetModeResponse{}, nil
 }

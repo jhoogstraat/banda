@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -66,6 +67,12 @@ func main() {
 	}
 	if svc.LoginIdle, err = time.ParseDuration(env("LOGIN_IDLE_AFTER", "10m")); err != nil {
 		log.Fatalf("LOGIN_IDLE_AFTER: %v", err)
+	}
+	if svc.MaxSubthreadDepth, err = strconv.Atoi(env("MAX_SUBTHREAD_DEPTH", "3")); err != nil {
+		log.Fatalf("MAX_SUBTHREAD_DEPTH: %v", err)
+	}
+	if svc.MaxAgentThreads, err = strconv.Atoi(env("MAX_AGENT_THREADS", "8")); err != nil {
+		log.Fatalf("MAX_AGENT_THREADS: %v", err)
 	}
 	every, err := time.ParseDuration(env("IDLE_SWEEP_EVERY", "1m"))
 	if err != nil {
