@@ -1,6 +1,6 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
-import { apply, newChat, prepend, typingNow, type Chat } from './events.ts';
+import { apply, itemAt, newChat, prepend, typingNow, type Chat } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
@@ -105,6 +105,9 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+apply(chat, ev({ case: 'autoPush', value: { state: 3, detail: 'origin cannot be pushed to' } }));
+const push = chat.items.at(-1);
+if (push?.kind !== 'push' || push.pushed) throw new Error('autoPush should become a chat item');
 
 // Paging: a tail plus older pages prepended one by one gives the same chat as the full replay,
 // wherever the page edges fall (inside groups, between a call and its result, inside a subagent).
@@ -116,6 +119,8 @@ for (let t = 0; t < 4; t++) {
 	add({ case: 'message', value: { text: `turn ${t}` } }, { actor: 'dev' });
 	if (t !== 3) add({ case: 'toolCall', value: { id: `todo${t}`, name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } });
 	call(`r${t}`, 'Read');
+	if (t === 1) add({ case: 'permissionRequested', value: { id: 'p1', toolCallId: 'r1', toolName: 'Read', inputJson: '{}' } });
+	if (t === 2) add({ case: 'permissionResolved', value: { id: 'p1', decision: 1, message: '' } }, { actor: 'dev' });
 	add({ case: 'agentThinking', value: { text: 'hmm' } });
 	call(`task${t}`, 'Task');
 	call(`g${t}`, 'Grep', `task${t}`);
@@ -145,11 +150,36 @@ for (let tail = 1; tail <= history.length; tail++) {
 			oldest = Math.max(0, oldest - size);
 		}
 		if (show(paged) !== show(whole)) throw new Error(`tail ${tail}, pages of ${size}: paged history differs from the full replay`);
-		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size) throw new Error('every orphan should find its call');
+		for (let seq = 1n; seq <= history.length; seq++)
+			if (itemAt(paged, seq) !== itemAt(whole, seq)) throw new Error(`tail ${tail}, pages of ${size}: #${seq} maps to another item`);
+		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size || paged.orphans.answers.size) throw new Error('every orphan should find its call');
 	}
 }
 const tailOnly = newChat();
 apply(tailOnly, { ...history[history.findLastIndex((e) => e.kind.case === 'toolCall' && e.kind.value.name === 'TodoWrite')], context: true } as Event);
 for (const e of history.slice(-3)) apply(tailOnly, e);
 if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a context plan sets the plan without adding an item');
+{
+	// A permission request becomes its own item next to its tool call, and its answer resolves it.
+	const c = newChat();
+	apply(c, ev({ case: 'toolCall', value: { id: 'tb', name: 'Bash', inputJson: '{"command":"ls"}' } }));
+	apply(c, ev({ case: 'permissionRequested', value: { id: 'r1', toolCallId: 'tb', toolName: 'Bash', inputJson: '{"command":"ls"}' } }));
+	apply(c, ev({ case: 'permissionRequested', value: { id: 'r2', toolCallId: 'unknown', toolName: 'Write', inputJson: '{}' } }));
+	const [, p1, p2] = c.items;
+	if (p1?.kind !== 'permission' || p1.tool !== c.tools.get('tb') || p2?.kind !== 'permission' || p2.tool.call.name !== 'Write')
+		throw new Error('a permission request should point at its tool call, or one made from the request');
+	apply(c, { seq: 9n, actor: 'ann', kind: { case: 'permissionResolved', value: { id: 'r1', decision: 3, message: 'no' } } } as Event);
+	if (p1.resolved?.by !== 'ann' || p1.resolved.message !== 'no' || p2.resolved) throw new Error('an answer should resolve only its request');
+}
+apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
+const forked = chat.items.at(-1);
+if (forked?.kind !== 'fork' || forked.actor !== 'bob' || forked.note.threadId !== 't2') throw new Error('forkNote should become a link to the fork');
+
+// Search results link to an event's seq: it maps to the item showing it, once it arrived.
+const jump = newChat();
+apply(jump, ev({ case: 'message', value: { text: 'hi', review: [] } }, 3n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j1', name: 'Bash', inputJson: '{}' } }, 4n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j2', name: 'Read', inputJson: '{}' } }, 6n));
+if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 || itemAt(jump, 2n) !== -1 || itemAt(jump, 7n) !== -1)
+	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
 console.log('ok');

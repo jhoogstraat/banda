@@ -21,6 +21,10 @@
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import {
 		Conversation,
 		ConversationContent,
@@ -48,6 +52,8 @@
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
 	import Plan from '#lib/components/plan.svelte';
+	import PermissionCard from '#lib/components/permission-card.svelte';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -58,10 +64,11 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
-	import { apply, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
+	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
-	import { threads, userName } from '#lib/threads.svelte.js';
+	import { permissionLabel, permissionModes } from '#lib/permissions.js';
+	import { prUrl, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -89,6 +96,7 @@
 	});
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	let loginOpen = $state(false);
+	let forkOpen = $state(false);
 	let error = $state('');
 	// The reason of the latest status change, e.g. why the environment failed.
 	let reason = $state('');
@@ -153,6 +161,29 @@
 		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
 	};
 
+	// /t/<id>#<seq> (from search) scrolls to that event's item and flashes it once it is loaded:
+	// older history loads down to it, newer events arrive with the stream.
+	let target = $state<bigint>();
+	let flash = $state<number>();
+	$effect(() => {
+		const hash = page.url.hash;
+		if (/^#\d+$/.test(hash)) target = BigInt(hash.slice(1));
+	});
+	$effect(() => {
+		if (target === undefined || !oldest) return;
+		if (target < oldest) {
+			loadOlder(Math.min(1000, Number(oldest - target) + 20)); // runs again once `oldest` moved
+			return;
+		}
+		const i = itemAt(chat, target);
+		if (i < 0) return;
+		const key = chat.items[i].key;
+		target = undefined;
+		flash = key;
+		setTimeout(() => document.querySelector(`[data-key="${key}"]`)?.scrollIntoView({ block: 'center' }));
+		setTimeout(() => flash === key && (flash = undefined), 2500);
+	});
+
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
 		while (!signal.aborted) {
@@ -172,7 +203,7 @@
 					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionRequested', 'permissionResolved', 'forkNote'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -182,11 +213,11 @@
 		}
 	}
 
-	async function loadOlder() {
+	async function loadOlder(limit = PAGE) {
 		if (loadingOlder || oldest <= 1n || !scroller) return;
 		loadingOlder = true;
 		try {
-			const { events } = await api.history({ threadId: id, beforeSeq: oldest, limit: PAGE });
+			const { events } = await api.history({ threadId: id, beforeSeq: oldest, limit });
 			const el = scroller;
 			const height = el.scrollHeight;
 			const top = el.scrollTop;
@@ -244,6 +275,8 @@
 	const interrupt = () => act(api.interrupt({ threadId: id }));
 	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
 	const push = () => act(api.push({ threadId: id }));
+	const recreate = () => act(api.environmentRecreate({ threadId: id }));
+	const pr = $derived(thread ? prUrl(thread) : '');
 	const retry = () => act(api.retry({ threadId: id }));
 	const show = (t: string) => {
 		tab = t;
@@ -264,11 +297,14 @@
 		else
 			for (const [label, date] of [presets[0], presets[2]])
 				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
+		c.push({ label: 'Fork this thread', icon: GitForkIcon, run: () => (forkOpen = true) });
 		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
+		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
+		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner) {
-			c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
+			if (!pr) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
 				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
 				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });
@@ -381,9 +417,12 @@
 					disabled={!owner}
 					onclick={toggleMode}
 				/>
+				<IconButton icon={GitForkIcon} label="Fork: try another way from here" onclick={() => (forkOpen = true)} />
 				<ThreadActions {thread} {act} />
 			{/if}
-			{#if owner}
+			{#if pr}
+				<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
+			{:else if owner}
 				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 			{/if}
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
@@ -394,13 +433,18 @@
 		<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
 			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 				{#if oldest > 1n}
-					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={loadOlder}>
+					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={() => loadOlder()}>
 						{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
 					</Button>
 				{/if}
 				{#each chat.items as item (item.key)}
 					<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
-					<div class="[contain-intrinsic-size:auto_80px] [content-visibility:auto]">
+					<div
+						data-key={item.key}
+						class="rounded-lg transition-shadow duration-500 [contain-intrinsic-size:auto_80px] [content-visibility:auto] {flash === item.key
+							? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
+							: ''}"
+					>
 						{#if item.kind === 'message'}
 							{@const name = userName(item.actor)}
 							<div class="flex gap-3">
@@ -447,6 +491,8 @@
 									<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
 								{/if}
 							</div>
+						{:else if item.kind === 'permission'}
+							<PermissionCard {item} threadId={id} {owner} trusted={!!thread?.trusted} ownerName={userName(thread?.ownerId ?? '')} {act} />
 						{:else if item.kind === 'text'}
 							{@render agentText(item.text)}
 						{:else if item.kind === 'steps'}
@@ -498,10 +544,26 @@
 									</Tool>
 								{/each}
 							</div>
+						{:else if item.kind === 'push'}
+							{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
 						{:else if item.kind === 'mode'}
 							{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
 						{:else if item.kind === 'settings'}
 							{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
+						{:else if item.kind === 'fork'}
+							{@const n = item.note}
+							<div class="flex items-center gap-3 text-xs text-muted-foreground">
+								<div class="h-px flex-1 bg-border"></div>
+								<GitForkIcon class="size-3.5" />
+								<span>
+									{userName(item.actor)}
+									{#if !n.picked}forked this after turn {n.turn}:
+									{:else if n.threadId === id}picked this try.
+									{:else}picked another try:{/if}
+									{#if n.threadId !== id}<a class="underline" href="/t/{n.threadId}">{n.title}</a>{/if}
+								</span>
+								<div class="h-px flex-1 bg-border"></div>
+							</div>
 						{/if}
 					</div>
 				{/each}
@@ -509,6 +571,14 @@
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 				{#if thread?.status === Status.STARTING}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
+				{:else if thread?.status === Status.SUSPENDED && thread.environmentDeleted}
+					<div class="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+						<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" />
+						<span class="flex-1">Environment deleted. Branch <code>{thread.branch}</code> is on origin.</span>
+						{#if owner}
+							<Button size="sm" onclick={recreate}><RotateCcwIcon /> Recreate environment</Button>
+						{/if}
+					</div>
 				{:else if thread?.status === Status.SUSPENDED}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 				{:else if thread?.status === Status.ERRORED}
@@ -530,7 +600,9 @@
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
 		<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
 		<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
-			{#if thread?.status === Status.WORKING}
+			{#if thread?.permissionPending}
+				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for permission</span>
+			{:else if thread?.status === Status.WORKING}
 				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 			{/if}
 			{#if typingText}
@@ -550,12 +622,19 @@
 				<PromptInput.Toolbar>
 					<div class="flex items-center gap-1.5 pl-2">
 						{#if thread && owner}
-							<!-- A running agent switches once its turns have ended. -->
+							<!-- A running agent switches model and effort once its turns have ended, permissions at once. -->
 							<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />
 							<OptionMenu label="Effort" icon={BrainIcon} bind:value={() => thread!.effort, (effort) => setAgent({ effort })} options={efforts} />
+							<OptionMenu
+								label="Permissions"
+								icon={ShieldIcon}
+								options={Object.keys(permissionModes)}
+								bind:value={() => permissionLabel(thread!.permissionMode), (v) => act(api.permissionSetMode({ threadId: id, mode: permissionModes[v] }))}
+							/>
 						{:else if thread}
 							<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
 							<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
+							<Badge variant="outline" class="font-normal text-muted-foreground"><ShieldIcon /> {permissionLabel(thread.permissionMode)}</Badge>
 						{/if}
 					</div>
 					<PromptInput.Submit />
@@ -601,3 +680,4 @@
 </SidePane>
 
 <LoginDialog bind:open={loginOpen} />
+{#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}

@@ -31,7 +31,7 @@ type setup struct {
 
 // prepare runs the setup steps. When it returns an error, the failed step
 // has been reported.
-func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(string) error, loginStatus func(bool) error) error {
+func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(string) error, loginStatus func(bool) error, forkPatch func(context.Context) (*bandav1.ForkPatchResponse, error)) error {
 	_, err := os.Stat(filepath.Join(work, ".git"))
 	s := setup{send: send, fresh: err != nil}
 	title := "Check out " + os.Getenv("BANDA_BRANCH")
@@ -42,6 +42,10 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 	}
 	if err != nil {
 		return err
+	}
+	// A recreated environment continues from the pushed branch, which has the fork's changes.
+	if s.fresh && exec.CommandContext(ctx, "git", "-C", work, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+os.Getenv("BANDA_BRANCH")).Run() != nil {
+		s.fork(ctx, forkPatch, notice)
 	}
 
 	const tools = "Install tools (mise)"
@@ -78,6 +82,36 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 	}
 	s.report("login", "Use the API key", bandav1.SetupState_SETUP_STATE_SKIPPED, "Using the API key instead of a subscription login.")
 	return nil
+}
+
+// fork commits the changes a fork starts from, right after its first
+// checkout. If they don't apply (the base branch moved on, a binary file, a
+// diff cut at 1 MiB) the fork starts from the base branch and says so: a
+// failed step would stop the thread.
+// ponytail: dying between the checkout and this commit loses the changes; mark it done on the home volume if that bites.
+func (s setup) fork(ctx context.Context, forkPatch func(context.Context) (*bandav1.ForkPatchResponse, error), notice func(string) error) {
+	const title = "Apply the forked thread's changes"
+	p, err := forkPatch(ctx)
+	if err == nil && p.Patch == "" {
+		return // not a fork
+	}
+	s.report("fork", title, bandav1.SetupState_SETUP_STATE_RUNNING, "")
+	var out []byte
+	if err == nil {
+		apply := exec.CommandContext(ctx, "git", "apply", "--index", "-")
+		apply.Dir, apply.Stdin = work, strings.NewReader(p.Patch)
+		if out, err = apply.CombinedOutput(); err == nil {
+			commit := exec.CommandContext(ctx, "git", "commit", "-q", "-m", p.Message)
+			commit.Dir = work
+			out, err = commit.CombinedOutput()
+		}
+	}
+	if err != nil {
+		s.report("fork", title, bandav1.SetupState_SETUP_STATE_SKIPPED, strings.TrimSpace(string(out)+"\n"+err.Error()))
+		notice("The forked thread's changes could not be applied, so this fork starts from " + os.Getenv("BANDA_BASE_BRANCH") + ". See the setup step for why.")
+		return
+	}
+	s.report("fork", title, bandav1.SetupState_SETUP_STATE_DONE, p.Message)
 }
 
 // once runs a setup command unless it already succeeded for this content

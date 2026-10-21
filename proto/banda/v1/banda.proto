@@ -36,6 +36,9 @@ service ThreadService {
   // Pushes the thread branch to origin (owner only). The result arrives as a
   // notice event.
   rpc Push(PushRequest) returns (PushResponse);
+  // Provisions a fresh environment for a thread whose settled environment was
+  // deleted, from its pushed branch (owner only).
+  rpc EnvironmentRecreate(EnvironmentRecreateRequest) returns (EnvironmentRecreateResponse);
   // A terminal in the thread's environment (owner only). Output streams until
   // the process exits; opening again replaces the previous terminal.
   rpc OpenTerminal(OpenTerminalRequest) returns (stream OpenTerminalResponse);
@@ -64,6 +67,26 @@ service ThreadService {
   // last activity and who is looking at them: sent at once, then again
   // (coalesced) whenever one changes.
   rpc TeamWatch(TeamWatchRequest) returns (stream TeamWatchResponse);
+  // Answers the agent's pending permission request: the owner, or anyone in
+  // a trusted thread. Approving a plan (ExitPlanMode) is for the owner only
+  // and switches the thread to `mode`.
+  rpc PermissionAnswer(PermissionAnswerRequest) returns (PermissionAnswerResponse);
+  // Sets which tool calls the agent must ask for (owner only). Applies to the
+  // running agent at once.
+  rpc PermissionSetMode(PermissionSetModeRequest) returns (PermissionSetModeResponse);
+  // Starts threads (one per try) from another thread's current changes and
+  // conversation, owned by the caller. Anyone who can see a thread can fork it.
+  rpc Fork(ForkRequest) returns (ForkResponse);
+  // Starts sibling threads with the same prompt, one per try.
+  rpc Race(RaceRequest) returns (RaceResponse);
+  // Status, cost, time and diff of threads, side by side.
+  rpc RaceCompare(RaceCompareRequest) returns (RaceCompareResponse);
+  // Keeps one thread of a race (owner only): settles its siblings for the
+  // caller and notes the pick in each.
+  rpc RacePick(RacePickRequest) returns (RacePickResponse);
+  // Full-text search over every thread's messages, review comments, agent
+  // text and tool calls, best matches first.
+  rpc Search(SearchRequest) returns (SearchResponse);
 }
 
 service UserService {
@@ -94,6 +117,8 @@ service SettingsService {
 // never has to reach into pods.
 service RunnerService {
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+  // The changes a fork starts from, applied once after the first checkout.
+  rpc ForkPatch(ForkPatchRequest) returns (ForkPatchResponse);
 }
 
 enum Status {
@@ -142,6 +167,50 @@ message Thread {
   TeamActivity activity = 20;
   // Users with the thread open right now. Set by TeamWatch only.
   repeated string present_user_ids = 21;
+  // Where the thread's work lives, as the runner last reported it.
+  AutoPushState auto_push = 22;
+  // The settled environment and its volume were deleted; the branch is on
+  // origin (see EnvironmentRecreate).
+  bool environment_deleted = 23;
+  PermissionMode permission_mode = 24;
+  // The agent waits for an answer to a permission request.
+  bool permission_pending = 25;
+  // Set if the thread was forked from another one.
+  ForkOrigin forked_from = 28;
+  // Shared by the threads started together by one Race or Fork.
+  string race_id = 29;
+}
+
+// Which tool calls the agent asks for, mapped to Claude Code's
+// --permission-mode. Requests arrive as PermissionRequested events.
+enum PermissionMode {
+  PERMISSION_MODE_UNSPECIFIED = 0;
+  // Nothing asks (bypassPermissions): the sandbox is the boundary.
+  PERMISSION_MODE_BYPASS = 1;
+  // Reads run, edits and commands ask (default).
+  PERMISSION_MODE_ASK = 2;
+  // Reads and edits run, other commands ask (acceptEdits).
+  PERMISSION_MODE_ACCEPT_EDITS = 3;
+  // Read-only planning until the owner approves the plan (plan).
+  PERMISSION_MODE_PLAN = 4;
+}
+
+enum PermissionDecision {
+  PERMISSION_DECISION_UNSPECIFIED = 0;
+  PERMISSION_DECISION_ALLOW = 1;
+  // Allow, and allow this tool without asking for the rest of the thread.
+  PERMISSION_DECISION_ALLOW_ALWAYS = 2;
+  PERMISSION_DECISION_DENY = 3;
+  // The agent withdrew the request, e.g. the turn was interrupted.
+  PERMISSION_DECISION_CANCELED = 4;
+  // The environment restarted before an answer; that turn is gone.
+  PERMISSION_DECISION_LOST = 5;
+}
+
+message ForkOrigin {
+  string thread_id = 1;
+  // Turns the source thread had finished when it was forked.
+  int32 turn = 2;
 }
 
 message User {
@@ -184,7 +253,23 @@ message Event {
     Typing typing = 23;
     // The owner changed the model or effort; actor is the owner.
     AgentSettings agent_settings = 26;
+    // Where the work lives changed, e.g. after an auto-push.
+    AutoPush auto_push = 29;
+    PermissionRequested permission_requested = 30;
+    PermissionResolved permission_resolved = 31;
+    // Links another thread: a fork of this one, or the pick of a race.
+    ForkNote fork_note = 33;
   }
+}
+
+message ForkNote {
+  // The fork, or the thread picked in the race.
+  string thread_id = 1;
+  string title = 2;
+  // false: `thread_id` was forked from this thread after `turn` turns.
+  // true: the actor picked `thread_id` (maybe this thread) in its race.
+  bool picked = 3;
+  int32 turn = 4;
 }
 
 message Message {
@@ -427,6 +512,31 @@ message PushRequest {
 
 message PushResponse {}
 
+message EnvironmentRecreateRequest {
+  string thread_id = 1;
+}
+
+message EnvironmentRecreateResponse {}
+
+enum AutoPushState {
+  // Nothing reported yet.
+  AUTO_PUSH_STATE_UNSPECIFIED = 0;
+  // origin has the branch, and the checkout has nothing origin doesn't.
+  AUTO_PUSH_STATE_PUSHED = 1;
+  // Commits or uncommitted changes exist only in the checkout.
+  AUTO_PUSH_STATE_UNPUSHED = 2;
+  // origin can't be pushed to (no token, read-only): the work only lives in
+  // the environment's volume.
+  AUTO_PUSH_STATE_UNAVAILABLE = 3;
+}
+
+// Sent by the runner after a turn changed the diff, or a push, when the
+// state or its detail changed.
+message AutoPush {
+  AutoPushState state = 1;
+  string detail = 2;
+}
+
 message OpenTerminalRequest {
   string thread_id = 1;
   uint32 cols = 2;
@@ -657,6 +767,50 @@ message HistoryResponse {
   repeated Event events = 1;
 }
 
+// The agent asks before running a tool call. Usually follows that call's
+// ToolCall event.
+message PermissionRequested {
+  // Claude Code's request id; PermissionResolved and PermissionAnswer refer to it.
+  string id = 1;
+  string tool_call_id = 2;
+  string tool_name = 3;
+  // Redacted.
+  string input_json = 4;
+  // Why Claude Code asks, if it said.
+  string reason = 5;
+}
+
+// The answer to a PermissionRequested, by the event's actor (a user, or
+// "system" for CANCELED and LOST).
+message PermissionResolved {
+  string id = 1;
+  PermissionDecision decision = 2;
+  // The reason given with a denial.
+  string message = 3;
+  // A plan approval switched the thread to this mode.
+  PermissionMode mode = 4;
+}
+
+message PermissionAnswerRequest {
+  string thread_id = 1;
+  string request_id = 2;
+  // ALLOW, ALLOW_ALWAYS or DENY.
+  PermissionDecision decision = 3;
+  // Optional, for DENY: told to the agent.
+  string message = 4;
+  // Required to approve a plan: the mode to work in afterwards.
+  PermissionMode mode = 5;
+}
+
+message PermissionAnswerResponse {}
+
+message PermissionSetModeRequest {
+  string thread_id = 1;
+  PermissionMode mode = 2;
+}
+
+message PermissionSetModeResponse {}
+
 message WatchThreadResponse {
   Event event = 1;
 }
@@ -731,7 +885,21 @@ message ConnectResponse {
     // them when no turn is running.
     AgentSettings agent_settings = 9;
     HttpTunnel http_tunnel = 11;
+    PermissionCommand permission = 14;
   }
+}
+
+// Answers a pending permission request (request_id set), or else configures
+// the agent: sent when the runner is ready and whenever the owner changes
+// the mode or always allows a tool.
+message PermissionCommand {
+  string request_id = 1;
+  PermissionDecision decision = 2;
+  string message = 3;
+  // The mode to run in from now on. Unset with an answer: keep it.
+  PermissionMode mode = 4;
+  // Tools the runner allows without asking.
+  repeated string allowed_tools = 5;
 }
 
 message Prompt {
@@ -785,4 +953,112 @@ message HttpTunnel {
 
 message PreviewPorts {
   repeated PreviewPort ports = 1;
+}
+
+// One thread of a Race or Fork; empty fields keep the default (or the
+// forked thread's) model and effort.
+message RaceTry {
+  string model = 1;
+  string effort = 2;
+}
+
+message ForkRequest {
+  string thread_id = 1;
+  // Optional new instruction. Without one the fork sums up where things stand.
+  string prompt = 2;
+  // Empty: one fork with the source's model and effort. At most 4.
+  repeated RaceTry tries = 3;
+}
+
+message ForkResponse {
+  repeated Thread threads = 1;
+}
+
+message RaceRequest {
+  string repo_url = 1;
+  string base_branch = 2;
+  string prompt = 3;
+  // 2 to 4.
+  repeated RaceTry tries = 4;
+}
+
+message RaceResponse {
+  repeated Thread threads = 1;
+}
+
+message RaceCompareRequest {
+  // The threads of a race, and/or any threads by id.
+  string race_id = 1;
+  repeated string thread_ids = 2;
+}
+
+message RaceCompareResponse {
+  repeated RaceEntry entries = 1;
+}
+
+message RaceEntry {
+  Thread thread = 1;
+  // Totals over the thread's finished turns.
+  int32 turns = 2;
+  double cost_usd = 3;
+  int64 duration_ms = 4;
+}
+
+message RacePickRequest {
+  string thread_id = 1;
+}
+
+message RacePickResponse {}
+
+message ForkPatchRequest {
+  string thread_id = 1;
+  string token = 2;
+}
+
+message ForkPatchResponse {
+  // Empty if the thread is not a fork. A unified diff (git apply).
+  string patch = 1;
+  // The commit message for it.
+  string message = 2;
+}
+
+enum SearchKind {
+  SEARCH_KIND_UNSPECIFIED = 0;
+  // Messages and turn requests by people (and agents posting through MCP).
+  SEARCH_KIND_PEOPLE = 1;
+  // The agent's text.
+  SEARCH_KIND_AGENT = 2;
+  // Tool calls and review comments.
+  SEARCH_KIND_CODE = 3;
+}
+
+message SearchRequest {
+  // Words, all of which must match, each also as a prefix ("auth" finds
+  // "authentication").
+  string query = 1;
+  // Filters; empty or unset means any.
+  string actor = 2;
+  string repo_url = 3;
+  SearchKind kind = 4;
+  google.protobuf.Timestamp after = 5;
+  google.protobuf.Timestamp before = 6;
+  // At most 100; 0 means 20.
+  int32 limit = 7;
+}
+
+message SearchResult {
+  string thread_id = 1;
+  string thread_title = 2;
+  string repo_url = 3;
+  // The matching event; the thread page scrolls to it at /t/<id>#<seq>.
+  int64 seq = 4;
+  string actor = 5;
+  google.protobuf.Timestamp time = 6;
+  SearchKind kind = 7;
+  // The matching passage in parts: odd parts are the matched words.
+  repeated string snippet = 8;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
 }

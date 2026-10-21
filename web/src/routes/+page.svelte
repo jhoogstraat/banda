@@ -5,15 +5,18 @@
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import PlugIcon from '@lucide/svelte/icons/plug';
+	import SplitIcon from '@lucide/svelte/icons/split';
 	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
-	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
+	import OptionMenu, { efforts, models, raceTries, tryOptions } from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import RepoPicker from '#lib/components/repo-picker.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { api, settingsApi } from '#lib/api.js';
-	import { AuthMethod, LoginState } from '#lib/gen/banda/v1/banda_pb.js';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import { AuthMethod, LoginState, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
+	import { permissionLabel, permissionModes } from '#lib/permissions.js';
 	import { projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
@@ -23,6 +26,9 @@
 	let baseBranch = $state(saved('baseBranch', 'main'));
 	let model = $state(saved('model', 'claude-opus-5-5'));
 	let effort = $state(saved('effort', 'high'));
+	let permissions = $state(saved('permissions', permissionLabel(PermissionMode.BYPASS)));
+	// Not remembered: every try runs (and bills) its own agent.
+	let tries = $state(tryOptions[0]);
 	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
 	$effect(() => {
 		if (!repoUrl) repoUrl = projects()[0] ?? '';
@@ -60,10 +66,21 @@
 		}
 		busy = true;
 		error = '';
-		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort })) localStorage.setItem(`banda.${k}`, v);
+		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
 		try {
-			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
-			await goto(`/t/${thread!.id}`);
+			const race = raceTries(tries, model, effort);
+			// Set before the environments are up: a runner gets the mode once it is ready, before the prompt.
+			const mode = permissionModes[permissions] ?? PermissionMode.BYPASS;
+			const ask = (ts: { id: string }[]) => Promise.all(mode === PermissionMode.BYPASS ? [] : ts.map((t) => api.permissionSetMode({ threadId: t.id, mode })));
+			if (race.length > 1) {
+				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race });
+				await ask(threads);
+				await goto(`/compare?race=${threads[0].raceId}`);
+			} else {
+				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
+				await ask([thread!]);
+				await goto(`/t/${thread!.id}`);
+			}
 		} catch (err) {
 			error = (err as Error).message;
 			busy = false;
@@ -108,6 +125,8 @@
 						<RepoPicker bind:repoUrl bind:baseBranch />
 						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
 						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
+						<OptionMenu label="Permissions" icon={ShieldIcon} bind:value={permissions} options={Object.keys(permissionModes)} />
+						<OptionMenu label="Try N ways" icon={SplitIcon} bind:value={tries} options={tryOptions} />
 					</PromptInput.Tools>
 					<PromptInput.Submit status={busy ? 'submitted' : undefined} />
 				</PromptInput.Toolbar>

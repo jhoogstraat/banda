@@ -97,3 +97,29 @@ CREATE INDEX IF NOT EXISTS threads_updated ON threads (updated_at DESC);
 
 -- Finds the latest plan before a tail without scanning the thread.
 CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'toolCall'->>'name' = 'TodoWrite';
+-- Where the thread's work lives (bandav1.AutoPushState name), as its runner last reported.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS auto_push text NOT NULL DEFAULT '';
+-- When the settled environment is (or was) deleted; null when none is scheduled.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;
+-- Which tool calls the agent asks for; its pending permission requests (id ->
+-- tool name); and the tools allowed without asking for the rest of the thread.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permission_mode text NOT NULL DEFAULT 'bypass';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permissions jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS allowed_tools text[] NOT NULL DEFAULT '{}';
+-- Forks start from another thread's changes after its turn fork_turn; the
+-- threads of a race (or of one Fork call) share race_id.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS forked_from text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS fork_turn int NOT NULL DEFAULT 0;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS race_id text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS threads_race ON threads (race_id) WHERE race_id <> '';
+-- Full-text search over what people and agents said and did: messages and
+-- turn requests (with review comments), agent text, tool calls (name and
+-- input values). Adding the column fills it for existing events.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS search tsvector GENERATED ALWAYS AS (
+  to_tsvector('english'::regconfig,
+    coalesce(body->'message'->>'text', body->'turnRequest'->'message'->>'text', body->'agentText'->>'text', '') || ' ' ||
+    coalesce(body->'toolCall'->>'name', '') || ' ' ||
+    regexp_replace(coalesce(body->'toolCall'->>'inputJson', ''), '"\w+":|[{}"]', ' ', 'g'))
+  || jsonb_to_tsvector('english'::regconfig, coalesce(body->'message'->'review', body->'turnRequest'->'message'->'review', '[]'), '["string"]')
+) STORED;
+CREATE INDEX IF NOT EXISTS events_search ON events USING gin (search);

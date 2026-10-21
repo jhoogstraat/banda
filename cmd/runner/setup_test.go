@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -76,5 +77,47 @@ func TestSetupMarkerFailureFailsStep(t *testing.T) {
 	s := setup{send: func(e *bandav1.Event) error { last = e.GetSetupStep().State; return nil }}
 	if err := s.once(context.Background(), "setup", "x", []byte("v1"), "true"); err == nil || last != bandav1.SetupState_SETUP_STATE_FAILED {
 		t.Errorf("got %v, last state %v", err, last)
+	}
+}
+
+func TestSetupFork(t *testing.T) {
+	work = t.TempDir()
+	git := func(args ...string) string {
+		out, err := exec.Command("git", append([]string{"-C", work, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+		return string(out)
+	}
+	git("init", "-q")
+	os.WriteFile(filepath.Join(work, "a.txt"), []byte("one\n"), 0o644)
+	git("add", "-A")
+	git("commit", "-qm", "base")
+	t.Setenv("GIT_AUTHOR_NAME", "t")
+	t.Setenv("GIT_AUTHOR_EMAIL", "t@t")
+	t.Setenv("GIT_COMMITTER_NAME", "t")
+	t.Setenv("GIT_COMMITTER_EMAIL", "t@t")
+
+	var states, notices []string
+	s := setup{fresh: true, send: func(e *bandav1.Event) error { states = append(states, e.GetSetupStep().State.String()); return nil }}
+	notice := func(text string) error { notices = append(notices, text); return nil }
+	patch := func(p string) func(context.Context) (*bandav1.ForkPatchResponse, error) {
+		return func(context.Context) (*bandav1.ForkPatchResponse, error) {
+			return &bandav1.ForkPatchResponse{Patch: p, Message: "Changes of t1"}, nil
+		}
+	}
+
+	s.fork(context.Background(), patch(""), notice)
+	if len(states) != 0 {
+		t.Fatalf("not a fork, but reported %v", states)
+	}
+	s.fork(context.Background(), patch("diff --git a/b.txt b/b.txt\nnew file mode 100644\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+two\n"), notice)
+	if strings.Join(states, ",") != "SETUP_STATE_RUNNING,SETUP_STATE_DONE" || !strings.Contains(git("log", "-1", "--format=%s", "--stat"), "Changes of t1") {
+		t.Fatalf("patch not committed: %v", states)
+	}
+	states = nil
+	s.fork(context.Background(), patch("diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-nope\n+three\n"), notice)
+	if strings.Join(states, ",") != "SETUP_STATE_RUNNING,SETUP_STATE_SKIPPED" || len(notices) != 1 {
+		t.Fatalf("a patch that doesn't apply: %v %q", states, notices)
 	}
 }

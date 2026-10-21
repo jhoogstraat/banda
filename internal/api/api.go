@@ -30,6 +30,9 @@ import (
 type Service struct {
 	store     *store.Store
 	sandboxes *sandbox.Client
+	// DeleteSettledAfter is how long after the owner settles a thread its
+	// pushed environment is kept.
+	DeleteSettledAfter time.Duration
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -77,8 +80,9 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 
-		loginLastUsed: map[string]time.Time{},
-		previewKey:    signer(rand.Text()),
+		DeleteSettledAfter: 7 * 24 * time.Hour,
+		loginLastUsed:      map[string]time.Time{},
+		previewKey:         signer(rand.Text()),
 	}
 	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}
 	return s
@@ -88,31 +92,43 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
 	}
-	id := strings.ToLower(rand.Text())
 	t := store.Thread{
 		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-		ID:            id,
 		Title:         title(req.Prompt),
 		RepoURL:       req.RepoUrl,
 		BaseBranch:    or(req.BaseBranch, "main"),
-		Branch:        "banda/" + id,
 		Model:         or(req.Model, "claude-opus-5-5"),
 		Effort:        or(req.Effort, "high"),
 		PendingPrompt: req.Prompt,
-		RunnerToken:   rand.Text(),
 	}
-	if err := s.store.Create(ctx, t); err != nil {
-		return nil, err
-	}
-	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		return []*bandav1.Event{messageEvent(t.OwnerID, &bandav1.Message{Text: req.Prompt})}, nil
-	})
+	t, err := s.start(ctx, t, &bandav1.Message{Text: req.Prompt})
 	if err != nil {
 		return nil, err
 	}
-	s.broadcast(id, events)
-	s.provision(ctx, t)
 	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+}
+
+// start stores a new thread, posts its first message (if any) as the owner
+// and provisions its environment. It sets the id, branch and runner token.
+func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Message) (store.Thread, error) {
+	t.ID = strings.ToLower(rand.Text())
+	t.Branch = "banda/" + t.ID
+	t.RunnerToken = rand.Text()
+	if err := s.store.Create(ctx, t); err != nil {
+		return t, err
+	}
+	t, events, err := s.store.Update(ctx, t.ID, func(t *store.Thread) ([]*bandav1.Event, error) {
+		if first == nil {
+			return nil, nil
+		}
+		return []*bandav1.Event{messageEvent(t.OwnerID, first)}, nil
+	})
+	if err != nil {
+		return t, err
+	}
+	s.broadcast(t.ID, events)
+	s.provision(ctx, t)
+	return t, nil
 }
 
 func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
@@ -464,6 +480,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		}
 		s.mu.Unlock()
 		if mine && !login {
+			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 			s.apply(context.WithoutCancel(ctx), id, thread.EnvLost{})
 		}
 	}()
@@ -503,6 +520,18 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				s.broadcast(id, []*bandav1.Event{e})
 				continue
 			}
+			if ap := e.GetAutoPush(); ap != nil {
+				if err := s.store.SetAutoPush(ctx, id, ap.State.String()); err != nil {
+					slog.Error("store auto-push state", "thread", id, "err", err)
+				}
+			}
+			if e.GetPermissionResolved() != nil {
+				e.Actor = "system" // the agent withdrew it
+			}
+			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
+				s.permissionEvent(ctx, id, e)
+				continue
+			}
 			var action thread.Action
 			var reason string
 			if e.GetTurnEnded() != nil {
@@ -514,6 +543,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			if _, err := s.applyBecause(ctx, id, action, reason, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
+			}
+			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
+				s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
 			s.mu.Lock()
@@ -561,8 +593,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 // ready marks the environment ready and hands over the initial prompt if it
 // has not been delivered yet.
 func (s *Service) ready(ctx context.Context, id string, r *runner) error {
+	// A new claude process: requests of the one before are gone.
+	s.settlePermissions(ctx, id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 	var prompt string
-	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 		if effect == thread.StartTurn {
 			prompt, t.PendingPrompt = t.PendingPrompt, ""
@@ -576,6 +610,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 		return err
 	}
 	s.broadcast(id, events)
+	s.configure(t) // before the prompt, so its first tool call already asks as it should
 	if prompt != "" {
 		s.deliver(ctx, id, prompt)
 	}
@@ -630,10 +665,17 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 		if err := s.sandboxes.Suspend(ctx, id); err != nil {
 			slog.Error("suspend sandbox", "thread", id, "err", err)
 		}
+		s.scheduleDelete(ctx, id)
 	}
 }
 
 func (s *Service) provision(ctx context.Context, t store.Thread) {
+	// Ensure also cancels a scheduled deletion, or recreates a deleted environment.
+	if t.EnvDeleteAt != nil {
+		if err := s.store.SetEnvDeleteAt(ctx, t.ID, nil); err != nil {
+			slog.Error("cancel environment deletion", "thread", t.ID, "err", err)
+		}
+	}
 	// Ensure replaces a running pod; its runner's disconnect is expected.
 	s.mu.Lock()
 	delete(s.runners, t.ID)
@@ -832,9 +874,17 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Settled:    t.Settled,
 		Unread:     t.Unread,
 
-		TurnRequests: int32(t.Requests),
-		Trusted:      t.Trusted,
-		Activity:     t.Activity,
+		TurnRequests:       int32(t.Requests),
+		Trusted:            t.Trusted,
+		AutoPush:           bandav1.AutoPushState(bandav1.AutoPushState_value[t.AutoPush]),
+		EnvironmentDeleted: t.EnvDeleteAt != nil && !t.EnvDeleteAt.After(time.Now()),
+		Activity:           t.Activity,
+		PermissionMode:     permissionModeToProto[t.PermissionMode],
+		PermissionPending:  len(t.Permissions) > 0,
+		RaceId:             t.RaceID,
+	}
+	if t.ForkedFrom != "" {
+		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

@@ -32,6 +32,15 @@ BUF=$(mise which buf)
 TMP=$(mktemp -d)
 # Events of thread $ID with the setup step id $1 in state $2.
 steps() { sql "select count(*) from events where thread_id='$ID' and body->'setupStep'->>'id'='$1' and body->'setupStep'->>'state'='SETUP_STATE_$2'"; }
+# new_thread <CreateThread json> [user]: sets ID; the thread's environment is deleted on exit.
+IDS=()
+new_thread() { ID=$(call ThreadService/CreateThread "$1" "${2:-dev}" | jq -r .thread.id); IDS+=("$ID"); }
+# Clean up even on failure: this run's sandboxes (their volumes go with them) and the git server.
+cleanup() {
+	for id in ${IDS[@]+"${IDS[@]}"}; do kc delete sandbox "t-$id" --ignore-not-found --wait=false >/dev/null; done
+	kc delete pod,service e2e-git --ignore-not-found --wait=false >/dev/null
+}
+trap cleanup EXIT
 login_state() {
 	for _ in $(seq 30); do [ "$(call SettingsService/GetSettings '{}' | jq -r '.accounts[0].loginState')" = "$1" ] && return; sleep 1; done
 	fail "login state is not $1"
@@ -58,7 +67,8 @@ echo "$S" | jq -e '(.secrets | map(.name) | index("E2E_SECRET")) and .accounts[0
 echo "$S" | grep -q "$SECRET" && fail "settings return a secret value"
 ok "secrets: set, reserved and invalid names and subscription tokens refused, values never returned"
 
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: add a file\"}"
+FIRST=$ID
 wait_for STATUS_AWAITING_INPUT
 thread diff | grep -q hello1.txt
 ok "thread $ID: sandbox started, first turn ran, diff has its file"
@@ -107,6 +117,7 @@ TEAM=$(mktemp)
 TEAM_PID=$!
 for _ in $(seq 30); do [ -s "$TEAM" ] && break; sleep 0.5; done
 BOB=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: bob on the board"}' bob | jq -r .thread.id)
+IDS+=("$BOB")
 # The latest activity of bob's thread in carol's last team snapshot starts with $1.
 board() { jq -se --arg id "$BOB" --arg want "$1" 'last.threads | map(select(.id == $id))[0].activity.text // "" | startswith($want)' "$TEAM" >/dev/null 2>&1; }
 for _ in $(seq 10); do board "e2e: bob on the board" && break; sleep 0.5; done
@@ -167,6 +178,34 @@ reply | grep -q "with claude-sonnet-5-5 · medium" || fail "the agent did not re
 [ "$(sql "select body->>'actor' from events where thread_id='$ID' and body->'agentSettings'->>'model'='claude-sonnet-5-5'")" = dev ]
 ok "the owner switches model and effort mid-thread: the running turn finishes, the next one runs on the new settings, the chat records it"
 
+SRC=$ID
+term ThreadService/OpenTerminal "{\"threadId\":\"$SRC\",\"cols\":80,\"rows\":24,\"command\":\"git add -A && git commit -qm e2e-commit && echo e2e-committed\"}" | grep -q e2e-committed
+ID=$(call ThreadService/Fork "{\"threadId\":\"$SRC\",\"prompt\":\"e2e: carry on\",\"tries\":[{\"model\":\"claude-haiku-5-5\"}]}" bob | jq -r '.threads[0].id')
+IDS+=("$ID")
+[ "$(thread ownerId) $(thread forkedFrom.threadId)" = "bob $SRC" ] || fail "fork owner/origin: $(thread ownerId) $(thread forkedFrom.threadId)"
+wait_for STATUS_AWAITING_INPUT
+[ "$(steps fork DONE)" = 1 ] || fail "the fork's changes were not applied"
+thread diff | grep -q hello2.txt || fail "the fork's diff lacks the source's committed changes"
+reply | grep -q "with claude-haiku-5-5" || fail "the fork runs on the wrong model: $(reply)"
+[ "$(sql "select count(*) from events where thread_id='$SRC' and body->'forkNote'->>'threadId'='$ID'")" = 1 ] || fail "the source does not link its fork"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" bob >/dev/null
+ok "a teammate forks a thread with commits: the fork is theirs, starts from the source's changes on another model, and both link each other"
+
+R=$(call ThreadService/Race "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: race\",\"tries\":[{},{\"model\":\"claude-sonnet-5-5\"}]}")
+A=$(echo "$R" | jq -r '.threads[0].id'); B=$(echo "$R" | jq -r '.threads[1].id'); RACE=$(echo "$R" | jq -r '.threads[0].raceId')
+IDS+=("$A" "$B")
+ID=$A; wait_for STATUS_AWAITING_INPUT; reply | grep -q "with claude-opus-5-5" || fail "try 1: $(reply)"
+ID=$B; wait_for STATUS_AWAITING_INPUT; reply | grep -q "with claude-sonnet-5-5" || fail "try 2: $(reply)"
+call ThreadService/RaceCompare "{\"raceId\":\"$RACE\"}" | jq -e '(.entries | length) == 2 and all(.entries[]; .turns == 1 and .costUsd > 0 and (.thread.diff | contains("hello1.txt")))' >/dev/null || fail "compare: $(call ThreadService/RaceCompare "{\"raceId\":\"$RACE\"}" | head -c 300)"
+call ThreadService/RacePick "{\"threadId\":\"$A\"}" bob >/dev/null 2>&1 && fail "bob picked in dev's race"
+call ThreadService/RacePick "{\"threadId\":\"$A\"}" >/dev/null
+[ "$(thread settled) $(thread status)" = "true STATUS_SUSPENDED" ] || fail "the other try: settled=$(thread settled) $(thread status)"
+ID=$A; [ "$(thread settled)" != true ] || fail "the pick was settled"
+[ "$(sql "select count(*) from events where thread_id in ('$A','$B') and body->'forkNote'->>'picked'='true' and body->'forkNote'->>'threadId'='$A'")" = 2 ] || fail "the pick is not noted in both"
+call ThreadService/Snooze "{\"threadId\":\"$A\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+ok "a race of 2 runs both tries on their models; compare shows them; picking one settles and pauses the other and notes it in both"
+ID=$SRC
+
 REVIEW='{"path":"hello1.txt","startLine":1,"endLine":1,"code":"+hello 1","body":"e2e: say hi instead"}'
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[{\"path\":\"x\",\"startLine\":1,\"endLine\":1,\"body\":\" \"}]}}" >/dev/null 2>&1 && fail "a review comment without text was accepted"
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[$REVIEW]}}" >/dev/null
@@ -186,6 +225,15 @@ ok "a teammate's review asking @agent waits for approval, then reaches the agent
 
 kc exec "t-$ID" -- sh -c 'curl -sf -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"' | grep -q read_thread
 ok "the Banda MCP server is reachable from the sandbox"
+
+WORD="quokka$RANDOM$RANDOM"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"we keep the $WORD cache in redis\"}}" bob >/dev/null
+SEQ=$(sql "select seq from events where thread_id='$ID' and body->'message'->>'text' like '%$WORD%'")
+HIT=$(call ThreadService/Search "{\"query\":\"${WORD:0:10}\"}" alice | jq -c '.results[0]')
+echo "$HIT" | jq -e --arg id "$ID" --arg seq "$SEQ" --arg w "$WORD" '.threadId == $id and .seq == $seq and .actor == "bob" and .snippet[1] == $w' >/dev/null || fail "search: $HIT"
+kc exec "t-$ID" -- sh -c "curl -sf -X POST \"\$BANDA_API_URL/mcp\" -H \"Authorization: Bearer \$BANDA_RUNNER_TOKEN\" -H \"X-Banda-Thread: \$BANDA_THREAD_ID\" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"search_threads\",\"arguments\":{\"query\":\"$WORD redis\"}}}'" | grep -q "\"seq\":$SEQ," || fail "search_threads did not find it"
+ok "a teammate's word is found by prefix from another user, with a highlighted snippet and its seq, and by the search_threads MCP tool"
+call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null # bob's post switched to chat mode
 
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo e2e-terminal-\$((6*7))\"}" | grep -q e2e-terminal-42
 ok "terminal runs commands in the sandbox"
@@ -241,7 +289,7 @@ thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
 ok "secrets are redacted from the diff"
 
-ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: never runs"}' | jq -r .thread.id)
+new_thread '{"repoUrl":"file:///opt/e2e/setup-fails.git","baseBranch":"main","prompt":"e2e: never runs"}'
 wait_for STATUS_ERRORED
 [ "$(steps setup FAILED)" = 1 ]
 sql "select body->'setupStep'->>'output' from events where thread_id='$ID' and body->'setupStep'->>'state'='SETUP_STATE_FAILED'" | grep -q 'setup sees \[redacted\]'
@@ -252,7 +300,7 @@ term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\
 ok "a failing .banda/setup.sh errors the thread with its redacted output; the runner stays up for the terminal"
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
-ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}' | jq -r .thread.id)
+new_thread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}'
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps setup DONE)" = 1 ]
 ok "a .banda/setup.sh that leaves a background process running succeeds"
@@ -264,7 +312,7 @@ call SettingsService/SetAuthMethod "{\"harness\":\"claude\",\"authMethod\":\"AUT
 S=$(call SettingsService/GetSettings '{}' "$U")
 echo "$S" | jq -e '.accounts[0] | .authMethod == "AUTH_METHOD_API_KEY" and .apiKeySet' >/dev/null
 echo "$S" | grep -q "$SECRET" && fail "settings return the API key"
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: api key\"}" "$U" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: api key\"}" "$U"
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps login SKIPPED)" = 1 ]
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo key-\${#ANTHROPIC_API_KEY}\"}" "$U" | grep -q "key-$((${#SECRET} + 4))"
@@ -283,7 +331,7 @@ ok "no secret value reached the database"
 
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
-ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}" | jq -r .thread.id)
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"no-such-branch\",\"prompt\":\"e2e: bad base\"}"
 wait_for STATUS_ERRORED
 sleep 15
 [ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
@@ -309,5 +357,116 @@ F=$(call ThreadService/History "{\"threadId\":\"$LONG\",\"beforeSeq\":1056,\"lim
 echo "$F" | jq -e '.events[0] | .seq == "1055" and (.toolResult.output | length) > 4096 and (.truncated | not)' >/dev/null || fail "full event: $(echo "$F" | jq -c '.events[0].seq')"
 sql "delete from threads where id='$LONG'" >/dev/null
 ok "long threads: a tail replays the last events with the plan from before it and cut outputs; older pages and full events load"
+# A pushable origin for this run: a git daemon accepting anonymous pushes.
+kc delete pod,service e2e-git --ignore-not-found >/dev/null
+kc run e2e-git --image=localhost/banda-sandbox:fake --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
+	'mkdir -p /tmp/git && git clone -q --bare /opt/e2e/setup-bg.git /tmp/git/push.git && exec git daemon --reuseaddr --base-path=/tmp/git --export-all --enable=receive-pack /tmp/git' >/dev/null
+kc wait --for=condition=Ready pod/e2e-git --timeout=120s >/dev/null
+origin() { kc exec e2e-git -- git --git-dir=/tmp/git/push.git "$@"; }
+auto_push() {
+	for _ in $(seq 30); do [ "$(thread autoPush)" = "$1" ] && return; sleep 1; done
+	fail "auto-push state is $(thread autoPush), not $1"
+}
+sandbox() { kc get sandbox "t-$ID" -o jsonpath="{.spec.$1}"; }
+
+new_thread '{"repoUrl":"git://e2e-git/push.git","baseBranch":"main","prompt":"e2e: commit a file"}'
+wait_for STATUS_AWAITING_INPUT
+auto_push AUTO_PUSH_STATE_PUSHED
+origin log --format=%s "banda/$ID" | grep -qx "hello 1"
+ok "auto-push: a turn's commits reach origin, and the thread's work counts as pushed"
+
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+[ "$(sandbox shutdownPolicy)" = Delete ] && [ -n "$(sandbox shutdownTime)" ] || fail "settling did not schedule the deletion"
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":false}" >/dev/null
+# The CRD defaults the policy back to Retain.
+[ -z "$(sandbox shutdownTime)" ] && [ "$(sandbox shutdownPolicy)" != Delete ] || fail "unsettling did not cancel the deletion"
+ok "settling a pushed thread schedules its environment's deletion; unsettling cancels it"
+
+# The e2e API deletes settled environments after DELETE_SETTLED_AFTER=20s.
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+for _ in $(seq 60); do kc get sandbox "t-$ID" >/dev/null 2>&1 || break; sleep 2; done
+! kc get sandbox "t-$ID" >/dev/null 2>&1 || fail "the settled environment was not deleted"
+for _ in $(seq 30); do kc get pvc "home-t-$ID" >/dev/null 2>&1 || break; sleep 2; done
+! kc get pvc "home-t-$ID" >/dev/null 2>&1 || fail "the deleted environment's volume is still there"
+[ "$(thread environmentDeleted)" = true ]
+call ThreadService/EnvironmentRecreate "{\"threadId\":\"$ID\"}" bob >/dev/null 2>&1 && fail "bob recreated the environment"
+call ThreadService/EnvironmentRecreate "{\"threadId\":\"$ID\"}" >/dev/null
+wait_for STATUS_AWAITING_INPUT
+[ "$(thread environmentDeleted)" = null ]
+call ThreadService/ListFiles "{\"threadId\":\"$ID\"}" | jq -e '.paths | index("hello1.txt")' >/dev/null || fail "the recreated checkout lacks the pushed commit"
+ok "after the delay the environment and its volume are deleted; the owner recreates it from the pushed branch"
+
+ID=$FIRST
+[ "$(thread autoPush)" = AUTO_PUSH_STATE_UNAVAILABLE ]
+call ThreadService/Settle "{\"threadId\":\"$ID\",\"settled\":true}" >/dev/null
+[ -z "$(sandbox shutdownTime)" ] || fail "an environment whose work isn't on origin was scheduled for deletion"
+ok "a thread that can't push (https without a token) reports it, and settling it keeps its environment"
+# Permissions, in a thread of their own. ask/answer: the pending request of thread $ID, answered by $3 (default dev).
+new_thread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: permissions\"}"
+wait_for STATUS_AWAITING_INPUT
+asks() { sql "select count(*) from events where thread_id='$ID' and body ? 'permissionRequested'"; }
+ask() {
+	call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"$1\"}}" >/dev/null
+	for _ in $(seq 30); do [ "$(thread permissionPending)" = true ] && break; sleep 1; done
+	[ "$(thread permissionPending)" = true ] || fail "no permission request for: $1"
+	RID=$(sql "select body->'permissionRequested'->>'id' from events where thread_id='$ID' and body ? 'permissionRequested' order by seq desc limit 1")
+}
+answer() { call ThreadService/PermissionAnswer "{\"threadId\":\"$ID\",\"requestId\":\"$RID\",$1}" "${2:-dev}" >/dev/null; }
+permitted() { call ThreadService/ReadFile "{\"threadId\":\"$ID\",\"path\":\"permitted.txt\"}" 2>/dev/null | jq -r '.content // ""' | grep -c e2e-permitted || true; }
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_ASK\"}" bob >/dev/null 2>&1 && fail "bob set the permission mode"
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_ASK\"}" >/dev/null
+[ "$(thread permissionMode)" = PERMISSION_MODE_ASK ]
+ask "e2e-ask once"
+[ "$(thread status)" = STATUS_WORKING ]
+answer '"decision":"PERMISSION_DECISION_ALLOW"' bob 2>/dev/null && fail "bob answered in an untrusted thread"
+answer '"decision":"PERMISSION_DECISION_ALLOW"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 1 ] && [ "$(thread permissionPending)" != true ]
+answer '"decision":"PERMISSION_DECISION_ALLOW"' 2>/dev/null && fail "answered a request twice"
+ok "ask mode: the agent waits for the owner's answer (the thread shows it pending), then runs the command"
+
+ask "e2e-ask deny"
+answer '"decision":"PERMISSION_DECISION_DENY","message":"not now"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 1 ]
+sql "select body->'toolResult'->>'output' from events where thread_id='$ID' and (body->'toolResult'->>'isError')::bool order by seq desc limit 1" | grep -qx "not now"
+ok "a denial reaches the agent with its reason, and the command does not run"
+
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" >/dev/null
+ask "e2e-ask by bob"
+answer '"decision":"PERMISSION_DECISION_ALLOW"' bob
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 2 ]
+ok "teammates answer in a trusted thread"
+
+ask "e2e-ask always"
+answer '"decision":"PERMISSION_DECISION_ALLOW_ALWAYS"'
+wait_for STATUS_AWAITING_INPUT
+N=$(asks)
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"e2e-ask again\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 4 ] && [ "$(asks)" = "$N" ]
+ok "always allow: the next Bash call runs without asking"
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_PLAN\"}" >/dev/null
+ask "e2e-plan"
+answer '"decision":"PERMISSION_DECISION_ALLOW","mode":"PERMISSION_MODE_ACCEPT_EDITS"' bob 2>/dev/null && fail "a teammate approved the plan"
+answer '"decision":"PERMISSION_DECISION_ALLOW"' 2>/dev/null && fail "approved a plan without a mode to work in"
+answer '"decision":"PERMISSION_DECISION_ALLOW","mode":"PERMISSION_MODE_ACCEPT_EDITS"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(thread permissionMode)" = PERMISSION_MODE_ACCEPT_EDITS ]
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"e2e-plan again\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+sql "select body->'agentText'->>'text' from events where thread_id='$ID' and body ? 'agentText' order by seq desc limit 1" | grep -q "Not in plan mode (acceptEdits)"
+ok "plan mode: only the owner approves the plan, which switches the agent to accept edits"
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_PLAN\"}" >/dev/null
+ask "e2e-plan lost"
+kc delete pod "t-$ID" --wait=false >/dev/null
+for _ in $(seq 60); do [ "$(sql "select count(*) from events where thread_id='$ID' and body->'permissionResolved'->>'decision'='PERMISSION_DECISION_LOST'")" = 1 ] && break; sleep 2; done
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'permissionResolved'->>'decision'='PERMISSION_DECISION_LOST'")" = 1 ] && [ "$(thread permissionPending)" != true ]
+ok "a request pending when the environment restarts is marked lost"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 
 echo "all checks passed"

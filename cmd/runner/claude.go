@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"strings"
 
@@ -30,6 +31,16 @@ type line struct {
 	TotalCostUSD float64 `json:"total_cost_usd"`
 	// system/api_retry
 	Error string `json:"error"`
+	// control_request (can_use_tool) and control_cancel_request
+	RequestID string `json:"request_id"`
+	Request   struct {
+		Subtype        string          `json:"subtype"`
+		ToolName       string          `json:"tool_name"`
+		Input          json.RawMessage `json:"input"`
+		ToolUseID      string          `json:"tool_use_id"`
+		DecisionReason string          `json:"decision_reason"`
+		Description    string          `json:"description"`
+	} `json:"request"`
 }
 
 type block struct {
@@ -100,8 +111,26 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 		return []*bandav1.Event{{Kind: &bandav1.Event_TurnEnded{TurnEnded: te}}}, true, false
 	case "system":
 		return nil, false, l.Subtype == "api_retry" && authErrors[l.Error]
+	case "control_request": // the CLI asks the host; other subtypes are answered by the caller
+		if r := l.Request; r.Subtype == "can_use_tool" {
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_PermissionRequested{PermissionRequested: &bandav1.PermissionRequested{
+				Id: l.RequestID, ToolCallId: r.ToolUseID, ToolName: r.ToolName, InputJson: string(r.Input), Reason: cmp.Or(r.DecisionReason, r.Description)}}})
+		}
+	case "control_cancel_request":
+		events = append(events, &bandav1.Event{Kind: &bandav1.Event_PermissionResolved{PermissionResolved: &bandav1.PermissionResolved{
+			Id: l.RequestID, Decision: bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED}}})
 	}
 	return events, false, false
+}
+
+// unsupportedRequest reports the id of a control request from the CLI that
+// Banda doesn't answer (anything but can_use_tool), so the caller can refuse it.
+func unsupportedRequest(raw []byte) (string, bool) {
+	var l line
+	if json.Unmarshal(raw, &l) != nil || l.Type != "control_request" || l.Request.Subtype == "can_use_tool" {
+		return "", false
+	}
+	return l.RequestID, true
 }
 
 // text flattens tool_result content, which is a string or a list of blocks.
