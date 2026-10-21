@@ -78,6 +78,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("IDLE_SWEEP_EVERY: %v", err)
 	}
+	// Tests only: holds a suspend between the thread's status and its environment.
+	if svc.SuspendPause, err = time.ParseDuration(env("TEST_SUSPEND_PAUSE", "0s")); err != nil {
+		log.Fatalf("TEST_SUSPEND_PAUSE: %v", err)
+	}
 	go svc.SuspendIdle(ctx, idle, every)
 	svc.Preview = api.PreviewConfig{Addr: env("PREVIEW_ADDR", ":8788"), URL: os.Getenv("PREVIEW_URL")}
 	go func() {

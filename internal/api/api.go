@@ -32,6 +32,9 @@ type Service struct {
 	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
 	// MaxAgentThreads how many sub-threads started by agents may run per owner.
 	MaxSubthreadDepth, MaxAgentThreads int
+	// SuspendPause holds every suspend between the thread's status and its
+	// environment, so tests can race it. Zero outside tests.
+	SuspendPause time.Duration
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -130,6 +133,7 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 			s.provision(ctx, t)
 		}
 	case thread.SuspendEnv:
+		time.Sleep(s.SuspendPause)
 		if err := s.sandboxes.Suspend(ctx, id); err != nil {
 			slog.Error("suspend sandbox", "thread", id, "err", err)
 		}
