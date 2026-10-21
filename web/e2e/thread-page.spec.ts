@@ -169,7 +169,7 @@ test('settle and snooze from the header; the sidebar files the thread under Sett
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const page = await open(alice, t);
 	const title = (await t.get()).title;
-	const section = (name: string) => page.locator('details', { has: page.locator('summary', { hasText: name }) });
+	const section = (name: string) => page.getByRole('group', { name, exact: true });
 
 	await page.getByRole('button', { name: 'Settle', exact: true }).click();
 	await expect(page.getByRole('button', { name: 'Unsettle' })).toBeVisible();

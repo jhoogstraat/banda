@@ -58,7 +58,7 @@
 	{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 	<div class="ml-auto flex shrink-0 items-center gap-0.5">
 		{#if here.length}
-			<div class="mr-1.5 flex -space-x-1.5" aria-label="Here now">
+			<div class="mr-1.5 flex -space-x-1.5" role="group" aria-label="Here now">
 				{#each here.slice(0, 4) as u (u)}
 					<Tooltip>
 						<TooltipTrigger>

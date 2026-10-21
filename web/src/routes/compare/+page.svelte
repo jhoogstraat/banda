@@ -17,6 +17,7 @@
 	const threadIds = $derived((page.url.searchParams.get('ids') ?? '').split(',').filter(Boolean));
 
 	let entries = $state<RaceEntry[]>([]);
+	let loaded = $state(false);
 	let error = $state('');
 	let reviews = $state<Record<string, { pending: Comment[]; ask: boolean; focus?: Comment }>>({});
 
@@ -28,6 +29,7 @@
 			entries = (await api.raceCompare({ raceId, threadIds })).entries;
 			for (const e of entries) reviews[e.thread!.id] ??= { pending: [], ask: true };
 			error = '';
+			loaded = true;
 		} catch (e) {
 			error = (e as Error).message;
 		}
@@ -123,7 +125,7 @@
 				</div>
 			</section>
 		{:else}
-			<p class="p-6 text-sm text-muted-foreground">{error ? '' : 'Loading…'}</p>
+			<p class="p-6 text-sm text-muted-foreground">{error ? '' : loaded ? 'Nothing to compare: no such tries.' : 'Loading…'}</p>
 		{/each}
 	</div>
 </div>

@@ -86,7 +86,7 @@
 {#snippet section(text: string, list: Family[], fold = false, byline = false)}
 	{@const n = list.reduce((n, f) => n + size(f), 0)}
 	{#if list.length && fold}
-		<details class="group space-y-0.5">
+		<details class="group space-y-0.5" aria-label={text}>
 			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
 				<ChevronRightIcon class="size-3 transition-transform group-open:rotate-90" />
 				{@render title(text, n)}
@@ -94,10 +94,10 @@
 			{#each list as f (f.thread.id)}{@render family(f)}{/each}
 		</details>
 	{:else if list.length}
-		<div class="space-y-0.5">
+		<section class="space-y-0.5" aria-label={text}>
 			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, n)}</h2>
 			{#each list as f (f.thread.id)}{@render family(f, byline)}{/each}
-		</div>
+		</section>
 	{/if}
 {/snippet}
 
