@@ -1,6 +1,6 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
-import { apply, newChat, typingNow } from './events.ts';
+import { apply, newChat, prepend, typingNow, type Chat } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
@@ -105,4 +105,51 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+
+// Paging: a tail plus older pages prepended one by one gives the same chat as the full replay,
+// wherever the page edges fall (inside groups, between a call and its result, inside a subagent).
+const history: Event[] = [];
+const add = (kind: unknown, extra = {}) => history.push({ ...ev(kind, BigInt(history.length + 1)), ...extra } as Event);
+const call = (id: string, name: string, parentToolCallId = '') => add({ case: 'toolCall', value: { id, name, inputJson: '{}', parentToolCallId } });
+const result = (id: string) => add({ case: 'toolResult', value: { toolCallId: id, output: `out ${id}` } });
+for (let t = 0; t < 4; t++) {
+	add({ case: 'message', value: { text: `turn ${t}` } }, { actor: 'dev' });
+	if (t !== 3) add({ case: 'toolCall', value: { id: `todo${t}`, name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } });
+	call(`r${t}`, 'Read');
+	add({ case: 'agentThinking', value: { text: 'hmm' } });
+	call(`task${t}`, 'Task');
+	call(`g${t}`, 'Grep', `task${t}`);
+	result(`g${t}`);
+	call(`b${t}`, 'Bash', `task${t}`);
+	result(`r${t}`);
+	result(`b${t}`);
+	result(`task${t}`);
+	add({ case: 'agentText', value: { text: `done ${t}` } });
+	add({ case: 'turnEnded', value: { durationMs: 1n, costUsd: 0 } });
+	if (t === 1) add({ case: 'turnRequest', value: { message: { text: '@agent please' } } }, { actor: 'bob' });
+	if (t === 2) add({ case: 'turnRequestResolved', value: { requestSeq: BigInt(history.findIndex((e) => e.kind.case === 'turnRequest') + 1), approved: true } }, { actor: 'dev' });
+}
+const show = (c: Chat) => JSON.stringify({ items: c.items, plan: c.plan, planSeq: c.planSeq }, (_, v) => (typeof v === 'bigint' ? Number(v) : v));
+const whole = newChat();
+for (const e of history) apply(whole, e);
+for (let tail = 1; tail <= history.length; tail++) {
+	for (const size of [1, 2, 3, 7]) {
+		const paged = newChat();
+		let oldest = history.length - tail;
+		// The server sends the latest plan from before the tail first, marked as context.
+		const before = history.slice(0, oldest).findLast((e) => e.kind.case === 'toolCall' && e.kind.value.name === 'TodoWrite');
+		if (before) apply(paged, { ...before, context: true } as Event);
+		for (const e of history.slice(oldest)) apply(paged, e);
+		while (oldest > 0) {
+			prepend(paged, history.slice(Math.max(0, oldest - size), oldest));
+			oldest = Math.max(0, oldest - size);
+		}
+		if (show(paged) !== show(whole)) throw new Error(`tail ${tail}, pages of ${size}: paged history differs from the full replay`);
+		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size) throw new Error('every orphan should find its call');
+	}
+}
+const tailOnly = newChat();
+apply(tailOnly, { ...history[history.findLastIndex((e) => e.kind.case === 'toolCall' && e.kind.value.name === 'TodoWrite')], context: true } as Event);
+for (const e of history.slice(-3)) apply(tailOnly, e);
+if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a context plan sets the plan without adding an item');
 console.log('ok');

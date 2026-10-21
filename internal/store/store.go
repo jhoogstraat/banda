@@ -209,7 +209,28 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 }
 
 func (s *Store) Events(ctx context.Context, id string, afterSeq int64) ([]*bandav1.Event, error) {
-	rows, err := s.db.Query(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 ORDER BY seq`, id, afterSeq)
+	return s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 ORDER BY seq`, id, afterSeq)
+}
+
+// Before returns the newest limit events with seq < beforeSeq, in seq order.
+func (s *Store) Before(ctx context.Context, id string, beforeSeq int64, limit int) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT body FROM (SELECT seq, body FROM events WHERE thread_id = $1 AND seq < $2
+		ORDER BY seq DESC LIMIT $3) e ORDER BY seq`, id, beforeSeq, limit)
+}
+
+// Plan returns the latest TodoWrite call of the agent itself (not of a subagent) with seq < beforeSeq, or nil.
+func (s *Store) Plan(ctx context.Context, id string, beforeSeq int64) (*bandav1.Event, error) {
+	events, err := s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq < $2
+		AND body->'toolCall'->>'name' = 'TodoWrite' AND NOT body->'toolCall' ? 'parentToolCallId'
+		ORDER BY seq DESC LIMIT 1`, id, beforeSeq)
+	if len(events) == 0 {
+		return nil, err
+	}
+	return events[0], err
+}
+
+func (s *Store) events(ctx context.Context, query string, args ...any) ([]*bandav1.Event, error) {
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
