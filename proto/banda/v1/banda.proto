@@ -137,6 +137,22 @@ message Message {
   string text = 1;
   bool mentions_agent = 2;
   repeated string mentioned_user_ids = 3;
+  // Comments on the thread's diff, posted together as one review. `text` is
+  // then an optional summary.
+  repeated ReviewComment review = 4;
+}
+
+// A comment on a line range of the diff.
+message ReviewComment {
+  string path = 1;
+  // Line numbers in the branch's version of the file, or in the base version
+  // when `old` is set (the range has only removed lines).
+  int32 start_line = 2;
+  int32 end_line = 3;
+  bool old = 4;
+  // The commented diff lines, with their +/-/space prefixes.
+  string code = 5;
+  string body = 6;
 }
 
 message AgentText {

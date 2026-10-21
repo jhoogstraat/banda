@@ -111,8 +111,13 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 
 func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageRequest) (*bandav1.SendMessageResponse, error) {
 	m := req.Message
-	if m == nil || strings.TrimSpace(m.Text) == "" {
+	if m == nil || strings.TrimSpace(m.Text) == "" && len(m.Review) == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "message text is required")
+	}
+	for _, c := range m.Review {
+		if c.Path == "" || strings.TrimSpace(c.Body) == "" || c.StartLine < 1 || c.EndLine < c.StartLine {
+			return nil, connect.NewError(connect.CodeInvalidArgument, "a review comment needs a path, lines and text")
+		}
 	}
 	by, id := user(ctx), req.ThreadId
 	before, err := s.store.Get(ctx, id)
@@ -128,7 +133,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	var effect thread.Effect
 	var prompt string
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0})
+		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent, MentionsUsers: len(m.MentionedUserIds) > 0, Review: len(m.Review) > 0})
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +145,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 					fresh = append(fresh, e)
 				}
 			}
-			prompt = agentPrompt(t.OwnerID, names, fresh, by, m.Text)
+			prompt = agentPrompt(t.OwnerID, names, fresh, by, m)
 			t.DeliveredSeq = t.LastSeq + 1 // the message stored below
 			if eff == thread.Provision {   // suspended: deliver once the environment is back
 				t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)

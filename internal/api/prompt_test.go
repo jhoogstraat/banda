@@ -13,17 +13,27 @@ func TestAgentPrompt(t *testing.T) {
 	agent := &bandav1.Event{Actor: "agent", Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: "done"}}}
 	names := map[string]string{"u1": "Ann", "u2": "Bob"}
 
-	if got := agentPrompt("u1", names, nil, "u1", "fix it"); got != "fix it" {
+	if got := agentPrompt("u1", names, nil, "u1", &bandav1.Message{Text: "fix it"}); got != "fix it" {
 		t.Errorf("owner prompt: %q", got)
 	}
-	if got := agentPrompt("u1", names, nil, "u2", "@agent fix it"); got != "Bob: @agent fix it" {
+	if got := agentPrompt("u1", names, nil, "u2", &bandav1.Message{Text: "@agent fix it"}); got != "Bob: @agent fix it" {
 		t.Errorf("teammate prompt: %q", got)
 	}
-	if got := agentPrompt("u1", names, nil, "agent:t9", "ping"); got != "agent in thread t9: ping" {
+	if got := agentPrompt("u1", names, nil, "agent:t9", &bandav1.Message{Text: "ping"}); got != "agent in thread t9: ping" {
 		t.Errorf("agent prompt: %q", got)
 	}
 	want := "Messages posted in this thread since your last turn:\nBob: looks off\nAnn: agreed\n\nAnn: @agent fix it"
-	if got := agentPrompt("u1", names, []*bandav1.Event{agent, msg("u2", "looks off"), msg("u1", "agreed")}, "u1", "@agent fix it"); got != want {
+	if got := agentPrompt("u1", names, []*bandav1.Event{agent, msg("u2", "looks off"), msg("u1", "agreed")}, "u1", &bandav1.Message{Text: "@agent fix it"}); got != want {
 		t.Errorf("with chat:\n%q\nwant\n%q", got, want)
+	}
+
+	review := &bandav1.Message{Text: "@agent please", Review: []*bandav1.ReviewComment{
+		{Path: "a.go", StartLine: 3, EndLine: 3, Code: "+x := 1", Body: "rename x"},
+		{Path: "b.md", StartLine: 7, EndLine: 9, Old: true, Code: "-```\n-a\n-```", Body: "keep this"},
+	}}
+	want = "@agent please\n\nReview of the diff (2 comments):\n\na.go, line 3:\n```diff\n+x := 1\n```\nrename x" +
+		"\n\nb.md, lines 7-9 (removed, numbered as in the base branch):\n````diff\n-```\n-a\n-```\n````\nkeep this"
+	if got := agentPrompt("u1", names, nil, "u1", review); got != want {
+		t.Errorf("review:\n%q\nwant\n%q", got, want)
 	}
 }

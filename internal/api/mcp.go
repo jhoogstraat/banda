@@ -194,7 +194,7 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 	for _, e := range events {
 		switch k := e.Kind.(type) {
 		case *bandav1.Event_Message:
-			lines = append(lines, actorName(names, e.Actor)+": "+k.Message.Text)
+			lines = append(lines, actorName(names, e.Actor)+": "+messageText(k.Message))
 		case *bandav1.Event_AgentText:
 			lines = append(lines, "agent: "+k.AgentText.Text)
 		case *bandav1.Event_ToolCall:

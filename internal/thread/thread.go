@@ -53,6 +53,9 @@ type Send struct {
 	By            string
 	MentionsAgent bool
 	MentionsUsers bool
+	// Review: a diff review. The owner's review starts a turn only when it
+	// mentions the agent, and otherwise leaves the mode alone.
+	Review bool
 }
 
 type Interrupt struct{ By string }
@@ -94,6 +97,9 @@ func (Wake) action()      {}
 func Apply(s State, a Action) (State, Effect, error) {
 	switch a := a.(type) {
 	case Send:
+		if a.Review && !a.MentionsAgent && a.By == s.OwnerID && !a.MentionsUsers {
+			return s, None, nil
+		}
 		turn := a.MentionsAgent || (s.Mode == AgentMode && a.By == s.OwnerID && !a.MentionsUsers)
 		if !turn {
 			// Someone other than the owner talking, or anyone mentioning a
