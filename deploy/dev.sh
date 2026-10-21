@@ -159,7 +159,7 @@ pg() { kc -n banda exec postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 "$@"; 
 # volumes go with them) older than CLEAN_HOURS whose thread wasn't touched in that time or is gone.
 clean() {
 	local h=${CLEAN_HOURS:-24} keep
-	keep=$(kc -n banda exec postgres-0 -- psql -U banda -tAc "select 't-' || id from threads where updated_at > now() - interval '$h hours'")
+	keep=$(kc -n banda exec postgres-0 -- psql -U banda -tAc "select 't-' || id from threads where updated_at > now() - interval '$h hours' or repo_url = ''")
 	kc -n banda get sandboxes -l banda.dev/thread -o json |
 		jq -r --argjson h "$h" '.items[] | select(.metadata.creationTimestamp | fromdate < now - $h * 3600) | .metadata.name' |
 		while read -r name; do

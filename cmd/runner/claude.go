@@ -211,10 +211,14 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 		"type": "http", "url": os.Getenv("BANDA_API_URL") + "/mcp",
 		"headers": map[string]string{"Authorization": "Bearer " + os.Getenv("BANDA_RUNNER_TOKEN"), "X-Banda-Thread": threadID},
 	}}})
+	where := "on git branch " + os.Getenv("BANDA_BRANCH")
+	if repoURL == "" {
+		where = "without a repository: your working directory started empty and lives only in this thread's environment"
+	}
 	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", fmt.Sprintf(
-		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
+		"You are running inside Banda thread %s %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
 			"The banda MCP server's tools, listed in its instructions, let you see and search the team's other threads, post into them and start sub-threads.",
-		threadID, os.Getenv("BANDA_BRANCH")))
+		threadID, where))
 	sid := sessionID(threadID)
 	if hasTranscript(sid) {
 		args = append(args, "--resume", sid)
