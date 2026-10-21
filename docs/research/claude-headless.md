@@ -166,6 +166,27 @@ Each line holds a single block, and all lines from one API response share `messa
 
 Messages from subagents carry a non-null `parent_tool_use_id` [doc].
 
+### Plans and subagents (shape from `sdk.d.ts` [sdk], not observed; the fake API can't drive them)
+
+`TodoWrite` is an ordinary tool call whose input is the **whole** list each time; the latest call is the plan. `status` is `pending`, `in_progress` or `completed`, and `activeForm` is the present-tense label of the item being worked on:
+
+```json
+{"type":"assistant","message":{"id":"msg_2","content":[{"type":"tool_use","id":"toolu_todo1","name":"TodoWrite","input":{"todos":[{"content":"Read the failing test","status":"completed","activeForm":"Reading the failing test"},{"content":"Fix the parser","status":"in_progress","activeForm":"Fixing the parser"},{"content":"Run the tests","status":"pending","activeForm":"Running the tests"}]}}]},"parent_tool_use_id":null,"session_id":"s"}
+```
+
+A subagent is a `Task` tool call (input `description`, `prompt`, `subagent_type`). Until its `tool_result` arrives, the subagent's own lines stream with `parent_tool_use_id` set to the Task call's id: its prompt as a `user` text block, its text, deltas, tool calls and their results. The final `tool_result` holds the subagent's answer as text blocks:
+
+```json
+{"type":"assistant","message":{"id":"msg_3","content":[{"type":"tool_use","id":"toolu_task1","name":"Task","input":{"description":"Find the parser","prompt":"Where is the config parser?","subagent_type":"Explore"}}]},"parent_tool_use_id":null,"session_id":"s"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Where is the config parser?"}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}
+{"type":"assistant","message":{"id":"msg_4","content":[{"type":"tool_use","id":"toolu_sub1","name":"Grep","input":{"pattern":"func parse","path":"internal"}}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_sub1","type":"tool_result","content":"Found 1 file\ninternal/config/parse.go"}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}
+{"type":"assistant","message":{"id":"msg_5","content":[{"type":"text","text":"It is in internal/config/parse.go."}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_task1","type":"tool_result","content":[{"type":"text","text":"The parser is internal/config/parse.go."}]}]},"parent_tool_use_id":null,"session_id":"s","tool_use_result":{"status":"completed","totalToolUseCount":1}}
+```
+
+Banda keeps only the subagent's tool calls (tagged with `parent_tool_call_id`) and results, and nests them in the Task call; its text is repeated by the final result. Newer versions may name the tool `Agent`; the nesting doesn't depend on the name.
+
 ### `user`: tool results (`tool_use_result` holds the structured tool output) [obs]
 
 ```json

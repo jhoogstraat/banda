@@ -206,7 +206,9 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 		case *bandav1.Event_AgentText:
 			lines = append(lines, "agent: "+k.AgentText.Text)
 		case *bandav1.Event_ToolCall:
-			lines = append(lines, "agent called tool "+k.ToolCall.Name)
+			if k.ToolCall.ParentToolCallId == "" { // a subagent's calls are summed up by its Task call
+				lines = append(lines, "agent called tool "+k.ToolCall.Name)
+			}
 		case *bandav1.Event_TurnEnded:
 			line := "turn ended"
 			if k.TurnEnded.IsError {

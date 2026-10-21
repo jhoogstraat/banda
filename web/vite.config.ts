@@ -3,6 +3,9 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+// Vite runs this in Node; @types/node isn't installed.
+declare const process: { env: Record<string, string | undefined> };
+
 // BANDA_API lets a second checkout run its own API and web server side by side.
 const api = process.env.BANDA_API ?? 'http://localhost:8787';
 

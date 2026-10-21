@@ -18,6 +18,8 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
 4. `mise run down` stops the servers and the kind node.
 
+In the app, Cmd/Ctrl-K opens the command palette and `?` lists the keyboard shortcuts.
+
 `mise run image` rebuilds the sandbox image after changing `cmd/runner` or `deploy/sandbox.Dockerfile`; `mise run gen` regenerates `gen/` from `proto/`. Server logs are in `/tmp/banda-run/`.
 
 For private repos, add a `GIT_TOKEN` secret in Settings. Secrets are environment variables in all your threads, applied when a thread's environment next starts, and redacted from everything the agent reports. A shared fallback for everyone:
@@ -47,7 +49,7 @@ Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings:
 
 ## Tests
 
-- `mise run test`: Go unit tests (state machine, agent prompt, Claude stream mapping, sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer.
+- `mise run test`: Go unit tests (state machine, inbox fan-out, agent prompt, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, and that 20k tool calls stay fast), `node web/src/lib/inbox.check.ts` which inbox changes notify.
 - `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790`, next to the normal one.
 
 ## Run the API in the cluster

@@ -1,63 +1,114 @@
 <script lang="ts">
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import FilePenIcon from '@lucide/svelte/icons/file-pen';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
-	import SearchIcon from '@lucide/svelte/icons/search';
-	import TerminalIcon from '@lucide/svelte/icons/terminal';
+	import CircleIcon from '@lucide/svelte/icons/circle';
 	import WrenchIcon from '@lucide/svelte/icons/wrench';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
-	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
-	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
+	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
 	import ToolOutput from '#lib/components/ai-elements/tool/tool-output.svelte';
-	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
-	import type { ToolCall, ToolResult } from '#lib/gen/banda/v1/banda_pb.js';
+	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
+	import { todos, type Tool } from '#lib/events.js';
+	import { describe, diff, exitCode, icons, input, lines } from '#lib/tools.js';
+	import Self from './tool-call.svelte';
 
-	let { call, result }: { call: ToolCall; result?: ToolResult } = $props();
+	let { tool }: { tool: Tool } = $props();
 
-	const icons = {
-		Bash: TerminalIcon,
-		Read: FileTextIcon,
-		Write: FilePenIcon,
-		Edit: FilePenIcon,
-		Grep: SearchIcon,
-		Glob: SearchIcon,
-		WebFetch: GlobeIcon,
-		WebSearch: GlobeIcon
-	} as Record<string, typeof WrenchIcon>;
+	const name = $derived(tool.call.name);
+	const result = $derived(tool.result);
+	const head = $derived(describe(tool));
+	const Icon = $derived(icons[name] ?? WrenchIcon);
+	const code = $derived(name === 'Bash' ? exitCode(tool) : undefined);
+	const failed = $derived(!!result?.isError);
+	const subagent = $derived(name === 'Task' || name === 'Agent');
 
-	const input = $derived.by(() => {
-		try {
-			return JSON.parse(call.inputJson);
-		} catch {
-			return call.inputJson;
-		}
-	});
-	// The most telling argument: a path, a command, a pattern, ...
-	const summary = $derived(
-		input?.file_path ?? input?.command ?? input?.pattern ?? input?.url ?? input?.query ?? input?.path ?? input?.description ?? ''
-	);
-	const Icon = $derived(icons[call.name] ?? WrenchIcon);
+	// Long outputs show their first lines; "show more" renders the rest.
+	const FOLD = 20;
+	let full = $state(false);
+	const tone = (l: string) =>
+		l === '@@'
+			? 'text-muted-foreground/60'
+			: l[0] === '+'
+				? 'bg-green-500/15 text-green-700 dark:text-green-300'
+				: l[0] === '-'
+					? 'bg-red-500/15 text-red-700 dark:text-red-300'
+					: 'text-muted-foreground';
 </script>
 
-<Tool class="group/tool mb-0 border-0">
+{#snippet more(n: number)}
+	{#if n > FOLD && !full}
+		<button class="w-full px-3 py-1 text-left text-xs text-muted-foreground hover:text-foreground" onclick={() => (full = true)}>
+			Show {n - FOLD} more lines
+		</button>
+	{/if}
+{/snippet}
+
+{#snippet output(text: string)}
+	{@const all = lines(text)}
+	<div class="my-1 overflow-hidden rounded-md {failed ? 'bg-destructive/10 text-destructive' : 'bg-muted/50'}">
+		<pre class="overflow-x-auto p-3 font-mono text-xs whitespace-pre-wrap">{(full ? all : all.slice(0, FOLD)).join('\n')}</pre>
+		{@render more(all.length)}
+	</div>
+{/snippet}
+
+<Collapsible class="group/tool">
 	<CollapsibleTrigger class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted/50">
 		<Icon class="size-3.5 shrink-0 text-muted-foreground" />
-		<span class="shrink-0 font-medium">{call.name}</span>
-		<span class="min-w-0 flex-1 truncate font-mono text-muted-foreground">{summary}</span>
+		{#if head.label}<span class="max-w-1/2 shrink-0 truncate font-medium">{head.label}</span>{/if}
+		<span class="min-w-0 flex-1 truncate font-mono text-muted-foreground" title={head.detail}>{head.detail}</span>
+		{#if head.meta}<span class="shrink-0 font-mono text-muted-foreground">{head.meta}</span>{/if}
 		{#if !result}
 			<Loader size={12} class="text-muted-foreground" />
-		{:else if result.isError}
+		{:else if code}
+			<span class="shrink-0 font-mono text-destructive">exit {code}</span>
+		{:else if failed}
 			<XCircleIcon class="size-3.5 shrink-0 text-destructive" />
 		{/if}
 		<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90" />
 	</CollapsibleTrigger>
-	<ToolContent class="ml-4 border-l">
-		<ToolInput {input} />
-		{#if result}
-			<ToolOutput output={result.isError ? undefined : result.output} errorText={result.isError ? result.output || 'Error' : undefined} />
+	<CollapsibleContent class="mb-1 ml-4 border-l pl-2">
+		{@const edits = diff(tool)}
+		{#if name === 'Bash'}
+			{@const out = lines(result?.output)}
+			<div class="my-1 overflow-hidden rounded-md bg-zinc-950 font-mono text-xs text-zinc-200">
+				<pre class="overflow-x-auto p-3 whitespace-pre-wrap"><span class="text-emerald-400">$</span> {input(tool).command}{#if out.length}{'\n'}{(full ? out : out.slice(0, FOLD)).join('\n')}{/if}</pre>
+				{@render more(out.length)}
+				{#if code !== undefined}
+					<div class="border-t border-zinc-800 px-3 py-1 {code ? 'text-red-400' : 'text-zinc-500'}">exit {code}</div>
+				{/if}
+			</div>
+		{:else if edits}
+			<div class="my-1 overflow-hidden rounded-md bg-muted/30">
+				<pre class="overflow-x-auto py-1 font-mono text-xs leading-5">{#each full ? edits : edits.slice(0, FOLD) as line, i (i)}<div class="px-3 {tone(line)}">{line === '@@' ? '⋯' : line || ' '}</div>{/each}</pre>
+				{@render more(edits.length)}
+			</div>
+			{#if failed}{@render output(result!.output)}{/if}
+		{:else if name === 'TodoWrite'}
+			<ul class="my-1 space-y-0.5 text-xs">
+				{#each todos(tool.call) as t, i (i)}
+					<li class="flex items-center gap-2 {t.status === 'completed' ? 'text-muted-foreground line-through' : ''}">
+						{#if t.status === 'completed'}<CheckIcon class="size-3.5 text-emerald-500" />{:else}<CircleIcon
+								class="size-3.5 {t.status === 'in_progress' ? 'fill-primary text-primary' : 'text-muted-foreground'}"
+							/>{/if}
+						{t.content}
+					</li>
+				{/each}
+			</ul>
+		{:else if subagent}
+			{#each tool.children as child (child.call.id)}<Self tool={child} />{/each}
+			{#if result}
+				<div class="my-1 max-h-72 overflow-auto rounded-md bg-muted/30 px-3 py-2 text-sm">
+					<Response content={result.output} class="h-auto" />
+				</div>
+			{/if}
+		{:else if name in icons}
+			{#if result}{@render output(result.output)}{/if}
+		{:else}
+			<ToolInput input={input(tool)} />
+			{#if result}
+				<ToolOutput output={failed ? undefined : result.output} errorText={failed ? result.output || 'Error' : undefined} />
+			{/if}
 		{/if}
-	</ToolContent>
-</Tool>
+	</CollapsibleContent>
+</Collapsible>

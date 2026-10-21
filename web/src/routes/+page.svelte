@@ -14,7 +14,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { api, settingsApi } from '#lib/api.js';
 	import { AuthMethod, LoginState } from '#lib/gen/banda/v1/banda_pb.js';
-	import { loadThreads, projects, threads } from '#lib/threads.svelte.js';
+	import { projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
 	// (the app is a client-only SPA, so localStorage is always there).
@@ -63,7 +63,6 @@
 		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort })) localStorage.setItem(`banda.${k}`, v);
 		try {
 			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
-			loadThreads().catch(() => {});
 			await goto(`/t/${thread!.id}`);
 		} catch (err) {
 			error = (err as Error).message;

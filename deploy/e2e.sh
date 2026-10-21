@@ -54,9 +54,41 @@ ok "thread $ID: sandbox started, first turn ran, diff has its file"
 [ "$(steps checkout DONE)" = 1 ] && [ "$(steps setup SKIPPED)" = 1 ]
 ok "setup steps are reported: checkout done, no .banda/setup.sh"
 
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'toolCall'->>'name'='TodoWrite'")" = 2 ]
+[ "$(sql "select body->'toolCall'->>'name' from events where thread_id='$ID' and body->'toolCall'->>'parentToolCallId'='toolu_task1'")" = Glob ]
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'agentText'->>'text'='Two files.'")" = 0 ]
+ok "plans (TodoWrite) are stored; a subagent's tool calls carry their Task call, its text is dropped"
+# Bob and carol watch the thread; carol types. Bob sees both present and carol typing.
+W=$(mktemp)
+BUF=$(mise which buf) # run directly, so kill ends the stream
+watch() { exec "$BUF" curl --schema proto --protocol connect -H "X-Banda-User: $1" --data "{\"threadId\":\"$ID\",\"afterSeq\":\"999999\"}" "$API/banda.v1.ThreadService/WatchThread"; }
+watch bob >"$W" & BOB=$!
+watch carol >/dev/null & CAROL=$!
+sleep 3
+call ThreadService/SendTyping "{\"threadId\":\"$ID\"}" carol >/dev/null
+sleep 1; kill $CAROL; sleep 1; kill $BOB
+jq -se 'map(.event) | any(.presenceChanged.userIds == ["bob","carol"]) and any(.typing and .actor == "carol") and (last.presenceChanged.userIds == ["bob"])' "$W" >/dev/null || fail "presence and typing: $(cat "$W")"
+[ "$(sql "select count(*) from events where thread_id='$ID' and (body ? 'presenceChanged' or body ? 'typing')")" = 0 ]
+rm "$W"
+ok "watchers see who is here and who is typing, and nothing of it is stored"
+
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"nice, carol what do you think?\"}}" bob >/dev/null
 [ "$(thread mode)" = MODE_CHAT ]
 ok "a teammate's post switches to chat mode"
+
+call ThreadService/InboxMarkRead "{\"threadId\":\"$ID\"}" >/dev/null
+[ "$(thread unread)" = null ] || fail "still unread after InboxMarkRead"
+INBOX=$(mktemp)
+mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: carol" --data '{}' "$API/banda.v1.ThreadService/InboxWatch" >"$INBOX" 2>/dev/null &
+INBOX_PID=$!
+for _ in $(seq 30); do [ -s "$INBOX" ] && break; sleep 0.5; done
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@carol over to you\",\"mentionedUserIds\":[\"carol\"]}}" bob >/dev/null
+mentioned() { jq -se --arg id "$ID" 'last | .mentioned // [] | map(.id) | index($id)' "$INBOX" >/dev/null 2>&1; }
+for _ in $(seq 20); do mentioned && break; sleep 0.5; done
+kill $INBOX_PID
+mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")"
+[ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
+ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
 ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true}}" bob >/dev/null; }
 request() { sql "select seq from events where thread_id='$ID' and body ? 'turnRequest' order by seq desc limit 1"; }

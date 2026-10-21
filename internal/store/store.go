@@ -42,6 +42,7 @@ type Thread struct {
 	// The viewer's own state; only set by List and ListMentioned.
 	SnoozedUntil *time.Time
 	Settled      bool
+	Unread       bool
 }
 
 type Store struct{ db *pgxpool.Pool }
@@ -120,7 +121,7 @@ func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, e
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT t.id, t.owner_id, t.title, t.repo_url, t.base_branch, t.branch, t.model,
 		t.effort, t.status, t.mode, t.pending_prompt, t.runner_token, t.diff, t.delivered_seq, t.last_seq, t.turns, t.requests, t.trusted, t.created_at,
-		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL
+		t.updated_at, v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0)
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -132,7 +133,7 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 		var t Thread
 		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
 			&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt,
-			&t.SnoozedUntil, &t.Settled); err != nil {
+			&t.SnoozedUntil, &t.Settled, &t.Unread); err != nil {
 			return nil, err
 		}
 		out = append(out, t)

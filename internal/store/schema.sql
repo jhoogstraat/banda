@@ -86,3 +86,5 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
 -- start turns without approval.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
+-- The last event seq each viewer has seen; later events make the thread unread.
+ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
