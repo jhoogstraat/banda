@@ -26,8 +26,11 @@
 <script lang="ts">
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import IconButton from '#lib/components/icon-button.svelte';
+	import { threads } from '#lib/threads.svelte.js';
 	import {
 		DropdownMenu,
 		DropdownMenuContent,
@@ -78,6 +81,16 @@
 		{/if}
 	</DropdownMenuContent>
 </DropdownMenu>
+{#if threads.me?.id === thread.ownerId}
+	<IconButton
+		icon={thread.trusted ? ShieldOffIcon : ShieldCheckIcon}
+		variant={thread.trusted ? 'secondary' : 'ghost'}
+		label={thread.trusted
+			? 'Teammates can run the agent without your approval: require approval'
+			: "Teammates' turns need your approval: let them run the agent"}
+		onclick={() => act(api.trust({ threadId: thread.id, trusted: !thread.trusted }))}
+	/>
+{/if}
 <IconButton
 	icon={CheckIcon}
 	variant={thread.settled ? 'secondary' : 'ghost'}

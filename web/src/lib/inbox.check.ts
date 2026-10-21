@@ -32,4 +32,8 @@ eq(
 	["n: You were mentioned in bob's thread"],
 	'only new mentions alert'
 );
+const asking = (n: number, status = Status.WORKING) => ({ threads: [t('a', status, { turnRequests: n })], mentioned: [] });
+eq(titles(asking(0), asking(1)), ['a: A teammate asks to run your agent'], 'a new turn request alerts, even while working');
+eq(titles(asking(1), asking(1)), [], 'a pending request is not news');
+eq(titles(asking(2), asking(1)), [], 'a resolved request is quiet');
 console.log('inbox ok');

@@ -23,7 +23,8 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | First milestone | Solo end-to-end slice (see M1). |
 | Thread ownership | Threads belong to a user. Anyone can look up another user in the sidebar and see all of their threads (all statuses). Threads you are mentioned in appear in a **Mentioned** section at the top. |
 | Posting | Anyone can post in any thread at any time. |
-| Chat mode | A post by someone other than the owner, or any post that mentions a person, switches the thread to chat mode, unless the post mentions the agent. Only the owner can switch chat mode off; it never ends by itself. In agent mode the owner doesn't need to mention the agent. In chat mode everyone, the owner included, must mention the agent to start a turn. |
+| Chat mode | A post by someone other than the owner, or any post that mentions a person, switches the thread to chat mode, unless the post mentions the agent. Only the owner can switch chat mode off; it never ends by itself. In agent mode the owner doesn't need to mention the agent. In chat mode everyone, the owner included, must mention the agent to start a turn. A teammate's turn needs the owner's approval (next row). |
+| Teammate turns | A teammate's post that would start a turn becomes a **turn request**: a card in the chat that the owner approves (it runs as the teammate's turn; the prompt says who asked) or declines with an optional note. Requests don't wake a paused environment and can pile up; a pending one puts the thread in the owner's Needs input. Per thread, the owner can trust teammates to run the agent without approval. The owner's own agents posting through MCP never need approval. |
 | Sandboxes | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) v1.0.7, core `Sandbox` CRD only. See [research](docs/research/sandbox-lifecycle.md). |
 | Claude login | A per-user volume mounted as `CLAUDE_CONFIG_DIR` into that user's pods. Only the `claude` binary reads or writes it. Users log in from Settings, in a terminal on their **login environment** (`login-<hash>`: the runner image in login mode, mounting only that volume, no secrets; it runs only `claude auth login` or `logout` and is suspended after 10 min without a terminal), or from a thread's terminal. Runners report the login state; Settings shows it. See [research](docs/research/claude-login.md). |
 | API key mode | Per user and harness, the user may choose an Anthropic API key instead of the subscription. The key goes to the Secret `banda-auth-<hash>`, which thread pods load only in that mode; the runner then skips the login wait. Never returned by the API. |
@@ -51,7 +52,7 @@ What this means for Banda:
 2. Banda's code never sees a token. Users run `claude auth login` inside a sandbox: in M1 via `kubectl exec`, from M2 in a terminal pane. The binary writes the login to the user's config volume, which every one of their sandboxes mounts. This is the pattern [Anthropic's devcontainer](https://code.claude.com/docs/en/devcontainer) uses.
 3. Never set `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN` in a pod, and `ANTHROPIC_API_KEY` only when the user chose API key mode. Each of them overrides the user's login. Secrets can't use these names.
 4. Refresh tokens rotate, and killing `claude` in the middle of a refresh logs the user out of every pod. To avoid that, the runner stops `claude` gracefully (pods get a 90 s grace period) and the image pins Claude Code ≥ 2.1.301.
-5. **Open risk:** the terms assume "ordinary, individual usage" by the subscriber. Our chat-mode rule lets a teammate start a turn on the owner's subscription by mentioning the agent. And since turns run without permission prompts in a pod that holds the owner's Claude login (and the optional git token), a teammate could ask the agent to reveal or send them. The runner redacts Anthropic tokens and the git/runner tokens from everything it reports, so they don't reach Banda's database or the UI, but an agent told to exfiltrate them over the network could. Options: keep it (a team that trusts each other), or have the owner approve each teammate request before it runs. Ask Anthropic before open-sourcing. Same for the persistent login volume.
+5. **Open risk:** the terms assume "ordinary, individual usage" by the subscriber. A teammate can start a turn on the owner's subscription by mentioning the agent, but only once the owner approves it, or in a thread the owner explicitly trusts (see Teammate turns). And since turns run without permission prompts in a pod that holds the owner's Claude login (and the optional git token), a teammate could ask the agent to reveal or send them. The runner redacts Anthropic tokens and the git/runner tokens from everything it reports, so they don't reach Banda's database or the UI, but an agent told to exfiltrate them over the network could. Approval by default means the owner reads every teammate request before it runs in their pod; trusting a thread accepts the risk. Ask Anthropic before open-sourcing. Same for the persistent login volume.
 
 ## Architecture
 
@@ -85,7 +86,7 @@ Kubernetes (agent-sandbox) ── one Sandbox pod per thread:
 | Entity | Fields |
 |---|---|
 | User | OIDC `sub`, name, email (dev auth: the header value) |
-| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, delivered seq (what the agent has seen), runner token, latest diff |
+| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, delivered seq (what the agent has seen), open turn requests, trusted, runner token, latest diff |
 | Event | thread, seq, protojson body (`banda.v1.Event`). Append-only; the chat is rendered from these. |
 | Mention | thread, event seq, user, answered_at. Drives the Mentioned section. |
 | ThreadView | user, thread, snoozed_until, settled_at. Per-user overlay. |
@@ -103,6 +104,7 @@ working ──Interrupt──▶ (stop sent; TurnEnded follows)
 any ──EnvLost──▶ errored ──Retry / runner reconnects──▶ starting / awaiting_input
 awaiting_input / starting / errored ──Suspend (idle, owner snooze/settle)──▶ suspended
 suspended ──turn-starting post (kept as pending prompt) / owner Wake──▶ starting
+teammate's turn-starting post (untrusted thread) ──▶ request (status unchanged) ──owner Approve──▶ as a post / Decline──▶ dropped
 ```
 
 Mode is `agent` or `chat`; the rules are in the Decisions table. Posts that don't start a turn are always allowed. Prompts sent while the agent works are queued (Claude Code runs them in order) and the thread stays `working` until all turns have ended. A post that would start a turn is rejected while the environment is starting or errored.
@@ -112,7 +114,7 @@ Snooze and settle are per viewer. **Sidebar sections**, computed per viewer:
 | Section | Rule | Position |
 |---|---|---|
 | Mentioned | someone else's thread, I'm mentioned, unanswered | top |
-| Needs input | my thread, `awaiting_input`, `errored` or `suspended`, not snoozed or settled | top |
+| Needs input | my thread, `awaiting_input`, `errored` or `suspended`, or with a teammate's turn request; not snoozed or settled | top |
 | Working | my thread, `starting` or `working`, not snoozed or settled | bottom, collapsed |
 | Snoozed | `snoozed_until > now` | bottom, collapsed |
 | Settled | `settled_at` set | bottom, collapsed |
@@ -143,6 +145,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 **Built**
 - Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
 - State machine: `starting`, `working`, `awaiting_input`, `errored`, `suspended`; agent/chat mode with the posting rules from the Decisions table.
+- Teammate turn requests: approve/decline cards in the chat, Needs input for the owner, a per-thread trust toggle in the header.
 - Sign-in with OIDC (Dex locally), users, display names.
 - Sidebar: search, project filter (by repository) and new-thread button on top; Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
 - New thread is an empty chat: the first message creates the thread; repository, branch, model and effort are chips in the composer.
@@ -186,6 +189,6 @@ docs/research/  sandbox lifecycle, Claude login, Claude headless protocol
 
 ## Open questions
 
-1. **Teammate turns:** do they stay on the owner's subscription? See open risk 5 above.
+1. **Teammate turns:** decided: they run on the owner's subscription only after the owner approves, or in threads the owner trusts (see Teammate turns). Still to confirm with Anthropic (question 3).
 2. **Repos:** any HTTPS git URL works, with an optional token in the `banda-git` Secret. A GitHub App would allow per-user access and opening PRs via the API.
 3. **Anthropic:** before open-sourcing, confirm the persistent login volume and teammate turns with Anthropic.

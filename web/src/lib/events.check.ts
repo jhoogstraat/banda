@@ -81,4 +81,13 @@ if (typingNow(chat, Date.now()).join() !== 'bob,carol' || count() !== m) throw n
 if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should expire');
 apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
 if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
+
+const asks = newChat();
+apply(asks, { seq: 7n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent go' } } } } as Event);
+apply(asks, { seq: 8n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent again' } } } } as Event);
+apply(asks, { seq: 9n, actor: 'ann', kind: { case: 'turnRequestResolved', value: { requestSeq: 7n, approved: false, note: 'no' } } } as Event);
+const [first, second] = asks.items;
+if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
+	throw new Error('a resolution should attach to its request');
+if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
 console.log('ok');

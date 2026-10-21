@@ -13,6 +13,11 @@ service ThreadService {
   rpc Interrupt(InterruptRequest) returns (InterruptResponse);
   rpc SetMode(SetModeRequest) returns (SetModeResponse);
   rpc Retry(RetryRequest) returns (RetryResponse);
+  // Owner only: runs a teammate's turn request as their turn, or drops it.
+  rpc ApproveTurn(ApproveTurnRequest) returns (ApproveTurnResponse);
+  rpc DeclineTurn(DeclineTurnRequest) returns (DeclineTurnResponse);
+  // Owner only: whether teammates can start turns without approval.
+  rpc Trust(TrustRequest) returns (TrustResponse);
   // Replays stored events with seq > after_seq, then streams live events.
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
   // Other users' threads in which the caller is mentioned and hasn't answered.
@@ -110,6 +115,10 @@ message Thread {
   // The caller's own view of the thread.
   google.protobuf.Timestamp snoozed_until = 14;
   bool settled = 15;
+  // Teammate turn requests waiting for the owner's approval.
+  int32 turn_requests = 18;
+  // Teammates start turns without the owner's approval.
+  bool trusted = 19;
   // The thread has events the caller hasn't seen (see InboxMarkRead).
   bool unread = 16;
 }
@@ -140,6 +149,8 @@ message Event {
     DiffChanged diff_changed = 19;
     Notice notice = 20;
     SetupStep setup_step = 21;
+    TurnRequest turn_request = 24;
+    TurnRequestResolved turn_request_resolved = 25;
     // Ephemeral (seq 0): who is watching the thread.
     PresenceChanged presence_changed = 22;
     // Ephemeral (seq 0): the actor is typing in the composer.
@@ -151,6 +162,19 @@ message Message {
   string text = 1;
   bool mentions_agent = 2;
   repeated string mentioned_user_ids = 3;
+}
+
+// A teammate's message to the agent, waiting for the owner's approval
+// (instead of a Message event). The actor is the teammate.
+message TurnRequest {
+  Message message = 1;
+}
+
+// The owner approved or declined the TurnRequest event at request_seq.
+message TurnRequestResolved {
+  int64 request_seq = 1;
+  bool approved = 2;
+  string note = 3;
 }
 
 message AgentText {
@@ -292,6 +316,30 @@ message RetryRequest {
 }
 
 message RetryResponse {}
+
+message ApproveTurnRequest {
+  string thread_id = 1;
+  // Seq of the TurnRequest event.
+  int64 request_seq = 2;
+}
+
+message ApproveTurnResponse {}
+
+message DeclineTurnRequest {
+  string thread_id = 1;
+  int64 request_seq = 2;
+  // Optional, shown to the requester.
+  string note = 3;
+}
+
+message DeclineTurnResponse {}
+
+message TrustRequest {
+  string thread_id = 1;
+  bool trusted = 2;
+}
+
+message TrustResponse {}
 
 message ListMentionedRequest {}
 

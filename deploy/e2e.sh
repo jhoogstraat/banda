@@ -90,10 +90,38 @@ mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")
 [ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
-call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent one more\",\"mentionsAgent\":true}}" bob >/dev/null
+ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true}}" bob >/dev/null; }
+request() { sql "select seq from events where thread_id='$ID' and body ? 'turnRequest' order by seq desc limit 1"; }
+ask "one more"
+sleep 2
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread turnRequests)" = 1 ] || fail "bob's request did not wait"
+thread diff | grep -q hello2.txt && fail "bob's request ran without approval"
+REQ=$(request)
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" bob >/dev/null 2>&1 && fail "bob approved his own request"
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-thread diff | grep -q hello2.txt
-ok "mentioning @agent in chat mode starts a turn"
+thread diff | grep -q 'bob: @agent one more' || fail "the approved turn did not run as bob's"
+[ "$(thread turnRequests)" = null ] || fail "the request is still open"
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/dev/null 2>&1 && fail "a request was approved twice"
+ok "a teammate's @agent post waits for the owner; approving runs it as the teammate's turn"
+
+ask "not this"
+REQ=$(request)
+call ThreadService/DeclineTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ,\"note\":\"not now\"}" >/dev/null
+sleep 2
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread turnRequests)" = null ] || fail "decline left the thread $(thread status)"
+thread diff | grep -q hello3.txt && fail "a declined request ran"
+[ "$(sql "select body->'turnRequestResolved'->>'note' from events where thread_id='$ID' and body ? 'turnRequestResolved' order by seq desc limit 1")" = "not now" ]
+ok "declining a request runs no turn and keeps the note"
+
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" bob >/dev/null 2>&1 && fail "bob trusted himself"
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" >/dev/null
+[ "$(thread trusted)" = true ]
+ask "trusted"
+sleep 1; wait_for STATUS_AWAITING_INPUT
+thread diff | grep -q 'bob: @agent trusted' || fail "bob's post in a trusted thread did not run"
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":false}" >/dev/null
+ok "in a trusted thread a teammate's @agent post runs directly"
 
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" bob >/dev/null 2>&1 && { echo "not ok - bob switched modes"; exit 1; }
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null
@@ -128,7 +156,7 @@ ok "snoozing suspends the environment (pod gone, volumes kept)"
 
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-thread diff | grep -q hello3.txt
+thread diff | grep -q hello4.txt
 ok "a prompt resumes the environment with the checkout intact"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'

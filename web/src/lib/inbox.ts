@@ -6,23 +6,26 @@ const STARTING = 1, WORKING = 2, AWAITING_INPUT = 3, ERRORED = 4;
 
 export type Inbox = { threads: Thread[]; mentioned: Thread[] };
 
-// The sidebar section of one of my threads. Precedence: settled > snoozed > status.
+// The sidebar section of one of my threads. Precedence: settled > snoozed > teammates' turn requests > status.
 export const sectionOf = (t: Thread, now = Date.now()) =>
 	t.settled
 		? 'settled'
 		: t.snoozedUntil && timestampMs(t.snoozedUntil) > now
 			? 'snoozed'
-			: t.status === STARTING || t.status === WORKING
+			: !t.turnRequests && (t.status === STARTING || t.status === WORKING)
 				? 'working'
 				: 'needs';
 
 // What deserves a notification between two inbox snapshots: my thread newly
-// needing input or failing (unless snoozed or settled), or a new mention.
+// needing input or failing (unless snoozed or settled), a new teammate turn request, or a new mention.
 export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = (id) => id) {
 	const was = new Map(prev.threads.map((t) => [t.id, t.status]));
+	const asks = new Map(prev.threads.map((t) => [t.id, t.turnRequests]));
 	const out: { thread: Thread; title: string }[] = [];
 	for (const t of next.threads) {
-		if (was.get(t.id) === t.status || sectionOf(t) !== 'needs') continue;
+		if (sectionOf(t) !== 'needs') continue;
+		if (t.turnRequests > (asks.get(t.id) ?? 0)) out.push({ thread: t, title: 'A teammate asks to run your agent' });
+		if (was.get(t.id) === t.status) continue;
 		if (t.status === AWAITING_INPUT) out.push({ thread: t, title: 'Your agent needs input' });
 		if (t.status === ERRORED) out.push({ thread: t, title: 'Your thread failed' });
 	}

@@ -50,6 +50,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
@@ -81,6 +82,8 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// The owner's optional decline note per turn request seq.
+	const notes = $state<Record<string, string>>({});
 	// Ticks so typing expires; `others` drops the viewer from presence and typing.
 	let now = $state(Date.now());
 	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
@@ -136,7 +139,7 @@
 					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -308,6 +311,34 @@
 									<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
 								</Message>
 							</div>
+						</div>
+					{:else if item.kind === 'request'}
+						{@const name = userName(item.actor)}
+						{@const ownerName = userName(thread?.ownerId ?? '')}
+						<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+							<div class="flex items-center gap-2">
+								<UserAvatar {name} class="size-5" />
+								<span><span class="font-medium">{name}</span> asks the agent:</span>
+								<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+							</div>
+							<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>
+							{#if item.resolved}
+								<p class="text-xs text-muted-foreground">
+									{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
+								</p>
+							{:else if owner}
+								{@const seq = String(item.seq)}
+								<div class="flex flex-wrap items-center gap-2">
+									<Button size="sm" onclick={() => act(api.approveTurn({ threadId: id, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
+									<Input bind:value={notes[seq]} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
+									<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId: id, requestSeq: item.seq, note: notes[seq] ?? '' }))}>
+										<XIcon /> Decline
+									</Button>
+								</div>
+								<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
+							{:else}
+								<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+							{/if}
 						</div>
 					{:else if item.kind === 'text'}
 						{@render agentText(item.text)}
