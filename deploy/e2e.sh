@@ -18,6 +18,14 @@ fail() { echo "not ok - $*"; exit 1; }
 sql() { kc exec postgres-0 -- psql -U banda -tAc "$1"; }
 # Output of a terminal stream (OpenTerminal, OpenLoginTerminal).
 term() { mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" | jq -r '.data // empty' | base64 -d; }
+# What a server stream sent within 4 s, one JSON object per message.
+stream() {
+	"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" >"$TMP/stream" 2>&1 &
+	local p=$!; sleep 4; kill $p 2>/dev/null || true; wait $p 2>/dev/null || true
+	jq -c . "$TMP/stream" 2>/dev/null || cat "$TMP/stream"
+}
+BUF=$(mise which buf)
+TMP=$(mktemp -d)
 # Events of thread $ID with the setup step id $1 in state $2.
 steps() { sql "select count(*) from events where thread_id='$ID' and body->'setupStep'->>'id'='$1' and body->'setupStep'->>'state'='SETUP_STATE_$2'"; }
 login_state() {
@@ -83,6 +91,20 @@ call ThreadService/ListFiles "{\"threadId\":\"$ID\"}" | jq -e '.paths | index("R
 call ThreadService/ReadFile "{\"threadId\":\"$ID\",\"path\":\"../.claude/.credentials.json\"}" >/dev/null 2>&1 && { echo "not ok - read outside the checkout"; exit 1; }
 ok "files are listed; paths outside the checkout are refused"
 
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"start the preview\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+for _ in $(seq 10); do stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.running and (.ports | index({port: 5173, process: "http.server"}))' >/dev/null && break; done
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.ports | map(.port) == [5173]' >/dev/null || fail "preview ports: $(cat "$TMP/stream")"
+ok "the preview lists the dev server the agent started (port 5173, http.server), to teammates too"
+
+URL=$(call ThreadService/PreviewOpen "{\"threadId\":\"$ID\",\"port\":5173,\"path\":\"/\"}" bob | jq -r .url)
+PREVIEW=${URL%%/__banda/*}
+curl -sf -c "$TMP/jar" -b "$TMP/jar" -L "$URL" | grep -q e2e-preview-page
+curl -sf -b "$TMP/jar" "$PREVIEW/assets/app.js" | grep -q e2e-preview-asset
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$PREVIEW/assets/app.js")" = 401 ] || fail "the preview answers without its cookie"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$PREVIEW/__banda/open?token=forged&path=/")" = 401 ] || fail "a forged preview token was accepted"
+ok "the preview serves the page and its absolute-path asset on $PREVIEW, only with the cookie from PreviewOpen"
+
 call ThreadService/Push "{\"threadId\":\"$ID\"}" >/dev/null
 for _ in $(seq 20); do [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ] && break; sleep 1; done
 [ "$(sql "select count(*) from events where thread_id='$ID' and body->'notice'->>'text' like 'Push%'")" -gt 0 ]
@@ -93,6 +115,12 @@ call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00
 for _ in $(seq 30); do kc get pod "t-$ID" >/dev/null 2>&1 || break; sleep 2; done
 ! kc get pod "t-$ID" >/dev/null 2>&1
 ok "snoozing suspends the environment (pod gone, volumes kept)"
+
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" | tail -1 | grep -qx '{}' || fail "preview of a paused environment: $(cat "$TMP/stream")"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar" "$PREVIEW/")" = 503 ]
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob | grep -q permission_denied || fail "a teammate woke the preview: $(cat "$TMP/stream")"
+[ "$(thread status)" = STATUS_SUSPENDED ]
+ok "the preview of a paused environment says so and does not wake it; teammates can't wake it"
 
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
