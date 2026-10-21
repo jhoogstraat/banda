@@ -21,6 +21,9 @@ func actorName(names map[string]string, id string) string {
 	return id
 }
 
+// promptKinds are the kinds of events postedSince uses.
+var promptKinds = []string{"message", "lineageUpdate"}
+
 // agentPrompt hands the agent the thread messages it hasn't seen yet (chat
 // between people, posts by other agents) and says who is asking when it
 // isn't the owner. A plain owner prompt is passed through unchanged. Posts by

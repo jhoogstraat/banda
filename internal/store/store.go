@@ -198,7 +198,7 @@ type TurnTotals struct {
 func (s *Store) TurnTotals(ctx context.Context, ids []string) (map[string]TurnTotals, error) {
 	rows, err := s.db.Query(ctx, `SELECT thread_id, count(*), coalesce(sum((body->'turnEnded'->>'costUsd')::float8), 0),
 		coalesce(sum((body->'turnEnded'->>'durationMs')::bigint), 0)
-		FROM events WHERE thread_id = ANY($1) AND body ? 'turnEnded' GROUP BY thread_id`, ids)
+		FROM events WHERE thread_id = ANY($1) AND kind = 'turnEnded' GROUP BY thread_id`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func (s *Store) AgentSpawned(ctx context.Context, owner string) (int, error) {
 func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 	var text string
 	err := s.db.QueryRow(ctx, `SELECT coalesce(body->'agentText'->>'text', '') FROM events
-		WHERE thread_id = $1 AND body ? 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
+		WHERE thread_id = $1 AND kind = 'agentText' ORDER BY seq DESC LIMIT 1`, id).Scan(&text)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}
@@ -253,7 +253,7 @@ func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 // Pushed reports whether the thread's branch was ever pushed to origin.
 func (s *Store) Pushed(ctx context.Context, id string) (bool, error) {
 	var ok bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1 AND kind = 'autoPush'
 		AND body @> '{"autoPush": {"branchPushed": true}}')`, id).Scan(&ok)
 	return ok, err
 }
@@ -358,6 +358,11 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 
 func (s *Store) Events(ctx context.Context, id string, afterSeq int64) ([]*bandav1.Event, error) {
 	return s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 ORDER BY seq`, id, afterSeq)
+}
+
+// EventsOf is Events of the given kinds only (Event.kind oneof JSON names, e.g. "message").
+func (s *Store) EventsOf(ctx context.Context, id string, afterSeq int64, kinds ...string) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq > $2 AND kind = ANY($3) ORDER BY seq`, id, afterSeq, kinds)
 }
 
 // Before returns the newest limit events with seq < beforeSeq, in seq order.

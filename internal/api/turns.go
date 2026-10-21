@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 
@@ -138,7 +139,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 			return nil, err
 		}
 		// Read under the thread's lock, so a request resolves only once.
-		events, err := tx.Events(ctx, id, min(t.DeliveredSeq, seq-1))
+		events, err := tx.EventsOf(ctx, id, min(t.DeliveredSeq, seq-1), slices.Concat(promptKinds, []string{"turnRequest", "turnRequestResolved"})...)
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +207,7 @@ func (s *Service) readUnseen(ctx context.Context, id string, m *bandav1.Message)
 		return unseen{}, err
 	}
 	u := unseen{last: t.LastSeq}
-	if u.events, err = s.store.Events(ctx, id, t.DeliveredSeq); err != nil {
+	if u.events, err = s.store.EventsOf(ctx, id, t.DeliveredSeq, promptKinds...); err != nil {
 		return u, err
 	}
 	if n := len(u.events); n > 0 {
