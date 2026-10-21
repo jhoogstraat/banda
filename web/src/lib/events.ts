@@ -1,8 +1,8 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded } from './gen/banda/v1/banda_pb.ts';
+import type { Event, Mode, ReviewComment, SetupStep, ToolCall, ToolResult, TurnEnded } from './gen/banda/v1/banda_pb.ts';
 
 export type Item =
-	| { kind: 'message'; actor: string; text: string; time?: Timestamp }
+	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; time?: Timestamp }
 	| { kind: 'text' | 'thinking' | 'notice'; text: string }
 	| { kind: 'tool'; call: ToolCall; result?: ToolResult }
 	| { kind: 'turn'; turn: TurnEnded }
@@ -16,7 +16,7 @@ export function apply(chat: Chat, e: Event) {
 	const k = e.kind;
 	switch (k.case) {
 		case 'message':
-			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
+			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, time: e.time });
 			break;
 		case 'agentText':
 			chat.streaming = '';

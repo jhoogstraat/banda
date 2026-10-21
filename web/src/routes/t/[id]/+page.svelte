@@ -45,9 +45,10 @@
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
+	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { api } from '#lib/api.js';
+	import { tone, where, type Comment } from '#lib/diff.js';
 	import { apply, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
@@ -74,6 +75,23 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+
+	// The review being written in the Diff tab, kept in this browser until it is sent.
+	const reviewKey = `banda-review-${id}`;
+	let pending = $state<Comment[]>(JSON.parse(localStorage.getItem(reviewKey) ?? '[]'));
+	$effect(() => localStorage.setItem(reviewKey, JSON.stringify(pending)));
+	// Ask the agent to address the review: on by default for the owner.
+	let ask = $state(false);
+	$effect(() => {
+		ask = owner;
+	});
+	let focus = $state<Comment>();
+	const posted = $derived(chat.items.flatMap((i) => (i.kind === 'message' ? i.review.map((c) => ({ ...c, by: i.actor })) : [])));
+	function reveal(c: Comment) {
+		diffOpen = true;
+		tab = 'diff';
+		focus = c;
+	}
 
 	const clock = (t?: Timestamp) =>
 		t ? timestampDate(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
@@ -137,16 +155,29 @@
 		}
 	}
 
-	async function send({ text }: { text: string }) {
-		if (!text.trim()) return;
-		const message = {
+	function message(text: string, review: Comment[] = []) {
+		const all = [text, ...review.map((c) => c.body)].join('\n');
+		return {
 			text,
+			review,
 			mentionsAgent: /@agent\b/.test(text),
 			// Typed or picked from the popup: anyone whose @name is in the text.
-			mentionedUserIds: threads.users.filter((u) => u.id !== threads.me?.id && text.includes('@' + u.name)).map((u) => u.id)
+			mentionedUserIds: threads.users.filter((u) => u.id !== threads.me?.id && all.includes('@' + u.name)).map((u) => u.id)
 		};
+	}
+
+	async function send({ text }: { text: string }) {
+		if (!text.trim()) return;
 		// Throwing keeps the text in the prompt box so it can be retried.
-		if (!(await act(api.sendMessage({ threadId: id, message })))) throw new Error(error);
+		if (!(await act(api.sendMessage({ threadId: id, message: message(text) })))) throw new Error(error);
+	}
+
+	async function sendReview(summary: string) {
+		let text = summary.trim();
+		if (ask && !/@agent\b/.test(text)) text = `@agent ${text || 'please address these review comments.'}`;
+		const ok = await act(api.sendMessage({ threadId: id, message: message(text, pending) }));
+		if (ok) pending = [];
+		return ok;
 	}
 </script>
 
@@ -203,9 +234,25 @@
 									<span class="text-sm font-medium">{name}</span>
 									<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 								</div>
-								<Message from="user" class="ml-0 max-w-full">
-									<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
-								</Message>
+								{#if item.text}
+									<Message from="user" class="ml-0 max-w-full">
+										<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+									</Message>
+								{/if}
+								{#each item.review as c, j (j)}
+									<Collapsible open class="group/rc overflow-hidden rounded-lg border text-sm">
+										<div class="flex items-center gap-1 bg-muted/40 px-2 py-1 text-xs">
+											<CollapsibleTrigger class="rounded p-0.5 hover:bg-muted" aria-label="Toggle the code">
+												<ChevronRightIcon class="size-3.5 text-muted-foreground transition-transform group-data-[state=open]/rc:rotate-90" />
+											</CollapsibleTrigger>
+											<button class="min-w-0 truncate font-mono hover:underline" title="Show in the diff" onclick={() => reveal(c)}>{where(c)}</button>
+										</div>
+										<CollapsibleContent>
+											<pre class="max-h-48 overflow-auto border-t py-1 font-mono text-xs leading-5">{#each c.code.split('\n') as line}<div class="px-3 {tone(line)}">{line || ' '}</div>{/each}</pre>
+										</CollapsibleContent>
+										<p class="border-t px-3 py-2 whitespace-pre-wrap"><MentionText text={c.body} /></p>
+									</Collapsible>
+								{/each}
 							</div>
 						</div>
 					{:else if item.kind === 'text'}
@@ -317,13 +364,13 @@
 <SidePane bind:open={diffOpen}>
 	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
 		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
-			<TabsTrigger value="diff">Diff</TabsTrigger>
+			<TabsTrigger value="diff">Diff{#if pending.length}<Badge variant="secondary" class="ml-1 h-4 px-1 text-[10px]">{pending.length}</Badge>{/if}</TabsTrigger>
 			<TabsTrigger value="files">Files</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
 			<IconButton icon={XIcon} label="Close the pane" class="ml-auto" onclick={() => (diffOpen = false)} />
 		</TabsList>
-		<TabsContent value="diff" class="min-h-0 overflow-auto">
-			<DiffView diff={thread?.diff ?? ''} />
+		<TabsContent value="diff" class="flex min-h-0 flex-col">
+			<DiffView diff={thread?.diff ?? ''} bind:pending bind:focus bind:ask {posted} onsend={sendReview} />
 		</TabsContent>
 		<TabsContent value="files" class="min-h-0 overflow-auto">
 			{#if filesOpened}<FileBrowser threadId={id} diff={thread?.diff ?? ''} />{/if}
