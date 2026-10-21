@@ -1,6 +1,6 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
-import { apply, newChat, typingNow } from './events.ts';
+import { apply, itemAt, newChat, typingNow } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
@@ -105,4 +105,12 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+
+// Search results link to an event's seq: it maps to the item showing it, once it arrived.
+const jump = newChat();
+apply(jump, ev({ case: 'message', value: { text: 'hi', review: [] } }, 3n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j1', name: 'Bash', inputJson: '{}' } }, 4n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j2', name: 'Read', inputJson: '{}' } }, 6n));
+if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 || itemAt(jump, 2n) !== -1 || itemAt(jump, 7n) !== -1)
+	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
 console.log('ok');

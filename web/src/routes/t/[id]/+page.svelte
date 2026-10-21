@@ -57,7 +57,7 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
-	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
+	import { apply, itemAt, newChat, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
@@ -145,6 +145,24 @@
 		clearTimeout(readTimer);
 		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
 	};
+
+	// /t/<id>#<seq> (from search) scrolls to that event's item and flashes it once it has arrived.
+	// ponytail: the whole history replays; with paged history, jump would load the page around `seq` first.
+	let target = $state<bigint>();
+	let flash = $state<number>();
+	$effect(() => {
+		const hash = page.url.hash;
+		if (/^#\d+$/.test(hash)) target = BigInt(hash.slice(1));
+	});
+	$effect(() => {
+		if (target === undefined) return;
+		const i = itemAt(chat, target);
+		if (i < 0) return;
+		target = undefined;
+		flash = i;
+		setTimeout(() => document.querySelector(`[data-item="${i}"]`)?.scrollIntoView({ block: 'center' }));
+		setTimeout(() => flash === i && (flash = undefined), 2500);
+	});
 
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
@@ -353,6 +371,7 @@
 		<ConversationContent class="min-h-0 flex-1 overflow-y-auto">
 			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 				{#each chat.items as item, i (i)}
+					<div data-item={i} class="rounded-lg transition-shadow duration-500 {flash === i ? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background' : ''}">
 					{#if item.kind === 'message'}
 						{@const name = userName(item.actor)}
 						<div class="flex gap-3">
@@ -455,6 +474,7 @@
 					{:else if item.kind === 'settings'}
 						{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
 					{/if}
+					</div>
 				{/each}
 
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}

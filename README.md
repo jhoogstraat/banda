@@ -51,7 +51,7 @@ The Browser tab shows apps running in a thread's environment from a second origi
 
 ## Tests
 
-- `mise run test`: Go unit tests (state machine, inbox fan-out, agent prompt and review rendering, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps, preview tunnel, ports and proxy). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, and that 20k tool calls stay fast) and diff parsing, `node web/src/lib/inbox.check.ts` which inbox changes notify.
+- `mise run test`: Go unit tests (state machine, search queries, inbox fan-out, agent prompt and review rendering, Claude stream mapping (plans and subagents included), sessions, MCP transcript, push URLs, secret names, redaction, setup steps, preview tunnel, ports and proxy). `node web/src/lib/events.check.ts` checks the web event reducer (tool grouping, subagent nesting, the plan, and that 20k tool calls stay fast) diff parsing and jumping to an event, `node web/src/lib/inbox.check.ts` which inbox changes notify.
 - `mise run e2e`: drives the whole thread lifecycle with a fake agent that needs no Claude login (`deploy/e2e.sh`). It builds the fake sandbox image and runs a dev-auth API on `:8790` (preview `:8791`), next to the normal one.
 
 ## Run the API in the cluster

@@ -46,7 +46,7 @@ const (
 	// The readable text of an event, close to what schema.sql indexes.
 	searchDoc = `coalesce(e.body->'message'->>'text', e.body->'turnRequest'->'message'->>'text', e.body->'agentText'->>'text', '') ||
 	coalesce(' ' || (SELECT string_agg((r->>'path') || ': ' || (r->>'body'), ' · ') FROM jsonb_array_elements(` + searchReview + `) r), '') ||
-	coalesce(e.body->'toolCall'->>'name' || ' ' || regexp_replace(e.body->'toolCall'->>'inputJson', '"\w+":|[{}"]', ' ', 'g'), '')`
+	coalesce(e.body->'toolCall'->>'name' || ' ' || regexp_replace(regexp_replace(e.body->'toolCall'->>'inputJson', '"\w+":|[][{}",]', ' ', 'g'), '\s+', ' ', 'g'), '')`
 )
 
 // Search finds events by their words across all threads, best match first.

@@ -21,8 +21,11 @@ export type Item =
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
+// `firstSeq[i]` is the seq of the event that started `items[i]`; `seq` the latest stored event applied (see itemAt).
 export type Chat = {
 	items: Item[];
+	firstSeq: bigint[];
+	seq: bigint;
 	streaming: string;
 	plan: Todo[];
 	tools: Map<string, Tool>;
@@ -30,7 +33,7 @@ export type Chat = {
 	typing: Record<string, number>;
 };
 
-export const newChat = (): Chat => ({ items: [], streaming: '', plan: [], tools: new Map(), present: [], typing: {} });
+export const newChat = (): Chat => ({ items: [], firstSeq: [], seq: 0n, streaming: '', plan: [], tools: new Map(), present: [], typing: {} });
 
 export const todos = (call: ToolCall): Todo[] => {
 	try {
@@ -56,7 +59,17 @@ export const typingNow = (chat: Chat, now: number, ms = 5000) =>
 		.sort(([, a], [, b]) => a - b)
 		.map(([actor]) => actor);
 
+// The index of the item that shows event `seq` (a tool call's group, say), or -1 before it arrived.
+export const itemAt = (chat: Chat, seq: bigint) => (seq > chat.seq ? -1 : chat.firstSeq.findLastIndex((s) => s <= seq));
+
 export function apply(chat: Chat, e: Event) {
+	const n = chat.items.length;
+	applyKind(chat, e);
+	for (let i = n; i < chat.items.length; i++) chat.firstSeq[i] = e.seq;
+	if (e.seq > chat.seq) chat.seq = e.seq;
+}
+
+function applyKind(chat: Chat, e: Event) {
 	const k = e.kind;
 	switch (k.case) {
 		case 'message':
