@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -70,7 +71,16 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, err
 	}
 	// One statement list is one transaction; the lock keeps APIs starting together from deadlocking on it.
-	if _, err := db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema); err != nil {
+	// Its ALTERs lock tables even when there is nothing to change, so it can still deadlock with another
+	// API's traffic, and Postgres may pick it as the victim: try again.
+	for try := 1; ; try++ {
+		_, err = db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema)
+		var pe *pgconn.PgError
+		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
+			break
+		}
+	}
+	if err != nil {
 		db.Close()
 		return nil, err
 	}
