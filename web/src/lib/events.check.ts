@@ -1,6 +1,6 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
-import { apply, newChat, prepend, typingNow, type Chat } from './events.ts';
+import { apply, itemAt, newChat, prepend, typingNow, type Chat } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
@@ -150,6 +150,8 @@ for (let tail = 1; tail <= history.length; tail++) {
 			oldest = Math.max(0, oldest - size);
 		}
 		if (show(paged) !== show(whole)) throw new Error(`tail ${tail}, pages of ${size}: paged history differs from the full replay`);
+		for (let seq = 1n; seq <= history.length; seq++)
+			if (itemAt(paged, seq) !== itemAt(whole, seq)) throw new Error(`tail ${tail}, pages of ${size}: #${seq} maps to another item`);
 		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size || paged.orphans.answers.size) throw new Error('every orphan should find its call');
 	}
 }
@@ -172,4 +174,12 @@ if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a con
 apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
 const forked = chat.items.at(-1);
 if (forked?.kind !== 'fork' || forked.actor !== 'bob' || forked.note.threadId !== 't2') throw new Error('forkNote should become a link to the fork');
+
+// Search results link to an event's seq: it maps to the item showing it, once it arrived.
+const jump = newChat();
+apply(jump, ev({ case: 'message', value: { text: 'hi', review: [] } }, 3n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j1', name: 'Bash', inputJson: '{}' } }, 4n));
+apply(jump, ev({ case: 'toolCall', value: { id: 'j2', name: 'Read', inputJson: '{}' } }, 6n));
+if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 || itemAt(jump, 2n) !== -1 || itemAt(jump, 7n) !== -1)
+	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
 console.log('ok');

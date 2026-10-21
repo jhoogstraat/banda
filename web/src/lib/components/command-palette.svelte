@@ -4,15 +4,17 @@
 	import { timestampMs } from '@bufbuild/protobuf/wkt';
 	import { computeCommandScore } from 'bits-ui';
 	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import UsersIcon from '@lucide/svelte/icons/users';
+	import SearchHit from '#lib/components/search-hit.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { api } from '#lib/api.js';
-	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import type { SearchResult, Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { newThread, recent, shortcuts, ui, type Command as Cmd } from '#lib/shortcuts.svelte.js';
 	import { projectName, threads, userName } from '#lib/threads.svelte.js';
 
@@ -30,6 +32,24 @@
 		untrack(loadOthers);
 	});
 
+	// From 3 characters on, the best few messages matching the query follow the threads.
+	let hits = $state<SearchResult[]>([]);
+	let asked = 0;
+	$effect(() => {
+		const q = query.trim();
+		const n = ++asked;
+		if (q.length < 3) return void (hits = []);
+		const timer = setTimeout(
+			() =>
+				api
+					.search({ query: q, limit: 5 })
+					.then((r) => n === asked && (hits = r.results))
+					.catch(() => {}),
+			150
+		);
+		return () => clearTimeout(timer);
+	});
+
 	// Recently opened first, then recently active.
 	const all = $derived.by(() => {
 		const byId = new Map([...threads.list, ...threads.mentioned, ...others].map((t) => [t.id, t]));
@@ -42,6 +62,7 @@
 	const global: Cmd[] = [
 		{ label: 'New thread', icon: SquarePenIcon, keys: 'C', run: newThread },
 		{ label: 'Go to Team', icon: UsersIcon, keys: 'G T', run: () => goto('/team') },
+		{ label: 'Search messages', icon: SearchIcon, run: () => goto('/search') },
 		{ label: 'Go to Settings', icon: SettingsIcon, keys: 'G S', run: () => goto('/settings') },
 		{ label: 'Keyboard shortcuts', icon: KeyboardIcon, keys: '?', run: () => (ui.help = true) }
 	];
@@ -97,6 +118,20 @@
 				</Command.Item>
 			{/each}
 		</Command.Group>
+		{#if query.trim().length >= 3}
+			<!-- The query itself is in each value, so the client-side filter keeps the server's results. -->
+			<Command.Group heading="Messages">
+				{#each hits as hit (`${hit.threadId}#${hit.seq}`)}
+					<Command.Item value="{query} {hit.threadId} {hit.seq}" onSelect={() => run({ label: '', run: () => goto(`/t/${hit.threadId}#${hit.seq}`) })}>
+						<SearchHit {hit} compact />
+					</Command.Item>
+				{/each}
+				<Command.Item value="{query} search all messages" onSelect={() => run({ label: '', run: () => goto(`/search?q=${encodeURIComponent(query.trim())}`) })}>
+					<SearchIcon />
+					<span class="truncate">See all results for “{query.trim()}”</span>
+				</Command.Item>
+			</Command.Group>
+		{/if}
 		{#if !query}{@render actions()}{/if}
 	</Command.List>
 </Command.Dialog>

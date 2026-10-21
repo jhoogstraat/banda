@@ -64,7 +64,7 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
-	import { apply, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
+	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { permissionLabel, permissionModes } from '#lib/permissions.js';
@@ -161,6 +161,29 @@
 		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
 	};
 
+	// /t/<id>#<seq> (from search) scrolls to that event's item and flashes it once it is loaded:
+	// older history loads down to it, newer events arrive with the stream.
+	let target = $state<bigint>();
+	let flash = $state<number>();
+	$effect(() => {
+		const hash = page.url.hash;
+		if (/^#\d+$/.test(hash)) target = BigInt(hash.slice(1));
+	});
+	$effect(() => {
+		if (target === undefined || !oldest) return;
+		if (target < oldest) {
+			loadOlder(Math.min(1000, Number(oldest - target) + 20)); // runs again once `oldest` moved
+			return;
+		}
+		const i = itemAt(chat, target);
+		if (i < 0) return;
+		const key = chat.items[i].key;
+		target = undefined;
+		flash = key;
+		setTimeout(() => document.querySelector(`[data-key="${key}"]`)?.scrollIntoView({ block: 'center' }));
+		setTimeout(() => flash === key && (flash = undefined), 2500);
+	});
+
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
 		while (!signal.aborted) {
@@ -190,11 +213,11 @@
 		}
 	}
 
-	async function loadOlder() {
+	async function loadOlder(limit = PAGE) {
 		if (loadingOlder || oldest <= 1n || !scroller) return;
 		loadingOlder = true;
 		try {
-			const { events } = await api.history({ threadId: id, beforeSeq: oldest, limit: PAGE });
+			const { events } = await api.history({ threadId: id, beforeSeq: oldest, limit });
 			const el = scroller;
 			const height = el.scrollHeight;
 			const top = el.scrollTop;
@@ -410,13 +433,18 @@
 		<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
 			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 				{#if oldest > 1n}
-					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={loadOlder}>
+					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={() => loadOlder()}>
 						{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
 					</Button>
 				{/if}
 				{#each chat.items as item (item.key)}
 					<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
-					<div class="[contain-intrinsic-size:auto_80px] [content-visibility:auto]">
+					<div
+						data-key={item.key}
+						class="rounded-lg transition-shadow duration-500 [contain-intrinsic-size:auto_80px] [content-visibility:auto] {flash === item.key
+							? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
+							: ''}"
+					>
 						{#if item.kind === 'message'}
 							{@const name = userName(item.actor)}
 							<div class="flex gap-3">

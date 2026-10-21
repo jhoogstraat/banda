@@ -108,6 +108,8 @@ const (
 	ThreadServiceRaceCompareProcedure = "/banda.v1.ThreadService/RaceCompare"
 	// ThreadServiceRacePickProcedure is the procedure name of the ThreadService's RacePick RPC.
 	ThreadServiceRacePickProcedure = "/banda.v1.ThreadService/RacePick"
+	// ThreadServiceSearchProcedure is the procedure name of the ThreadService's Search RPC.
+	ThreadServiceSearchProcedure = "/banda.v1.ThreadService/Search"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -384,6 +386,13 @@ var (
 			Procedure:  ThreadServiceRacePickProcedure,
 		}
 	})
+	threadServiceSearchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Search"),
+			Procedure:  ThreadServiceSearchProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -466,6 +475,9 @@ type ThreadServiceClient interface {
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
+	// Full-text search over every thread's messages, review comments, agent
+	// text and tool calls, best matches first.
+	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -657,6 +669,9 @@ type ThreadServiceHandler interface {
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
+	// Full-text search over every thread's messages, review comments, agent
+	// text and tool calls, best matches first.
+	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -699,6 +714,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceRaceSpec(), Handler: adapter.race},
 		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
 		connect.Method{Spec: threadServiceRacePickSpec(), Handler: adapter.racePick},
+		connect.Method{Spec: threadServiceSearchSpec(), Handler: adapter.search},
 	)
 }
 
@@ -921,6 +937,10 @@ func (UnimplementedThreadServiceHandler) RaceCompare(context.Context, *v1.RaceCo
 
 func (UnimplementedThreadServiceHandler) RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RacePick is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Search is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1202,6 +1222,14 @@ func (c *threadServiceClient) RaceCompare(ctx context.Context, req *v1.RaceCompa
 func (c *threadServiceClient) RacePick(ctx context.Context, req *v1.RacePickRequest) (*v1.RacePickResponse, error) {
 	var res v1.RacePickResponse
 	if err := c.client.CallUnary(ctx, threadServiceRacePickSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Search(ctx context.Context, req *v1.SearchRequest) (*v1.SearchResponse, error) {
+	var res v1.SearchResponse
+	if err := c.client.CallUnary(ctx, threadServiceSearchSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1603,6 +1631,18 @@ func (h threadServiceHandler) racePick(ctx context.Context, _ connect.Spec, stre
 		return err
 	}
 	res, err := h.svc.RacePick(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) search(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SearchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Search(ctx, &req)
 	if err != nil {
 		return err
 	}

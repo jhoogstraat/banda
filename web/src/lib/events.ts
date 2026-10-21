@@ -42,12 +42,14 @@ export type Item = { key: number } & (
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
 // subagent calls by parent id, turn request resolutions by request seq, permission answers by request id. `planSeq` is the seq of the TodoWrite behind `plan`.
+// `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
 	items: Item[];
 	streaming: string;
 	plan: Todo[];
 	planSeq: bigint;
+	seq: bigint;
 	tools: Map<string, Tool>;
 	orphans: {
 		results: Map<string, { result: ToolResult; seq: bigint; cut: boolean }>;
@@ -64,6 +66,7 @@ export const newChat = (): Chat => ({
 	streaming: '',
 	plan: [],
 	planSeq: 0n,
+	seq: 0n,
 	tools: new Map(),
 	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map() },
 	present: [],
@@ -110,6 +113,10 @@ function setPlan(chat: Chat, call: ToolCall, seq: bigint) {
 	chat.planSeq = seq;
 }
 
+// The index of the item that shows stored event `seq` (a tool call's group, say), or -1 if it isn't loaded:
+// not arrived yet, or in older history.
+export const itemAt = (chat: Chat, seq: bigint) => (seq > chat.seq ? -1 : chat.items.findLastIndex((i) => i.key > 0 && i.key <= seq));
+
 export function apply(chat: Chat, e: Event) {
 	const k = e.kind;
 	if (e.context) {
@@ -117,6 +124,7 @@ export function apply(chat: Chat, e: Event) {
 		if (k.case === 'toolCall' && k.value.name === 'TodoWrite') setPlan(chat, k.value, e.seq);
 		return;
 	}
+	if (e.seq > chat.seq) chat.seq = e.seq;
 	const key = keyOf(e);
 	switch (k.case) {
 		case 'message':
