@@ -167,7 +167,7 @@ func (s *Service) RacePick(ctx context.Context, req *bandav1.RacePickRequest) (*
 			return nil, err
 		}
 		if t.ID != won.ID {
-			s.suspendIfOwner(ctx, t.ID)
+			s.suspendIfOwner(ctx, t.ID, "settled")
 		}
 	}
 	s.pokeInbox(by)

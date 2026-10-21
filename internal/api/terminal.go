@@ -72,6 +72,14 @@ func (s *Service) terminal(ctx context.Context, key string, open *bandav1.Termin
 	}
 }
 
+// closeTerminal ends key's terminal stream, if any. s.mu must be held.
+func (s *Service) closeTerminal(key string) {
+	if term := s.terminals[key]; term != nil {
+		close(term)
+		delete(s.terminals, key)
+	}
+}
+
 func (s *Service) WriteTerminal(ctx context.Context, req *bandav1.WriteTerminalRequest) (*bandav1.WriteTerminalResponse, error) {
 	if _, err := s.owned(ctx, req.ThreadId); err != nil {
 		return nil, err

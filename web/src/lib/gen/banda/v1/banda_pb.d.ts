@@ -2846,6 +2846,14 @@ export declare type ConnectRequest = Message$1<"banda.v1.ConnectRequest"> & {
      */
     value: Pong;
     case: "pong";
+  } | {
+    /**
+     * The result of a Push before a suspend, whether or not it changed.
+     *
+     * @generated from field: banda.v1.AutoPush pushed = 15;
+     */
+    value: AutoPush;
+    case: "pushed";
   } | { case: undefined; value?: undefined };
 };
 
@@ -3228,6 +3236,14 @@ export declare const StopSchema: GenMessage<Stop>;
  * @generated from message banda.v1.Push
  */
 export declare type Push = Message$1<"banda.v1.Push"> & {
+  /**
+   * Before the environment is suspended: once the push before (if any) is
+   * done, push again and answer with ConnectRequest.pushed, so the API knows
+   * whether all work is on origin, terminal commits and edits included.
+   *
+   * @generated from field: bool suspend = 1;
+   */
+  suspend: boolean;
 };
 
 /**

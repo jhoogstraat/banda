@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -32,6 +33,9 @@ type Service struct {
 	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
 	// MaxAgentThreads how many sub-threads started by agents may run per owner.
 	MaxSubthreadDepth, MaxAgentThreads int
+	// SuspendPause holds every suspend between the thread's status and its
+	// environment, so tests can race it. Zero outside tests.
+	SuspendPause time.Duration
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -46,6 +50,12 @@ type Service struct {
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
 	files map[string]chan *bandav1.FileResponse
+	// pushes holds the suspends waiting for their runner's push (see pushAll).
+	pushes map[string]chan *bandav1.AutoPush
+	// parking holds the threads to suspend once their turn ends, and how
+	// their owner put them away: "snoozed" or "settled" (see park).
+	// ponytail: in memory, an API restart forgets them; the idle sweep still suspends them.
+	parking map[string]string
 	// previews is closed and removed when a thread's preview changes: its
 	// runner came or went, or reported other ports (see PreviewWatch).
 	previews map[string]chan struct{}
@@ -70,6 +80,8 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
+		pushes:    map[string]chan *bandav1.AutoPush{},
+		parking:   map[string]string{},
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 		reports:   map[string]chan struct{}{},
@@ -130,11 +142,54 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 			s.provision(ctx, t)
 		}
 	case thread.SuspendEnv:
-		if err := s.sandboxes.Suspend(ctx, id); err != nil {
+		ctx = context.WithoutCancel(ctx) // a caller going away must not leave it half done
+		pushed := s.pushAll(id)
+		time.Sleep(s.SuspendPause)
+		// Under the thread's lock: a post or wake since Suspend wins, and its
+		// environment stays up.
+		_, _, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			if t.Status != thread.Suspended {
+				return nil, errResumed
+			}
+			t.EnvPushed = pushed
+			return nil, s.sandboxes.Suspend(ctx, id)
+		})
+		if err == nil {
+			s.scheduleDelete(ctx, id)
+		} else if !errors.Is(err, errResumed) {
 			slog.Error("suspend sandbox", "thread", id, "err", err)
 		}
-		s.scheduleDelete(ctx, id)
 	}
+}
+
+var errResumed = errors.New("resumed while suspending")
+
+// pushAll has the thread's runner push once more, after any push still
+// running, and reports whether all its work is on origin. Without a runner,
+// or an answer within a minute, nobody knows.
+func (s *Service) pushAll(id string) bool {
+	ch := make(chan *bandav1.AutoPush, 1)
+	s.mu.Lock()
+	r := s.runners[id]
+	s.pushes[id] = ch
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		if s.pushes[id] == ch {
+			delete(s.pushes, id)
+		}
+		s.mu.Unlock()
+	}()
+	if r == nil || !r.send(&bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Push{Push: &bandav1.Push{Suspend: true}}}) {
+		return false
+	}
+	select {
+	case p := <-ch:
+		return p.State == bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED
+	case <-r.done: // e.g. a post restarted the environment
+	case <-time.After(time.Minute):
+	}
+	return false
 }
 
 func messageEvent(by string, m *bandav1.Message) *bandav1.Event {

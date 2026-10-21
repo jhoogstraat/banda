@@ -96,14 +96,17 @@ func (s *Service) start(ctx context.Context, t store.Thread, by string, first *b
 
 func (s *Service) provision(ctx context.Context, t store.Thread) {
 	// Ensure also cancels a scheduled deletion, or recreates a deleted environment.
-	if t.EnvDeleteAt != nil {
-		if err := s.store.SetEnvDeleteAt(ctx, t.ID, nil); err != nil {
-			slog.Error("cancel environment deletion", "thread", t.ID, "err", err)
-		}
+	if err := s.store.ResetEnv(ctx, t.ID); err != nil {
+		slog.Error("cancel environment deletion", "thread", t.ID, "err", err)
 	}
-	// Ensure replaces a running pod; its runner's disconnect is expected.
+	// Ensure replaces a running pod; its runner's disconnect is expected, and
+	// everything bound to that runner ends now.
 	s.mu.Lock()
+	if r := s.runners[t.ID]; r != nil {
+		r.tunnels.CloseAll()
+	}
 	delete(s.runners, t.ID)
+	s.closeTerminal(t.ID)
 	s.previewChanged(t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)

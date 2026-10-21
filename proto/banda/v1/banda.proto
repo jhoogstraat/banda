@@ -902,6 +902,8 @@ message ConnectRequest {
     PreviewPorts preview_ports = 9;
     // Answers a Ping.
     Pong pong = 10;
+    // The result of a Push before a suspend, whether or not it changed.
+    AutoPush pushed = 15;
   }
 }
 
@@ -994,7 +996,12 @@ message AttachmentImage {
 message Stop {}
 
 // Push the thread branch and report the result as a notice.
-message Push {}
+message Push {
+  // Before the environment is suspended: once the push before (if any) is
+  // done, push again and answer with ConnectRequest.pushed, so the API knows
+  // whether all work is on origin, terminal commits and edits included.
+  bool suspend = 1;
+}
 
 message TerminalOpen {
   uint32 cols = 1;

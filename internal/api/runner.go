@@ -85,10 +85,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		if mine {
 			delete(s.runners, id)
 			s.previewChanged(id)
-			if term := s.terminals[id]; term != nil { // the terminal dies with the runner
-				close(term)
-				delete(s.terminals, id)
-			}
+			s.closeTerminal(id) // the terminal dies with the runner
 		}
 		s.mu.Unlock()
 		if mine && !login {
@@ -151,6 +148,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
 				s.permissionEvent(bg, id, e)
+				if e.GetPermissionRequested() != nil { // asking keeps a parked thread's turn open
+					go s.park(bg, id)
+				}
 				continue
 			}
 			var action thread.Action
@@ -167,6 +167,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			}
 			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
 				s.settlePermissions(bg, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
+				go s.park(bg, id) // not here: suspending waits for this stream
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
 			s.mu.Lock()
@@ -174,8 +175,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				select {
 				case term <- k.TerminalOutput:
 				default: // too slow, drop it like a lagging watcher, and end the shell
-					close(term)
-					delete(s.terminals, id)
+					s.closeTerminal(id)
 					select {
 					case r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_TerminalClose{TerminalClose: &bandav1.TerminalClose{}}}:
 					default:
@@ -187,6 +187,15 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if err := s.store.SetLogin(bg, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
 				slog.Error("store login status", "user", owner, "err", err)
 			}
+		case *bandav1.ConnectRequest_Pushed:
+			s.mu.Lock()
+			if ch := s.pushes[id]; ch != nil {
+				select {
+				case ch <- k.Pushed:
+				default:
+				}
+			}
+			s.mu.Unlock()
 		case *bandav1.ConnectRequest_FileResponse:
 			s.fileResponse(k.FileResponse)
 		case *bandav1.ConnectRequest_HttpTunnel:
