@@ -32,6 +32,7 @@ type Thread struct {
 	Model         string
 	Effort        string
 	PendingPrompt string
+	PendingImages []string // attachment ids; only read by Get and Update
 	RunnerToken   string
 	Diff          string
 	DeliveredSeq  int64
@@ -62,12 +63,12 @@ func Open(ctx context.Context, url string) (*Store, error) {
 }
 
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
-	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at`
+	pending_prompt, runner_token, diff, delivered_seq, last_seq, turns, requests, trusted, created_at, updated_at, pending_images`
 
 func scan(row pgx.Row) (Thread, error) {
 	var t Thread
 	err := row.Scan(&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort,
-		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt)
+		&t.Status, &t.Mode, &t.PendingPrompt, &t.RunnerToken, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted, &t.CreatedAt, &t.UpdatedAt, &t.PendingImages)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, ErrNotFound
 	}
@@ -161,8 +162,8 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	}
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
-		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
-		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort).Scan(&seq, &t.UpdatedAt)
+		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, pending_images=coalesce($13, '{}'::text[]), last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort, t.PendingImages).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

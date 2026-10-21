@@ -84,7 +84,9 @@ apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'bob' });
 apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'carol' });
 if (typingNow(chat, Date.now()).join() !== 'bob,carol' || count() !== m) throw new Error('typing should be tracked per person');
 if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should expire');
-apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
+apply(chat, { ...ev({ case: 'message', value: { text: 'hi', attachments: [{ id: 'f1', name: 'shot.png', mediaType: 'image/png' }] } }), actor: 'bob' });
+const posted = chat.items.at(-1);
+if (posted?.kind !== 'message' || posted.attachments[0]?.id !== 'f1') throw new Error('a message should keep its attachments');
 if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
 
 const asks = newChat();

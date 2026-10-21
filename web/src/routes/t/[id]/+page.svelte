@@ -30,6 +30,7 @@
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import Browser from '#lib/components/browser.svelte';
@@ -40,6 +41,8 @@
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
 	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
+	import MessageAttachments from '#lib/components/message-attachments.svelte';
+	import AttachButton from '#lib/components/attach-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SidePane from '#lib/components/side-pane.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
@@ -55,7 +58,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
-	import { api } from '#lib/api.js';
+	import { api, upload } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
@@ -250,10 +253,17 @@
 		};
 	}
 
-	async function send({ text }: { text: string }) {
-		if (!text.trim()) return;
-		// Throwing keeps the text in the prompt box so it can be retried.
-		if (!(await act(api.sendMessage({ threadId: id, message: message(text) })))) throw new Error(error);
+	async function send({ text, attachments: files }: PromptInputMessage) {
+		if (!text.trim() && !files.length) return;
+		let attachments;
+		try {
+			attachments = await Promise.all(files.map((f) => upload(f.file)));
+		} catch (e) {
+			error = (e as Error).message;
+			throw e;
+		}
+		// Throwing keeps the text and files in the prompt box so they can be retried.
+		if (!(await act(api.sendMessage({ threadId: id, message: { ...message(text), attachments } })))) throw new Error(error);
 		typedAt = 0;
 	}
 
@@ -367,6 +377,7 @@
 										<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
 									</Message>
 								{/if}
+								{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}
 								{@render reviewCards(item.review)}
 							</div>
 						</div>
@@ -380,6 +391,7 @@
 								<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 							</div>
 							{#if item.text}<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>{/if}
+							{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}
 							{@render reviewCards(item.review)}
 							{#if item.resolved}
 								<p class="text-xs text-muted-foreground">
@@ -493,13 +505,17 @@
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
 		<Plan plan={chat.plan} />
-		<PromptInput.Root onSubmit={send}>
+		<PromptInput.Root onSubmit={send} multiple maxFiles={5} maxFileSize={5 << 20} onError={(e) => (error = e.message)}>
 			<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
+				<PromptInput.Attachments class="px-2">
+					{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
+				</PromptInput.Attachments>
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar>
-					<div class="flex items-center gap-1.5 pl-2">
+					<div class="flex items-center gap-1.5 pl-1">
+						<AttachButton />
 						{#if thread && owner}
 							<!-- A running agent switches once its turns have ended. -->
 							<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />

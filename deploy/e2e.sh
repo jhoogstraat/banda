@@ -18,6 +18,14 @@ fail() { echo "not ok - $*"; exit 1; }
 sql() { kc exec postgres-0 -- psql -U banda -tAc "$1"; }
 # The agent's latest reply in thread $ID (the fake names its model and effort).
 reply() { sql "select body->'agentText'->>'text' from events where thread_id='$ID' and body ? 'agentText' order by seq desc limit 1"; }
+# Uploads file $1 named $2 with media type $3 as user $4, prints the attachment id.
+upload() { curl -sf -X POST "$API/files?name=$2" -H "Content-Type: $3" -H "X-Banda-User: ${4:-dev}" --data-binary "@$1" | jq -r .id; }
+# Whether the agent of thread $ID said exactly $1.
+said() { [ "$(sql "select count(*) from events where thread_id='$ID' and body->'agentText'->>'text' = '$1'")" -gt 0 ]; }
+FILES=$(mktemp -d)
+printf %s iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg== | base64 -d >"$FILES/dot.png"
+printf '# Notes\nuse ``` fences\n' >"$FILES/notes.md"
+printf '\0\1\2binary' >"$FILES/blob.bin"
 # Output of a terminal stream (OpenTerminal, OpenLoginTerminal).
 term() { mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" | jq -r '.data // empty' | base64 -d; }
 # What a server stream sent within 4 s, one JSON object per message.
@@ -82,7 +90,8 @@ jq -se 'map(.event) | any(.presenceChanged.userIds == ["bob","carol"]) and any(.
 rm "$W"
 ok "watchers see who is here and who is typing, and nothing of it is stored"
 
-call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"nice, carol what do you think?\"}}" bob >/dev/null
+PNG=$(upload "$FILES/dot.png" dot.png image/png bob)
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"nice, carol what do you think?\",\"attachments\":[{\"id\":\"$PNG\"}]}}" bob >/dev/null
 [ "$(thread mode)" = MODE_CHAT ]
 ok "a teammate's post switches to chat mode"
 
@@ -100,9 +109,11 @@ mentioned || fail "carol's inbox stream did not get the mention: $(cat "$INBOX")
 [ "$(thread unread)" = true ] || fail "a teammate's post did not make the thread unread for its owner"
 ok "the inbox stream pushes a new mention live; a teammate's post makes the thread unread until it is read"
 
-ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true}}" bob >/dev/null; }
+# Bob asks the agent $1, with the attachment ids $2 (a JSON list).
+ask() { call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent $1\",\"mentionsAgent\":true,\"attachments\":${2:-[]}}}" bob >/dev/null; }
 request() { sql "select seq from events where thread_id='$ID' and body ? 'turnRequest' order by seq desc limit 1"; }
-ask "one more"
+TXT=$(upload "$FILES/notes.md" notes.md "" bob)
+ask "one more" "[{\"id\":\"$TXT\"}]"
 sleep 2
 [ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread turnRequests)" = 1 ] || fail "bob's request did not wait"
 thread diff | grep -q hello2.txt && fail "bob's request ran without approval"
@@ -114,6 +125,18 @@ thread diff | grep -q 'bob: @agent one more' || fail "the approved turn did not 
 [ "$(thread turnRequests)" = null ] || fail "the request is still open"
 call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$REQ}" >/dev/null 2>&1 && fail "a request was approved twice"
 ok "a teammate's @agent post waits for the owner; approving runs it as the teammate's turn"
+said "Received 1 image blocks (image/png) and 1 text files" || fail "the agent did not get bob's image and text file"
+sql "select body->'message'->'attachments'->0->>'name' from events where thread_id='$ID' and body->'message'->'attachments' is not null order by seq limit 1" | grep -qx dot.png
+ok "attachments: a chat message's image is folded into the next prompt as an image block, an approved request's text file is inlined"
+
+H=$(curl -sfD - -o "$FILES/got.png" "$API/files/$PNG")
+cmp -s "$FILES/dot.png" "$FILES/got.png" && echo "$H" | grep -qi '^content-type: image/png' && echo "$H" | grep -qi '^x-content-type-options: nosniff' && echo "$H" | grep -qi "^content-security-policy: default-src 'none'; sandbox" || fail "GET /files: $H"
+curl -sf "$API/files/$TXT" | grep -q 'use ``` fences'
+[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/files?name=blob.bin" -H 'Content-Type: application/octet-stream' --data-binary "@$FILES/blob.bin")" = 415 ] || fail "a binary file was accepted"
+head -c $((5 * 1024 * 1024 + 1)) /dev/zero >"$FILES/big.png"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/files?name=big.png" -H 'Content-Type: image/png' --data-binary "@$FILES/big.png")" = 413 ] || fail "a file over 5 MB was accepted"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"mine now\",\"attachments\":[{\"id\":\"$PNG\"}]}}" >/dev/null 2>&1 && fail "posted someone else's upload"
+ok "files are served as uploaded, sandboxed; binaries, files over 5 MB and other people's uploads are refused"
 
 ask "not this"
 REQ=$(request)
@@ -214,12 +237,15 @@ stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob >/d
 [ "$(thread status)" = STATUS_SUSPENDED ]
 ok "the preview of a paused environment says so and does not wake it; teammates can't wake it"
 
+IMG=$(upload "$FILES/dot.png" wake.png image/png)
 call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"effort\":\"max\"}" >/dev/null
-call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\",\"attachments\":[{\"id\":\"$IMG\"}]}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
 reply | grep -q "with claude-sonnet-5-5 · max" || fail "settings changed while paused were not applied: $(reply)"
 thread diff | grep -q hello8.txt
 ok "a prompt resumes the environment with the checkout intact and the settings changed while paused"
+said "Received 1 image blocks (image/png) and 0 text files" || fail "the image of a prompt that resumed the environment was lost"
+ok "a prompt's images wait with it while the environment resumes"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
 ok "secrets are redacted from the diff"
@@ -272,4 +298,5 @@ sleep 15
 ok "a bad base branch errors once, without a crash loop"
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 
+rm -r "$FILES"
 echo "all checks passed"

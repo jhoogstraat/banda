@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+
+	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+)
 
 // Lines are verbatim (trimmed) from docs/research/claude-headless.md.
 func TestTranslate(t *testing.T) {
@@ -62,5 +67,17 @@ func TestTranslate(t *testing.T) {
 		if got != tt.want || ended != tt.ended || auth != tt.auth {
 			t.Errorf("%s:\n got %q ended=%v auth=%v\nwant %q ended=%v auth=%v", tt.line, got, ended, auth, tt.want, tt.ended, tt.auth)
 		}
+	}
+}
+
+func TestUserMessage(t *testing.T) {
+	plain, _ := json.Marshal(userMessage(&bandav1.Prompt{Text: "hi"}))
+	if string(plain) != `{"message":{"content":"hi","role":"user"},"type":"user"}` {
+		t.Errorf("plain: %s", plain)
+	}
+	img, _ := json.Marshal(userMessage(&bandav1.Prompt{Text: "look", Images: []*bandav1.AttachmentImage{{MediaType: "image/png", Data: []byte("png")}}}))
+	want := `{"message":{"content":[{"text":"look","type":"text"},{"source":{"data":"cG5n","media_type":"image/png","type":"base64"},"type":"image"}],"role":"user"},"type":"user"}`
+	if string(img) != want {
+		t.Errorf("with an image:\n%s\nwant\n%s", img, want)
 	}
 }

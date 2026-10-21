@@ -136,7 +136,7 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 
 func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageRequest) (*bandav1.SendMessageResponse, error) {
 	m := req.Message
-	if m == nil || strings.TrimSpace(m.Text) == "" && len(m.Review) == 0 {
+	if m == nil || strings.TrimSpace(m.Text) == "" && len(m.Review) == 0 && len(m.Attachments) == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "message text is required")
 	}
 	for _, c := range m.Review {
@@ -145,6 +145,9 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		}
 	}
 	by, id := user(ctx), req.ThreadId
+	if err := s.checkAttachments(ctx, m, by); err != nil {
+		return nil, err
+	}
 	before, err := s.store.Get(ctx, id)
 	if err != nil {
 		return nil, cerr(err)
@@ -154,9 +157,14 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		return nil, err
 	}
 	names := s.names(ctx)
+	texts, err := s.textAttachments(ctx, append(messages(unseen), m))
+	if err != nil {
+		return nil, err
+	}
 
 	var effect thread.Effect
 	var prompt string
+	var images []string
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		// Only MCP posts as "agent:<thread>", and it lets an agent start turns
 		// only in threads of its own owner.
@@ -170,7 +178,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		if eff == thread.RequestTurn {
 			posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
 		}
-		prompt = turnPrompt(t, eff, names, unseen, by, m)
+		prompt, images = turnPrompt(t, eff, names, unseen, by, m, texts)
 		events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
 		t.State = next
 		return events, nil
@@ -187,7 +195,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	}
 	s.pokeInbox(append([]string{by}, m.MentionedUserIds...)...)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, id, prompt)
+		s.deliver(ctx, id, prompt, images)
 	}
 	s.do(ctx, id, effect)
 	return &bandav1.SendMessageResponse{}, nil
@@ -196,10 +204,11 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 // turnPrompt is the prompt for a turn by `by` that starts with the next
 // stored event, given the thread's events since at least its delivered seq.
 // It marks them delivered, and for a suspended thread (Provision) keeps the
-// prompt as pending. Other effects start no turn: it returns "".
-func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message) string {
+// prompt and its images as pending. Other effects start no turn: it returns
+// "". texts holds the attached text files (see agentPrompt).
+func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message, texts map[string]string) (string, []string) {
 	if eff != thread.StartTurn && eff != thread.Provision {
-		return ""
+		return "", nil
 	}
 	var fresh []*bandav1.Event
 	for _, e := range unseen {
@@ -207,12 +216,13 @@ func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, uns
 			fresh = append(fresh, e)
 		}
 	}
-	prompt := agentPrompt(t.OwnerID, names, fresh, by, m)
+	prompt, images := agentPrompt(t.OwnerID, names, fresh, by, m, texts)
 	t.DeliveredSeq = t.LastSeq + 1 // the event stored next
 	if eff == thread.Provision {   // suspended: deliver once the environment is back
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
+		t.PendingImages = lastImages(append(t.PendingImages, images...))
 	}
-	return prompt
+	return prompt, images
 }
 
 func (s *Service) ApproveTurn(ctx context.Context, req *bandav1.ApproveTurnRequest) (*bandav1.ApproveTurnResponse, error) {
@@ -229,6 +239,7 @@ func (s *Service) resolve(ctx context.Context, id string, seq int64, approve boo
 	by, names := user(ctx), s.names(ctx)
 	var effect thread.Effect
 	var prompt string
+	var images []string
 	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		var a thread.Action = thread.Decline{By: by}
 		if approve {
@@ -248,7 +259,12 @@ func (s *Service) resolve(ctx context.Context, id string, seq int64, approve boo
 			return nil, thread.ErrNoRequest
 		}
 		effect = eff
-		prompt = turnPrompt(t, eff, names, events, r.Actor, r.GetTurnRequest().GetMessage())
+		m := r.GetTurnRequest().GetMessage()
+		texts, err := s.textAttachments(ctx, append(messages(events), m))
+		if err != nil {
+			return nil, err
+		}
+		prompt, images = turnPrompt(t, eff, names, events, r.Actor, m, texts)
 		out := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_TurnRequestResolved{
 			TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: seq, Approved: approve, Note: note}}}},
 			stateEvents(t.State, next)...)
@@ -260,7 +276,7 @@ func (s *Service) resolve(ctx context.Context, id string, seq int64, approve boo
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, id, prompt)
+		s.deliver(ctx, id, prompt, images)
 	}
 	s.do(ctx, id, effect)
 	return nil
@@ -546,10 +562,12 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 // has not been delivered yet.
 func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	var prompt string
+	var images []string
 	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 		if effect == thread.StartTurn {
 			prompt, t.PendingPrompt = t.PendingPrompt, ""
+			images, t.PendingImages = t.PendingImages, nil
 			t.DeliveredSeq = t.LastSeq
 		}
 		events := stateEvents(t.State, next)
@@ -561,7 +579,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	}
 	s.broadcast(id, events)
 	if prompt != "" {
-		s.deliver(ctx, id, prompt)
+		s.deliver(ctx, id, prompt, images)
 	}
 	return nil
 }
@@ -641,14 +659,24 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	}
 }
 
-// deliver hands a prompt to the runner. Without one the environment is gone:
-// keep the prompt for the next runner, which delivers it once it is ready.
-func (s *Service) deliver(ctx context.Context, id, prompt string) {
-	if s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: &bandav1.Prompt{Text: prompt}}}) {
+// deliver hands a prompt and its images (attachment ids) to the runner.
+// Without one the environment is gone: keep the prompt for the next runner,
+// which delivers it once it is ready.
+func (s *Service) deliver(ctx context.Context, id, prompt string, images []string) {
+	p := &bandav1.Prompt{Text: prompt}
+	files, err := s.store.Attachments(ctx, images, true)
+	if err != nil {
+		slog.Error("load prompt images", "thread", id, "err", err)
+	}
+	for _, f := range files {
+		p.Images = append(p.Images, &bandav1.AttachmentImage{MediaType: f.MediaType, Data: f.Data})
+	}
+	if s.sendRunner(id, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Prompt{Prompt: p}}) {
 		return
 	}
 	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(t *store.Thread) ([]*bandav1.Event, error) {
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
+		t.PendingImages = lastImages(append(t.PendingImages, images...))
 		next, _, _ := thread.Apply(t.State, thread.EnvLost{})
 		events := stateEvents(t.State, next)
 		t.State = next
@@ -836,4 +864,20 @@ func or(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// lastImages keeps the latest maxPromptImages of a prompt's images.
+func lastImages(ids []string) []string {
+	return ids[max(0, len(ids)-maxPromptImages):]
+}
+
+// messages are the posted messages among events.
+func messages(events []*bandav1.Event) []*bandav1.Message {
+	var out []*bandav1.Message
+	for _, e := range events {
+		if m := e.GetMessage(); m != nil {
+			out = append(out, m)
+		}
+	}
+	return out
 }

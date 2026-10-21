@@ -194,9 +194,9 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 	for _, e := range events {
 		switch k := e.Kind.(type) {
 		case *bandav1.Event_Message:
-			lines = append(lines, actorName(names, e.Actor)+": "+messageText(k.Message))
+			lines = append(lines, actorName(names, e.Actor)+": "+messageText(k.Message)+attached(k.Message))
 		case *bandav1.Event_TurnRequest:
-			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+messageText(k.TurnRequest.GetMessage()))
+			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+messageText(k.TurnRequest.GetMessage())+attached(k.TurnRequest.GetMessage()))
 		case *bandav1.Event_TurnRequestResolved:
 			line := actorName(names, e.Actor) + " approved a request"
 			if r := k.TurnRequestResolved; !r.Approved {
@@ -220,4 +220,13 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 		}
 	}
 	return strings.Join(lines[max(0, len(lines)-limit):], "\n")
+}
+
+// attached names a message's attachments for the transcript.
+func attached(m *bandav1.Message) string {
+	var s string
+	for _, a := range m.GetAttachments() {
+		s += " [attached: " + a.Name + "]"
+	}
+	return s
 }

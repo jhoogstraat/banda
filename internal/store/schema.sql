@@ -88,3 +88,17 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+
+-- Files posted with messages: images and small text files, referenced from
+-- Message.attachments by id. Rows of uploads that were never posted stay.
+CREATE TABLE IF NOT EXISTS attachments (
+  id         text PRIMARY KEY,
+  user_id    text NOT NULL,
+  name       text NOT NULL,
+  media_type text NOT NULL,
+  data       bytea NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Attachment ids of the images that go with pending_prompt.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS pending_images text[] NOT NULL DEFAULT '{}';

@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("sandbox client: %v", err)
 	}
 
-	auth := api.DevAuth()
+	auth, httpUser := api.DevAuth(), api.DevUser
 	var sso *api.OIDC
 	if issuer := os.Getenv("OIDC_ISSUER"); issuer != "" {
 		sso, err = api.NewOIDC(ctx, st, api.OIDCConfig{
@@ -47,7 +47,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("oidc: %v", err)
 		}
-		auth = sso.Interceptor()
+		auth, httpUser = sso.Interceptor(), sso.User
 	} else if os.Getenv("DEV_AUTH") != "1" {
 		log.Fatal("set OIDC_ISSUER to enable sign-in, or DEV_AUTH=1 to trust the X-Banda-User header (local development only)")
 	}
@@ -74,6 +74,8 @@ func main() {
 		sso.Mount(mux)
 	}
 	mux.Handle("/mcp", svc.MCPHandler())
+	mux.Handle("/files", svc.FilesHandler(httpUser))
+	mux.Handle("/files/", svc.FilesHandler(httpUser))
 	if dir := os.Getenv("WEB_DIR"); dir != "" {
 		mux.Handle("/", spa(dir))
 	}

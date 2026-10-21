@@ -36,6 +36,13 @@ JSON
       ;;
     *'"type":"user"'*)
       n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); printf 'hello %s\n%s\n' "$n" "$line" > "hello$n.txt"; sleep 1
+      # Report the image blocks and inlined text files received, for e2e.
+      images=$(grep -o '"type":"image"' <<<"$line" | wc -l | tr -d ' ')
+      files=$(grep -o 'Attached file ' <<<"$line" | wc -l | tr -d ' ')
+      if [ "$images" -gt 0 ] || [ "$files" -gt 0 ]; then
+        types=$(grep -o '"media_type":"[^"]*"' <<<"$line" | cut -d'"' -f4 | tr '\n' ' ')
+        echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Received $images image blocks (${types% }) and $files text files\"}]},\"parent_tool_use_id\":null}"
+      fi
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}

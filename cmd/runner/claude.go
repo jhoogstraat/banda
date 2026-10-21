@@ -104,6 +104,21 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 	return events, false, false
 }
 
+// userMessage is the stream-json user message for a prompt: plain text, or a
+// text block followed by base64 image blocks (Messages API content).
+func userMessage(p *bandav1.Prompt) map[string]any {
+	var content any = p.Text
+	if len(p.Images) > 0 {
+		blocks := []map[string]any{{"type": "text", "text": p.Text}}
+		for _, img := range p.Images {
+			// []byte marshals as standard base64.
+			blocks = append(blocks, map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": img.MediaType, "data": img.Data}})
+		}
+		content = blocks
+	}
+	return map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": content}}
+}
+
 // text flattens tool_result content, which is a string or a list of blocks.
 func text(raw json.RawMessage) string {
 	var s string
