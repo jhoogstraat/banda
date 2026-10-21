@@ -233,11 +233,13 @@ sleep 5
 [ "$(thread status)" = STATUS_ERRORED ] && [ "$(kc get pod "t-$ID" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ]
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo still-up\"}" | grep -q still-up
 ok "a failing .banda/setup.sh errors the thread with its redacted output; the runner stays up for the terminal"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
 ID=$(call ThreadService/CreateThread '{"repoUrl":"file:///opt/e2e/setup-bg.git","baseBranch":"main","prompt":"e2e: setup in the background"}' | jq -r .thread.id)
 wait_for STATUS_AWAITING_INPUT
 [ "$(steps setup DONE)" = 1 ]
 ok "a .banda/setup.sh that leaves a background process running succeeds"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null # leave no pod behind
 
 U=e2e-$RANDOM$RANDOM
 call SettingsService/SetAuthMethod '{"harness":"claude","authMethod":"AUTH_METHOD_API_KEY"}' "$U" >/dev/null 2>&1 && fail "API key mode without a key"
