@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -33,34 +34,36 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	var prompt string
 	var images []string
 	unlock := s.lockDelivery(id)
-	_, stored, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		// Only MCP posts as "agent:<thread>", and it lets an agent start turns
-		// only in threads of its own owner.
-		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
-			MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
+	var stored []*bandav1.Event
+	err := retryStale(func() error {
+		u, err := s.readUnseen(ctx, id, m)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		effect = eff
-		posted := messageEvent(by, m)
-		if eff == thread.RequestTurn {
-			posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
-		}
-		if eff == thread.StartTurn || eff == thread.Provision {
-			// Read under the thread's lock: what is marked delivered is what the prompt holds.
-			unseen, err := s.store.Events(ctx, id, t.DeliveredSeq)
+		_, stored, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			// Only MCP posts as "agent:<thread>", and it lets an agent start turns
+			// only in threads of its own owner.
+			next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
+				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
 			if err != nil {
 				return nil, err
 			}
-			texts, err := s.textAttachments(ctx, append(messages(unseen), m))
-			if err != nil {
-				return nil, err
+			effect = eff
+			posted := messageEvent(by, m)
+			if eff == thread.RequestTurn {
+				posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
 			}
-			prompt, images = turnPrompt(t, eff, names, unseen, by, m, texts)
-		}
-		events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
-		t.State = next
-		return events, nil
+			if eff == thread.StartTurn || eff == thread.Provision {
+				if err := u.fresh(t); err != nil {
+					return nil, err
+				}
+				prompt, images = turnPrompt(t, eff, names, u.events, by, m, u.texts)
+			}
+			events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
+			t.State = next
+			return events, nil
+		})
+		return err
 	})
 	if err != nil {
 		unlock()
@@ -182,6 +185,57 @@ func openRequest(events []*bandav1.Event, seq int64) *bandav1.Event {
 		}
 	}
 	return r
+}
+
+// errStale: events were stored between reading a thread's unseen events and
+// locking it.
+var errStale = connect.NewError(connect.CodeUnavailable, "the thread is busy, try again")
+
+// unseen are a thread's events after its delivered seq, read before locking
+// it (a transaction must not wait for another connection), and the text files
+// they and m attach.
+type unseen struct {
+	events []*bandav1.Event
+	texts  map[string]string
+	last   int64 // the thread's last seq then
+}
+
+func (s *Service) readUnseen(ctx context.Context, id string, m *bandav1.Message) (unseen, error) {
+	t, err := s.store.Get(ctx, id)
+	if err != nil {
+		return unseen{}, err
+	}
+	u := unseen{last: t.LastSeq}
+	if u.events, err = s.store.Events(ctx, id, t.DeliveredSeq); err != nil {
+		return u, err
+	}
+	if n := len(u.events); n > 0 {
+		u.last = max(u.last, u.events[n-1].Seq)
+	}
+	msgs := messages(u.events)
+	if m != nil {
+		msgs = append(msgs, m)
+	}
+	u.texts, err = s.textAttachments(ctx, msgs)
+	return u, err
+}
+
+// fresh returns errStale if t, locked, has events u lacks: else u holds all
+// that is not delivered, and a prompt built from it can mark it so.
+func (u unseen) fresh(t *store.Thread) error {
+	if t.LastSeq != u.last {
+		return errStale
+	}
+	return nil
+}
+
+// retryStale runs update again while it returns errStale, a few times.
+func retryStale(update func() error) error {
+	for try := 1; ; try++ {
+		if err := update(); !errors.Is(err, errStale) || try == 10 {
+			return err
+		}
+	}
 }
 
 // lockDelivery locks a thread's deliveries: hold it from marking a prompt

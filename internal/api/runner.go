@@ -209,30 +209,34 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	var prompt string
 	var images []string
 	defer s.lockDelivery(id)()
-	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
-		events := lostTurns(t.State, 0) // e.g. the API restarted mid-turn
-		if effect == thread.StartTurn {
-			// The pending prompt covers the events through DeliveredSeq. Read under the lock.
-			unseen, err := s.store.Events(ctx, id, t.DeliveredSeq)
-			if err != nil {
-				return nil, err
-			}
-			texts, err := s.textAttachments(ctx, messages(unseen))
-			if err != nil {
-				return nil, err
-			}
-			posted, more := postedSince(names, unseen, texts)
-			prompt, images = t.PendingPrompt, lastImages(append(t.PendingImages, more...))
-			if posted != "" {
-				prompt += "\n\nMessages posted in this thread since:\n" + posted
-			}
-			t.PendingPrompt, t.PendingImages = "", nil
-			t.DeliveredSeq = t.LastSeq
+	var t store.Thread
+	var events []*bandav1.Event
+	err := retryStale(func() error {
+		u, err := s.readUnseen(ctx, id, nil)
+		if err != nil {
+			return err
 		}
-		events = append(events, stateEvents(t.State, next)...)
-		t.State = next
-		return events, nil
+		t, events, err = s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
+			next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
+			events := lostTurns(t.State, 0) // e.g. the API restarted mid-turn
+			if effect == thread.StartTurn {
+				// The pending prompt covers the events through DeliveredSeq.
+				if err := u.fresh(t); err != nil {
+					return nil, err
+				}
+				posted, more := postedSince(names, u.events, u.texts)
+				prompt, images = t.PendingPrompt, lastImages(append(t.PendingImages, more...))
+				if posted != "" {
+					prompt += "\n\nMessages posted in this thread since:\n" + posted
+				}
+				t.PendingPrompt, t.PendingImages = "", nil
+				t.DeliveredSeq = t.LastSeq
+			}
+			events = append(events, stateEvents(t.State, next)...)
+			t.State = next
+			return events, nil
+		})
+		return err
 	})
 	if err != nil {
 		return err
