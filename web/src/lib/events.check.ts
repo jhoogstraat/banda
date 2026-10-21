@@ -105,4 +105,7 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
+const forked = chat.items.at(-1);
+if (forked?.kind !== 'fork' || forked.actor !== 'bob' || forked.note.threadId !== 't2') throw new Error('forkNote should become a link to the fork');
 console.log('ok');

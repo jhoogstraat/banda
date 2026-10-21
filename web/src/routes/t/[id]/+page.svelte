@@ -20,6 +20,8 @@
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
+	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import {
 		Conversation,
 		ConversationContent,
@@ -82,6 +84,7 @@
 	});
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	let loginOpen = $state(false);
+	let forkOpen = $state(false);
 	let error = $state('');
 	// The reason of the latest status change, e.g. why the environment failed.
 	let reason = $state('');
@@ -160,7 +163,7 @@
 					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'forkNote'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -223,6 +226,7 @@
 		else
 			for (const [label, date] of [presets[0], presets[2]])
 				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
+		c.push({ label: 'Fork this thread', icon: GitForkIcon, run: () => (forkOpen = true) });
 		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
@@ -340,6 +344,7 @@
 					disabled={!owner}
 					onclick={toggleMode}
 				/>
+				<IconButton icon={GitForkIcon} label="Fork: try another way from here" onclick={() => (forkOpen = true)} />
 				<ThreadActions {thread} {act} />
 			{/if}
 			{#if owner}
@@ -454,6 +459,20 @@
 						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
 					{:else if item.kind === 'settings'}
 						{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
+					{:else if item.kind === 'fork'}
+						{@const n = item.note}
+						<div class="flex items-center gap-3 text-xs text-muted-foreground">
+							<div class="h-px flex-1 bg-border"></div>
+							<GitForkIcon class="size-3.5" />
+							<span>
+								{userName(item.actor)}
+								{#if !n.picked}forked this after turn {n.turn}:
+								{:else if n.threadId === id}picked this try.
+								{:else}picked another try:{/if}
+								{#if n.threadId !== id}<a class="underline" href="/t/{n.threadId}">{n.title}</a>{/if}
+							</span>
+							<div class="h-px flex-1 bg-border"></div>
+						</div>
 					{/if}
 				{/each}
 
@@ -552,3 +571,4 @@
 </SidePane>
 
 <LoginDialog bind:open={loginOpen} />
+{#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}
