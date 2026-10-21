@@ -210,6 +210,7 @@ Everything below is implemented on `main` and checked by `mise run e2e` against 
 
 **Not yet**
 - Permission prompts: `AskUserQuestion` (answered with the selected options) and editing a request before allowing it; per-call "always allow" rules (e.g. `Bash(npm test *)`) instead of whole tools; the mode the agent switches to itself (`EnterPlanMode`) is not shown. The real CLI's `ExitPlanMode` input is not verified: the card falls back to the plan in the chat.
+- One API per database: live events reach only the watchers of the API process that stored them, and "suspend once the turn ends" after a snooze or settle is held in that process's memory (a restart forgets it; the idle sweep still suspends the thread later).
 - Preview: one preview cookie per browser, so two windows previewing different threads share the one opened last until reloaded; per-thread origins would need wildcard DNS. The preview origin shares the host (and so cookies) with Banda, and the previewed apps of all threads share it with each other: for a hardened setup, serve Banda over https and point `PREVIEW_URL` at a sibling subdomain (see open risk 6). The address bar can't follow navigation inside the frame (cross-origin).
 - Forks: commit history is squashed into one commit and binary files don't carry over (the stored diff has neither); a fork's first prompt has the source's messages and replies, not its tool calls. The compare view polls while a try runs.
 - Codex and other harnesses (check their subscription terms first).
