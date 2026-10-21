@@ -57,6 +57,10 @@ service ThreadService {
   // Tells the thread's watchers that the caller is typing. The composer calls
   // it every few seconds while typing; clients forget it after a few seconds.
   rpc SendTyping(TypingRequest) returns (TypingResponse);
+  // Everyone's recent threads that their owners haven't settled, with their
+  // last activity and who is looking at them: sent at once, then again
+  // (coalesced) whenever one changes.
+  rpc TeamWatch(TeamWatchRequest) returns (stream TeamWatchResponse);
 }
 
 service UserService {
@@ -131,6 +135,10 @@ message Thread {
   bool trusted = 19;
   // The thread has events the caller hasn't seen (see InboxMarkRead).
   bool unread = 16;
+  // The latest thing that happened, for passers-by. Set in lists only.
+  TeamActivity activity = 20;
+  // Users with the thread open right now. Set by TeamWatch only.
+  repeated string present_user_ids = 21;
 }
 
 message User {
@@ -587,6 +595,23 @@ message ResizeLoginTerminalRequest {
   string harness = 1;
   uint32 cols = 2;
   uint32 rows = 3;
+}
+
+// A one-line summary of a thread's latest notable event.
+message TeamActivity {
+  // User id, "agent" or "system", as in Event.
+  string actor = 1;
+  // E.g. "Edit src/x.ts", "errored: Setup failed: tools", a message's first line.
+  string text = 2;
+  google.protobuf.Timestamp time = 3;
+}
+
+message TeamWatchRequest {}
+
+message TeamWatchResponse {
+  // Threads updated in the last 7 days, not settled by their owners, most
+  // recently updated first. Without diffs.
+  repeated Thread threads = 1;
 }
 
 message InboxWatchRequest {}

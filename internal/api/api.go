@@ -695,6 +695,7 @@ func (s *Service) watch(id, user string) chan *bandav1.Event {
 	}
 	s.present[id][user]++
 	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
+	s.presenceChanged()
 	return ch
 }
 
@@ -713,6 +714,7 @@ func (s *Service) unwatch(id, user string, ch chan *bandav1.Event) {
 		delete(s.present, id)
 	}
 	s.broadcastLocked(id, []*bandav1.Event{s.presence(id)})
+	s.presenceChanged()
 }
 
 // presence is the ephemeral PresenceChanged event for a thread. Callers hold mu.
@@ -816,6 +818,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 
 		TurnRequests: int32(t.Requests),
 		Trusted:      t.Trusted,
+		Activity:     t.Activity,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)
