@@ -14,7 +14,7 @@ fi
 while IFS= read -r line; do
   case "$line" in
     *control_request*) echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}' ;;
-    *'"type":"user"'*preview*)
+    *preview*'"type":"user"'*) # keys are sorted: the prompt comes first
       mkdir -p ~/site/assets
       echo '<!doctype html><script src="/assets/app.js"></script><p>e2e-preview-page</p>' > ~/site/index.html
       echo 'console.log("e2e-preview-asset")' > ~/site/assets/app.js

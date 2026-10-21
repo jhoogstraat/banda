@@ -22,7 +22,7 @@ term() { mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-Use
 stream() {
 	"$BUF" curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" >"$TMP/stream" 2>&1 &
 	local p=$!; sleep 4; kill $p 2>/dev/null || true; wait $p 2>/dev/null || true
-	jq -c . "$TMP/stream" 2>/dev/null || cat "$TMP/stream"
+	jq -c 'select(.code == null)' "$TMP/stream" 2>/dev/null # drop the error our kill causes
 }
 BUF=$(mise which buf)
 TMP=$(mktemp -d)
@@ -93,8 +93,8 @@ ok "files are listed; paths outside the checkout are refused"
 
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"start the preview\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-for _ in $(seq 10); do stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.running and (.ports | index({port: 5173, process: "http.server"}))' >/dev/null && break; done
-stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.ports | map(.port) == [5173]' >/dev/null || fail "preview ports: $(cat "$TMP/stream")"
+for _ in $(seq 10); do stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob | tail -1 | jq -e '.running and .ports == [{port: 5173, process: "http.server"}]' >/dev/null && break; done
+tail -1 <(stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" bob) | jq -e '.ports == [{port: 5173, process: "http.server"}]' >/dev/null || fail "preview ports: $(cat "$TMP/stream")"
 ok "the preview lists the dev server the agent started (port 5173, http.server), to teammates too"
 
 URL=$(call ThreadService/PreviewOpen "{\"threadId\":\"$ID\",\"port\":5173,\"path\":\"/\"}" bob | jq -r .url)
@@ -118,7 +118,7 @@ ok "snoozing suspends the environment (pod gone, volumes kept)"
 
 stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\"}" | tail -1 | grep -qx '{}' || fail "preview of a paused environment: $(cat "$TMP/stream")"
 [ "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar" "$PREVIEW/")" = 503 ]
-stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob | grep -q permission_denied || fail "a teammate woke the preview: $(cat "$TMP/stream")"
+stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob >/dev/null; grep -q permission_denied "$TMP/stream" || fail "a teammate woke the preview: $(cat "$TMP/stream")"
 [ "$(thread status)" = STATUS_SUSPENDED ]
 ok "the preview of a paused environment says so and does not wake it; teammates can't wake it"
 
