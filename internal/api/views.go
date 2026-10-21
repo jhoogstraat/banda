@@ -36,7 +36,7 @@ func (s *Service) Snooze(ctx context.Context, req *bandav1.SnoozeRequest) (*band
 	if until != nil {
 		s.suspendIfOwner(ctx, req.ThreadId, "snoozed")
 	} else {
-		s.unpark(req.ThreadId)
+		s.unpark(ctx, req.ThreadId)
 	}
 	return &bandav1.SnoozeResponse{}, nil
 }
@@ -50,7 +50,7 @@ func (s *Service) Settle(ctx context.Context, req *bandav1.SettleRequest) (*band
 		s.suspendIfOwner(ctx, req.ThreadId, "settled")
 		s.scheduleDelete(ctx, req.ThreadId) // also when it was suspended already
 	} else {
-		s.unpark(req.ThreadId)
+		s.unpark(ctx, req.ThreadId)
 		s.cancelDelete(ctx, req.ThreadId)
 	}
 	return &bandav1.SettleResponse{}, nil
@@ -123,7 +123,10 @@ func (s *Service) suspendIfOwner(ctx context.Context, id, how string) {
 }
 
 // unpark: the owner unsnoozed or unsettled the thread before it was suspended.
-func (s *Service) unpark(id string) {
+func (s *Service) unpark(ctx context.Context, id string) {
+	if _, err := s.owned(ctx, id); err != nil {
+		return
+	}
 	s.mu.Lock()
 	delete(s.parking, id)
 	s.mu.Unlock()
@@ -151,7 +154,9 @@ func (s *Service) park(ctx context.Context, id string) {
 		}
 		return
 	}
-	s.unpark(id)
+	s.mu.Lock()
+	delete(s.parking, id)
+	s.mu.Unlock()
 	if effect, err := s.apply(ctx, id, thread.Suspend{}); err == nil {
 		s.do(ctx, id, effect)
 	}
