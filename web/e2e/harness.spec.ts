@@ -1,6 +1,6 @@
 // The harness's own capabilities (deploy/fake-claude directives, fixture repos, test APIs), so a
 // broken capability fails here instead of in a scenario built on it.
-import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, mcpDirective, repo, Status, test } from './fixtures.ts';
 
 const said = (text: string) => (e: { kind: { case?: string; value?: unknown } }) =>

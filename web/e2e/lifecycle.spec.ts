@@ -1,5 +1,5 @@
 // A thread from start to its first turn: checkout, setup, the agent's work, settings, failures.
-import { SetupState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { DB, expect, kube, refused, repo, sql, Status, test, type Thread } from './fixtures.ts';
 
 const steps = async (t: Thread, id: string, state: SetupState) => (await t.of('setupStep')).filter((s) => s.id === id && s.state === state);

@@ -1,5 +1,5 @@
 // Teammates in a thread: presence, chat mode, the inbox and team board, turn requests, trust and reviews.
-import { Mode } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { Mode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, listen, png, refused, repo, Status, test, type Thread } from './fixtures.ts';
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));

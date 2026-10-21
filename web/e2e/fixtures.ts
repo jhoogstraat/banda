@@ -21,7 +21,7 @@ import {
 	UserService,
 	type Event,
 	type Thread as ThreadInfo
-} from '../src/lib/gen/banda/v1/banda_pb.ts';
+} from '../src/lib/gen/banda/v1/banda_pb.js';
 
 export { expect };
 export { Status };

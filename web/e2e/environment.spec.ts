@@ -1,5 +1,5 @@
 // A thread's environment over time: push, suspend and resume, settle, delete and recreate.
-import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { exists, expect, kube, png, refused, repo, Status, test, until } from './fixtures.ts';
 
 test('push reports its result as a notice', async ({ as }) => {

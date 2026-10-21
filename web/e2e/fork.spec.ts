@@ -1,5 +1,5 @@
 // Forks and races: threads started from another one, or together.
-import { SetupState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, refused, repo, Status, test } from './fixtures.ts';
 
 test('a teammate forks a thread with commits: the fork is theirs, starts from the source’s changes on another model, and both link each other', async ({ as }) => {

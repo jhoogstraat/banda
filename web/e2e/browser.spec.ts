@@ -1,6 +1,6 @@
 // The web app end to end, one browser context per user: the template for UI tests.
 import { devices } from '@playwright/test';
-import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, repo, Status, test } from './fixtures.ts';
 
 const composer = 'Message the agent. Use @agent to mention it in chat mode.';

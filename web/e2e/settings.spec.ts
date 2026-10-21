@@ -1,5 +1,5 @@
 // A user's account: the Claude login environment, secrets and the API key.
-import { AuthMethod, LoginAction, LoginState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { AuthMethod, LoginAction, LoginState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
 
 const loginState = async (u: User) => (await u.settings.getSettings({})).accounts[0]?.loginState;

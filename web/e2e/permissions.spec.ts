@@ -1,5 +1,5 @@
 // Permission modes: the agent asks (deploy/fake-claude's e2e-ask and e2e-plan), and who may answer.
-import { PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, refused, Status, test, type Thread, type User } from './fixtures.ts';
 
 /** A thread in the given permission mode, after its first turn. */

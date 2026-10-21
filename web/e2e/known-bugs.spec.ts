@@ -1,7 +1,7 @@
 // Reproductions of open bugs from the round-4 correctness audit (B<n>), one per harness capability.
 // test.fail(): they pass while the bug is there. Fixing a bug makes its test fail: then turn it into
 // a plain test() in the spec file of its domain.
-import { AutoPushState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.ts';
+import { AutoPushState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, listen, repo, Status, test } from './fixtures.ts';
 
 test.fail('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
