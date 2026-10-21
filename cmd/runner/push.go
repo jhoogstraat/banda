@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -96,4 +98,29 @@ func (p *pusher) manualPush(ctx context.Context, notice func(string) error) {
 		text += fmt.Sprintf(" [Open a pull request](https://github.com/%s/compare/%s...%s?expand=1)", m[1], os.Getenv("BANDA_BASE_BRANCH"), branch)
 	}
 	notice(text)
+}
+
+// diff returns the branch's changes against its base, untracked files
+// included, using a throwaway index so the agent's own index is untouched.
+func diff(ctx context.Context) string {
+	const max = 1 << 20
+	idx := filepath.Join(os.TempDir(), "banda-index")
+	var out []byte
+	for _, args := range [][]string{{"read-tree", "HEAD"}, {"add", "-A"}, {"diff", "--cached", base}} {
+		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd.Dir = work
+		cmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+idx)
+		var err error
+		if out, err = cmd.Output(); err != nil {
+			var ee *exec.ExitError
+			if errors.As(err, &ee) {
+				return fmt.Sprintf("git %s failed: %s", args[0], ee.Stderr)
+			}
+			return err.Error()
+		}
+	}
+	if len(out) > max {
+		out = append(out[:max], "\n… diff truncated at 1 MiB"...)
+	}
+	return string(out) // redact makes it valid UTF-8
 }

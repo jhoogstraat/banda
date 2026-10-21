@@ -2,8 +2,19 @@ package main
 
 import (
 	"cmp"
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
@@ -165,4 +176,101 @@ func text(raw json.RawMessage) string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+type claudeProc struct {
+	cmd    *exec.Cmd
+	stdout io.Reader
+	mu     sync.Mutex
+	stdin  io.WriteCloser
+}
+
+func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
+	args := []string{"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+		"--include-partial-messages",
+		// Permission prompts come to the runner as control requests (permissions.go). The API sets
+		// the thread's mode once the runner is ready; bypass must be allowed for it to be one.
+		"--permission-mode", "default", "--permission-prompt-tool", "stdio", "--allow-dangerously-skip-permissions"}
+	if s.model != "" {
+		args = append(args, "--model", s.model)
+	}
+	if s.effort != "" {
+		args = append(args, "--effort", s.effort)
+	}
+	// Neither flag is restored on --resume, so both are always passed.
+	mcpConfig, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"banda": map[string]any{
+		"type": "http", "url": os.Getenv("BANDA_API_URL") + "/mcp",
+		"headers": map[string]string{"Authorization": "Bearer " + os.Getenv("BANDA_RUNNER_TOKEN"), "X-Banda-Thread": threadID},
+	}}})
+	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", fmt.Sprintf(
+		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
+			"The banda MCP tools (list_threads, read_thread, post_message, create_thread) let you see other threads, post into them and start new threads.",
+		threadID, os.Getenv("BANDA_BRANCH")))
+	sid := sessionID(threadID)
+	if hasTranscript(sid) {
+		args = append(args, "--resume", sid)
+	} else {
+		args = append(args, "--session-id", sid)
+	}
+
+	cmd := claudeCmd(ctx, args...)
+	cmd.Dir = work
+	cmd.Stderr = os.Stderr
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	return &claudeProc{cmd: cmd, stdout: stdout, stdin: stdin}, cmd.Start()
+}
+
+// claudeCmd never kills claude outright: a kill during a token refresh logs
+// the user out of every pod. The pod's grace period is 90s.
+func claudeCmd(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 80 * time.Second
+	return cmd
+}
+
+// write sends one stream-json line. A malformed line kills claude, so only
+// ever write marshalled values.
+func (c *claudeProc) write(v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, err = c.stdin.Write(append(b, '\n'))
+	return err
+}
+
+func (c *claudeProc) interrupt() error {
+	return c.write(controlRequest(map[string]any{"subtype": "interrupt"}))
+}
+
+func controlRequest(req map[string]any) map[string]any {
+	return map[string]any{"type": "control_request", "request_id": rand.Text(), "request": req}
+}
+
+// sessionID derives a stable UUID from the thread id, so a restarted runner
+// resumes the same Claude Code session.
+func sessionID(thread string) string {
+	h := sha256.Sum256([]byte(thread))
+	h[6] = h[6]&0x0f | 0x40
+	h[8] = h[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", h[0:4], h[4:6], h[6:8], h[8:10], h[10:16])
+}
+
+func hasTranscript(sid string) bool {
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		dir = filepath.Join(os.Getenv("HOME"), ".claude")
+	}
+	m, _ := filepath.Glob(filepath.Join(dir, "projects", "*", sid+".jsonl"))
+	return len(m) > 0
 }

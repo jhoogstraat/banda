@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -183,4 +184,80 @@ func runGroup(ctx context.Context, command string) (string, error) {
 		err = fmt.Errorf("timed out after %s", setupTimeout)
 	}
 	return out.String(), err
+}
+
+// checkout clones the repo onto the thread branch the first time; the home
+// volume keeps it across restarts.
+func checkout(ctx context.Context) error {
+	git := func(args ...string) error {
+		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s: %w: %s", args[0], err, out)
+		}
+		return nil
+	}
+	steps := [][]string{
+		{"config", "--global", "user.name", "Banda"},
+		{"config", "--global", "user.email", "banda@localhost"},
+	}
+	if u, err := url.Parse(os.Getenv("BANDA_REPO_URL")); err == nil && u.Scheme == "https" && os.Getenv("GIT_TOKEN") != "" {
+		// Only for the repo's host. Reads the token from the environment at use
+		// time; it is never written to disk.
+		steps = append(steps, []string{"config", "--global", "credential.https://" + u.Host + ".helper",
+			`!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
+	}
+	if _, err := os.Stat(filepath.Join(work, ".git")); err != nil {
+		steps = append(steps, []string{"clone", "--branch", os.Getenv("BANDA_BASE_BRANCH"), os.Getenv("BANDA_REPO_URL"), work})
+	}
+	for _, args := range steps {
+		if err := git(args...); err != nil {
+			return err
+		}
+	}
+	// Also covers a previous start that died right after cloning. A fresh
+	// checkout of a thread whose environment was deleted continues from the
+	// pushed branch.
+	branch := os.Getenv("BANDA_BRANCH")
+	switch {
+	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch) == nil:
+		return nil
+	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+branch) == nil:
+		return git("-C", work, "switch", branch)
+	}
+	return git("-C", work, "switch", "-c", branch)
+}
+
+// waitForLogin waits for a subscription login, reported as the login step
+// only if there is something to wait for.
+func (s setup) waitForLogin(ctx context.Context, notice func(string) error, loginStatus func(bool) error) error {
+	const title = "Log in to Claude Code"
+	told := false
+	for {
+		if loggedIn(ctx) {
+			if told {
+				s.report("login", title, bandav1.SetupState_SETUP_STATE_DONE, "")
+			}
+			return loginStatus(true)
+		}
+		if !told {
+			told = true
+			loginStatus(false)
+			s.report("login", title, bandav1.SetupState_SETUP_STATE_RUNNING, "")
+			if err := notice(loginHint("Claude Code is not logged in.")); err != nil {
+				return err
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+func loggedIn(ctx context.Context) bool {
+	return claudeCmd(ctx, "auth", "status", "--json").Run() == nil
+}
+
+func loginHint(problem string) string {
+	return fmt.Sprintf("%s Open the Terminal tab and run `claude auth login` (or use the Log in button). Fallback: `kubectl exec -it -n banda t-%s -- claude auth login`. The thread continues once you are logged in.", problem, threadID)
 }
