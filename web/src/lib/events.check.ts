@@ -1,4 +1,5 @@
 // Run: node src/lib/events.check.ts
+import { endsAt, locate, parseDiff } from './diff.ts';
 import { apply, newChat, typingNow } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
@@ -94,4 +95,14 @@ const [first, second] = asks.items;
 if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
 	throw new Error('a resolution should attach to its request');
 if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
+
+const [f] = parseDiff('diff --git a/x.go b/x.go\n--- a/x.go\n+++ b/x.go\n@@ -3,4 +3,4 @@ func\n a\n-b\n-c\n+B\n d\n\\ No newline at end of file\n');
+if (f.path !== 'x.go' || f.add !== 1 || f.del !== 2 || f.lines.map((l) => `${l.old ?? ''}/${l.new ?? ''}`).join() !== '/,3/3,4/,5/,/4,6/5,/')
+	throw new Error('diff lines should be numbered in both versions');
+const both = locate(f.lines, 2, 4); // -b -c +B: numbered in the branch
+const removed = { path: 'x.go', body: '', ...locate(f.lines, 2, 3) };
+if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine !== 4 || removed.endLine !== 5 || !removed.old)
+	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
+if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
+	throw new Error('a comment should mark its last line while that line is unchanged');
 console.log('ok');
