@@ -177,6 +177,7 @@ HIT=$(call ThreadService/Search "{\"query\":\"${WORD:0:10}\"}" alice | jq -c '.r
 echo "$HIT" | jq -e --arg id "$ID" --arg seq "$SEQ" --arg w "$WORD" '.threadId == $id and .seq == $seq and .actor == "bob" and .snippet[1] == $w' >/dev/null || fail "search: $HIT"
 kc exec "t-$ID" -- sh -c "curl -sf -X POST \"\$BANDA_API_URL/mcp\" -H \"Authorization: Bearer \$BANDA_RUNNER_TOKEN\" -H \"X-Banda-Thread: \$BANDA_THREAD_ID\" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"search_threads\",\"arguments\":{\"query\":\"$WORD redis\"}}}'" | grep -q "\"seq\":$SEQ," || fail "search_threads did not find it"
 ok "a teammate's word is found by prefix from another user, with a highlighted snippet and its seq, and by the search_threads MCP tool"
+call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null # bob's post switched to chat mode
 
 term ThreadService/OpenTerminal "{\"threadId\":\"$ID\",\"cols\":80,\"rows\":24,\"command\":\"echo e2e-terminal-\$((6*7))\"}" | grep -q e2e-terminal-42
 ok "terminal runs commands in the sandbox"
