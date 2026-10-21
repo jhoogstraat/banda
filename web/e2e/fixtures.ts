@@ -2,7 +2,7 @@
 // it in E2E_* variables. Every test gets its own users, so tests run in parallel and never see each
 // other's threads, settings or volumes.
 import { test as base, expect, type Browser, type BrowserContext, type BrowserContextOptions, type Page } from '@playwright/test';
-import { create, toJsonString } from '@bufbuild/protobuf';
+import { create, toJsonString, type MessageInitShape } from '@bufbuild/protobuf';
 import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { createClient, type Interceptor } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-web';
@@ -12,15 +12,14 @@ import { openSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import {
+	CreateThreadRequestSchema,
 	EventSchema,
 	MessageSchema,
 	SettingsService,
 	Status,
 	ThreadService,
 	UserService,
-	type CreateThreadRequest,
 	type Event,
-	type Message,
 	type Thread as ThreadInfo
 } from '../src/lib/gen/banda/v1/banda_pb.ts';
 
@@ -66,7 +65,7 @@ export const sql = (query: string, db = DB) =>
 export const userHash = (id: string) => createHash('sha256').update(id).digest('hex').slice(0, 16);
 
 /** Polls fn until it returns something truthy; fails with what() if it doesn't within timeout. */
-export async function until<T>(fn: () => Promise<T>, what: () => string | Promise<string>, timeout = 60_000): Promise<T> {
+export async function until<T>(fn: () => Promise<T | undefined>, what: () => string | Promise<string>, timeout = 60_000): Promise<T> {
 	const end = Date.now() + timeout;
 	for (;;) {
 		const v = await fn().catch(() => undefined);
@@ -141,7 +140,7 @@ function newUser(id: string, browser: () => Promise<Browser>, api = API) {
 		settings: createClient(SettingsService, transport),
 		users: createClient(UserService, transport),
 		/** Starts a thread on the plain repo unless told otherwise. */
-		async create(req: Partial<CreateThreadRequest> = {}) {
+		async create(req: MessageInitShape<typeof CreateThreadRequestSchema> = {}) {
 			const r = await user.threads.createThread({ repoUrl: repo(), baseBranch: 'main', prompt: 'e2e', ...req });
 			return user.thread(r.thread!.id);
 		},
@@ -216,7 +215,7 @@ export class Thread {
 		return until(
 			async () => {
 				last = await this.get();
-				return ok(last) && last;
+				return ok(last) ? last : undefined;
 			},
 			async () => `thread ${this.id} ${what}; it is ${Status[last?.status ?? 0]}, its last events:\n${describe((await this.events()).slice(-15))}`,
 			timeout
@@ -303,7 +302,7 @@ export class Thread {
 		return (await this.of('agentText')).at(-1)?.text ?? '';
 	}
 
-	send(text: string, message: Partial<Message> = {}) {
+	send(text: string, message: MessageInitShape<typeof MessageSchema> = {}) {
 		return this.user.threads.sendMessage({ threadId: this.id, message: create(MessageSchema, { text, ...message }) });
 	}
 
