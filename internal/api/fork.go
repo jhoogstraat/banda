@@ -99,9 +99,9 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 			State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
 			Title:         title(req.Prompt) + tryLabel(i, len(req.Tries)),
 			RepoURL:       req.RepoUrl,
-			BaseBranch:    or(req.BaseBranch, "main"),
-			Model:         or(try.Model, "claude-opus-5-5"),
-			Effort:        or(try.Effort, "high"),
+			BaseBranch:    req.BaseBranch,
+			Model:         try.Model,
+			Effort:        try.Effort,
 			PendingPrompt: req.Prompt,
 			RaceID:        race,
 		}, &bandav1.Message{Text: req.Prompt})

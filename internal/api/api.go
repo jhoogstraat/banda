@@ -204,10 +204,14 @@ func pullRequestURL(t store.Thread) string {
 	return fmt.Sprintf("https://github.com/%s/compare/%s...%s?expand=1", m[1], t.BaseBranch, t.Branch)
 }
 
-func title(prompt string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(prompt), "\n")
-	if r := []rune(line); len(r) > 60 {
-		return string(r[:60]) + "…"
+// title is a thread's title from its first prompt.
+func title(prompt string) string { return firstLine(prompt, 60) }
+
+// firstLine is the first line of s, cut to n runes.
+func firstLine(s string, n int) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	if r := []rune(line); len(r) > n {
+		return string(r[:n]) + "…"
 	}
 	return line
 }

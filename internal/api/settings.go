@@ -128,7 +128,9 @@ func (s *Service) DeleteSecret(ctx context.Context, req *bandav1.DeleteSecretReq
 
 // loginKey is how a user's login runner is keyed in runners and terminals,
 // next to thread ids (which never contain a colon).
-func loginKey(userID string) string { return "login:" + userID }
+func loginKey(userID string) string { return loginPrefix + userID }
+
+const loginPrefix = "login:"
 
 // OpenLoginTerminal starts or resumes the caller's login environment and runs
 // the harness's login or logout command there; nothing else can run in it.
@@ -175,7 +177,7 @@ func (s *Service) suspendIdleLogins(ctx context.Context) {
 	var idle []string
 	s.mu.Lock()
 	for key := range s.runners {
-		if u, ok := strings.CutPrefix(key, "login:"); ok && s.terminals[key] == nil && time.Since(s.loginLastUsed[u]) > loginIdle {
+		if u, ok := strings.CutPrefix(key, loginPrefix); ok && s.terminals[key] == nil && time.Since(s.loginLastUsed[u]) > loginIdle {
 			idle = append(idle, u)
 		}
 	}

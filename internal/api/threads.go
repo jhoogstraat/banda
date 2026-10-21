@@ -25,9 +25,9 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
 		Title:         title(req.Prompt),
 		RepoURL:       req.RepoUrl,
-		BaseBranch:    or(req.BaseBranch, "main"),
-		Model:         or(req.Model, "claude-opus-5-5"),
-		Effort:        or(req.Effort, "high"),
+		BaseBranch:    req.BaseBranch,
+		Model:         req.Model,
+		Effort:        req.Effort,
 		PendingPrompt: req.Prompt,
 	}
 	t, err := s.start(ctx, t, &bandav1.Message{Text: req.Prompt})
@@ -38,14 +38,13 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 }
 
 // create starts a thread (owner, repo, base, model, effort, permission mode and
-// parent taken from t) with its first prompt.
+// parent taken from t, see start) with its first prompt.
 func (s *Service) create(ctx context.Context, t store.Thread, prompt string) (store.Thread, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
 	t.Title, t.PendingPrompt = title(prompt), prompt
 	t.Status, t.Mode = thread.Starting, thread.AgentMode
-	t.Model, t.Effort = or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	return s.start(ctx, t, &bandav1.Message{Text: prompt})
 }
 
@@ -59,8 +58,11 @@ func checkRepoURL(repo string) error {
 }
 
 // start stores a new thread, posts its first message (if any) as the owner
-// and provisions its environment. It sets the id, branch and runner token.
+// and provisions its environment. It sets the id, branch and runner token,
+// and the defaults for what t leaves empty.
 func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Message) (store.Thread, error) {
+	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
+	t.PermissionMode = or(t.PermissionMode, "bypass")
 	// Here, so forks of a thread created with a credentialed URL are refused too.
 	if err := checkRepoURL(t.RepoURL); err != nil {
 		return t, err

@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	// The first is the default, as in the API.
 	export const models = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 	export const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
 	// How many threads to start with one prompt; "Each model" races the models.

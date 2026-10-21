@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/store"
@@ -37,13 +36,10 @@ func (s *Service) LineageChildren(ctx context.Context, req *bandav1.LineageChild
 // spawn creates a sub-thread of parent owned by owner and announces it in the
 // parent as actor. Repo, model and effort default to the parent's. The base
 // defaults to the parent's branch once it was pushed (its commits are on
-// origin), else to the parent's base branch; for another repo, to main.
+// origin), else to the parent's base branch; for another repo, see start.
 func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, prompt, repo, base, model, effort string) (store.Thread, error) {
 	repo = or(repo, parent.RepoURL)
-	if base == "" && repo != parent.RepoURL {
-		base = "main"
-	}
-	if base == "" {
+	if base == "" && repo == parent.RepoURL {
 		base = parent.BaseBranch
 		if pushed, err := s.store.Pushed(ctx, parent.ID); err != nil {
 			return store.Thread{}, err
@@ -60,6 +56,9 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 	s.lineage(ctx, child, actor, bandav1.Status_STATUS_STARTING, "")
 	return child, nil
 }
+
+// maxLineage is how much of a reply or an error a LineageUpdate quotes.
+const maxLineage = 200
 
 // lineage posts a LineageUpdate about child into its parent's chat.
 func (s *Service) lineage(ctx context.Context, child store.Thread, actor string, status bandav1.Status, text string) {
@@ -92,7 +91,7 @@ func (s *Service) reportToParent(id string, events []*bandav1.Event) {
 			if err != nil {
 				slog.Error("last agent text", "thread", id, "err", err)
 			}
-			text = firstLine(last)
+			text = firstLine(last, maxLineage)
 		}
 		s.lineage(ctx, t, "system", status, text)
 	}()
@@ -115,20 +114,12 @@ func lineageStatus(events []*bandav1.Event) (bandav1.Status, string) {
 				continue
 			}
 			if ended.IsError {
-				return sc.Status, "Turn failed: " + firstLine(ended.Error)
+				return sc.Status, "Turn failed: " + firstLine(ended.Error, maxLineage)
 			}
 			return sc.Status, ""
 		case bandav1.Status_STATUS_ERRORED:
-			return sc.Status, or(firstLine(sc.Reason), "The environment failed or was lost.")
+			return sc.Status, or(firstLine(sc.Reason, maxLineage), "The environment failed or was lost.")
 		}
 	}
 	return bandav1.Status_STATUS_UNSPECIFIED, ""
-}
-
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-	if r := []rune(line); len(r) > 200 {
-		return string(r[:200]) + "…"
-	}
-	return line
 }

@@ -104,16 +104,16 @@ func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, uns
 }
 
 func (s *Service) ApproveTurn(ctx context.Context, req *bandav1.ApproveTurnRequest) (*bandav1.ApproveTurnResponse, error) {
-	return &bandav1.ApproveTurnResponse{}, s.resolve(ctx, req.ThreadId, req.RequestSeq, true, "")
+	return &bandav1.ApproveTurnResponse{}, s.resolveTurn(ctx, req.ThreadId, req.RequestSeq, true, "")
 }
 
 func (s *Service) DeclineTurn(ctx context.Context, req *bandav1.DeclineTurnRequest) (*bandav1.DeclineTurnResponse, error) {
-	return &bandav1.DeclineTurnResponse{}, s.resolve(ctx, req.ThreadId, req.RequestSeq, false, strings.TrimSpace(req.Note))
+	return &bandav1.DeclineTurnResponse{}, s.resolveTurn(ctx, req.ThreadId, req.RequestSeq, false, strings.TrimSpace(req.Note))
 }
 
-// resolve approves or declines the turn request at seq. An approved request
+// resolveTurn approves or declines the turn request at seq. An approved request
 // runs as the requester's turn.
-func (s *Service) resolve(ctx context.Context, id string, seq int64, approve bool, note string) error {
+func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve bool, note string) error {
 	by, names := user(ctx), s.names(ctx)
 	var effect thread.Effect
 	var prompt string

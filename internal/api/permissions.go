@@ -74,7 +74,7 @@ func (s *Service) PermissionAnswer(ctx context.Context, req *bandav1.PermissionA
 	}
 	var cmd *bandav1.PermissionCommand
 	_, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		res, c, err := resolve(t, by, req)
+		res, c, err := answerPermission(t, by, req)
 		cmd = c
 		return []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_PermissionResolved{PermissionResolved: res}}}, err
 	})
@@ -86,9 +86,9 @@ func (s *Service) PermissionAnswer(ctx context.Context, req *bandav1.PermissionA
 	return &bandav1.PermissionAnswerResponse{}, nil
 }
 
-// resolve applies an answer by `by` to t: who may answer, a plan approval
+// answerPermission applies an answer by `by` to t: who may answer, a plan approval
 // switching the mode, a tool allowed from now on.
-func resolve(t *store.Thread, by string, req *bandav1.PermissionAnswerRequest) (*bandav1.PermissionResolved, *bandav1.PermissionCommand, error) {
+func answerPermission(t *store.Thread, by string, req *bandav1.PermissionAnswerRequest) (*bandav1.PermissionResolved, *bandav1.PermissionCommand, error) {
 	d := req.Decision
 	tool, ok := t.Permissions[req.RequestId]
 	if !ok {

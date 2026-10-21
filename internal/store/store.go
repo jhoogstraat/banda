@@ -3,7 +3,6 @@ package store
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	_ "embed"
 	"errors"
@@ -118,7 +117,7 @@ func (s *Store) Create(ctx context.Context, t Thread) error {
 		effort, status, mode, pending_prompt, runner_token, permission_mode, diff, forked_from, fork_turn, race_id, parent_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerToken, cmp.Or(t.PermissionMode, "bypass"), t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
+		t.PendingPrompt, t.RunnerToken, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
 	return err
 }
 

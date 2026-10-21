@@ -43,7 +43,7 @@ func TestLineageInPrompt(t *testing.T) {
 	if !strings.Contains(got, `[Sub-thread c1 "fix the parser" finished] Fixed it.`) || !strings.HasSuffix(got, "u1: next?") {
 		t.Errorf("prompt: %q", got)
 	}
-	if got := firstLine(strings.Repeat("x", 300) + "\nmore"); len([]rune(got)) != 201 {
+	if got := firstLine(strings.Repeat("x", 300)+"\nmore", maxLineage); len([]rune(got)) != 201 {
 		t.Errorf("first line not truncated: %d", len([]rune(got)))
 	}
 }

@@ -24,7 +24,7 @@
 	const saved = (key: string, fallback: string) => localStorage.getItem(`banda.${key}`) ?? fallback;
 	let repoUrl = $state(threads.project || saved('repoUrl', ''));
 	let baseBranch = $state(saved('baseBranch', 'main'));
-	let model = $state(saved('model', 'claude-opus-5-5'));
+	let model = $state(saved('model', models[0]));
 	let effort = $state(saved('effort', 'high'));
 	let permissions = $state(saved('permissions', permissionLabel(PermissionMode.BYPASS)));
 	// Not remembered: every try runs (and bills) its own agent.
