@@ -159,6 +159,9 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
 		slog.Error("store mentions", "thread", id, "err", err)
 	}
+	if err := s.store.MarkRead(ctx, by, id); err != nil { // posting means having read it
+		slog.Error("mark read", "thread", id, "err", err)
+	}
 	s.pokeInbox(append([]string{by}, m.MentionedUserIds...)...)
 	if effect == thread.StartTurn {
 		s.deliver(ctx, id, prompt)

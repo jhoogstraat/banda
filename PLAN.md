@@ -32,6 +32,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Sign-in | OIDC authorization code flow with PKCE, signed session cookie. Any provider via env; Dex runs locally with three dev users. |
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
+| Live inbox | The sidebar is one server stream per tab (`InboxWatch`): the caller's own and mentioned threads, re-sent whole (coalesced, 250 ms) when one of them gets an event, a thread is created, or the caller's own view changes. Unread is per viewer: events after `thread_views.seen_seq`, which opening a thread or posting in it moves forward. The tab title counts unread threads in Mentioned and Needs input. Browser notifications (asked once from a bell in the account footer) for my thread needing input or failing, unless snoozed or settled, and for new mentions; never for the thread on screen. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
 
 ## Constraint: Claude subscriptions
@@ -143,6 +144,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Sign-in with OIDC (Dex locally), users, display names.
 - Sidebar: search, project filter (by repository) and new-thread button on top; Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
 - New thread is an empty chat: the first message creates the thread; repository, branch, model and effort are chips in the composer.
+- Live inbox: the sidebar updates itself over `InboxWatch`; unread threads are bold with a dot; mentioned threads show the owner's avatar with a live status dot; browser notifications and an `(n) Banda` tab title for what needs me.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
