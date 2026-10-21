@@ -29,7 +29,7 @@ description = "Start the local stack: Podman machine, kind cluster, Dex, web and
 run = "deploy/dev.sh up"
 
 [tasks.e2e]
-description = "End-to-end check with the fake agent on :8790, next to the normal API"
+description = "End-to-end suite (web/e2e, Playwright) with the fake agent, in a namespace and database of its own; args go to Playwright"
 run = "deploy/dev.sh e2e"
 
 [tasks.down]
@@ -70,10 +70,13 @@ kubectl --context kind-banda rollout status deployment/dex -n banda --timeout=30
 description = "Build the sandbox image and load it into kind (after changing cmd/runner or deploy/sandbox.Dockerfile)"
 run = """
 i=${SANDBOX_IMAGE:-localhost/banda-sandbox:dev}
-${CONTAINER:-podman} build -f deploy/sandbox.Dockerfile --target "${TARGET:-sandbox}" -t "$i" .
+c=${CONTAINER:-podman}
+$c build -f deploy/sandbox.Dockerfile --target "${TARGET:-sandbox}" -t "$i" .
+# Loading is the slow part: skip it when the node already has this build.
+$c exec banda-control-plane crictl inspecti -q "$i" 2>/dev/null | grep -q "$($c image inspect "$i" | jq -r '.[0].Id')" && exit
 # Its own archive: checkouts build their images side by side.
 t=$(mktemp -u /tmp/banda-sandbox.XXXXXX).tar
-${CONTAINER:-podman} save "$i" -o "$t"
+$c save "$i" -o "$t"
 kind load image-archive "$t" --name banda
 rm -f "$t"
 """

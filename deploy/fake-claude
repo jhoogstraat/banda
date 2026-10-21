@@ -7,6 +7,23 @@
 # runs a Bash command (its description holds $E2E_SECRET, for redaction) that
 # asks for permission first (unless the mode bypasses), "e2e-plan" proposes a
 # plan in plan mode (ExitPlanMode); both act on the answer.
+#
+# Directives a test puts anywhere in a prompt, one case each in the loop below
+# (web/e2e/fixtures.ts has helpers for them):
+#   e2e-echo          first says "Received: <the prompt's text>", so tests read
+#                     what reached the agent from the events.
+#   e2e-hold:<name>   starts the turn (init, a delta, "Holding <name>", a Bash
+#                     tool call) and keeps it open until ~/e2e-release/<name>
+#                     exists, then goes on with the prompt. It keeps reading
+#                     stdin: messages queue, permission modes apply, and an
+#                     interrupt ends the turn.
+#   e2e-crash:<name>  makes a tool call and exits 1 mid-turn, without a result,
+#                     once per thread: a redelivered prompt runs normally.
+#   e2e-cost:<usd>    the turn's result reports this total_cost_usd (default 0.01).
+#   e2e-mcp:<tool>:<base64 JSON arguments>
+#                     calls that tool of the Banda MCP server, as the agent
+#                     would, and says "MCP <tool>: <result text>".
+# An interrupt gets a result only while a turn runs (a hold), like the real CLI.
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -55,9 +72,75 @@ say() {
   echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"$1\"}]},\"parent_tool_use_id\":null}"
   echo '{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0}'
 }
-while IFS= read -r line; do
+# ack <control_request line>: a success control_response to it.
+ack() { echo "{\"type\":\"control_response\",\"response\":{\"subtype\":\"success\",\"request_id\":\"$(sed -n 's/.*"request_id":"\([^"]*\)".*/\1/p' <<<"$1")\"}}"; }
+interrupted() { echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}'; }
+text() { jq -cn --arg t "$1" '{type:"assistant",message:{content:[{type:"text",text:$t}]},parent_tool_use_id:null}'; }
+result() { echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":10,\"total_cost_usd\":$cost}"; }
+queue=()
+# next: the next line, from the messages queued during a hold first.
+next() {
+  if [ ${#queue[@]} -gt 0 ]; then line=${queue[0]}; queue=("${queue[@]:1}"); else IFS= read -r line; fi
+}
+# hold <name>: see e2e-hold above. Fails if interrupted.
+hold() {
+  local l part= id=toolu_hold_$1
+  echo "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s\",\"model\":\"$model\"}"
+  echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Holding"}},"parent_tool_use_id":null}'
+  text "Holding $1"
+  echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"$id\",\"name\":\"Bash\",\"input\":{\"command\":\"wait for $1\"}}]},\"parent_tool_use_id\":null}"
+  until [ -e ~/e2e-release/"$1" ]; do
+    IFS= read -r -t 0.2 l
+    case $? in
+      0) l=$part$l part= ;;
+      1) exit 0 ;; # stdin closed
+      *) part+=$l; continue ;; # a timeout keeps what was read of the line
+    esac
+    case "$l" in
+      *'"subtype":"interrupt"'*)
+        ack "$l"
+        echo "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"$id\",\"type\":\"tool_result\",\"content\":\"interrupted\",\"is_error\":true}]},\"parent_tool_use_id\":null}"
+        interrupted; return 1 ;;
+      *set_permission_mode*) setmode "$l" ;;
+      *control_re*) ;;
+      *) queue+=("$l") ;;
+    esac
+  done
+  echo "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"tool_use_id\":\"$id\",\"type\":\"tool_result\",\"content\":\"released\",\"is_error\":false}]},\"parent_tool_use_id\":null}"
+}
+# mcp <tool> <base64 arguments>: see e2e-mcp above.
+mcp() {
+  local args out id=toolu_mcp$RANDOM
+  args=$(base64 -d <<<"$2")
+  echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"$id\",\"name\":\"mcp__banda__$1\",\"input\":$args}]},\"parent_tool_use_id\":null}"
+  out=$(curl -s -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" \
+    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -d "$(jq -cn --arg n "$1" --argjson a "$args" '{jsonrpc:"2.0",id:1,method:"tools/call",params:{name:$n,arguments:$a}}')" |
+    sed -n 's/^data: //; /^{/p' | jq -r '.result.content[0].text // .error.message // .')
+  jq -cn --arg id "$id" --arg out "$out" '{type:"user",message:{role:"user",content:[{tool_use_id:$id,type:"tool_result",content:$out,is_error:false}]},parent_tool_use_id:null}'
+  text "MCP $1: $out"
+}
+while next; do
+  cost=0.01
+  if [[ $line == *'"type":"user"'* ]]; then
+    [[ $line =~ e2e-cost:([0-9.]+) ]] && cost=${BASH_REMATCH[1]}
+    if [[ $line == *e2e-echo* ]]; then
+      text "Received: $(jq -r '.message.content | if type == "string" then . else map(select(.type == "text").text) | join("\n") end' <<<"$line")"
+    fi
+    if [[ $line =~ e2e-crash:([A-Za-z0-9_-]+) ]] && [ ! -e ~/e2e-crashed/"${BASH_REMATCH[1]}" ]; then
+      mkdir -p ~/e2e-crashed && touch ~/e2e-crashed/"${BASH_REMATCH[1]}"
+      echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_crash","name":"Bash","input":{"command":"crash"}}]},"parent_tool_use_id":null}'
+      exit 1
+    fi
+    if [[ $line =~ e2e-hold:([A-Za-z0-9_-]+) ]]; then hold "${BASH_REMATCH[1]}" || continue; fi
+    if [[ $line =~ e2e-mcp:([a-z_]+):([A-Za-z0-9+/=]+) ]]; then
+      mcp "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+      result
+      continue
+    fi
+  fi
   case "$line" in
-    *'"subtype":"interrupt"'*) echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}' ;;
+    *'"subtype":"interrupt"'*) ack "$line" ;; # idle: no turn to end
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-ask*'"type":"user"'*)
@@ -107,7 +190,7 @@ JSON
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"text","text":"Created hello$n.txt with $model · $effort"}]},"parent_tool_use_id":null}
-{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":0.01}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost}
 JSON
       ;;
   esac

@@ -33,15 +33,20 @@ WORKDIR /home/banda
 ENTRYPOINT ["/usr/local/bin/runner"]
 
 # Test image: a fake claude that needs no login (see deploy/fake-claude), and
-# repos for e2e at file:///opt/e2e/<name>.git: setup-fails (its .banda/setup.sh
-# fails) and setup-bg (it succeeds, leaving a background process).
+# the e2e fixture repos in /opt/e2e/<name>.git, which the e2e git server serves:
+# plain (a README), setup-fails (its .banda/setup.sh fails), setup-bg (it
+# succeeds, leaving a background process) and setup-hold (it waits for
+# ~/e2e-release/setup). Their pre-receive hook can hold a push.
 FROM sandbox AS fake
 COPY deploy/fake-claude /usr/local/bin/claude
+COPY deploy/e2e-pre-receive /opt/e2e/pre-receive
 USER root
-RUN repo() { git init -q -b main /tmp/$1 && mkdir /tmp/$1/.banda && printf "$2" > /tmp/$1/.banda/setup.sh \
+RUN repo() { git init -q -b main /tmp/$1 && mkdir /tmp/$1/.banda && printf "$2" > /tmp/$1/.banda/$3 \
    && git -C /tmp/$1 add -A && git -C /tmp/$1 -c user.name=e2e -c user.email=e2e@localhost commit -qm init \
-   && git clone -q --bare /tmp/$1 /opt/e2e/$1.git && rm -rf /tmp/$1; } \
- && repo setup-fails 'echo "setup sees $E2E_SECRET"\nexit 7\n' \
- && repo setup-bg 'sleep 600 &\necho setup-bg-done\n' \
+   && git clone -q --bare /tmp/$1 /opt/e2e/$1.git && rm -rf /tmp/$1 && cp /opt/e2e/pre-receive /opt/e2e/$1.git/hooks/; } \
+ && repo plain 'Hello World!\n' ../README \
+ && repo setup-fails 'echo "setup sees $E2E_SECRET"\nexit 7\n' setup.sh \
+ && repo setup-bg 'sleep 600 &\necho setup-bg-done\n' setup.sh \
+ && repo setup-hold 'until [ -e ~/e2e-release/setup ]; do sleep 0.2; done\n' setup.sh \
  && chown -R 1000:1000 /opt/e2e
 USER 1000

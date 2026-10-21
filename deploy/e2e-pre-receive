@@ -1,0 +1,7 @@
+#!/bin/sh
+# The e2e git server's hook: a push of branch <b> waits while /tmp/git-hold/<b, / as _> exists
+# (web/e2e/fixtures.ts: holdPush).
+while read -r old new ref; do
+  b=$(echo "${ref#refs/heads/}" | tr / _)
+  while [ -e "/tmp/git-hold/$b" ]; do sleep 0.2; done
+done
