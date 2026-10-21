@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS secrets (
   PRIMARY KEY (user_id, name)
 );
 
+-- Names of the team's secrets, in every user's threads, and who set each
+-- last. The values live only in the Kubernetes Secret banda-env-team.
+CREATE TABLE IF NOT EXISTS team_secrets (
+  name       text PRIMARY KEY,
+  updated_by text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
 -- Runner tokens are kept as SHA-256 hashes only (pods read theirs from a

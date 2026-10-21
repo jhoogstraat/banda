@@ -25,6 +25,12 @@ type Secret struct {
 	UpdatedAt time.Time
 }
 
+type TeamSecret struct {
+	Name      string
+	UpdatedAt time.Time
+	UpdatedBy string
+}
+
 // Settings returns the defaults if the user never changed them.
 func (s *Store) Settings(ctx context.Context, userID, harness string) (Settings, error) {
 	st := Settings{AuthMethod: "subscription", LoginState: "unknown"}
@@ -71,6 +77,35 @@ func (s *Store) PutSecret(ctx context.Context, userID, name string) error {
 func (s *Store) DeleteSecret(ctx context.Context, userID, name string) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM secrets WHERE user_id = $1 AND name = $2`, userID, name)
 	return err
+}
+
+func (s *Store) TeamSecrets(ctx context.Context) ([]TeamSecret, error) {
+	rows, err := s.db.Query(ctx, `SELECT name, updated_at, updated_by FROM team_secrets ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[TeamSecret])
+}
+
+func (s *Store) PutTeamSecret(ctx context.Context, name, by string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO team_secrets (name, updated_by) VALUES ($1, $2)
+		ON CONFLICT (name) DO UPDATE SET updated_by = excluded.updated_by, updated_at = now()`, name, by)
+	return err
+}
+
+func (s *Store) DeleteTeamSecret(ctx context.Context, name string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM team_secrets WHERE name = $1`, name)
+	return err
+}
+
+// SecretNames are the variables a user's threads get from secrets: the
+// team's and their own.
+func (s *Store) SecretNames(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.Query(ctx, `SELECT name FROM team_secrets UNION SELECT name FROM secrets WHERE user_id = $1 ORDER BY name`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
 // NewLoginToken gives the user's login environment a new runner token,

@@ -15,9 +15,9 @@ import (
 var anthropicToken = regexp.MustCompile(`sk-ant-[A-Za-z0-9_-]{8,}`)
 
 // redact removes credentials the agent can reach in its sandbox (the owner's
-// Claude login, API key and secrets, the git and runner tokens) from text that
-// leaves the pod, so they never end up in Banda's database or in front of
-// teammates. The owner's secrets are the variables named in
+// Claude login, API key and secrets, the team's secrets, the git and runner
+// tokens) from text that leaves the pod, so they never end up in Banda's
+// database or in front of teammates. The secrets are the variables named in
 // BANDA_SECRET_NAMES; the pod's environment is fixed at start.
 func redact(s string) string {
 	s = anthropicToken.ReplaceAllString(s, "[redacted]")

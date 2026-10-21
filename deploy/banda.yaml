@@ -24,7 +24,7 @@ rules:
     resources: [persistentvolumeclaims]
     verbs: [create]
   - apiGroups: [""]
-    resources: [secrets] # users' banda-env-* and banda-auth-*
+    resources: [secrets] # users' banda-env-* and banda-auth-*, the team's banda-env-team
     verbs: [create, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

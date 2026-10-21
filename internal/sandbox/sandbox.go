@@ -3,7 +3,8 @@
 // suspends). Claude Code's config dir is a per-user PVC that only the claude
 // binary touches, so a user logs in once for all their threads. Each user
 // also has a small login environment and two Secrets: their own environment
-// variables and, in API key mode, the Anthropic API key.
+// variables and, in API key mode, the Anthropic API key. The team's
+// environment variables are one more Secret, in every thread.
 // See docs/research/claude-login.md and docs/research/sandbox-lifecycle.md.
 package sandbox
 
@@ -65,7 +66,7 @@ func New(cfg Config) (*Client, error) {
 
 // Ensure gives the thread a freshly started pod, with token as its runner
 // token. authMethod is the owner's: "subscription" or "api_key"; secrets are
-// the names of the owner's secrets, which the runner redacts.
+// the names of the team's and the owner's secrets, which the runner redacts.
 func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod string, secrets []string) error {
 	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID)
 	if err == nil {
@@ -157,9 +158,16 @@ func hash(owner string) string {
 func envSecret(owner string) string  { return "banda-env-" + hash(owner) }
 func authSecret(owner string) string { return "banda-auth-" + hash(owner) }
 
+const teamSecret = "banda-env-team" // hashes are hex, so no user's
+
 // SetSecret sets the user's environment variable; a nil value removes it.
 func (c *Client) SetSecret(ctx context.Context, owner, name string, value []byte) error {
 	return c.patchSecret(ctx, envSecret(owner), "user-secret", map[string][]byte{name: value})
+}
+
+// SetTeamSecret sets an environment variable of every thread; a nil value removes it.
+func (c *Client) SetTeamSecret(ctx context.Context, name string, value []byte) error {
+	return c.patchSecret(ctx, teamSecret, "team-secret", map[string][]byte{name: value})
 }
 
 func (c *Client) SetAPIKey(ctx context.Context, owner, key string) error {
@@ -272,9 +280,10 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 	from := func(secret string) corev1.EnvFromSource {
 		return corev1.EnvFromSource{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: secret}, Optional: &optional}}
 	}
-	// Later sources win: the user's own variables (GIT_TOKEN for private
-	// repos, say) beat the shared, admin-made "banda-git".
-	envFrom := []corev1.EnvFromSource{from("banda-git"), from(envSecret(t.OwnerID))}
+	// For a key in several sources Kubernetes takes the last: the user's own
+	// variables (GIT_TOKEN for private repos, say) beat the team's, which beat
+	// the admin-made "banda-git".
+	envFrom := []corev1.EnvFromSource{from("banda-git"), from(teamSecret), from(envSecret(t.OwnerID))}
 	if authMethod == "api_key" { // overrides the subscription login, so only when chosen
 		envFrom = append(envFrom, from(authSecret(t.OwnerID)))
 	}
