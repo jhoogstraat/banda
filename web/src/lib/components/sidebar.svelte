@@ -17,13 +17,13 @@
 	import { matches, projectName, projects, threads, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
-	// Precedence: settled > snoozed > status.
+	// Precedence: settled > snoozed > teammates' turn requests > status.
 	const sectionOf = (t: Thread) =>
 		t.settled
 			? 'settled'
 			: t.snoozedUntil && timestampMs(t.snoozedUntil) > Date.now()
 				? 'snoozed'
-				: t.status === Status.STARTING || t.status === Status.WORKING
+				: !t.turnRequests && (t.status === Status.STARTING || t.status === Status.WORKING)
 					? 'working'
 					: 'needs';
 
@@ -57,6 +57,11 @@
 	>
 		{#if byline}<UserAvatar name={userName(t.ownerId)} class="size-5" />{:else}<StatusDot status={t.status} />{/if}
 		<span class="truncate">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
+		{#if t.turnRequests && !byline}
+			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-400" title="Teammates ask to run the agent">
+				{t.turnRequests} ask{t.turnRequests > 1 ? 's' : ''}
+			</span>
+		{/if}
 		<span class="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums">{ago(t.updatedAt)}</span>
 	</a>
 {/snippet}

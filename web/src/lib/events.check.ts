@@ -40,4 +40,13 @@ apply(chat, step('setup', 3));
 apply(chat, step('setup', 1)); // retry: only status changes in between, which add no item
 if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== 3)
 	throw new Error('a finished step running again should start a new checklist');
+
+const asks: Chat = { items: [], streaming: '' };
+apply(asks, { seq: 7n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent go' } } } } as Event);
+apply(asks, { seq: 8n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent again' } } } } as Event);
+apply(asks, { seq: 9n, actor: 'ann', kind: { case: 'turnRequestResolved', value: { requestSeq: 7n, approved: false, note: 'no' } } } as Event);
+const [first, second] = asks.items;
+if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
+	throw new Error('a resolution should attach to its request');
+if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
 console.log('ok');

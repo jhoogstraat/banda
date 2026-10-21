@@ -2,6 +2,8 @@
 	import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import {
@@ -14,6 +16,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { api } from '#lib/api.js';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { threads } from '#lib/threads.svelte.js';
 
 	// `act` runs a call, reports its error and refreshes the page and sidebar.
 	let { thread, act }: { thread: Thread; act: (call: Promise<unknown>) => Promise<boolean> } = $props();
@@ -70,6 +73,16 @@
 		{/if}
 	</DropdownMenuContent>
 </DropdownMenu>
+{#if threads.me?.id === thread.ownerId}
+	<IconButton
+		icon={thread.trusted ? ShieldOffIcon : ShieldCheckIcon}
+		variant={thread.trusted ? 'secondary' : 'ghost'}
+		label={thread.trusted
+			? 'Teammates can run the agent without your approval: require approval'
+			: "Teammates' turns need your approval: let them run the agent"}
+		onclick={() => act(api.trust({ threadId: thread.id, trusted: !thread.trusted }))}
+	/>
+{/if}
 <IconButton
 	icon={CheckIcon}
 	variant={thread.settled ? 'secondary' : 'ghost'}

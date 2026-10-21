@@ -1,8 +1,10 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded } from './gen/banda/v1/banda_pb.ts';
+import type { Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
 
 export type Item =
 	| { kind: 'message'; actor: string; text: string; time?: Timestamp }
+	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
+	| { kind: 'request'; seq: bigint; actor: string; text: string; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	| { kind: 'text' | 'thinking' | 'notice'; text: string }
 	| { kind: 'tool'; call: ToolCall; result?: ToolResult }
 	| { kind: 'turn'; turn: TurnEnded }
@@ -18,6 +20,15 @@ export function apply(chat: Chat, e: Event) {
 		case 'message':
 			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
 			break;
+		case 'turnRequest':
+			chat.items.push({ kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', time: e.time });
+			break;
+		case 'turnRequestResolved': {
+			const seq = k.value.requestSeq;
+			const req = chat.items.find((i): i is Extract<Item, { kind: 'request' }> => i.kind === 'request' && i.seq === seq);
+			if (req) req.resolved = { ...k.value, by: e.actor };
+			break;
+		}
 		case 'agentText':
 			chat.streaming = '';
 			chat.items.push({ kind: 'text', text: k.value.text });
