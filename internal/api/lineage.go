@@ -45,7 +45,7 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 	}
 	if base == "" {
 		base = parent.BaseBranch
-		if pushed, err := s.store.Pushed(ctx, parent); err != nil {
+		if pushed, err := s.store.Pushed(ctx, parent.ID); err != nil {
 			return store.Thread{}, err
 		} else if pushed {
 			base = parent.Branch

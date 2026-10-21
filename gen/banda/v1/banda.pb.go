@@ -618,10 +618,12 @@ type Thread struct {
 	// Shared by the threads started together by one Race or Fork.
 	RaceId string `protobuf:"bytes,29,opt,name=race_id,json=raceId,proto3" json:"race_id,omitempty"`
 	// The thread this one was spawned from, if any.
-	ParentId      string `protobuf:"bytes,26,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
-	ParentTitle   string `protobuf:"bytes,27,opt,name=parent_title,json=parentTitle,proto3" json:"parent_title,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ParentId    string `protobuf:"bytes,26,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	ParentTitle string `protobuf:"bytes,27,opt,name=parent_title,json=parentTitle,proto3" json:"parent_title,omitempty"`
+	// A GitHub pull request for the branch, once it is pushed.
+	PullRequestUrl string `protobuf:"bytes,30,opt,name=pull_request_url,json=pullRequestUrl,proto3" json:"pull_request_url,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Thread) Reset() {
@@ -846,6 +848,13 @@ func (x *Thread) GetParentId() string {
 func (x *Thread) GetParentTitle() string {
 	if x != nil {
 		return x.ParentTitle
+	}
+	return ""
+}
+
+func (x *Thread) GetPullRequestUrl() string {
+	if x != nil {
+		return x.PullRequestUrl
 	}
 	return ""
 }
@@ -4339,9 +4348,12 @@ func (*EnvironmentRecreateResponse) Descriptor() ([]byte, []int) {
 // Sent by the runner after a turn changed the diff, or a push, when the
 // state or its detail changed.
 type AutoPush struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         AutoPushState          `protobuf:"varint,1,opt,name=state,proto3,enum=banda.v1.AutoPushState" json:"state,omitempty"`
-	Detail        string                 `protobuf:"bytes,2,opt,name=detail,proto3" json:"detail,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	State  AutoPushState          `protobuf:"varint,1,opt,name=state,proto3,enum=banda.v1.AutoPushState" json:"state,omitempty"`
+	Detail string                 `protobuf:"bytes,2,opt,name=detail,proto3" json:"detail,omitempty"`
+	// The push went through: the branch's commits are on origin, even if
+	// uncommitted changes are not (state UNPUSHED).
+	BranchPushed  bool `protobuf:"varint,3,opt,name=branch_pushed,json=branchPushed,proto3" json:"branch_pushed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4388,6 +4400,13 @@ func (x *AutoPush) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *AutoPush) GetBranchPushed() bool {
+	if x != nil {
+		return x.BranchPushed
+	}
+	return false
 }
 
 type OpenTerminalRequest struct {
@@ -9170,7 +9189,7 @@ var File_banda_v1_banda_proto protoreflect.FileDescriptor
 
 const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
-	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\b\n" +
+	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc6\b\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bowner_id\x18\x02 \x01(\tR\aownerId\x12\x14\n" +
@@ -9204,7 +9223,8 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"forkedFrom\x12\x17\n" +
 	"\arace_id\x18\x1d \x01(\tR\x06raceId\x12\x1b\n" +
 	"\tparent_id\x18\x1a \x01(\tR\bparentId\x12!\n" +
-	"\fparent_title\x18\x1b \x01(\tR\vparentTitle\"=\n" +
+	"\fparent_title\x18\x1b \x01(\tR\vparentTitle\x12(\n" +
+	"\x10pull_request_url\x18\x1e \x01(\tR\x0epullRequestUrl\"=\n" +
 	"\n" +
 	"ForkOrigin\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
@@ -9412,10 +9432,11 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\fPushResponse\"9\n" +
 	"\x1aEnvironmentRecreateRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\x1d\n" +
-	"\x1bEnvironmentRecreateResponse\"Q\n" +
+	"\x1bEnvironmentRecreateResponse\"v\n" +
 	"\bAutoPush\x12-\n" +
 	"\x05state\x18\x01 \x01(\x0e2\x17.banda.v1.AutoPushStateR\x05state\x12\x16\n" +
-	"\x06detail\x18\x02 \x01(\tR\x06detail\"t\n" +
+	"\x06detail\x18\x02 \x01(\tR\x06detail\x12#\n" +
+	"\rbranch_pushed\x18\x03 \x01(\bR\fbranchPushed\"t\n" +
 	"\x13OpenTerminalRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\rR\x04cols\x12\x12\n" +

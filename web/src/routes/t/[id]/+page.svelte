@@ -76,7 +76,7 @@
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { permissionLabel, permissionModes } from '#lib/permissions.js';
-	import { prUrl, threads, userName } from '#lib/threads.svelte.js';
+	import { threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -289,7 +289,7 @@
 	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
 	const push = () => act(api.push({ threadId: id }));
 	const recreate = () => act(api.environmentRecreate({ threadId: id }));
-	const pr = $derived(thread ? prUrl(thread) : '');
+	const pr = $derived(thread?.pullRequestUrl ?? '');
 	const retry = () => act(api.retry({ threadId: id }));
 	const show = (t: string) => {
 		tab = t;

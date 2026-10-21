@@ -213,12 +213,11 @@ func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 	return text, err
 }
 
-// Pushed reports whether the thread's branch was ever pushed to origin (the
-// runner's "Pushed `<branch>` ..." notice or auto-push detail).
-func (s *Store) Pushed(ctx context.Context, t Thread) (bool, error) {
+// Pushed reports whether the thread's branch was ever pushed to origin.
+func (s *Store) Pushed(ctx context.Context, id string) (bool, error) {
 	var ok bool
 	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE thread_id = $1
-		AND starts_with(coalesce(body->'notice'->>'text', body->'autoPush'->>'detail'), $2))`, t.ID, "Pushed `"+t.Branch+"`").Scan(&ok)
+		AND body @> '{"autoPush": {"branchPushed": true}}')`, id).Scan(&ok)
 	return ok, err
 }
 

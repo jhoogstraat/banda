@@ -187,6 +187,8 @@ message Thread {
   // The thread this one was spawned from, if any.
   string parent_id = 26;
   string parent_title = 27;
+  // A GitHub pull request for the branch, once it is pushed.
+  string pull_request_url = 30;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -588,6 +590,9 @@ enum AutoPushState {
 message AutoPush {
   AutoPushState state = 1;
   string detail = 2;
+  // The push went through: the branch's commits are on origin, even if
+  // uncommitted changes are not (state UNPUSHED).
+  bool branch_pushed = 3;
 }
 
 message OpenTerminalRequest {

@@ -15,8 +15,6 @@ import (
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
 
-var githubRepo = regexp.MustCompile(`^(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$`)
-
 // The remote turned the push down for good, not just this once.
 var refused = regexp.MustCompile(`(?i)\b403\b|permission|denied|authentication failed|could not read username|read-only|not allowed`)
 
@@ -79,23 +77,18 @@ func pushBranch(ctx context.Context) *bandav1.AutoPush {
 		return &bandav1.AutoPush{State: state, Detail: "Push failed: " + out}
 	}
 	if out, _ := git("status", "--porcelain"); out != "" {
-		return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_UNPUSHED,
+		return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_UNPUSHED, BranchPushed: true,
 			Detail: fmt.Sprintf("Pushed `%s` to origin. Uncommitted changes only live in this environment; ask the agent to commit them.", branch)}
 	}
-	return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED, Detail: fmt.Sprintf("Pushed `%s` to origin.", branch)}
+	return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED, BranchPushed: true, Detail: fmt.Sprintf("Pushed `%s` to origin.", branch)}
 }
 
-// manualPush is the Push button: it also reports the result as a notice,
-// with a pull request link for GitHub.
+// manualPush is the Push button: it also reports the result as a notice.
 func (p *pusher) manualPush(ctx context.Context, notice func(string) error) {
 	r := p.push(ctx)
 	text := r.Detail
 	if !strings.HasPrefix(text, "Push") {
 		text = "Push failed: " + text
-	}
-	if m := githubRepo.FindStringSubmatch(os.Getenv("BANDA_REPO_URL")); m != nil && strings.HasPrefix(text, "Pushed") {
-		branch := os.Getenv("BANDA_BRANCH")
-		text += fmt.Sprintf(" [Open a pull request](https://github.com/%s/compare/%s...%s?expand=1)", m[1], os.Getenv("BANDA_BASE_BRANCH"), branch)
 	}
 	notice(text)
 }

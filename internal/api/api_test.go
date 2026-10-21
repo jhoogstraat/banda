@@ -9,6 +9,7 @@ import (
 
 	"connectrpc.com/connect/v2"
 
+	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
 )
@@ -44,5 +45,24 @@ func TestPublicError(t *testing.T) {
 		if connect.CodeOf(got) != want || want == connect.CodeInternal && strings.Contains(got.Error(), "relation") {
 			t.Errorf("publicError(%v) = %v, want %v", err, got, want)
 		}
+	}
+}
+
+func TestPullRequestURL(t *testing.T) {
+	pushed := bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String()
+	for repo, want := range map[string]string{
+		"https://github.com/o/r":      "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://github.com/o/r.git":  "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"git@github.com:o/r.git":      "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://github.com/o/r.git/": "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://gitlab.com/o/r.git":  "",
+		"/tmp/origin.git":             "",
+	} {
+		if got := pullRequestURL(store.Thread{RepoURL: repo, BaseBranch: "main", Branch: "banda/x", AutoPush: pushed}); got != want {
+			t.Errorf("%s: got %q, want %q", repo, got, want)
+		}
+	}
+	if got := pullRequestURL(store.Thread{RepoURL: "https://github.com/o/r"}); got != "" {
+		t.Errorf("not pushed: got %q", got)
 	}
 }

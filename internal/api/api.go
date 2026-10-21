@@ -5,8 +5,10 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -179,6 +181,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		PermissionMode:     permissionModeToProto[t.PermissionMode],
 		PermissionPending:  len(t.Permissions) > 0,
 		RaceId:             t.RaceID,
+		PullRequestUrl:     pullRequestURL(t),
 	}
 	if t.ForkedFrom != "" {
 		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}
@@ -187,6 +190,18 @@ func toProto(t store.Thread) *bandav1.Thread {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)
 	}
 	return p
+}
+
+var githubRepo = regexp.MustCompile(`^(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$`)
+
+// pullRequestURL opens a GitHub pull request for the thread's branch, once
+// all its work is pushed.
+func pullRequestURL(t store.Thread) string {
+	m := githubRepo.FindStringSubmatch(t.RepoURL)
+	if m == nil || t.AutoPush != bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String() {
+		return ""
+	}
+	return fmt.Sprintf("https://github.com/%s/compare/%s...%s?expand=1", m[1], t.BaseBranch, t.Branch)
 }
 
 func title(prompt string) string {
