@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -92,6 +93,23 @@ type (
 	createOut struct {
 		ThreadID string `json:"thread_id"`
 	}
+	searchIn struct {
+		Query string `json:"query" jsonschema:"words to find, all of which must match; each also matches as a prefix"`
+		Kind  string `json:"kind,omitempty" jsonschema:"only 'people' (messages), 'agent' (agent text) or 'code' (tool calls and review comments)"`
+		Limit int    `json:"limit,omitempty" jsonschema:"at most this many results (default 20, at most 100)"`
+	}
+	searchHit struct {
+		ThreadID    string     `json:"thread_id"`
+		ThreadTitle string     `json:"thread_title"`
+		Seq         int64      `json:"seq"`
+		Author      string     `json:"author"`
+		Time        *time.Time `json:"time,omitempty"`
+		Kind        string     `json:"kind"`
+		Snippet     string     `json:"snippet" jsonschema:"the matching passage, matched words in **"`
+	}
+	searchOut struct {
+		Results []searchHit `json:"results"`
+	}
 )
 
 func textResult(s string) *mcp.CallToolResult {
@@ -150,6 +168,19 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 				fmt.Fprintf(&b, "\nDiff:\n%s\n", d)
 			}
 			return textResult(b.String()), nil, nil
+		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "search_threads", Description: "Full-text search across every Banda thread: what people wrote (messages, review comments), what agents said, and their tool calls (commands, file paths). Use it to find prior work and decisions, e.g. how something was set up before. Best matches first; read a hit's thread with read_thread."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in searchIn) (*mcp.CallToolResult, searchOut, error) {
+			hits, err := s.store.Search(ctx, store.SearchQuery{Words: in.Query, Kind: in.Kind, Limit: cmp.Or(in.Limit, 20)})
+			if err != nil {
+				return nil, searchOut{}, err
+			}
+			names, out := s.names(ctx), searchOut{Results: []searchHit{}}
+			for _, h := range hits {
+				out.Results = append(out.Results, searchHit{h.ThreadID, h.Title, h.Seq, actorName(names, h.Actor), h.Time, h.Kind, snippetText(h.Snippet)})
+			}
+			return nil, out, nil
 		})
 
 	mcp.AddTool(srv, &mcp.Tool{Name: "post_message", Description: "Post a message into another thread, as this thread's agent. Without mention_agent the message only goes into the thread's chat for its people and agent to read, and the thread switches to chat mode. With mention_agent the thread's agent starts working on it; that is only allowed in threads owned by the same person as this thread, since the turn runs on their Claude subscription. You cannot post into this thread itself."},

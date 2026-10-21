@@ -88,3 +88,15 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+
+-- Full-text search over what people and agents said and did: messages and
+-- turn requests (with review comments), agent text, tool calls (name and
+-- input values). Adding the column fills it for existing events.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS search tsvector GENERATED ALWAYS AS (
+  to_tsvector('english'::regconfig,
+    coalesce(body->'message'->>'text', body->'turnRequest'->'message'->>'text', body->'agentText'->>'text', '') || ' ' ||
+    coalesce(body->'toolCall'->>'name', '') || ' ' ||
+    regexp_replace(coalesce(body->'toolCall'->>'inputJson', ''), '"\w+":|[{}"]', ' ', 'g'))
+  || jsonb_to_tsvector('english'::regconfig, coalesce(body->'message'->'review', body->'turnRequest'->'message'->'review', '[]'), '["string"]')
+) STORED;
+CREATE INDEX IF NOT EXISTS events_search ON events USING gin (search);

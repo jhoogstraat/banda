@@ -57,6 +57,9 @@ service ThreadService {
   // Tells the thread's watchers that the caller is typing. The composer calls
   // it every few seconds while typing; clients forget it after a few seconds.
   rpc SendTyping(TypingRequest) returns (TypingResponse);
+  // Full-text search over every thread's messages, review comments, agent
+  // text and tool calls, best matches first.
+  rpc Search(SearchRequest) returns (SearchResponse);
 }
 
 service UserService {
@@ -736,4 +739,45 @@ message HttpTunnel {
 
 message PreviewPorts {
   repeated PreviewPort ports = 1;
+}
+
+enum SearchKind {
+  SEARCH_KIND_UNSPECIFIED = 0;
+  // Messages and turn requests by people (and agents posting through MCP).
+  SEARCH_KIND_PEOPLE = 1;
+  // The agent's text.
+  SEARCH_KIND_AGENT = 2;
+  // Tool calls and review comments.
+  SEARCH_KIND_CODE = 3;
+}
+
+message SearchRequest {
+  // Words, all of which must match, each also as a prefix ("auth" finds
+  // "authentication").
+  string query = 1;
+  // Filters; empty or unset means any.
+  string actor = 2;
+  string repo_url = 3;
+  SearchKind kind = 4;
+  google.protobuf.Timestamp after = 5;
+  google.protobuf.Timestamp before = 6;
+  // At most 100; 0 means 20.
+  int32 limit = 7;
+}
+
+message SearchResult {
+  string thread_id = 1;
+  string thread_title = 2;
+  string repo_url = 3;
+  // The matching event; the thread page scrolls to it at /t/<id>#<seq>.
+  int64 seq = 4;
+  string actor = 5;
+  google.protobuf.Timestamp time = 6;
+  SearchKind kind = 7;
+  // The matching passage in parts: odd parts are the matched words.
+  repeated string snippet = 8;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
 }

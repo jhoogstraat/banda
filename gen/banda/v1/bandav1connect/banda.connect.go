@@ -87,6 +87,8 @@ const (
 	ThreadServiceInboxMarkReadProcedure = "/banda.v1.ThreadService/InboxMarkRead"
 	// ThreadServiceSendTypingProcedure is the procedure name of the ThreadService's SendTyping RPC.
 	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
+	// ThreadServiceSearchProcedure is the procedure name of the ThreadService's Search RPC.
+	ThreadServiceSearchProcedure = "/banda.v1.ThreadService/Search"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -298,6 +300,13 @@ var (
 			Procedure:  ThreadServiceSendTypingProcedure,
 		}
 	})
+	threadServiceSearchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Search"),
+			Procedure:  ThreadServiceSearchProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -353,6 +362,9 @@ type ThreadServiceClient interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Full-text search over every thread's messages, review comments, agent
+	// text and tool calls, best matches first.
+	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -497,6 +509,9 @@ type ThreadServiceHandler interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Full-text search over every thread's messages, review comments, agent
+	// text and tool calls, best matches first.
+	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -530,6 +545,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
+		connect.Method{Spec: threadServiceSearchSpec(), Handler: adapter.search},
 	)
 }
 
@@ -701,6 +717,10 @@ func (UnimplementedThreadServiceHandler) InboxMarkRead(context.Context, *v1.Inbo
 
 func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SendTyping is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Search is not implemented")
 }
 
 type threadServiceClient struct {
@@ -910,6 +930,14 @@ func (c *threadServiceClient) InboxMarkRead(ctx context.Context, req *v1.InboxMa
 func (c *threadServiceClient) SendTyping(ctx context.Context, req *v1.TypingRequest) (*v1.TypingResponse, error) {
 	var res v1.TypingResponse
 	if err := c.client.CallUnary(ctx, threadServiceSendTypingSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Search(ctx context.Context, req *v1.SearchRequest) (*v1.SearchResponse, error) {
+	var res v1.SearchResponse
+	if err := c.client.CallUnary(ctx, threadServiceSearchSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1207,6 +1235,18 @@ func (h threadServiceHandler) sendTyping(ctx context.Context, _ connect.Spec, st
 		return err
 	}
 	res, err := h.svc.SendTyping(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) search(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SearchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Search(ctx, &req)
 	if err != nil {
 		return err
 	}
