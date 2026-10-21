@@ -148,7 +148,13 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &bandav1.GetThreadResponse{Thread: toProto(t)}, nil
+	overlaps, err := s.overlaps(ctx, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	p := toProto(t)
+	p.Overlaps = overlaps[t.ID]
+	return &bandav1.GetThreadResponse{Thread: p}, nil
 }
 
 func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav1.TrustResponse, error) {

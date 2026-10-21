@@ -27,6 +27,7 @@
 #   e2e-cost:<usd>    the turn's result reports this total_cost_usd (default 0.01).
 #   e2e-deltas:<n>    first streams n text deltas in a burst.
 #   e2e-noop          replies and ends the turn, changing no file.
+#   e2e-file:<path>   writes <path> instead of hello<n>.txt.
 #   e2e-mcp:<tool>:<base64 JSON arguments>
 #                     calls that tool of the Banda MCP server, as the agent
 #                     would, and says "MCP <tool>: <result text>".
@@ -212,7 +213,9 @@ while next; do
 JSON
       ;;
     *'"type":"user"'*)
-      n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); printf 'hello %s\n%s\n' "$n" "$line" > "hello$n.txt"; sleep 1
+      n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); f=hello$n.txt
+      [[ $line =~ e2e-file:([A-Za-z0-9_./-]+) ]] && f=${BASH_REMATCH[1]} && mkdir -p "$(dirname "$f")"
+      printf 'hello %s\n%s\n' "$n" "$line" > "$f"; sleep 1
       case "$line" in *commit*) { git add -A && git commit -qm "hello $n"; } >&2 ;; esac
       # Report the image blocks and inlined text files received, for e2e.
       images=$(grep -o '"type":"image"' <<<"$line" | wc -l | tr -d ' ')

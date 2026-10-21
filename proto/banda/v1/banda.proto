@@ -189,6 +189,20 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // Other recent, unsettled threads on the same repository and base branch
+  // whose diffs change some of the same files. Set by GetThread and TeamWatch.
+  repeated Overlap overlaps = 31;
+}
+
+// Another thread that changes some of the same files (see Thread.overlaps).
+message Overlap {
+  string thread_id = 1;
+  string title = 2;
+  string owner_id = 3;
+  // Not set in an Event.
+  Status status = 4;
+  // The files both diffs change, sorted.
+  repeated string paths = 5;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -272,6 +286,9 @@ message Event {
     LineageUpdate lineage_update = 32;
     // The owner changed the permission mode; actor is the owner.
     PermissionModeChanged permission_mode_changed = 34;
+    // The thread now changes files that another one changes too, or more of
+    // them than it was told before.
+    Overlap overlap = 35;
   }
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GitMergeConflictIcon from '@lucide/svelte/icons/git-merge-conflict';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
@@ -119,6 +120,12 @@
 							<div class="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
 								<span class="truncate">{projectName(t.repoUrl)}</span>
 								<span class="shrink-0 tabular-nums">{ago(t.activity?.time ?? t.updatedAt, threads.now)}</span>
+								{#if t.overlaps.length}
+									{@const label = `Overlaps with ${t.overlaps.map((o) => o.title || 'Untitled thread').join(', ')}`}
+									<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400" aria-label={label} title={label}>
+										<GitMergeConflictIcon class="size-3" />{t.overlaps.length}
+									</span>
+								{/if}
 								{#if t.presentUserIds.length}
 									<span class="ml-auto flex shrink-0 -space-x-1.5" title="Here now: {t.presentUserIds.map(userName).join(', ')}">
 										{#each t.presentUserIds.slice(0, 3) as u (u)}

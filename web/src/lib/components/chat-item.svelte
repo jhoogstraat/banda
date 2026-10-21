@@ -12,6 +12,7 @@
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import GitMergeConflictIcon from '@lucide/svelte/icons/git-merge-conflict';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
@@ -156,6 +157,12 @@
 		<GitBranchPlusIcon class="size-3.5 shrink-0" />
 		<StatusDot status={u.status} />
 		<span class="truncate"><span class="font-medium text-foreground">{u.title}</span> {lineageVerb[u.status]}{u.status === Status.STARTING && item.actor !== 'agent' ? ` by ${userName(item.actor)}` : ''}{u.text ? `: ${u.text}` : ''}</span>
+	</a>
+{:else if item.kind === 'overlap'}
+	{@const o = item.overlap}
+	<a href="/t/{o.threadId}" class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+		<GitMergeConflictIcon class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+		<span class="truncate">Now overlaps with <span class="font-medium text-foreground">{o.title || 'Untitled thread'}</span> by {userName(o.ownerId)}: <span class="font-mono">{o.paths.join(', ')}</span></span>
 	</a>
 {:else if item.kind === 'notice'}
 	<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
