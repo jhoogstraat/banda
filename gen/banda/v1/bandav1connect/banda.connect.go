@@ -42,6 +42,9 @@ const (
 	ThreadServiceInterruptProcedure = "/banda.v1.ThreadService/Interrupt"
 	// ThreadServiceSetModeProcedure is the procedure name of the ThreadService's SetMode RPC.
 	ThreadServiceSetModeProcedure = "/banda.v1.ThreadService/SetMode"
+	// ThreadServiceSetAgentSettingsProcedure is the procedure name of the ThreadService's
+	// SetAgentSettings RPC.
+	ThreadServiceSetAgentSettingsProcedure = "/banda.v1.ThreadService/SetAgentSettings"
 	// ThreadServiceRetryProcedure is the procedure name of the ThreadService's Retry RPC.
 	ThreadServiceRetryProcedure = "/banda.v1.ThreadService/Retry"
 	// ThreadServiceApproveTurnProcedure is the procedure name of the ThreadService's ApproveTurn RPC.
@@ -153,6 +156,13 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SetMode"),
 			Procedure:  ThreadServiceSetModeProcedure,
+		}
+	})
+	threadServiceSetAgentSettingsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SetAgentSettings"),
+			Procedure:  ThreadServiceSetAgentSettingsProcedure,
 		}
 	})
 	threadServiceRetrySpec = sync.OnceValue(func() connect.Spec {
@@ -298,6 +308,9 @@ type ThreadServiceClient interface {
 	SendMessage(context.Context, *v1.SendMessageRequest) (*v1.SendMessageResponse, error)
 	Interrupt(context.Context, *v1.InterruptRequest) (*v1.InterruptResponse, error)
 	SetMode(context.Context, *v1.SetModeRequest) (*v1.SetModeResponse, error)
+	// Changes the agent's model and effort (owner only). A running agent
+	// restarts with them once its turns have ended; a paused one starts with them.
+	SetAgentSettings(context.Context, *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
 	// Owner only: runs a teammate's turn request as their turn, or drops it.
 	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
@@ -439,6 +452,9 @@ type ThreadServiceHandler interface {
 	SendMessage(context.Context, *v1.SendMessageRequest) (*v1.SendMessageResponse, error)
 	Interrupt(context.Context, *v1.InterruptRequest) (*v1.InterruptResponse, error)
 	SetMode(context.Context, *v1.SetModeRequest) (*v1.SetModeResponse, error)
+	// Changes the agent's model and effort (owner only). A running agent
+	// restarts with them once its turns have ended; a paused one starts with them.
+	SetAgentSettings(context.Context, *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error)
 	Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error)
 	// Owner only: runs a teammate's turn request as their turn, or drops it.
 	ApproveTurn(context.Context, *v1.ApproveTurnRequest) (*v1.ApproveTurnResponse, error)
@@ -494,6 +510,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceSendMessageSpec(), Handler: adapter.sendMessage},
 		connect.Method{Spec: threadServiceInterruptSpec(), Handler: adapter.interrupt},
 		connect.Method{Spec: threadServiceSetModeSpec(), Handler: adapter.setMode},
+		connect.Method{Spec: threadServiceSetAgentSettingsSpec(), Handler: adapter.setAgentSettings},
 		connect.Method{Spec: threadServiceRetrySpec(), Handler: adapter.retry},
 		connect.Method{Spec: threadServiceApproveTurnSpec(), Handler: adapter.approveTurn},
 		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
@@ -604,6 +621,10 @@ func (UnimplementedThreadServiceHandler) Interrupt(context.Context, *v1.Interrup
 
 func (UnimplementedThreadServiceHandler) SetMode(context.Context, *v1.SetModeRequest) (*v1.SetModeResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SetMode is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) SetAgentSettings(context.Context, *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SetAgentSettings is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) Retry(context.Context, *v1.RetryRequest) (*v1.RetryResponse, error) {
@@ -729,6 +750,14 @@ func (c *threadServiceClient) Interrupt(ctx context.Context, req *v1.InterruptRe
 func (c *threadServiceClient) SetMode(ctx context.Context, req *v1.SetModeRequest) (*v1.SetModeResponse, error) {
 	var res v1.SetModeResponse
 	if err := c.client.CallUnary(ctx, threadServiceSetModeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) SetAgentSettings(ctx context.Context, req *v1.SetAgentSettingsRequest) (*v1.SetAgentSettingsResponse, error) {
+	var res v1.SetAgentSettingsResponse
+	if err := c.client.CallUnary(ctx, threadServiceSetAgentSettingsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -954,6 +983,18 @@ func (h threadServiceHandler) setMode(ctx context.Context, _ connect.Spec, strea
 		return err
 	}
 	res, err := h.svc.SetMode(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) setAgentSettings(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetAgentSettingsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetAgentSettings(ctx, &req)
 	if err != nil {
 		return err
 	}

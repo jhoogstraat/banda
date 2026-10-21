@@ -41,6 +41,10 @@ apply(chat, step('setup', 3));
 apply(chat, step('setup', 1)); // retry: only status changes in between, which add no item
 if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== 3)
 	throw new Error('a finished step running again should start a new checklist');
+apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'agentSettings', value: { model: 'm', effort: 'low' } } } as Event);
+const switched = chat.items.at(-1);
+if (switched?.kind !== 'settings' || switched.actor !== 'alice' || switched.settings.model !== 'm')
+	throw new Error('agentSettings should become a divider naming who switched');
 
 // Steps between texts fold into one group; a subagent's calls nest in its Task call; TodoWrite sets the plan.
 const plan = (statuses: string[]) =>

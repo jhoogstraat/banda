@@ -1,8 +1,9 @@
 #!/bin/bash
 # Fake Claude Code for tests: logged in unless `auth logout` ran, and emits
 # stream-json turns like the real CLI, creating one file per prompt (holding
-# the prompt's stream-json line). A prompt that mentions "preview" starts a web
-# server on :5173 instead (the Browser tab).
+# the prompt's stream-json line). Replies name the --model and --effort it was
+# started with. A prompt that mentions "preview" starts a web server on :5173
+# instead (the Browser tab).
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -12,6 +13,14 @@ if [ "$1" = auth ]; then
   esac
   exit
 fi
+model=default effort=default
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model) model=$2; shift ;;
+    --effort) effort=$2; shift ;;
+  esac
+  shift
+done
 while IFS= read -r line; do
   case "$line" in
     *control_request*) echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1}' ;;
@@ -28,7 +37,7 @@ JSON
     *'"type":"user"'*)
       n=$(( $(ls hello*.txt 2>/dev/null | wc -l) + 1 )); printf 'hello %s\n%s\n' "$n" "$line" > "hello$n.txt"; sleep 1
       cat <<JSON
-{"type":"system","subtype":"init","session_id":"s","model":"fake"}
+{"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_a$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"in_progress","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"pending","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_a$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
@@ -44,7 +53,7 @@ JSON
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_$n","type":"tool_result","content":"ok","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
-{"type":"assistant","message":{"content":[{"type":"text","text":"Created hello$n.txt"}]},"parent_tool_use_id":null}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Created hello$n.txt with $model · $effort"}]},"parent_tool_use_id":null}
 {"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":0.01}
 JSON
       ;;

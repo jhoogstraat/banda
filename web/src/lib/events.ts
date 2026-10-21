@@ -1,5 +1,5 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
+import type { AgentSettings, Event, Mode, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
 
 // A subagent's (Task's) calls nest in `children`.
 export type Tool = { kind: 'tool'; call: ToolCall; result?: ToolResult; children: Tool[] };
@@ -15,6 +15,7 @@ export type Item =
 	| { kind: 'request'; seq: bigint; actor: string; text: string; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
 	| { kind: 'mode'; mode: Mode }
+	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'setup'; steps: SetupStep[] };
 
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
@@ -125,6 +126,9 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'modeChanged':
 			chat.items.push({ kind: 'mode', mode: k.value.mode });
+			break;
+		case 'agentSettings':
+			chat.items.push({ kind: 'settings', actor: e.actor, settings: k.value });
 			break;
 	}
 }

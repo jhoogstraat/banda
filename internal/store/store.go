@@ -161,8 +161,8 @@ func (s *Store) Update(ctx context.Context, id string, fn func(*Thread) ([]*band
 	}
 	var seq int64
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
-		turns=$8, requests=$9, trusted=$10, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
-		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted).Scan(&seq, &t.UpdatedAt)
+		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, last_seq=last_seq+$6, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

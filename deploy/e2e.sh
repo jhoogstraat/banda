@@ -16,6 +16,8 @@ wait_for() {
 ok() { echo "ok - $*"; }
 fail() { echo "not ok - $*"; exit 1; }
 sql() { kc exec postgres-0 -- psql -U banda -tAc "$1"; }
+# The agent's latest reply in thread $ID (the fake names its model and effort).
+reply() { sql "select body->'agentText'->>'text' from events where thread_id='$ID' and body ? 'agentText' order by seq desc limit 1"; }
 # Output of a terminal stream (OpenTerminal, OpenLoginTerminal).
 term() { mise exec -- buf curl --schema proto --protocol connect -H "X-Banda-User: ${3:-dev}" --data "$2" "$API/banda.v1.$1" | jq -r '.data // empty' | base64 -d; }
 # What a server stream sent within 4 s, one JSON object per message.
@@ -135,6 +137,19 @@ call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" bob 
 call ThreadService/SetMode "{\"threadId\":\"$ID\",\"mode\":\"MODE_AGENT\"}" >/dev/null
 ok "only the owner ends chat mode"
 
+reply | grep -q "with claude-opus-5-5 · high"
+call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"model\":\"claude-haiku-5-5\"}" bob >/dev/null 2>&1 && fail "bob changed the model"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"keep going\"}}" >/dev/null
+call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"model\":\"claude-sonnet-5-5\",\"effort\":\"medium\"}" >/dev/null
+[ "$(thread model) $(thread effort)" = "claude-sonnet-5-5 medium" ]
+sleep 1; wait_for STATUS_AWAITING_INPUT
+reply | grep -q "with claude-opus-5-5 · high" || fail "the running turn was cut short or switched: $(reply)"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"and again\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+reply | grep -q "with claude-sonnet-5-5 · medium" || fail "the agent did not restart with the new settings: $(reply)"
+[ "$(sql "select body->>'actor' from events where thread_id='$ID' and body->'agentSettings'->>'model'='claude-sonnet-5-5'")" = dev ]
+ok "the owner switches model and effort mid-thread: the running turn finishes, the next one runs on the new settings, the chat records it"
+
 kc exec "t-$ID" -- sh -c 'curl -sf -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"' | grep -q read_thread
 ok "the Banda MCP server is reachable from the sandbox"
 
@@ -182,10 +197,12 @@ stream ThreadService/PreviewWatch "{\"threadId\":\"$ID\",\"wake\":true}" bob >/d
 [ "$(thread status)" = STATUS_SUSPENDED ]
 ok "the preview of a paused environment says so and does not wake it; teammates can't wake it"
 
+call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"effort\":\"max\"}" >/dev/null
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
-thread diff | grep -q hello4.txt
-ok "a prompt resumes the environment with the checkout intact"
+reply | grep -q "with claude-sonnet-5-5 · max" || fail "settings changed while paused were not applied: $(reply)"
+thread diff | grep -q hello6.txt
+ok "a prompt resumes the environment with the checkout intact and the settings changed while paused"
 thread diff | grep -q "$SECRET" && fail "the diff contains a secret"
 thread diff | grep -q '\[redacted\]'
 ok "secrets are redacted from the diff"

@@ -12,6 +12,9 @@ service ThreadService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
   rpc Interrupt(InterruptRequest) returns (InterruptResponse);
   rpc SetMode(SetModeRequest) returns (SetModeResponse);
+  // Changes the agent's model and effort (owner only). A running agent
+  // restarts with them once its turns have ended; a paused one starts with them.
+  rpc SetAgentSettings(SetAgentSettingsRequest) returns (SetAgentSettingsResponse);
   rpc Retry(RetryRequest) returns (RetryResponse);
   // Owner only: runs a teammate's turn request as their turn, or drops it.
   rpc ApproveTurn(ApproveTurnRequest) returns (ApproveTurnResponse);
@@ -162,6 +165,8 @@ message Event {
     PresenceChanged presence_changed = 22;
     // Ephemeral (seq 0): the actor is typing in the composer.
     Typing typing = 23;
+    // The owner changed the model or effort; actor is the owner.
+    AgentSettings agent_settings = 26;
   }
 }
 
@@ -317,6 +322,21 @@ message SetModeRequest {
 }
 
 message SetModeResponse {}
+
+// The agent's model and effort.
+message AgentSettings {
+  string model = 1;
+  string effort = 2;
+}
+
+message SetAgentSettingsRequest {
+  string thread_id = 1;
+  // Empty keeps the current value.
+  string model = 2;
+  string effort = 3;
+}
+
+message SetAgentSettingsResponse {}
 
 message RetryRequest {
   string thread_id = 1;
@@ -642,6 +662,9 @@ message ConnectResponse {
     TerminalResize terminal_resize = 6;
     TerminalClose terminal_close = 7;
     FileRequest file_request = 8;
+    // Sent on connect and on every change. The runner restarts the agent with
+    // them when no turn is running.
+    AgentSettings agent_settings = 9;
     HttpTunnel http_tunnel = 11;
   }
 }
