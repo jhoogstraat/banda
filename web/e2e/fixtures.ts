@@ -50,10 +50,12 @@ const run = (cmd: string, args: string[], input?: string) =>
 		if (input !== undefined) p.stdin!.end(input);
 	});
 
-/** kubectl in the run's namespace. Only for facts no API exposes. */
-export const kube = (...args: string[]) => run('kubectl', ['--context', 'kind-banda', '-n', NAMESPACE, ...args]);
-/** Runs a shell command in a pod of the run's namespace. */
-export const kexec = (pod: string, command: string) => kube('exec', pod, '--', 'sh', '-c', command);
+/** kubectl in the namespace. Only for facts no API exposes. */
+export const kubeIn = (ns: string, ...args: string[]) => run('kubectl', ['--context', 'kind-banda', '-n', ns, ...args]);
+/** kubectl in the run's namespace. */
+export const kube = (...args: string[]) => kubeIn(NAMESPACE, ...args);
+/** Runs a shell command in a pod of the run's namespace, or of ns. */
+export const kexec = (pod: string, command: string, ns = NAMESPACE) => kubeIn(ns, 'exec', pod, '--', 'sh', '-c', command);
 /** Whether the object exists in the run's namespace. */
 export const exists = (kind: string, name: string) =>
 	kube('get', kind, name, '--ignore-not-found', '-o', 'name').then((out) => out.trim() !== '');
@@ -421,7 +423,7 @@ export class Api {
 
 	async start() {
 		const port = Number(new URL(this.url || 'http://x').port) || (await freePort());
-		await run('../deploy/dev.sh', ['host-api', NAMESPACE, String(port)]); // its sandboxes may reach it (deploy/sandbox-policy.yaml)
+		await run('../deploy/dev.sh', ['host-api', this.namespace, String(port)]); // its sandboxes may reach it (deploy/sandbox-policy.yaml)
 		this.url = `http://localhost:${port}`;
 		this.log = `${DIR}/api-${port}.log`;
 		const out = openSync(this.log, 'a');
@@ -445,6 +447,11 @@ export class Api {
 		);
 	}
 
+	/** Where its sandboxes run. */
+	get namespace() {
+		return this.env.SANDBOX_NAMESPACE ?? NAMESPACE;
+	}
+
 	async stop() {
 		const p = this.proc;
 		if (!p || p.exitCode !== null) return;
@@ -465,14 +472,17 @@ type Fixtures = {
 	/**
 	 * Starts an API of this test's own (see Api) on a fresh database, so neither its schema nor its sweeps touch
 	 * other tests' threads; sharedDatabase puts it on the run's. query is added to its DATABASE_URL, e.g. pool_max_conns=1.
+	 * namespace gives it a fresh namespace with the sandbox policies, for settings that apply to a whole namespace
+	 * (SANDBOX_EGRESS_ALLOW); its threads clone file:///opt/e2e/<repo>.git there, as e2e-git is out of reach.
 	 */
-	startApi: (env?: Record<string, string>, opts?: { sharedDatabase?: boolean; query?: string }) => Promise<Api>;
+	startApi: (env?: Record<string, string>, opts?: { sharedDatabase?: boolean; query?: string; namespace?: boolean }) => Promise<Api>;
 };
 
 export const test = base.extend<Fixtures>({
 	startApi: async ({}, use) => {
 		const apis: Api[] = [];
 		const dbs: string[] = [];
+		const namespaces: string[] = [];
 		await use(async (env = {}, opts = {}) => {
 			let db = DB;
 			if (!opts.sharedDatabase) {
@@ -482,6 +492,14 @@ export const test = base.extend<Fixtures>({
 			}
 			const url = `${process.env.DATABASE_URL!.replace(/\/[^/?]*(\?.*)?$/, `/${db}`)}${opts.query ? `?${opts.query}` : ''}`;
 			env = { DATABASE_URL: url, ...env };
+			if (opts.namespace) {
+				const ns = `${NAMESPACE}-${randomBytes(3).toString('hex')}`;
+				namespaces.push(ns);
+				await kubeIn(ns, 'create', 'namespace', ns);
+				await kubeIn(ns, 'label', 'namespace', ns, `banda.dev/e2e-run=${NAMESPACE}`); // deploy/dev.sh deletes leftovers
+				await kubeIn(ns, 'apply', '-f', '../deploy/sandbox-policy.yaml');
+				env = { SANDBOX_NAMESPACE: ns, ...env };
+			}
 			const api = new Api(env, db);
 			apis.push(api);
 			await api.start();
@@ -489,6 +507,7 @@ export const test = base.extend<Fixtures>({
 		});
 		await Promise.all(apis.map((a) => a.stop()));
 		for (const db of dbs) await sql(`DROP DATABASE ${db} WITH (FORCE)`);
+		for (const ns of namespaces) await kubeIn(ns, 'delete', 'namespace', ns, '--wait=false');
 	},
 	// Depends on startApi, so it tears down first, while the test's own APIs still run.
 	as: async ({ browser, startApi: _ }, use, testInfo) => {
