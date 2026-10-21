@@ -101,7 +101,8 @@ e2e() {
 	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
 	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
 	local api_pid=$PID
-	OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
+	# It shares the database but leaves sweeps to the main API, whose watchers see what they change.
+	IDLE_SWEEP_EVERY=24h OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
 		ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://host.containers.internal:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
 	until_ok oidc-api listening "$op"
 	PID=$api_pid until_ok api listening "$p"
