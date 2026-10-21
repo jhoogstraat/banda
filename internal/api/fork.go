@@ -61,6 +61,7 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 			BaseBranch:    src.BaseBranch,
 			Model:         or(try.Model, src.Model),
 			Effort:        or(try.Effort, src.Effort),
+			Profile:       src.Profile,
 			PendingPrompt: prompt,
 			Diff:          src.Diff, // also what the runner applies, see ForkPatch
 			ForkedFrom:    src.ID,
@@ -106,6 +107,7 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 			BaseBranch:     req.BaseBranch,
 			Model:          try.Model,
 			Effort:         try.Effort,
+			Profile:        req.Profile,
 			PendingPrompt:  req.Prompt,
 			RaceID:         race,
 			PermissionMode: mode,

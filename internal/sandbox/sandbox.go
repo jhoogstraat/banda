@@ -261,6 +261,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_BRANCH":                 t.Branch,
 		"BANDA_MODEL":                  t.Model,
 		"BANDA_EFFORT":                 t.Effort,
+		"BANDA_PROFILE":                t.Profile,
 		"BANDA_AUTH_METHOD":            authMethod,
 		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
 	}

@@ -12,8 +12,9 @@ service ThreadService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
   rpc Interrupt(InterruptRequest) returns (InterruptResponse);
   rpc SetMode(SetModeRequest) returns (SetModeResponse);
-  // Changes the agent's model and effort (owner only). A running agent
-  // restarts with them once its turns have ended; a paused one starts with them.
+  // Changes the agent's model, effort and profile (owner only). A running
+  // agent restarts with them once its turns have ended; a paused one starts
+  // with them.
   rpc SetAgentSettings(SetAgentSettingsRequest) returns (SetAgentSettingsResponse);
   rpc Retry(RetryRequest) returns (RetryResponse);
   // Owner only: runs a teammate's turn request as their turn, or drops it.
@@ -110,6 +111,8 @@ service SettingsService {
   // an environment variable. Reserved names (harness credentials) are refused.
   rpc SetSecret(SetSecretRequest) returns (SetSecretResponse);
   rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
+  // The profile of the caller's new threads that don't name one.
+  rpc SetDefaultProfile(SetDefaultProfileRequest) returns (SetDefaultProfileResponse);
   // A terminal in the caller's login environment: a small pod that mounts
   // only the caller's harness config volume, started on demand. It runs the
   // harness's login or logout command. Output streams until it exits.
@@ -189,6 +192,8 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // Who the agent works with, see AgentSettings.
+  string profile = 31;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -261,7 +266,8 @@ message Event {
     PresenceChanged presence_changed = 22;
     // Ephemeral (seq 0): the actor is typing in the composer.
     Typing typing = 23;
-    // The owner changed the model or effort; actor is the owner.
+    // The owner changed the model or effort (both set), the profile (set
+    // when it changed) or both; actor is the owner.
     AgentSettings agent_settings = 26;
     // Where the work lives changed, e.g. after an auto-push.
     AutoPush auto_push = 29;
@@ -438,6 +444,8 @@ message CreateThreadRequest {
   string prompt = 5;
   // Unspecified: bypass.
   PermissionMode permission_mode = 6;
+  // Empty: the owner's default profile.
+  string profile = 7;
 }
 
 message CreateThreadResponse {
@@ -481,10 +489,13 @@ message SetModeRequest {
 
 message SetModeResponse {}
 
-// The agent's model and effort.
+// The agent's model, effort and profile.
 message AgentSettings {
   string model = 1;
   string effort = 2;
+  // Who the agent works with: "engineer" (Claude Code as it is), "spec",
+  // "devops" or "business". Its text is appended to the system prompt.
+  string profile = 3;
 }
 
 message SetAgentSettingsRequest {
@@ -492,6 +503,7 @@ message SetAgentSettingsRequest {
   // Empty keeps the current value.
   string model = 2;
   string effort = 3;
+  string profile = 4;
 }
 
 message SetAgentSettingsResponse {}
@@ -731,6 +743,8 @@ message GetSettingsRequest {}
 message GetSettingsResponse {
   repeated HarnessAccount accounts = 1;
   repeated SecretInfo secrets = 2;
+  // The profile of new threads that don't name one.
+  string default_profile = 3;
 }
 
 message SetAuthMethodRequest {
@@ -755,6 +769,12 @@ message DeleteSecretRequest {
 }
 
 message DeleteSecretResponse {}
+
+message SetDefaultProfileRequest {
+  string profile = 1;
+}
+
+message SetDefaultProfileResponse {}
 
 enum LoginAction {
   LOGIN_ACTION_UNSPECIFIED = 0;
@@ -1073,6 +1093,8 @@ message RaceRequest {
   repeated RaceTry tries = 4;
   // Every try's; unspecified: bypass.
   PermissionMode permission_mode = 5;
+  // Every try's; empty: the caller's default profile.
+  string profile = 6;
 }
 
 message RaceResponse {

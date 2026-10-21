@@ -235,6 +235,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Branch:      t.Branch,
 		Model:       t.Model,
 		Effort:      t.Effort,
+		Profile:     t.Profile,
 		Status:      statusToProto[t.Status],
 		Mode:        modeToProto[t.Mode],
 		Diff:        t.Diff,

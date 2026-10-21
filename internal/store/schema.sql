@@ -159,3 +159,7 @@ CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAG
   AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
 CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
+-- Who the agent works with (see AgentSettings.profile), and each user's
+-- profile for new threads that don't name one.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS profile text NOT NULL DEFAULT 'engineer';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_profile text NOT NULL DEFAULT 'engineer';

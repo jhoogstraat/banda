@@ -25,15 +25,15 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 		return nil, err
 	}
 	t, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: user(ctx)}, RepoURL: req.RepoUrl,
-		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, PermissionMode: mode}, user(ctx), req.Prompt)
+		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, Profile: req.Profile, PermissionMode: mode}, user(ctx), req.Prompt)
 	if err != nil {
 		return nil, err
 	}
 	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
 }
 
-// create starts a thread (owner, repo, base, model, effort, permission mode and
-// parent taken from t, see start) with its first prompt, posted by `by`.
+// create starts a thread (owner, repo, base, model, effort, profile, permission
+// mode and parent taken from t, see start) with its first prompt, posted by `by`.
 func (s *Service) create(ctx context.Context, t store.Thread, by, prompt string) (store.Thread, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
@@ -66,12 +66,21 @@ func checkRepoURL(repo string) error {
 
 // start stores a new thread, posts its first message (if any) as `by` (the
 // owner, or the agent that spawned it) and provisions its environment. It sets the id and branch,
-// and the defaults for what t leaves empty.
+// and the defaults for what t leaves empty (the profile: the owner's default).
 func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
 	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	t.PermissionMode = or(t.PermissionMode, "bypass")
 	// Here, so forks of a thread created with a credentialed URL are refused too.
 	if err := checkRepoURL(t.RepoURL); err != nil {
+		return t, err
+	}
+	if t.Profile == "" {
+		var err error
+		if t.Profile, err = s.store.DefaultProfile(ctx, t.OwnerID); err != nil {
+			return t, err
+		}
+	}
+	if err := checkProfile(t.Profile); err != nil {
 		return t, err
 	}
 	t.ID = strings.ToLower(rand.Text())
@@ -180,17 +189,31 @@ func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*ba
 }
 
 func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSettingsRequest) (*bandav1.SetAgentSettingsResponse, error) {
+	if req.Profile != "" {
+		if err := checkProfile(req.Profile); err != nil {
+			return nil, err
+		}
+	}
 	var changed *bandav1.AgentSettings
 	_, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if err := t.CheckOwner(user(ctx)); err != nil {
 			return nil, err
 		}
-		if or(req.Model, t.Model) == t.Model && or(req.Effort, t.Effort) == t.Effort {
+		model, effort, profile := or(req.Model, t.Model), or(req.Effort, t.Effort), or(req.Profile, t.Profile)
+		if model == t.Model && effort == t.Effort && profile == t.Profile {
 			return nil, nil
 		}
-		t.Model, t.Effort = or(req.Model, t.Model), or(req.Effort, t.Effort)
+		// The event says what changed, so the chat's divider can.
+		event := &bandav1.AgentSettings{}
+		if model != t.Model || effort != t.Effort {
+			event.Model, event.Effort = model, effort
+		}
+		if profile != t.Profile {
+			event.Profile = profile
+		}
+		t.Model, t.Effort, t.Profile = model, effort, profile
 		changed = agentSettings(*t)
-		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: changed}}}, nil
+		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: event}}}, nil
 	})
 	if err != nil {
 		return nil, err
@@ -203,7 +226,18 @@ func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSet
 }
 
 func agentSettings(t store.Thread) *bandav1.AgentSettings {
-	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort}
+	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort, Profile: t.Profile}
+}
+
+// profiles are the agent's profiles. Their texts are the runner's
+// (cmd/runner/profiles), which a repo may replace.
+var profiles = []string{"engineer", "spec", "devops", "business"}
+
+func checkProfile(p string) error {
+	if !slices.Contains(profiles, p) {
+		return connect.NewError(connect.CodeInvalidArgument, "the profile must be engineer, spec, devops or business")
+	}
+	return nil
 }
 
 func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav1.RetryResponse, error) {

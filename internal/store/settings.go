@@ -73,6 +73,22 @@ func (s *Store) DeleteSecret(ctx context.Context, userID, name string) error {
 	return err
 }
 
+// DefaultProfile is the profile of the user's new threads that don't name one.
+func (s *Store) DefaultProfile(ctx context.Context, userID string) (string, error) {
+	profile := "engineer"
+	err := s.db.QueryRow(ctx, `SELECT default_profile FROM users WHERE id = $1`, userID).Scan(&profile)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = nil
+	}
+	return profile, err
+}
+
+func (s *Store) SetDefaultProfile(ctx context.Context, userID, profile string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, default_profile) VALUES ($1, $1, $2)
+		ON CONFLICT (id) DO UPDATE SET default_profile = excluded.default_profile`, userID, profile)
+	return err
+}
+
 // NewLoginToken gives the user's login environment a new runner token,
 // creating the user if needed. Only its hash is kept.
 func (s *Store) NewLoginToken(ctx context.Context, userID string) (string, error) {

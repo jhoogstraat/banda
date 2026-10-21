@@ -17,7 +17,7 @@ func (s *Service) SpawnThread(ctx context.Context, req *bandav1.SpawnThreadReque
 	if err != nil {
 		return nil, err
 	}
-	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort)
+	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort, "")
 	if err != nil {
 		return nil, err
 	}
@@ -37,10 +37,10 @@ func (s *Service) LineageChildren(ctx context.Context, req *bandav1.LineageChild
 }
 
 // spawn creates a sub-thread of parent owned by owner and announces it in the
-// parent as actor. Repo, model and effort default to the parent's. The base
+// parent as actor. Repo, model, effort and profile default to the parent's. The base
 // defaults to the parent's branch once it was pushed (its commits are on
 // origin), else to the parent's base branch; for another repo, see start.
-func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, prompt, repo, base, model, effort string) (store.Thread, error) {
+func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, prompt, repo, base, model, effort, profile string) (store.Thread, error) {
 	repo = or(repo, parent.RepoURL)
 	if base == "" && repo == parent.RepoURL {
 		base = parent.BaseBranch
@@ -55,7 +55,7 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 		by = "agent:" + parent.ID
 	}
 	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, ParentID: parent.ID, RepoURL: repo,
-		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort),
+		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort), Profile: or(profile, parent.Profile),
 		PermissionMode: parent.PermissionMode}, by, prompt) // an agent's sub-thread asks no less than it does
 	if err != nil {
 		return child, err
