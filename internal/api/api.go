@@ -141,8 +141,13 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 
 func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageRequest) (*bandav1.SendMessageResponse, error) {
 	m := req.Message
-	if m == nil || strings.TrimSpace(m.Text) == "" {
+	if m == nil || strings.TrimSpace(m.Text) == "" && len(m.Review) == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "message text is required")
+	}
+	for _, c := range m.Review {
+		if c.Path == "" || strings.TrimSpace(c.Body) == "" || c.StartLine < 1 || c.EndLine < c.StartLine {
+			return nil, connect.NewError(connect.CodeInvalidArgument, "a review comment needs a path, lines and text")
+		}
 	}
 	by, id := user(ctx), req.ThreadId
 	before, err := s.store.Get(ctx, id)
@@ -161,7 +166,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		// Only MCP posts as "agent:<thread>", and it lets an agent start turns
 		// only in threads of its own owner.
 		next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
-			MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:")})
+			MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +175,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		if eff == thread.RequestTurn {
 			posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
 		}
-		prompt = turnPrompt(t, eff, names, unseen, by, m.Text)
+		prompt = turnPrompt(t, eff, names, unseen, by, m)
 		events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
 		t.State = next
 		return events, nil
@@ -197,7 +202,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 // stored event, given the thread's events since at least its delivered seq.
 // It marks them delivered, and for a suspended thread (Provision) keeps the
 // prompt as pending. Other effects start no turn: it returns "".
-func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by, text string) string {
+func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message) string {
 	if eff != thread.StartTurn && eff != thread.Provision {
 		return ""
 	}
@@ -207,7 +212,7 @@ func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, uns
 			fresh = append(fresh, e)
 		}
 	}
-	prompt := agentPrompt(t.OwnerID, names, fresh, by, text)
+	prompt := agentPrompt(t.OwnerID, names, fresh, by, m)
 	t.DeliveredSeq = t.LastSeq + 1 // the event stored next
 	if eff == thread.Provision {   // suspended: deliver once the environment is back
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
@@ -248,7 +253,7 @@ func (s *Service) resolve(ctx context.Context, id string, seq int64, approve boo
 			return nil, thread.ErrNoRequest
 		}
 		effect = eff
-		prompt = turnPrompt(t, eff, names, events, r.Actor, r.GetTurnRequest().GetMessage().GetText())
+		prompt = turnPrompt(t, eff, names, events, r.Actor, r.GetTurnRequest().GetMessage())
 		out := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_TurnRequestResolved{
 			TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: seq, Approved: approve, Note: note}}}},
 			stateEvents(t.State, next)...)

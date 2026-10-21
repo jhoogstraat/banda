@@ -150,6 +150,23 @@ reply | grep -q "with claude-sonnet-5-5 · medium" || fail "the agent did not re
 [ "$(sql "select body->>'actor' from events where thread_id='$ID' and body->'agentSettings'->>'model'='claude-sonnet-5-5'")" = dev ]
 ok "the owner switches model and effort mid-thread: the running turn finishes, the next one runs on the new settings, the chat records it"
 
+REVIEW='{"path":"hello1.txt","startLine":1,"endLine":1,"code":"+hello 1","body":"e2e: say hi instead"}'
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[{\"path\":\"x\",\"startLine\":1,\"endLine\":1,\"body\":\" \"}]}}" >/dev/null 2>&1 && fail "a review comment without text was accepted"
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[$REVIEW]}}" >/dev/null
+[ "$(thread status)" = STATUS_AWAITING_INPUT ] && [ "$(thread mode)" = MODE_AGENT ]
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent please address these review comments.\",\"mentionsAgent\":true,\"review\":[$REVIEW]}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+thread diff | grep -q 'hello1.txt, line 1:.*+hello 1.*e2e: say hi instead' || fail "the agent did not get the review"
+ok "the owner's review is a note until it asks @agent; then the agent gets each comment with its code"
+
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"@agent see my review\",\"mentionsAgent\":true,\"review\":[{\"path\":\"hello2.txt\",\"startLine\":1,\"endLine\":1,\"code\":\"+hello 2\",\"body\":\"e2e: bob reviews\"}]}}" bob >/dev/null
+sleep 2
+[ "$(thread turnRequests)" = 1 ] && ! thread diff | grep -q 'e2e: bob reviews' || fail "bob's review ran without approval"
+call ThreadService/ApproveTurn "{\"threadId\":\"$ID\",\"requestSeq\":$(request)}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+thread diff | grep -q 'bob: @agent see my review.*hello2.txt, line 1:.*e2e: bob reviews' || fail "the approved review did not reach the agent"
+ok "a teammate's review asking @agent waits for approval, then reaches the agent with its comments"
+
 kc exec "t-$ID" -- sh -c 'curl -sf -X POST "$BANDA_API_URL/mcp" -H "Authorization: Bearer $BANDA_RUNNER_TOKEN" -H "X-Banda-Thread: $BANDA_THREAD_ID" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"' | grep -q read_thread
 ok "the Banda MCP server is reachable from the sandbox"
 
@@ -223,7 +240,7 @@ call ThreadService/SetAgentSettings "{\"threadId\":\"$ID\",\"effort\":\"max\"}" 
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"wake up\"}}" >/dev/null
 sleep 1; wait_for STATUS_AWAITING_INPUT
 reply | grep -q "with claude-sonnet-5-5 · max" || fail "settings changed while paused were not applied: $(reply)"
-thread diff | grep -q hello6.txt
+thread diff | grep -q hello8.txt
 ok "a prompt resumes the environment with the checkout intact and the settings changed while paused"
 thread diff | grep -q "Sub-thread $CHILD" || fail "the parent agent's prompt does not mention its sub-thread"
 ok "the parent agent hears of its sub-threads in its next prompt"

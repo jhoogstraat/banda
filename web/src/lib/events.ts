@@ -1,5 +1,5 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { AgentSettings, Event, LineageUpdate, Mode, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
+import type { AgentSettings, Event, LineageUpdate, Mode, ReviewComment, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
 
 // A subagent's (Task's) calls nest in `children`.
 export type Tool = { kind: 'tool'; call: ToolCall; result?: ToolResult; children: Tool[] };
@@ -8,11 +8,11 @@ export type Step = Tool | { kind: 'thinking'; text: string };
 export type Todo = { content: string; status: 'pending' | 'in_progress' | 'completed'; activeForm?: string };
 
 export type Item =
-	| { kind: 'message'; actor: string; text: string; time?: Timestamp }
+	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; time?: Timestamp }
 	| { kind: 'text' | 'notice'; text: string }
 	| { kind: 'steps'; steps: Step[] }
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
-	| { kind: 'request'; seq: bigint; actor: string; text: string; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
+	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
@@ -63,14 +63,14 @@ export function apply(chat: Chat, e: Event) {
 	switch (k.case) {
 		case 'message':
 			delete chat.typing[e.actor];
-			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
+			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, time: e.time });
 			break;
 		case 'lineageUpdate':
 			chat.items.push({ kind: 'lineage', actor: e.actor, update: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];
-			chat.items.push({ kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', time: e.time });
+			chat.items.push({ kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', review: k.value.message?.review ?? [], time: e.time });
 			break;
 		case 'turnRequestResolved': {
 			const seq = k.value.requestSeq;

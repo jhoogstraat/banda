@@ -39,7 +39,7 @@ func TestLineageStatus(t *testing.T) {
 func TestLineageInPrompt(t *testing.T) {
 	u := &bandav1.Event{Actor: "system", Kind: &bandav1.Event_LineageUpdate{LineageUpdate: &bandav1.LineageUpdate{
 		ThreadId: "c1", Title: "fix the parser", Status: bandav1.Status_STATUS_AWAITING_INPUT, Text: "Fixed it."}}}
-	got := agentPrompt("u1", nil, []*bandav1.Event{u}, "u1", "next?")
+	got := agentPrompt("u1", nil, []*bandav1.Event{u}, "u1", &bandav1.Message{Text: "next?"})
 	if !strings.Contains(got, `[Sub-thread c1 "fix the parser" finished] Fixed it.`) || !strings.HasSuffix(got, "u1: next?") {
 		t.Errorf("prompt: %q", got)
 	}
