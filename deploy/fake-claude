@@ -4,9 +4,9 @@
 # the prompt's stream-json line). Replies name the --model and --effort it was
 # started with. A prompt that mentions "preview" starts a web server on :5173
 # instead (the Browser tab). One that says "commit" also commits. "e2e-ask"
-# runs a Bash command that asks for permission first (unless the mode
-# bypasses), "e2e-plan" proposes a plan in plan mode (ExitPlanMode); both act
-# on the answer.
+# runs a Bash command (its description holds $E2E_SECRET, for redaction) that
+# asks for permission first (unless the mode bypasses), "e2e-plan" proposes a
+# plan in plan mode (ExitPlanMode); both act on the answer.
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -61,7 +61,7 @@ while IFS= read -r line; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-ask*'"type":"user"'*)
-      tool "toolu_ask$RANDOM" Bash '{"command":"echo e2e-permitted >> permitted.txt","description":"Append a line"}' ran
+      tool "toolu_ask$RANDOM" Bash '{"command":"echo e2e-permitted >> permitted.txt","description":"Append a line, not '"${E2E_SECRET:-}"'"}' ran
       if [ -n "$ok" ]; then echo e2e-permitted >> permitted.txt; say "Ran it"; else say "Not allowed: $out"; fi
       ;;
     *e2e-plan*'"type":"user"'*)
