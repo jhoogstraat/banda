@@ -4,7 +4,7 @@ A web app where a team builds software together with coding agents. Each thread 
 
 ## Layout
 
-- `cmd/api`: Go API (Connect RPC, OIDC sign-in, MCP at `/mcp`). `internal/` holds its packages: `api`, `thread` (state machine), `sandbox` (agent-sandbox pods), `store` (Postgres).
+- `cmd/api`: Go API (Connect RPC, OIDC sign-in, MCP at `/mcp`). `internal/` holds its packages: `api`, `thread` (state machine), `sandbox` (agent-sandbox pods), `store` (Postgres), `tunnel` (preview connections over the runner's stream, shared with the runner).
 - `cmd/runner`: runs inside each sandbox pod, drives the unmodified `claude` CLI and calls back to the API.
 - `proto/` → `gen/` via `mise run gen` (buf). Don't edit `gen/`.
 - `web/`: SvelteKit static SPA (Svelte 5, shadcn-svelte, pnpm).
