@@ -377,7 +377,7 @@
 						<a href="/t/{u.threadId}" class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
 							<GitForkIcon class="size-3.5 shrink-0" />
 							<StatusDot status={u.status} />
-							<span class="truncate"><span class="font-medium text-foreground">{u.title}</span> {lineageVerb[u.status]}{u.text ? `: ${u.text}` : ''}</span>
+							<span class="truncate"><span class="font-medium text-foreground">{u.title}</span> {lineageVerb[u.status]}{u.status === Status.STARTING && item.actor !== 'agent' ? ` by ${userName(item.actor)}` : ''}{u.text ? `: ${u.text}` : ''}</span>
 						</a>
 					{:else if item.kind === 'notice'}
 						<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">

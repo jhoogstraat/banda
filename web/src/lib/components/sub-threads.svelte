@@ -21,7 +21,7 @@
 </script>
 
 {#if children.length}
-	<nav class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-1.5 text-xs" aria-label="Sub-threads">
+	<nav class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-1.5 text-xs [scrollbar-width:none]" aria-label="Sub-threads">
 		<span class="flex shrink-0 items-center gap-1 text-muted-foreground"><GitForkIcon class="size-3.5" /> {children.length}</span>
 		{#each children as c (c.id)}
 			<a

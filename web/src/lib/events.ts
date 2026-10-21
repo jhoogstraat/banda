@@ -15,7 +15,7 @@ export type Item =
 	| { kind: 'request'; seq: bigint; actor: string; text: string; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
 	// A sub-thread was spawned, finished its turns or failed.
-	| { kind: 'lineage'; update: LineageUpdate }
+	| { kind: 'lineage'; actor: string; update: LineageUpdate }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'setup'; steps: SetupStep[] };
 
@@ -65,7 +65,7 @@ export function apply(chat: Chat, e: Event) {
 			chat.items.push({ kind: 'message', actor: e.actor, text: k.value.text, time: e.time });
 			break;
 		case 'lineageUpdate':
-			chat.items.push({ kind: 'lineage', update: k.value });
+			chat.items.push({ kind: 'lineage', actor: e.actor, update: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];
