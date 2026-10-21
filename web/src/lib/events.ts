@@ -1,5 +1,17 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type { AgentSettings, Event, Mode, ReviewComment, SetupStep, ToolCall, ToolResult, TurnEnded, TurnRequestResolved } from './gen/banda/v1/banda_pb.ts';
+import type {
+	AgentSettings,
+	Event,
+	Mode,
+	PermissionRequested,
+	PermissionResolved,
+	ReviewComment,
+	SetupStep,
+	ToolCall,
+	ToolResult,
+	TurnEnded,
+	TurnRequestResolved
+} from './gen/banda/v1/banda_pb.ts';
 
 // A subagent's (Task's) calls nest in `children`.
 export type Tool = { kind: 'tool'; call: ToolCall; result?: ToolResult; children: Tool[] };
@@ -13,6 +25,8 @@ export type Item =
 	| { kind: 'steps'; steps: Step[] }
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
 	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
+	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
+	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
@@ -99,6 +113,18 @@ export function apply(chat: Chat, e: Event) {
 		case 'toolResult': {
 			const tool = chat.tools.get(k.value.toolCallId);
 			if (tool) tool.result = k.value;
+			break;
+		}
+		case 'permissionRequested': {
+			const r = k.value;
+			const call = { id: r.toolCallId, name: r.toolName, inputJson: r.inputJson } as ToolCall;
+			chat.items.push({ kind: 'permission', req: r, tool: chat.tools.get(r.toolCallId) ?? { kind: 'tool', call, children: [] } });
+			break;
+		}
+		case 'permissionResolved': {
+			const id = k.value.id;
+			const req = chat.items.findLast((i): i is Extract<Item, { kind: 'permission' }> => i.kind === 'permission' && i.req.id === id);
+			if (req) req.resolved = { ...k.value, by: e.actor };
 			break;
 		}
 		case 'turnEnded':

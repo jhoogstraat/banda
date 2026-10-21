@@ -13,7 +13,9 @@
 	import RepoPicker from '#lib/components/repo-picker.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { api, settingsApi } from '#lib/api.js';
-	import { AuthMethod, LoginState } from '#lib/gen/banda/v1/banda_pb.js';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import { AuthMethod, LoginState, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
+	import { permissionLabel, permissionModes } from '#lib/permissions.js';
 	import { projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
@@ -23,6 +25,7 @@
 	let baseBranch = $state(saved('baseBranch', 'main'));
 	let model = $state(saved('model', 'claude-opus-5-5'));
 	let effort = $state(saved('effort', 'high'));
+	let permissions = $state(saved('permissions', permissionLabel(PermissionMode.BYPASS)));
 	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
 	$effect(() => {
 		if (!repoUrl) repoUrl = projects()[0] ?? '';
@@ -60,9 +63,12 @@
 		}
 		busy = true;
 		error = '';
-		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort })) localStorage.setItem(`banda.${k}`, v);
+		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
 		try {
 			const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text });
+			// Set before the environment is up: the runner gets the mode once it is ready, before the prompt.
+			const mode = permissionModes[permissions] ?? PermissionMode.BYPASS;
+			if (mode !== PermissionMode.BYPASS) await api.permissionSetMode({ threadId: thread!.id, mode });
 			await goto(`/t/${thread!.id}`);
 		} catch (err) {
 			error = (err as Error).message;
@@ -108,6 +114,7 @@
 						<RepoPicker bind:repoUrl bind:baseBranch />
 						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
 						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
+						<OptionMenu label="Permissions" icon={ShieldIcon} bind:value={permissions} options={Object.keys(permissionModes)} />
 					</PromptInput.Tools>
 					<PromptInput.Submit status={busy ? 'submitted' : undefined} />
 				</PromptInput.Toolbar>

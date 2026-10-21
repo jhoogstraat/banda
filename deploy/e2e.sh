@@ -272,4 +272,72 @@ sleep 15
 ok "a bad base branch errors once, without a crash loop"
 call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 
+# Permissions, in a thread of their own. ask/answer: the pending request of thread $ID, answered by $3 (default dev).
+ID=$(call ThreadService/CreateThread "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: permissions\"}" | jq -r .thread.id)
+wait_for STATUS_AWAITING_INPUT
+asks() { sql "select count(*) from events where thread_id='$ID' and body ? 'permissionRequested'"; }
+ask() {
+	call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"$1\"}}" >/dev/null
+	for _ in $(seq 30); do [ "$(thread permissionPending)" = true ] && break; sleep 1; done
+	[ "$(thread permissionPending)" = true ] || fail "no permission request for: $1"
+	RID=$(sql "select body->'permissionRequested'->>'id' from events where thread_id='$ID' and body ? 'permissionRequested' order by seq desc limit 1")
+}
+answer() { call ThreadService/PermissionAnswer "{\"threadId\":\"$ID\",\"requestId\":\"$RID\",$1}" "${2:-dev}" >/dev/null; }
+permitted() { call ThreadService/ReadFile "{\"threadId\":\"$ID\",\"path\":\"permitted.txt\"}" 2>/dev/null | jq -r '.content // ""' | grep -c e2e-permitted || true; }
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_ASK\"}" bob >/dev/null 2>&1 && fail "bob set the permission mode"
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_ASK\"}" >/dev/null
+[ "$(thread permissionMode)" = PERMISSION_MODE_ASK ]
+ask "e2e-ask once"
+[ "$(thread status)" = STATUS_WORKING ]
+answer '"decision":"PERMISSION_DECISION_ALLOW"' bob 2>/dev/null && fail "bob answered in an untrusted thread"
+answer '"decision":"PERMISSION_DECISION_ALLOW"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 1 ] && [ "$(thread permissionPending)" != true ]
+answer '"decision":"PERMISSION_DECISION_ALLOW"' 2>/dev/null && fail "answered a request twice"
+ok "ask mode: the agent waits for the owner's answer (the thread shows it pending), then runs the command"
+
+ask "e2e-ask deny"
+answer '"decision":"PERMISSION_DECISION_DENY","message":"not now"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 1 ]
+sql "select body->'toolResult'->>'output' from events where thread_id='$ID' and (body->'toolResult'->>'isError')::bool order by seq desc limit 1" | grep -qx "not now"
+ok "a denial reaches the agent with its reason, and the command does not run"
+
+call ThreadService/Trust "{\"threadId\":\"$ID\",\"trusted\":true}" >/dev/null
+ask "e2e-ask by bob"
+answer '"decision":"PERMISSION_DECISION_ALLOW"' bob
+wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 2 ]
+ok "teammates answer in a trusted thread"
+
+ask "e2e-ask always"
+answer '"decision":"PERMISSION_DECISION_ALLOW_ALWAYS"'
+wait_for STATUS_AWAITING_INPUT
+N=$(asks)
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"e2e-ask again\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+[ "$(permitted)" = 4 ] && [ "$(asks)" = "$N" ]
+ok "always allow: the next Bash call runs without asking"
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_PLAN\"}" >/dev/null
+ask "e2e-plan"
+answer '"decision":"PERMISSION_DECISION_ALLOW","mode":"PERMISSION_MODE_ACCEPT_EDITS"' bob 2>/dev/null && fail "a teammate approved the plan"
+answer '"decision":"PERMISSION_DECISION_ALLOW"' 2>/dev/null && fail "approved a plan without a mode to work in"
+answer '"decision":"PERMISSION_DECISION_ALLOW","mode":"PERMISSION_MODE_ACCEPT_EDITS"'
+wait_for STATUS_AWAITING_INPUT
+[ "$(thread permissionMode)" = PERMISSION_MODE_ACCEPT_EDITS ]
+call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"text\":\"e2e-plan again\"}}" >/dev/null
+sleep 1; wait_for STATUS_AWAITING_INPUT
+sql "select body->'agentText'->>'text' from events where thread_id='$ID' and body ? 'agentText' order by seq desc limit 1" | grep -q "Not in plan mode (acceptEdits)"
+ok "plan mode: only the owner approves the plan, which switches the agent to accept edits"
+
+call ThreadService/PermissionSetMode "{\"threadId\":\"$ID\",\"mode\":\"PERMISSION_MODE_PLAN\"}" >/dev/null
+ask "e2e-plan lost"
+kc delete pod "t-$ID" --wait=false >/dev/null
+for _ in $(seq 60); do [ "$(sql "select count(*) from events where thread_id='$ID' and body->'permissionResolved'->>'decision'='PERMISSION_DECISION_LOST'")" = 1 ] && break; sleep 2; done
+[ "$(sql "select count(*) from events where thread_id='$ID' and body->'permissionResolved'->>'decision'='PERMISSION_DECISION_LOST'")" = 1 ] && [ "$(thread permissionPending)" != true ]
+ok "a request pending when the environment restarts is marked lost"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+
 echo "all checks passed"

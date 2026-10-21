@@ -105,4 +105,16 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+{
+	// A permission request becomes its own item next to its tool call, and its answer resolves it.
+	const c = newChat();
+	apply(c, ev({ case: 'toolCall', value: { id: 'tb', name: 'Bash', inputJson: '{"command":"ls"}' } }));
+	apply(c, ev({ case: 'permissionRequested', value: { id: 'r1', toolCallId: 'tb', toolName: 'Bash', inputJson: '{"command":"ls"}' } }));
+	apply(c, ev({ case: 'permissionRequested', value: { id: 'r2', toolCallId: 'unknown', toolName: 'Write', inputJson: '{}' } }));
+	const [, p1, p2] = c.items;
+	if (p1?.kind !== 'permission' || p1.tool !== c.tools.get('tb') || p2?.kind !== 'permission' || p2.tool.call.name !== 'Write')
+		throw new Error('a permission request should point at its tool call, or one made from the request');
+	apply(c, { seq: 9n, actor: 'ann', kind: { case: 'permissionResolved', value: { id: 'r1', decision: 3, message: 'no' } } } as Event);
+	if (p1.resolved?.by !== 'ann' || p1.resolved.message !== 'no' || p2.resolved) throw new Error('an answer should resolve only its request');
+}
 console.log('ok');
