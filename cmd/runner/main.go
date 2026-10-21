@@ -102,6 +102,8 @@ func run(ctx context.Context) error {
 	// ponytail: no reconnect loop, the container restart is the reconnect.
 	cmds := make(chan *bandav1.ConnectResponse, 16)
 	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT")}}
+	pushes := &pusher{report: send}
+	lastDiff := "" // the first turn after a start always pushes
 	term := &terminal{send: sendReq}
 	if loginUser != "" {
 		term.exited = func() { loginStatus(loggedIn(ctx)) }
@@ -127,7 +129,7 @@ func run(ctx context.Context) error {
 				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort})
 				cmds <- msg
 			case *bandav1.ConnectResponse_Push:
-				go push(ctx, notice)
+				go pushes.manualPush(ctx, notice)
 			case *bandav1.ConnectResponse_TerminalOpen:
 				term.open(k.TerminalOpen)
 			case *bandav1.ConnectResponse_TerminalInput:
@@ -250,8 +252,13 @@ func run(ctx context.Context) error {
 				if turnEnded {
 					authNoticed = false
 					pending = max(0, pending-1) // an interrupt while idle ends no prompt
-					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
+					d := redact(diff(ctx))
+					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: d}}}); err != nil {
 						return err
+					}
+					if d != lastDiff { // auto-push, so the work also lives on origin
+						lastDiff = d
+						go pushes.push(ctx)
 					}
 				}
 			}
@@ -320,12 +327,17 @@ func checkout(ctx context.Context) error {
 			return err
 		}
 	}
-	// Also covers a previous start that died right after cloning.
+	// Also covers a previous start that died right after cloning. A fresh
+	// checkout of a thread whose environment was deleted continues from the
+	// pushed branch.
 	branch := os.Getenv("BANDA_BRANCH")
-	if git("-C", work, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch) != nil {
-		return git("-C", work, "switch", "-c", branch)
+	switch {
+	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch) == nil:
+		return nil
+	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+branch) == nil:
+		return git("-C", work, "switch", branch)
 	}
-	return nil
+	return git("-C", work, "switch", "-c", branch)
 }
 
 // waitForLogin waits for a subscription login, reported as the login step

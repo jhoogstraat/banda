@@ -105,4 +105,7 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
+apply(chat, ev({ case: 'autoPush', value: { state: 3, detail: 'origin cannot be pushed to' } }));
+const push = chat.items.at(-1);
+if (push?.kind !== 'push' || push.pushed) throw new Error('autoPush should become a chat item');
 console.log('ok');

@@ -88,3 +88,8 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+
+-- Where the thread's work lives (bandav1.AutoPushState name), as its runner last reported.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS auto_push text NOT NULL DEFAULT '';
+-- When the settled environment is (or was) deleted; null when none is scheduled.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS env_delete_at timestamptz;

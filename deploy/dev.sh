@@ -3,6 +3,7 @@
 #   mise run up     Podman machine, kind cluster, API and web (PUBLIC_HOST, default: LAN address)
 #   mise run e2e    fake-agent end-to-end check on :8790 (preview :8791), next to the normal API
 #   mise run down   stop the servers and the kind node
+#   mise run clean  delete sandboxes of threads untouched for CLEAN_HOURS (default 24)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 LOG=/tmp/banda-run
@@ -72,14 +73,27 @@ lock() {
 e2e() {
 	TARGET=fake SANDBOX_IMAGE=localhost/banda-sandbox:fake mise run image
 	free 8790
-	DEV_AUTH=1 SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 PREVIEW_ADDR=:8791 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
+	DEV_AUTH=1 DELETE_SETTLED_AFTER=20s SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 PREVIEW_ADDR=:8791 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
 	until_ok e2e-api listening 8790
 	API=http://localhost:8790 deploy/e2e.sh
+}
+
+# Dev only: every e2e run and UI check leaves sandboxes behind. Deletes the thread sandboxes (their
+# volumes go with them) older than CLEAN_HOURS whose thread wasn't touched in that time or is gone.
+clean() {
+	local h=${CLEAN_HOURS:-24} keep
+	keep=$(kc -n banda exec postgres-0 -- psql -U banda -tAc "select 't-' || id from threads where updated_at > now() - interval '$h hours'")
+	kc -n banda get sandboxes -l banda.dev/thread -o json |
+		jq -r --argjson h "$h" '.items[] | select(.metadata.creationTimestamp | fromdate < now - $h * 3600) | .metadata.name' |
+		while read -r name; do
+			grep -qxF "$name" <<<"$keep" || kc -n banda delete sandbox "$name" --wait=false
+		done
 }
 
 case ${1:-} in
 up) machine; cluster; servers ;;
 e2e) lock; machine; cluster; e2e ;;
+clean) clean ;;
 down) free 8787; free 8788; free 5173; free 8790; free 8791; podman stop banda-control-plane ;;
-*) echo "usage: $0 up|e2e|down" >&2; exit 2 ;;
+*) echo "usage: $0 up|e2e|clean|down" >&2; exit 2 ;;
 esac

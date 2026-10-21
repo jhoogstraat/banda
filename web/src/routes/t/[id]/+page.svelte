@@ -20,6 +20,8 @@
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
 	import {
 		Conversation,
 		ConversationContent,
@@ -60,7 +62,7 @@
 	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
-	import { threads, userName } from '#lib/threads.svelte.js';
+	import { prUrl, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -203,6 +205,8 @@
 	const interrupt = () => act(api.interrupt({ threadId: id }));
 	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
 	const push = () => act(api.push({ threadId: id }));
+	const recreate = () => act(api.environmentRecreate({ threadId: id }));
+	const pr = $derived(thread ? prUrl(thread) : '');
 	const retry = () => act(api.retry({ threadId: id }));
 	const show = (t: string) => {
 		tab = t;
@@ -226,8 +230,10 @@
 		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
+		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
+		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner) {
-			c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
+			if (!pr) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
 				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
 				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });
@@ -342,7 +348,9 @@
 				/>
 				<ThreadActions {thread} {act} />
 			{/if}
-			{#if owner}
+			{#if pr}
+				<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
+			{:else if owner}
 				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 			{/if}
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
@@ -450,6 +458,8 @@
 								</Tool>
 							{/each}
 						</div>
+					{:else if item.kind === 'push'}
+						{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
 					{:else if item.kind === 'mode'}
 						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
 					{:else if item.kind === 'settings'}
@@ -460,6 +470,14 @@
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 				{#if thread?.status === Status.STARTING}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
+				{:else if thread?.status === Status.SUSPENDED && thread.environmentDeleted}
+					<div class="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+						<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" />
+						<span class="flex-1">Environment deleted. Branch <code>{thread.branch}</code> is on origin.</span>
+						{#if owner}
+							<Button size="sm" onclick={recreate}><RotateCcwIcon /> Recreate environment</Button>
+						{/if}
+					</div>
 				{:else if thread?.status === Status.SUSPENDED}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 				{:else if thread?.status === Status.ERRORED}

@@ -33,6 +33,9 @@ service ThreadService {
   // Pushes the thread branch to origin (owner only). The result arrives as a
   // notice event.
   rpc Push(PushRequest) returns (PushResponse);
+  // Provisions a fresh environment for a thread whose settled environment was
+  // deleted, from its pushed branch (owner only).
+  rpc EnvironmentRecreate(EnvironmentRecreateRequest) returns (EnvironmentRecreateResponse);
   // A terminal in the thread's environment (owner only). Output streams until
   // the process exits; opening again replaces the previous terminal.
   rpc OpenTerminal(OpenTerminalRequest) returns (stream OpenTerminalResponse);
@@ -131,6 +134,11 @@ message Thread {
   bool trusted = 19;
   // The thread has events the caller hasn't seen (see InboxMarkRead).
   bool unread = 16;
+  // Where the thread's work lives, as the runner last reported it.
+  AutoPushState auto_push = 22;
+  // The settled environment and its volume were deleted; the branch is on
+  // origin (see EnvironmentRecreate).
+  bool environment_deleted = 23;
 }
 
 message User {
@@ -167,6 +175,8 @@ message Event {
     Typing typing = 23;
     // The owner changed the model or effort; actor is the owner.
     AgentSettings agent_settings = 26;
+    // Where the work lives changed, e.g. after an auto-push.
+    AutoPush auto_push = 29;
   }
 }
 
@@ -409,6 +419,31 @@ message PushRequest {
 }
 
 message PushResponse {}
+
+message EnvironmentRecreateRequest {
+  string thread_id = 1;
+}
+
+message EnvironmentRecreateResponse {}
+
+enum AutoPushState {
+  // Nothing reported yet.
+  AUTO_PUSH_STATE_UNSPECIFIED = 0;
+  // origin has the branch, and the checkout has nothing origin doesn't.
+  AUTO_PUSH_STATE_PUSHED = 1;
+  // Commits or uncommitted changes exist only in the checkout.
+  AUTO_PUSH_STATE_UNPUSHED = 2;
+  // origin can't be pushed to (no token, read-only): the work only lives in
+  // the environment's volume.
+  AUTO_PUSH_STATE_UNAVAILABLE = 3;
+}
+
+// Sent by the runner after a turn changed the diff, or a push, when the
+// state or its detail changed.
+message AutoPush {
+  AutoPushState state = 1;
+  string detail = 2;
+}
 
 message OpenTerminalRequest {
   string thread_id = 1;

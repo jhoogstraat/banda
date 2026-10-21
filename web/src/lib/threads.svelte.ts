@@ -1,7 +1,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api, userApi } from './api';
-import type { Thread, User } from './gen/banda/v1/banda_pb';
+import { AutoPushState, type Thread, type User } from './gen/banda/v1/banda_pb';
 import { alerts, sectionOf, type Inbox } from './inbox';
 
 // `search` and `project` (a repo URL) filter the sidebar's threads.
@@ -79,6 +79,12 @@ export const projectName = (url: string) =>
 		.split('/')
 		.slice(-2)
 		.join('/');
+
+// A GitHub pull request for the thread's branch, once it is pushed.
+export function prUrl(t: Thread) {
+	const repo = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(t.repoUrl)?.[1];
+	return repo && t.autoPush === AutoPushState.PUSHED ? `https://github.com/${repo}/compare/${t.baseBranch}...${t.branch}?expand=1` : '';
+}
 
 // The repositories of all loaded threads, most recently active first.
 export const projects = () => [...new Set([...threads.list, ...threads.mentioned].map((t) => t.repoUrl))];

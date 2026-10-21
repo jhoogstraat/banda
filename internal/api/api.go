@@ -29,6 +29,9 @@ import (
 type Service struct {
 	store     *store.Store
 	sandboxes *sandbox.Client
+	// DeleteSettledAfter is how long after the owner settles a thread its
+	// pushed environment is kept.
+	DeleteSettledAfter time.Duration
 
 	mu       sync.Mutex
 	watchers map[string]map[chan *bandav1.Event]struct{}
@@ -76,8 +79,9 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 
-		loginLastUsed: map[string]time.Time{},
-		previewKey:    signer(rand.Text()),
+		DeleteSettledAfter: 7 * 24 * time.Hour,
+		loginLastUsed:      map[string]time.Time{},
+		previewKey:         signer(rand.Text()),
 	}
 	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}
 	return s
@@ -487,6 +491,11 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				s.broadcast(id, []*bandav1.Event{e})
 				continue
 			}
+			if ap := e.GetAutoPush(); ap != nil {
+				if err := s.store.SetAutoPush(ctx, id, ap.State.String()); err != nil {
+					slog.Error("store auto-push state", "thread", id, "err", err)
+				}
+			}
 			var action thread.Action
 			var reason string
 			if e.GetTurnEnded() != nil {
@@ -614,10 +623,17 @@ func (s *Service) do(ctx context.Context, id string, e thread.Effect) {
 		if err := s.sandboxes.Suspend(ctx, id); err != nil {
 			slog.Error("suspend sandbox", "thread", id, "err", err)
 		}
+		s.scheduleDelete(ctx, id)
 	}
 }
 
 func (s *Service) provision(ctx context.Context, t store.Thread) {
+	// Ensure also cancels a scheduled deletion, or recreates a deleted environment.
+	if t.EnvDeleteAt != nil {
+		if err := s.store.SetEnvDeleteAt(ctx, t.ID, nil); err != nil {
+			slog.Error("cancel environment deletion", "thread", t.ID, "err", err)
+		}
+	}
 	// Ensure replaces a running pod; its runner's disconnect is expected.
 	s.mu.Lock()
 	delete(s.runners, t.ID)
@@ -814,8 +830,10 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Settled:    t.Settled,
 		Unread:     t.Unread,
 
-		TurnRequests: int32(t.Requests),
-		Trusted:      t.Trusted,
+		TurnRequests:       int32(t.Requests),
+		Trusted:            t.Trusted,
+		AutoPush:           bandav1.AutoPushState(bandav1.AutoPushState_value[t.AutoPush]),
+		EnvironmentDeleted: t.EnvDeleteAt != nil && !t.EnvDeleteAt.After(time.Now()),
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)
