@@ -91,7 +91,7 @@ Kubernetes (agent-sandbox) ── one Sandbox pod per thread:
 | Entity | Fields |
 |---|---|
 | User | OIDC `sub`, name, email (dev auth: the header value) |
-| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, delivered seq (what the agent has seen), open turn requests, trusted, runner token, latest diff |
+| Thread | owner, repo URL, base branch, branch, title, model, effort, `status`, `mode`, pending prompt, delivered seq (what the agent has seen), open turn requests, trusted, runner token, latest diff, last activity (summary of the latest notable event) |
 | Event | thread, seq, protojson body (`banda.v1.Event`). Append-only; the chat is rendered from these. |
 | Mention | thread, event seq, user, answered_at. Drives the Mentioned section. |
 | ThreadView | user, thread, snoozed_until, settled_at. Per-user overlay. |
