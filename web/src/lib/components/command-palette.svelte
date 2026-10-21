@@ -22,10 +22,11 @@
 		Promise.all(threads.users.filter((u) => u.id !== threads.me?.id).map((u) => api.listThreads({ ownerId: u.id })))
 			.then((rs) => (others = rs.flatMap((r) => r.threads)))
 			.catch(() => {});
-	// Only on open/close: the sidebar's polling must not reload or clear the query.
+	// Only on open: the sidebar's polling must not reload or clear the query.
 	$effect(() => {
-		if (ui.palette) untrack(loadOthers);
-		else query = '';
+		if (!ui.palette) return;
+		query = '';
+		untrack(loadOthers);
 	});
 
 	// Recently opened first, then recently active.
@@ -64,10 +65,23 @@
 	</Command.Item>
 {/snippet}
 
+{#snippet actions()}
+	{#if ui.commands.length}
+		<Command.Group heading="This thread">
+			{#each ui.commands as c (c.label)}{@render item(c)}{/each}
+		</Command.Group>
+	{/if}
+	<Command.Group heading="General">
+		{#each global as c (c.label)}{@render item(c)}{/each}
+	</Command.Group>
+{/snippet}
+
 <Command.Dialog bind:open={ui.palette} {filter} title="Command palette" description="Search threads and actions">
 	<Command.Input placeholder="Search threads, teammates and actions" bind:value={query} />
 	<Command.List class="max-h-[60vh]">
 		<Command.Empty>Nothing found.</Command.Empty>
+		<!-- bits-ui sorts within groups only: while searching, actions come first so they aren't buried under threads. -->
+		{#if query}{@render actions()}{/if}
 		<Command.Group heading={query ? 'Threads' : 'Recent'}>
 			{#each query ? all : all.slice(0, 8) as t (t.id)}
 				{@const owner = userName(t.ownerId)}
@@ -81,14 +95,7 @@
 				</Command.Item>
 			{/each}
 		</Command.Group>
-		{#if ui.commands.length}
-			<Command.Group heading="This thread">
-				{#each ui.commands as c (c.label)}{@render item(c)}{/each}
-			</Command.Group>
-		{/if}
-		<Command.Group heading="General">
-			{#each global as c (c.label)}{@render item(c)}{/each}
-		</Command.Group>
+		{#if !query}{@render actions()}{/if}
 	</Command.List>
 </Command.Dialog>
 
