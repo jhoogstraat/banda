@@ -150,6 +150,32 @@ reply | grep -q "with claude-sonnet-5-5 · medium" || fail "the agent did not re
 [ "$(sql "select body->>'actor' from events where thread_id='$ID' and body->'agentSettings'->>'model'='claude-sonnet-5-5'")" = dev ]
 ok "the owner switches model and effort mid-thread: the running turn finishes, the next one runs on the new settings, the chat records it"
 
+SRC=$ID
+term ThreadService/OpenTerminal "{\"threadId\":\"$SRC\",\"cols\":80,\"rows\":24,\"command\":\"git add -A && git commit -qm e2e-commit && echo e2e-committed\"}" | grep -q e2e-committed
+ID=$(call ThreadService/Fork "{\"threadId\":\"$SRC\",\"prompt\":\"e2e: carry on\",\"tries\":[{\"model\":\"claude-haiku-5-5\"}]}" bob | jq -r '.threads[0].id')
+[ "$(thread ownerId) $(thread forkedFrom.threadId)" = "bob $SRC" ] || fail "fork owner/origin: $(thread ownerId) $(thread forkedFrom.threadId)"
+wait_for STATUS_AWAITING_INPUT
+[ "$(steps fork DONE)" = 1 ] || fail "the fork's changes were not applied"
+thread diff | grep -q hello2.txt || fail "the fork's diff lacks the source's committed changes"
+reply | grep -q "with claude-haiku-5-5" || fail "the fork runs on the wrong model: $(reply)"
+[ "$(sql "select count(*) from events where thread_id='$SRC' and body->'forkNote'->>'threadId'='$ID'")" = 1 ] || fail "the source does not link its fork"
+call ThreadService/Snooze "{\"threadId\":\"$ID\",\"until\":\"2099-01-01T00:00:00Z\"}" bob >/dev/null
+ok "a teammate forks a thread with commits: the fork is theirs, starts from the source's changes on another model, and both link each other"
+
+R=$(call ThreadService/Race "{\"repoUrl\":\"$REPO\",\"baseBranch\":\"$BASE\",\"prompt\":\"e2e: race\",\"tries\":[{},{\"model\":\"claude-sonnet-5-5\"}]}")
+A=$(echo "$R" | jq -r '.threads[0].id'); B=$(echo "$R" | jq -r '.threads[1].id'); RACE=$(echo "$R" | jq -r '.threads[0].raceId')
+ID=$A; wait_for STATUS_AWAITING_INPUT; reply | grep -q "with claude-opus-5-5" || fail "try 1: $(reply)"
+ID=$B; wait_for STATUS_AWAITING_INPUT; reply | grep -q "with claude-sonnet-5-5" || fail "try 2: $(reply)"
+call ThreadService/RaceCompare "{\"raceId\":\"$RACE\"}" | jq -e '(.entries | length) == 2 and all(.entries[]; .turns == 1 and .costUsd > 0 and (.thread.diff | contains("hello1.txt")))' >/dev/null || fail "compare: $(call ThreadService/RaceCompare "{\"raceId\":\"$RACE\"}" | head -c 300)"
+call ThreadService/RacePick "{\"threadId\":\"$A\"}" bob >/dev/null 2>&1 && fail "bob picked in dev's race"
+call ThreadService/RacePick "{\"threadId\":\"$A\"}" >/dev/null
+[ "$(thread settled) $(thread status)" = "true STATUS_SUSPENDED" ] || fail "the other try: settled=$(thread settled) $(thread status)"
+ID=$A; [ "$(thread settled)" = false ] || fail "the pick was settled"
+[ "$(sql "select count(*) from events where thread_id in ('$A','$B') and body->'forkNote'->>'picked'='true' and body->'forkNote'->>'threadId'='$A'")" = 2 ] || fail "the pick is not noted in both"
+call ThreadService/Snooze "{\"threadId\":\"$A\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
+ok "a race of 2 runs both tries on their models; compare shows them; picking one settles and pauses the other and notes it in both"
+ID=$SRC
+
 REVIEW='{"path":"hello1.txt","startLine":1,"endLine":1,"code":"+hello 1","body":"e2e: say hi instead"}'
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[{\"path\":\"x\",\"startLine\":1,\"endLine\":1,\"body\":\" \"}]}}" >/dev/null 2>&1 && fail "a review comment without text was accepted"
 call ThreadService/SendMessage "{\"threadId\":\"$ID\",\"message\":{\"review\":[$REVIEW]}}" >/dev/null

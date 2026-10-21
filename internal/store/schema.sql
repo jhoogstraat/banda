@@ -88,3 +88,9 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+-- Forks start from another thread's changes after its turn fork_turn; the
+-- threads of a race (or of one Fork call) share race_id.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS forked_from text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS fork_turn int NOT NULL DEFAULT 0;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS race_id text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS threads_race ON threads (race_id) WHERE race_id <> '';

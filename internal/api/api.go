@@ -87,31 +87,43 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
 	}
-	id := strings.ToLower(rand.Text())
 	t := store.Thread{
 		State:         thread.State{OwnerID: user(ctx), Status: thread.Starting, Mode: thread.AgentMode},
-		ID:            id,
 		Title:         title(req.Prompt),
 		RepoURL:       req.RepoUrl,
 		BaseBranch:    or(req.BaseBranch, "main"),
-		Branch:        "banda/" + id,
 		Model:         or(req.Model, "claude-opus-5-5"),
 		Effort:        or(req.Effort, "high"),
 		PendingPrompt: req.Prompt,
-		RunnerToken:   rand.Text(),
 	}
-	if err := s.store.Create(ctx, t); err != nil {
-		return nil, err
-	}
-	t, events, err := s.store.Update(ctx, id, func(t *store.Thread) ([]*bandav1.Event, error) {
-		return []*bandav1.Event{messageEvent(t.OwnerID, &bandav1.Message{Text: req.Prompt})}, nil
-	})
+	t, err := s.start(ctx, t, &bandav1.Message{Text: req.Prompt})
 	if err != nil {
 		return nil, err
 	}
-	s.broadcast(id, events)
-	s.provision(ctx, t)
 	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
+}
+
+// start stores a new thread, posts its first message (if any) as the owner
+// and provisions its environment. It sets the id, branch and runner token.
+func (s *Service) start(ctx context.Context, t store.Thread, first *bandav1.Message) (store.Thread, error) {
+	t.ID = strings.ToLower(rand.Text())
+	t.Branch = "banda/" + t.ID
+	t.RunnerToken = rand.Text()
+	if err := s.store.Create(ctx, t); err != nil {
+		return t, err
+	}
+	t, events, err := s.store.Update(ctx, t.ID, func(t *store.Thread) ([]*bandav1.Event, error) {
+		if first == nil {
+			return nil, nil
+		}
+		return []*bandav1.Event{messageEvent(t.OwnerID, first)}, nil
+	})
+	if err != nil {
+		return t, err
+	}
+	s.broadcast(t.ID, events)
+	s.provision(ctx, t)
+	return t, nil
 }
 
 func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
@@ -816,6 +828,10 @@ func toProto(t store.Thread) *bandav1.Thread {
 
 		TurnRequests: int32(t.Requests),
 		Trusted:      t.Trusted,
+		RaceId:       t.RaceID,
+	}
+	if t.ForkedFrom != "" {
+		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

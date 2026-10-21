@@ -87,6 +87,14 @@ const (
 	ThreadServiceInboxMarkReadProcedure = "/banda.v1.ThreadService/InboxMarkRead"
 	// ThreadServiceSendTypingProcedure is the procedure name of the ThreadService's SendTyping RPC.
 	ThreadServiceSendTypingProcedure = "/banda.v1.ThreadService/SendTyping"
+	// ThreadServiceForkProcedure is the procedure name of the ThreadService's Fork RPC.
+	ThreadServiceForkProcedure = "/banda.v1.ThreadService/Fork"
+	// ThreadServiceRaceProcedure is the procedure name of the ThreadService's Race RPC.
+	ThreadServiceRaceProcedure = "/banda.v1.ThreadService/Race"
+	// ThreadServiceRaceCompareProcedure is the procedure name of the ThreadService's RaceCompare RPC.
+	ThreadServiceRaceCompareProcedure = "/banda.v1.ThreadService/RaceCompare"
+	// ThreadServiceRacePickProcedure is the procedure name of the ThreadService's RacePick RPC.
+	ThreadServiceRacePickProcedure = "/banda.v1.ThreadService/RacePick"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -113,6 +121,8 @@ const (
 	SettingsServiceResizeLoginTerminalProcedure = "/banda.v1.SettingsService/ResizeLoginTerminal"
 	// RunnerServiceConnectProcedure is the procedure name of the RunnerService's Connect RPC.
 	RunnerServiceConnectProcedure = "/banda.v1.RunnerService/Connect"
+	// RunnerServiceForkPatchProcedure is the procedure name of the RunnerService's ForkPatch RPC.
+	RunnerServiceForkPatchProcedure = "/banda.v1.RunnerService/ForkPatch"
 )
 
 var (
@@ -298,6 +308,34 @@ var (
 			Procedure:  ThreadServiceSendTypingProcedure,
 		}
 	})
+	threadServiceForkSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Fork"),
+			Procedure:  ThreadServiceForkProcedure,
+		}
+	})
+	threadServiceRaceSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Race"),
+			Procedure:  ThreadServiceRaceProcedure,
+		}
+	})
+	threadServiceRaceCompareSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("RaceCompare"),
+			Procedure:  ThreadServiceRaceCompareProcedure,
+		}
+	})
+	threadServiceRacePickSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("RacePick"),
+			Procedure:  ThreadServiceRacePickProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -353,6 +391,16 @@ type ThreadServiceClient interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Starts threads (one per try) from another thread's current changes and
+	// conversation, owned by the caller. Anyone who can see a thread can fork it.
+	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
+	// Starts sibling threads with the same prompt, one per try.
+	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
+	// Status, cost, time and diff of threads, side by side.
+	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Keeps one thread of a race (owner only): settles its siblings for the
+	// caller and notes the pick in each.
+	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -497,6 +545,16 @@ type ThreadServiceHandler interface {
 	// Tells the thread's watchers that the caller is typing. The composer calls
 	// it every few seconds while typing; clients forget it after a few seconds.
 	SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error)
+	// Starts threads (one per try) from another thread's current changes and
+	// conversation, owned by the caller. Anyone who can see a thread can fork it.
+	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
+	// Starts sibling threads with the same prompt, one per try.
+	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
+	// Status, cost, time and diff of threads, side by side.
+	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Keeps one thread of a race (owner only): settles its siblings for the
+	// caller and notes the pick in each.
+	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -530,6 +588,10 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceInboxWatchSpec(), Handler: adapter.inboxWatch},
 		connect.Method{Spec: threadServiceInboxMarkReadSpec(), Handler: adapter.inboxMarkRead},
 		connect.Method{Spec: threadServiceSendTypingSpec(), Handler: adapter.sendTyping},
+		connect.Method{Spec: threadServiceForkSpec(), Handler: adapter.fork},
+		connect.Method{Spec: threadServiceRaceSpec(), Handler: adapter.race},
+		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
+		connect.Method{Spec: threadServiceRacePickSpec(), Handler: adapter.racePick},
 	)
 }
 
@@ -701,6 +763,22 @@ func (UnimplementedThreadServiceHandler) InboxMarkRead(context.Context, *v1.Inbo
 
 func (UnimplementedThreadServiceHandler) SendTyping(context.Context, *v1.TypingRequest) (*v1.TypingResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SendTyping is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Fork is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Race is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RaceCompare is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RacePick is not implemented")
 }
 
 type threadServiceClient struct {
@@ -910,6 +988,38 @@ func (c *threadServiceClient) InboxMarkRead(ctx context.Context, req *v1.InboxMa
 func (c *threadServiceClient) SendTyping(ctx context.Context, req *v1.TypingRequest) (*v1.TypingResponse, error) {
 	var res v1.TypingResponse
 	if err := c.client.CallUnary(ctx, threadServiceSendTypingSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Fork(ctx context.Context, req *v1.ForkRequest) (*v1.ForkResponse, error) {
+	var res v1.ForkResponse
+	if err := c.client.CallUnary(ctx, threadServiceForkSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) Race(ctx context.Context, req *v1.RaceRequest) (*v1.RaceResponse, error) {
+	var res v1.RaceResponse
+	if err := c.client.CallUnary(ctx, threadServiceRaceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) RaceCompare(ctx context.Context, req *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error) {
+	var res v1.RaceCompareResponse
+	if err := c.client.CallUnary(ctx, threadServiceRaceCompareSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) RacePick(ctx context.Context, req *v1.RacePickRequest) (*v1.RacePickResponse, error) {
+	var res v1.RacePickResponse
+	if err := c.client.CallUnary(ctx, threadServiceRacePickSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1207,6 +1317,54 @@ func (h threadServiceHandler) sendTyping(ctx context.Context, _ connect.Spec, st
 		return err
 	}
 	res, err := h.svc.SendTyping(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) fork(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ForkRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Fork(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) race(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RaceRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Race(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) raceCompare(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RaceCompareRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RaceCompare(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) racePick(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RacePickRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RacePick(ctx, &req)
 	if err != nil {
 		return err
 	}
@@ -1641,11 +1799,20 @@ var (
 			Procedure:  RunnerServiceConnectProcedure,
 		}
 	})
+	runnerServiceForkPatchSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("RunnerService").Methods().ByName("ForkPatch"),
+			Procedure:  RunnerServiceForkPatchProcedure,
+		}
+	})
 )
 
 // RunnerServiceClient is a client for the banda.v1.RunnerService service.
 type RunnerServiceClient interface {
 	Connect(context.Context) (RunnerServiceConnectClientStream, error)
+	// The changes a fork starts from, applied once after the first checkout.
+	ForkPatch(context.Context, *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error)
 }
 
 // NewRunnerServiceClient constructs a client for the banda.v1.RunnerService service. Multiple
@@ -1693,6 +1860,8 @@ func (s RunnerServiceConnectClientStream) Close() error {
 // RunnerServiceHandler is an implementation of the banda.v1.RunnerService service.
 type RunnerServiceHandler interface {
 	Connect(context.Context, RunnerServiceConnectServerStream) error
+	// The changes a fork starts from, applied once after the first checkout.
+	ForkPatch(context.Context, *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error)
 }
 
 // RegisterRunnerServiceHandler registers svc as the banda.v1.RunnerService implementation on
@@ -1701,6 +1870,7 @@ func RegisterRunnerServiceHandler(server *connect.Server, svc RunnerServiceHandl
 	adapter := runnerServiceHandler{svc: svc}
 	server.Register(
 		connect.Method{Spec: runnerServiceConnectSpec(), Handler: adapter.connect},
+		connect.Method{Spec: runnerServiceForkPatchSpec(), Handler: adapter.forkPatch},
 	)
 }
 
@@ -1735,6 +1905,10 @@ func (UnimplementedRunnerServiceHandler) Connect(context.Context, RunnerServiceC
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.RunnerService.Connect is not implemented")
 }
 
+func (UnimplementedRunnerServiceHandler) ForkPatch(context.Context, *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.RunnerService.ForkPatch is not implemented")
+}
+
 type runnerServiceClient struct {
 	client *connect.Client
 }
@@ -1747,8 +1921,28 @@ func (c *runnerServiceClient) Connect(ctx context.Context) (RunnerServiceConnect
 	return RunnerServiceConnectClientStream{stream: stream}, nil
 }
 
+func (c *runnerServiceClient) ForkPatch(ctx context.Context, req *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error) {
+	var res v1.ForkPatchResponse
+	if err := c.client.CallUnary(ctx, runnerServiceForkPatchSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 type runnerServiceHandler struct{ svc RunnerServiceHandler }
 
 func (h runnerServiceHandler) connect(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	return h.svc.Connect(ctx, RunnerServiceConnectServerStream{stream: stream})
+}
+
+func (h runnerServiceHandler) forkPatch(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ForkPatchRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ForkPatch(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
