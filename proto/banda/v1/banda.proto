@@ -373,6 +373,8 @@ message TurnEnded {
   string error = 2;
   int64 duration_ms = 3;
   double cost_usd = 4;
+  // The prompts the turn ended: its own and those folded into it.
+  int32 prompts = 5;
 }
 
 message StatusChanged {

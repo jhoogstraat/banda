@@ -25,8 +25,9 @@ type State struct {
 	OwnerID string
 	Status  Status
 	Mode    Mode
-	// Turns delivered to the agent and not yet ended. Claude Code queues
-	// prompts sent mid-turn, so a thread stays working until all have ended.
+	// Prompts delivered to the agent whose turn hasn't ended. Claude Code
+	// queues prompts sent mid-turn or folds them into the running turn, so a
+	// thread stays working until all have ended.
 	Turns int
 	// Requests is the number of teammate turn requests waiting for the
 	// owner. Unless Trusted, a teammate's turn needs the owner's approval: it
@@ -103,7 +104,9 @@ type Retry struct{ By string }
 // to be delivered (the initial prompt of a new thread).
 type EnvReady struct{ Pending bool }
 
-type TurnEnded struct{}
+// TurnEnded: a turn ended, and with it Prompts prompts (its own and those
+// folded into it; at least one).
+type TurnEnded struct{ Prompts int }
 
 // EnvLost: the runner disconnected, or a setup step failed (the runner then
 // stays connected so the owner can debug in the terminal; Retry reruns setup).
@@ -221,7 +224,7 @@ func Apply(s State, a Action) (State, Effect, error) {
 
 	case TurnEnded:
 		if s.Status == Working {
-			s.Turns = max(s.Turns-1, 0)
+			s.Turns = max(s.Turns-max(a.Prompts, 1), 0)
 			if s.Turns == 0 {
 				s.Status = AwaitingInput
 			}

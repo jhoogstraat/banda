@@ -83,6 +83,8 @@ The SDK form [sdk] adds an optional client `uuid`. With the `uuid`, the reply fr
 
 The state then moves through `started` and `completed`.
 
+**What Banda does:** it writes prompts as they come and counts turns by the CLI's own signal: after each `result`, all prompts written so far but the result's `queued_turn_count` have ended (§3). That a prompt folded into a turn is no longer counted there is inferred, not observed (2026-10-21); `deploy/fake-claude` folds that way (`e2e-fold`).
+
 Lines with an unknown `type` are ignored [obs]. **A malformed JSON line kills the process**: `Error parsing streaming input line (type=unknown, 8 chars): SyntaxError`, exit 1 [obs].
 
 ### Control requests (runner → CLI)
