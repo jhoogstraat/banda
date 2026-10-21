@@ -48,6 +48,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Access and errors | Everyone signed in reads every thread and posts into it; only its owner changes how it runs or uses its environment (`thread.State.CheckOwner`), and runs the agent or answers its permission prompts unless they trust teammates (`Trusts`). The state machine and the API share these two rules; runners and MCP calls act as their thread by its runner token. One Connect interceptor (`api.Errors`, also used for MCP tools) gives known errors their codes and turns anything else into `internal error`, logged with the call: database and Kubernetes errors never reach a client. |
 | Forks and races | Anyone can fork any thread into threads of their own: "Fork" in a thread, optionally with another model or effort, a new instruction and up to 4 tries. A fork starts from the source's latest diff (its state after the last finished turn, committed and uncommitted work alike), which the fork's runner applies and commits on top of the base branch right after its first checkout. The diff is already in Postgres, so the source's environment may be paused or broken, nothing is pushed, and a teammate's fork never touches the owner's sandbox or login. If it doesn't apply (the base moved on, binary files, a diff cut at 1 MiB) the fork starts from the base branch with a notice. Its first prompt carries the source's conversation (people's messages and the agent's replies, the latest 40 KiB) and the instruction, or else asks for a summary. Both threads link each other: the fork shows where it came from, the source a divider. "Try N ways" in the new-thread composer races 2–4 threads with one prompt ("Each model" runs one per model). `/compare` shows a race side by side; "Pick this one" settles and pauses the owner's other tries and notes the pick in every try. A fork is not a child: MCP-spawned lineage is separate. A fork keeps the source's permission mode, not its "always allow" grants; a race started with a mode applies it to every try. |
 | Model and effort | The owner can change them at any time from the composer chips; the chat records it as a divider. `claude` takes them only as start flags, so the runner restarts it with `--resume` once no turn is running (closing its stdin, so it exits by itself), never cutting a turn short. Prompts sent before the change still run on the old settings. A paused environment starts with the new ones. |
+| End-to-end tests | Playwright Test in `web/e2e`, API tests (generated Connect clients) and browser tests in one suite. Each `mise run e2e` gets its own namespace, database, fake image tag and APIs, named after the checkout, so runs never share state and need no lock; each test its own users and threads, so tests run in parallel (4 workers: the kind node's 110 pods are shared) and delete their sandboxes. Tests wait on facts (status, events), never on sleeps; timing-dependent cases use the fake agent's directives (hold a turn, crash, echo the prompt, call MCP), a holdable git origin and setup, and APIs of a test's own (custom env, restarts, a database of their own for sweeps). `kubectl` and SQL only where no API exposes the fact. |
 
 ## Constraint: Claude subscriptions
 
@@ -160,7 +161,7 @@ Expected resume time on kind: about 3–10 s. A suspended thread costs only disk
 
 ## Status
 
-Everything below is implemented on `main` and checked by `mise run e2e` against the kind cluster (fake agent), unless noted.
+Everything below is implemented on `main` and checked by `mise run e2e` against the kind cluster (fake agent), unless noted. Open bugs found by the round-4 audit are reproduced in `web/e2e/known-bugs.spec.ts`.
 
 **Built**
 - Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
@@ -181,7 +182,7 @@ Everything below is implemented on `main` and checked by `mise run e2e` against 
 - Browser tab (everyone): the app running in the sandbox, with a port picker (dev server picked by default), path bar, reload and open in a new tab; WebSockets pass through for HMR. Paused environments say so; the owner can wake them.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button.
-- Auto-push after every turn that changed the diff; the Push button becomes "Open a pull request" once a GitHub branch is pushed. Settled, pushed environments are deleted after 7 days and can be recreated from the branch. e2e cleans up its sandboxes (also on failure) and tests against an in-cluster git daemon; `mise run clean` deletes sandboxes of threads untouched for `CLEAN_HOURS` (dev only).
+- Auto-push after every turn that changed the diff; the Push button becomes "Open a pull request" once a GitHub branch is pushed. Settled, pushed environments are deleted after 7 days and can be recreated from the branch. e2e tests against an in-cluster git server in its own namespace; `mise run clean` deletes sandboxes of threads untouched for `CLEAN_HOURS` (dev only).
 - Settings (backend): subscription or API key per harness, login state reported by runners, per-user secrets as environment variables (write-only, redacted), and a login environment with a login/logout terminal.
 - Setup steps as events: checkout, mise tools, `.banda/setup.sh` (once per thread), login. A failing step errors the thread without a crash loop.
 - Banda MCP server for agents; its instructions list its tools for the agent's system prompt.
@@ -193,7 +194,9 @@ Everything below is implemented on `main` and checked by `mise run e2e` against 
 - Presence and typing: the thread header shows who else has the thread open (per user across tabs); a line above the composer shows the agent working or writing and who is typing. Both are ephemeral events, never stored.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`mise run deploy`, `deploy/banda.yaml`).
-- Keyboard: a Cmd/Ctrl-K command palette (also the search button in every page header, for phones) finds my, mentioned and teammates' threads, recently opened first, and runs the current thread's actions that apply to the viewer (pane and tabs, snooze, settle; owner: interrupt, retry, push, mode). Shortcuts: `c` new thread, `j`/`k` or Alt-↑/↓ through the sidebar, `g s` settings, `/` message box, `Esc`, `?` cheat sheet; never while typing. Not covered by e2e (UI only).
+- Keyboard: a Cmd/Ctrl-K command palette (also the search button in every page header, for phones) finds my, mentioned and teammates' threads, recently opened first, and runs the current thread's actions that apply to the viewer (pane and tabs, snooze, settle; owner: interrupt, retry, push, mode). Shortcuts: `c` new thread, `j`/`k` or Alt-↑/↓ through the sidebar, `g s` settings, `/` message box, `Esc`, `?` cheat sheet; never while typing. Not covered by e2e yet.
+
+- End-to-end suite: every check of the old `deploy/e2e.sh` as an independent Playwright test, plus browser tests (create from the home page, a teammate following live, a permission card, reconnecting, the phone layout) and Dex sign-in and sign-out. The full suite takes about 5 minutes.
 
 **Verified only partly**
 - Real Claude Code: the image starts, detects the missing login and prints the sign-in URL in the terminal. Completing a login and a real turn need a Claude subscription; the stream-json mapping is tested against recorded CLI output.
@@ -215,7 +218,7 @@ proto/          Connect API definitions
 gen/            generated Go
 web/            SvelteKit app
 deploy/         kind config, Postgres, sandbox image
-deploy/e2e.sh   end-to-end check with the fake agent
+web/e2e/        end-to-end suite (Playwright) and its harness
 docs/research/  sandbox lifecycle, Claude login, Claude headless protocol
 ```
 

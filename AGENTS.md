@@ -8,7 +8,8 @@ A web app where a team builds software together with coding agents. Each thread 
 - `cmd/runner`: runs inside each sandbox pod, drives the unmodified `claude` CLI and calls back to the API.
 - `proto/` → `gen/` via `mise run gen` (buf). Don't edit `gen/`.
 - `web/`: SvelteKit static SPA (Svelte 5, shadcn-svelte, pnpm).
-- `deploy/`: kind config, manifests, Dockerfiles, `dev.sh` (local stack), `e2e.sh`.
+- `deploy/`: kind config, manifests, Dockerfiles, `dev.sh` (local stack and the e2e world), `fake-claude` (the e2e agent).
+- `web/e2e/`: the end-to-end suite (Playwright): `fixtures.ts` is the harness, one spec file per domain.
 
 ## Environment
 
@@ -20,5 +21,5 @@ A web app where a team builds software together with coding agents. Each thread 
 
 ## Checks
 
-- `mise run test`: Go unit tests. `mise run e2e`: whole thread lifecycle against a running cluster.
+- `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. A bug fix comes with an e2e test that fails before it; `web/e2e/known-bugs.spec.ts` holds open bugs as `test.fail()`.
 - `node web/src/lib/events.check.ts`: web event reducer. `pnpm -C web check`: Svelte types.

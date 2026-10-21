@@ -9,7 +9,7 @@ Everything goes through `deploy/dev.sh`, run as mise tasks from the repo root. E
 
 ```sh
 mise run up     # default Podman machine, kind cluster, API (:8787, preview :8788) and web (:5173), on the LAN address
-mise run e2e    # end-to-end check with the fake agent on :8790 (preview :8791), next to the normal API
+mise run e2e    # end-to-end suite with the fake agent, in a namespace, database and API of its own
 mise run down   # stop the servers and the kind node; the shared Podman machine keeps running
 ```
 
@@ -25,7 +25,7 @@ mise run down   # stop the servers and the kind node; the shared Podman machine 
 
 ## Troubleshooting
 
-Server logs are in `/tmp/banda-run/` (`api.log`, `web.log`, `e2e-api.log`).
+Server logs are in `/tmp/banda-run/` (`api.log`, `web.log`); an e2e run's in `/tmp/banda-e2e-<run>/`, which it prints.
 
 | Symptom | Fix |
 |---|---|
