@@ -37,6 +37,7 @@ type Service struct {
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
 	files map[string]chan *bandav1.FileResponse
+	inbox map[*inboxWatcher]struct{}
 }
 
 // runner is a connected runner: commands go to ch until done is closed.
@@ -53,6 +54,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		runners:   map[string]*runner{},
 		terminals: map[string]chan *bandav1.TerminalOutput{},
 		files:     map[string]chan *bandav1.FileResponse{},
+		inbox:     map[*inboxWatcher]struct{}{},
 
 		loginLastUsed: map[string]time.Time{},
 	}
@@ -157,6 +159,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
 		slog.Error("store mentions", "thread", id, "err", err)
 	}
+	s.pokeInbox(append([]string{by}, m.MentionedUserIds...)...)
 	if effect == thread.StartTurn {
 		s.deliver(ctx, id, prompt)
 	}
@@ -529,6 +532,7 @@ func (s *Service) unwatch(id string, ch chan *bandav1.Event) {
 func (s *Service) broadcast(id string, events []*bandav1.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.inboxChanged(id, events)
 	for ch := range s.watchers[id] {
 		for _, e := range events {
 			select {
@@ -600,6 +604,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		UpdatedAt:  timestamppb.New(t.UpdatedAt),
 		BaseBranch: t.BaseBranch,
 		Settled:    t.Settled,
+		Unread:     t.Unread,
 	}
 	if t.SnoozedUntil != nil {
 		p.SnoozedUntil = timestamppb.New(*t.SnoozedUntil)

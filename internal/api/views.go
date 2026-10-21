@@ -32,6 +32,7 @@ func (s *Service) Snooze(ctx context.Context, req *bandav1.SnoozeRequest) (*band
 	if err := s.store.SetSnooze(ctx, user(ctx), req.ThreadId, until); err != nil {
 		return nil, err
 	}
+	s.pokeInbox(user(ctx))
 	if until != nil {
 		s.suspendIfOwner(ctx, req.ThreadId)
 	}
@@ -42,6 +43,7 @@ func (s *Service) Settle(ctx context.Context, req *bandav1.SettleRequest) (*band
 	if err := s.store.SetSettled(ctx, user(ctx), req.ThreadId, req.Settled); err != nil {
 		return nil, err
 	}
+	s.pokeInbox(user(ctx))
 	if req.Settled {
 		s.suspendIfOwner(ctx, req.ThreadId)
 	}
