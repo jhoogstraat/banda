@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local dev stack. Run through mise, which provides the tools and env:
 #   mise run up     Podman machine, kind cluster, API and web (PUBLIC_HOST, default: LAN address)
-#   mise run e2e    fake-agent end-to-end check on :8790 (preview :8791), next to the normal API
+#   mise run e2e    the end-to-end suite (web/e2e) with the fake agent, in a world of its own
 #   mise run down   stop the servers and the kind node
 #   mise run clean  delete sandboxes of threads untouched for CLEAN_HOURS (default 24)
 set -euo pipefail
@@ -12,7 +12,7 @@ mkdir -p "$LOG"
 kc() { kubectl --context kind-banda "$@"; }
 free() { lsof -tiTCP:"$1" -sTCP:LISTEN | xargs kill 2>/dev/null || true; }
 # start <log name> <cmd...>: run detached, so it outlives this script and the harness.
-start() { local name=$1; shift; nohup "$@" >"$LOG/$name.log" 2>&1 </dev/null & PID=$!; }
+start() { local name=$1; shift; nohup "$@" >"$LOG/$name.log" 2>&1 </dev/null & PID=$!; disown; }
 # until_ok <log name> <cmd...>: retry for 5 minutes, fail early if the last started server died.
 until_ok() {
 	local name=$1; shift
@@ -59,35 +59,71 @@ servers() {
 	echo "Open http://$h:5173 and sign in as alice@example.com / password. Logs: $LOG"
 }
 
-# One e2e at a time across all checkouts: they share the fake image, :8790 and the dev users.
-E2E_LOCK=/tmp/banda-e2e.lock
-lock() {
-	until mkdir "$E2E_LOCK" 2>/dev/null; do
-		[ -f "$E2E_LOCK/pid" ] && ! kill -0 "$(cat "$E2E_LOCK/pid")" 2>/dev/null && rm -rf "$E2E_LOCK"
-		sleep 5
-	done
-	echo $$ >"$E2E_LOCK/pid"
-	trap 'free 8790; free 8791; rm -rf "$E2E_LOCK"' EXIT
-}
-
-# Environments of earlier runs still point at the e2e API, which is gone: with the lock held,
-# pause them (volumes kept) before they fill the node's pod limit.
-e2e_leftovers() {
-	kc -n banda get sandbox -o json | jq -r '.items[] | select(.spec.operatingMode == "Running")
-		| select(any(.spec.podTemplate.spec.containers[0].env[]?; .name == "BANDA_API_URL" and (.value | endswith(":8790")))) | .metadata.name' |
-		while read -r sb; do kc -n banda patch sandbox "$sb" --type merge -p '{"spec":{"operatingMode":"Suspended"}}' >/dev/null; done
-}
-
+# mise run e2e [-- <Playwright args>]: the Playwright suite in web/e2e against a world of its own, so
+# runs from several checkouts go side by side: namespace banda-e2e-<run> (sandboxes, volumes, secrets,
+# a git server and Dex), database banda_e2e_<run>, image localhost/banda-sandbox:fake-<run> and two APIs
+# on free ports (dev auth, and OIDC for the sign-in tests), serving the web build. <run> comes from the
+# checkout path; a rerun wipes its world first. E2E_KEEP=1 keeps the namespace and database.
 e2e() {
-	e2e_leftovers
-	TARGET=fake SANDBOX_IMAGE=localhost/banda-sandbox:fake mise run image
-	free 8790
-	DEV_AUTH=1 DELETE_SETTLED_AFTER=20s SANDBOX_IMAGE=localhost/banda-sandbox:fake ADDR=:8790 PREVIEW_ADDR=:8791 RUNNER_API_URL=http://host.containers.internal:8790 start e2e-api mise run api
-	until_ok e2e-api listening 8790
-	API=http://localhost:8790 deploy/e2e.sh
+	run=$(printf %s "$PWD" | shasum | cut -c1-8)
+	LOG=/tmp/banda-e2e-$run ns=banda-e2e-$run db=banda_e2e_$run
+	mkdir -p "$LOG"
+	if [ -f "$LOG/pid" ] && kill -0 "$(cat "$LOG/pid")" 2>/dev/null; then
+		echo "an e2e run of this checkout is still running (pid $(cat "$LOG/pid"))" >&2; exit 1
+	fi
+	echo $$ >"$LOG/pid"
+	PIDS=()
+	trap e2e_down EXIT
+	export SANDBOX_IMAGE=localhost/banda-sandbox:fake-$run
+	TARGET=fake mise run image >"$LOG/image.log" 2>&1 & local image=$!
+	go build -o "$LOG/api" ./cmd/api & local api=$!
+	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!
+	pnpm -C web exec playwright install chromium >/dev/null & local chromium=$!
+	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
+	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
+	kc create ns "$ns" >/dev/null
+	local p pp op opp dp
+	read -r p pp op opp dp < <(node -e 'const n = require("net"); Promise.all([1, 2, 3, 4, 5].map(() => new Promise((r) => { const s = n.createServer().listen(0, () => r(s)); })))
+		.then((ss) => { console.log(ss.map((s) => s.address().port).join(" ")); ss.forEach((s) => s.close()); })')
+	sed -e "s|namespace: banda|namespace: $ns|" -e "s|issuer: http://localhost:5173|issuer: http://localhost:$dp|" -e "s|localhost:5173/auth|localhost:$op/auth|" \
+		-e 's/type: NodePort/type: ClusterIP/' -e '/nodePort:/d' deploy/dex.yaml | kc apply -f - >/dev/null
+	wait $image || { tail -30 "$LOG/image.log"; exit 1; }
+	# The fixture repos at git://e2e-git/<name>.git; readonly refuses pushes.
+	kc -n "$ns" run e2e-git --image="$SANDBOX_IMAGE" --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
+		'cp -r /opt/e2e /tmp/git && cp -r /tmp/git/plain.git /tmp/git/readonly.git &&
+		for r in plain setup-fails setup-bg setup-hold; do git --git-dir=/tmp/git/$r.git config daemon.receivepack true; done &&
+		exec git daemon --reuseaddr --base-path=/tmp/git --export-all /tmp/git' >/dev/null
+	kc -n "$ns" rollout status deployment/dex --timeout=300s >/dev/null
+	start dex kubectl --context kind-banda -n "$ns" port-forward svc/dex "$dp:5556"; PIDS+=("$PID")
+	until_ok dex curl -sf "http://localhost:$dp/dex/.well-known/openid-configuration"
+	wait $api
+	wait $web || { tail -30 "$LOG/web.log"; exit 1; }
+	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
+	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
+	until_ok api listening "$p" # it creates the schema: one at a time
+	OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
+		ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://host.containers.internal:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
+	until_ok oidc-api listening "$op"
+	kc -n "$ns" wait --for=condition=Ready pod/e2e-git --timeout=120s >/dev/null
+	wait $chromium
+	echo "e2e world $ns: API http://localhost:$p (log $LOG/api.log), OIDC API http://localhost:$op, Dex :$dp"
+	E2E_API=http://localhost:$p E2E_OIDC_API=http://localhost:$op E2E_NAMESPACE=$ns E2E_DB=$db E2E_DIR=$LOG E2E_LOG=$LOG/api.log \
+		pnpm -C web exec playwright test "$@" || { echo "Logs: $LOG. Report: pnpm -C web exec playwright show-report" >&2; exit 1; }
 }
 
-# Dev only: every e2e run and UI check leaves sandboxes behind. Deletes the thread sandboxes (their
+e2e_down() {
+	kill ${PIDS[@]+"${PIDS[@]}"} 2>/dev/null || true
+	if [ -n "${E2E_KEEP:-}" ]; then
+		echo "kept namespace $ns and database $db"
+	else
+		kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null || true
+		pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" || true
+	fi
+	rm -f "$LOG/pid"
+}
+pg() { kc -n banda exec postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 "$@"; }
+
+# Dev only: every UI check leaves sandboxes behind. Deletes the thread sandboxes (their
 # volumes go with them) older than CLEAN_HOURS whose thread wasn't touched in that time or is gone.
 clean() {
 	local h=${CLEAN_HOURS:-24} keep
@@ -101,8 +137,8 @@ clean() {
 
 case ${1:-} in
 up) machine; cluster; servers ;;
-e2e) lock; machine; cluster; e2e ;;
+e2e) shift; machine; cluster; e2e "$@" ;;
 clean) clean ;;
-down) free 8787; free 8788; free 5173; free 8790; free 8791; podman stop banda-control-plane ;;
+down) free 8787; free 8788; free 5173; podman stop banda-control-plane ;;
 *) echo "usage: $0 up|e2e|clean|down" >&2; exit 2 ;;
 esac

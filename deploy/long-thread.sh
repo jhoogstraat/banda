@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Seeds a suspended thread owned by $OWNER (default dev) with $1 events (default 20000), straight into
-# Postgres, and prints its id. For e2e paging checks and measuring long threads; no agent runs.
+# Postgres (database $DB, default banda), and prints its id. For e2e paging checks and measuring long
+# threads; no agent runs.
 # Each turn of 25 events: a message, a TodoWrite, 10 tool calls with results (1.5 KB, every 7th turn
 # one of 30 KB), agent text, the turn end.
 set -euo pipefail
 N=${1:-20000}
 ID=long$(od -An -N8 -tx8 /dev/urandom | tr -d " ")
-mise exec -- kubectl --context kind-banda -n banda exec -i postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 -v id="$ID" -v n="$N" -v owner="${OWNER:-dev}" <<'SQL'
+mise exec -- kubectl --context kind-banda -n banda exec -i postgres-0 -- psql -U banda -d "${DB:-banda}" -q -v ON_ERROR_STOP=1 -v id="$ID" -v n="$N" -v owner="${OWNER:-dev}" <<'SQL'
 BEGIN;
 INSERT INTO users (id, name) VALUES (:'owner', :'owner') ON CONFLICT DO NOTHING;
 INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode, runner_token, last_seq)
