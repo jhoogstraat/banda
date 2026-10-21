@@ -1,30 +1,54 @@
 package api
 
 import (
+	"slices"
 	"testing"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
 
 func TestAgentPrompt(t *testing.T) {
-	msg := func(actor, text string) *bandav1.Event {
-		return &bandav1.Event{Actor: actor, Kind: &bandav1.Event_Message{Message: &bandav1.Message{Text: text}}}
+	msg := func(actor, text string, att ...*bandav1.Attachment) *bandav1.Event {
+		return &bandav1.Event{Actor: actor, Kind: &bandav1.Event_Message{Message: &bandav1.Message{Text: text, Attachments: att}}}
 	}
 	agent := &bandav1.Event{Actor: "agent", Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: "done"}}}
 	names := map[string]string{"u1": "Ann", "u2": "Bob"}
+	prompt := func(by string, unseen []*bandav1.Event, text string, att ...*bandav1.Attachment) string {
+		got, _ := agentPrompt("u1", names, unseen, by, &bandav1.Message{Text: text, Attachments: att}, nil)
+		return got
+	}
 
-	if got := agentPrompt("u1", names, nil, "u1", &bandav1.Message{Text: "fix it"}); got != "fix it" {
+	if got := prompt("u1", nil, "fix it"); got != "fix it" {
 		t.Errorf("owner prompt: %q", got)
 	}
-	if got := agentPrompt("u1", names, nil, "u2", &bandav1.Message{Text: "@agent fix it"}); got != "Bob: @agent fix it" {
+	if got := prompt("u2", nil, "@agent fix it"); got != "Bob: @agent fix it" {
 		t.Errorf("teammate prompt: %q", got)
 	}
-	if got := agentPrompt("u1", names, nil, "agent:t9", &bandav1.Message{Text: "ping"}); got != "agent in thread t9: ping" {
+	if got := prompt("agent:t9", nil, "ping"); got != "agent in thread t9: ping" {
 		t.Errorf("agent prompt: %q", got)
 	}
 	want := "Messages posted in this thread since your last turn:\nBob: looks off\nAnn: agreed\n\nAnn: @agent fix it"
-	if got := agentPrompt("u1", names, []*bandav1.Event{agent, msg("u2", "looks off"), msg("u1", "agreed")}, "u1", &bandav1.Message{Text: "@agent fix it"}); got != want {
+	if got := prompt("u1", []*bandav1.Event{agent, msg("u2", "looks off"), msg("u1", "agreed")}, "@agent fix it"); got != want {
 		t.Errorf("with chat:\n%q\nwant\n%q", got, want)
+	}
+
+	shot := &bandav1.Attachment{Id: "a1", Name: "shot.png", MediaType: "image/png"}
+	mock := &bandav1.Attachment{Id: "a2", Name: "mock.webp", MediaType: "image/webp"}
+	notes := &bandav1.Attachment{Id: "a3", Name: "notes.md", MediaType: "text/plain"}
+	got, images := agentPrompt("u1", names, []*bandav1.Event{msg("u2", "like this?", mock)}, "u1",
+		&bandav1.Message{Text: "@agent build it", Attachments: []*bandav1.Attachment{shot, notes}}, map[string]string{"a3": "has ``` inside\n"})
+	want = "Messages posted in this thread since your last turn:\nBob: like this?\n[attached image: mock.webp]\n\n" +
+		"Ann: @agent build it\n[attached image: shot.png]\n\nAttached file notes.md:\n````\nhas ``` inside\n````"
+	if got != want || !slices.Equal(images, []string{"a2", "a1"}) {
+		t.Errorf("attachments:\n%q %v\nwant\n%q", got, images, want)
+	}
+
+	var many []*bandav1.Attachment
+	for i := range maxPromptImages + 3 {
+		many = append(many, &bandav1.Attachment{Id: string(rune('A' + i)), MediaType: "image/png"})
+	}
+	if _, images := agentPrompt("u1", names, nil, "u1", &bandav1.Message{Attachments: many}, nil); len(images) != maxPromptImages || images[0] != "D" {
+		t.Errorf("only the latest images are sent: %v", images)
 	}
 
 	review := &bandav1.Message{Text: "@agent please", Review: []*bandav1.ReviewComment{
@@ -33,7 +57,7 @@ func TestAgentPrompt(t *testing.T) {
 	}}
 	want = "@agent please\n\nReview of the diff (2 comments):\n\na.go, line 3:\n```diff\n+x := 1\n```\nrename x" +
 		"\n\nb.md, lines 7-9 (removed, numbered as in the base branch):\n````diff\n-```\n-a\n-```\n````\nkeep this"
-	if got := agentPrompt("u1", names, nil, "u1", review); got != want {
+	if got, _ := agentPrompt("u1", names, nil, "u1", review, nil); got != want {
 		t.Errorf("review:\n%q\nwant\n%q", got, want)
 	}
 }

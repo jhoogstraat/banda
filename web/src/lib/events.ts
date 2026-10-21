@@ -1,6 +1,7 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import type {
 	AgentSettings,
+	Attachment,
 	Event,
 	ForkNote,
 	Mode,
@@ -23,11 +24,11 @@ export type Todo = { content: string; status: 'pending' | 'in_progress' | 'compl
 
 // `key` is the seq of the event that started the item: stable when older history is prepended.
 export type Item = { key: number } & (
-	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; time?: Timestamp }
+	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; time?: Timestamp }
 	| { kind: 'text' | 'notice'; text: string }
 	| { kind: 'steps'; steps: Step[] }
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
-	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
+	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
 	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
 	| { kind: 'turn'; turn: TurnEnded }
@@ -129,11 +130,11 @@ export function apply(chat: Chat, e: Event) {
 	switch (k.case) {
 		case 'message':
 			delete chat.typing[e.actor];
-			chat.items.push({ key, kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, time: e.time });
+			chat.items.push({ key, kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, attachments: k.value.attachments, time: e.time });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];
-			chat.items.push({ key, kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', review: k.value.message?.review ?? [], time: e.time });
+			chat.items.push({ key, kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', review: k.value.message?.review ?? [], attachments: k.value.message?.attachments ?? [], time: e.time });
 			break;
 		case 'turnRequestResolved': {
 			const seq = k.value.requestSeq;

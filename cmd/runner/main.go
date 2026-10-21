@@ -226,7 +226,7 @@ func run(ctx context.Context) error {
 				var err error
 				switch k := msg.Kind.(type) {
 				case *bandav1.ConnectResponse_Prompt:
-					err = claude.write(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": k.Prompt.Text}})
+					err = claude.write(userMessage(k.Prompt))
 					pending++
 				case *bandav1.ConnectResponse_Stop:
 					err = claude.interrupt()

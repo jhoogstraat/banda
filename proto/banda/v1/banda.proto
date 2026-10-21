@@ -279,6 +279,9 @@ message Message {
   // Comments on the thread's diff, posted together as one review. `text` is
   // then an optional summary.
   repeated ReviewComment review = 4;
+  // Files uploaded with POST /files and posted with the message. The API
+  // fills in name, media type and size from the upload.
+  repeated Attachment attachments = 6;
 }
 
 // A comment on a line range of the diff.
@@ -292,6 +295,16 @@ message ReviewComment {
   // The commented diff lines, with their +/-/space prefixes.
   string code = 5;
   string body = 6;
+}
+
+// An image or small text file, served at GET /files/<id>. Images reach the
+// agent as image blocks, text files inlined in the prompt.
+message Attachment {
+  string id = 1;
+  string name = 2;
+  // image/png, image/jpeg, image/gif, image/webp, or text/plain.
+  string media_type = 3;
+  int64 size = 4;
 }
 
 // A teammate's message to the agent, waiting for the owner's approval
@@ -904,6 +917,13 @@ message PermissionCommand {
 
 message Prompt {
   string text = 1;
+  // Images referenced in the text, in order, sent as image content blocks.
+  repeated AttachmentImage images = 2;
+}
+
+message AttachmentImage {
+  string media_type = 1;
+  bytes data = 2;
 }
 
 // Interrupts the current turn.
