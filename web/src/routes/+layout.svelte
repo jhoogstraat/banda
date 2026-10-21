@@ -2,9 +2,11 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { ModeWatcher, setMode } from 'mode-watcher';
+	import CommandPalette from '#lib/components/command-palette.svelte';
 	import AppSidebar from '#lib/components/sidebar.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
+	import { onkeydown } from '#lib/shortcuts.svelte.js';
 	import { loadThreads } from '#lib/threads.svelte.js';
 	import type { LayoutProps } from './$types';
 
@@ -26,6 +28,8 @@
 	<title>Banda</title>
 </svelte:head>
 
+<svelte:window {onkeydown} />
+
 <ModeWatcher />
 
 <TooltipProvider>
@@ -38,4 +42,5 @@
 			{/key}
 		</Sidebar.Inset>
 	</Sidebar.Provider>
+	<CommandPalette />
 </TooltipProvider>

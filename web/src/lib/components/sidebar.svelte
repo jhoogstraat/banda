@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { timestampMs } from '@bufbuild/protobuf/wkt';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -13,25 +12,11 @@
 	import NewThreadDialog from '#lib/components/new-thread-dialog.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
-	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { matches, projectName, projects, threads, userName } from '#lib/threads.svelte.js';
+	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { matches, projectName, projects, sidebarSections, threads, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
-	// Precedence: settled > snoozed > status.
-	const sectionOf = (t: Thread) =>
-		t.settled
-			? 'settled'
-			: t.snoozedUntil && timestampMs(t.snoozedUntil) > Date.now()
-				? 'snoozed'
-				: t.status === Status.STARTING || t.status === Status.WORKING
-					? 'working'
-					: 'needs';
-
-	const sections = $derived.by(() => {
-		const s: Record<string, Thread[]> = { needs: [], working: [], snoozed: [], settled: [] };
-		for (const t of threads.list.filter(matches)) s[sectionOf(t)].push(t);
-		return s;
-	});
+	const sections = $derived.by(sidebarSections);
 	const name = $derived(threads.me?.name ?? '');
 	let newOpen = $state(false);
 
@@ -106,7 +91,7 @@
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
-			<IconButton icon={SquarePenIcon} label="New thread" onclick={() => (newOpen = true)} />
+			<IconButton icon={SquarePenIcon} label="New thread" keys="C" onclick={() => (newOpen = true)} />
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content class="space-y-3 px-2 pb-3">
@@ -122,7 +107,7 @@
 			<div class="truncate text-sm">{name}</div>
 			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
 		</div>
-		<IconButton icon={SettingsIcon} label="Settings" href="/settings" variant={page.url.pathname === '/settings' ? 'secondary' : 'ghost'} />
+		<IconButton icon={SettingsIcon} label="Settings" keys="G S" href="/settings" variant={page.url.pathname === '/settings' ? 'secondary' : 'ghost'} />
 	</Sidebar.Footer>
 </Sidebar.Root>
 <NewThreadDialog bind:open={newOpen} />

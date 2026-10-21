@@ -1,5 +1,6 @@
+import { timestampMs } from '@bufbuild/protobuf/wkt';
 import { api, userApi } from './api';
-import type { Thread, User } from './gen/banda/v1/banda_pb';
+import { Status, type Thread, type User } from './gen/banda/v1/banda_pb';
 
 // `search` and `project` (a repo URL) filter the sidebar's threads.
 export const threads = $state({
@@ -46,3 +47,22 @@ export function matches(t: Thread) {
 		(!q || `${t.title} ${projectName(t.repoUrl)}`.toLowerCase().includes(q))
 	);
 }
+
+// Precedence: settled > snoozed > status.
+export const sectionOf = (t: Thread) =>
+	t.settled
+		? 'settled'
+		: t.snoozedUntil && timestampMs(t.snoozedUntil) > Date.now()
+			? 'snoozed'
+			: t.status === Status.STARTING || t.status === Status.WORKING
+				? 'working'
+				: 'needs';
+
+export function sidebarSections() {
+	const s: Record<string, Thread[]> = { needs: [], working: [], snoozed: [], settled: [] };
+	for (const t of threads.list.filter(matches)) s[sectionOf(t)].push(t);
+	return s;
+}
+
+// The sidebar's threads top to bottom, for j/k.
+export const sidebarOrder = () => [threads.mentioned.filter(matches), ...Object.values(sidebarSections())].flat();

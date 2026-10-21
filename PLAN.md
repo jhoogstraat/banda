@@ -152,6 +152,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Banda MCP server for agents.
 - Phone layout: the sidebar becomes a drawer and the right pane a full-screen layer. Only the app shell (`+layout.svelte`, shadcn `Sidebar`) and `side-pane.svelte` know the screen size; everything else fills its container and adapts with container queries.
 - In-cluster deployment of the API (`mise run deploy`, `deploy/banda.yaml`).
+- Keyboard: a Cmd/Ctrl-K command palette (also the search button in every page header, for phones) finds my, mentioned and teammates' threads, recently opened first, and runs the current thread's actions that apply to the viewer (pane and tabs, snooze, settle; owner: interrupt, retry, push, mode). Shortcuts: `c` new thread, `j`/`k` or Alt-↑/↓ through the sidebar, `g s` settings, `/` message box, `Esc`, `?` cheat sheet; never while typing. Not covered by e2e (UI only).
 
 **Verified only partly**
 - Real Claude Code: the image starts, detects the missing login and prints the sign-in URL in the terminal. Completing a login and a real turn need a Claude subscription; the stream-json mapping is tested against recorded CLI output.

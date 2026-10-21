@@ -11,6 +11,10 @@
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import XIcon from '@lucide/svelte/icons/x';
+	import BellOffIcon from '@lucide/svelte/icons/bell-off';
+	import FileDiffIcon from '@lucide/svelte/icons/file-diff';
+	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
+	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -38,7 +42,7 @@
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SidePane from '#lib/components/side-pane.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
-	import ThreadActions from '#lib/components/thread-actions.svelte';
+	import ThreadActions, { isSnoozed, presets, settle, snooze } from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
 	import ToolCall from '#lib/components/tool-call.svelte';
@@ -50,10 +54,12 @@
 	import { api } from '#lib/api.js';
 	import { apply, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
+	visited(id);
 
 	let thread = $state<Thread>();
 	const chat = $state<Chat>({ items: [], streaming: '' });
@@ -137,6 +143,46 @@
 		}
 	}
 
+	// Shared by the header buttons and the command palette.
+	const interrupt = () => act(api.interrupt({ threadId: id }));
+	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
+	const push = () => act(api.push({ threadId: id }));
+	const retry = () => act(api.retry({ threadId: id }));
+	const show = (t: string) => {
+		tab = t;
+		diffOpen = true;
+	};
+
+	// The palette's "This thread" actions, each only where it applies.
+	$effect(() => {
+		const t = thread;
+		if (!t) return;
+		const c: Command[] = [
+			{ label: 'Toggle right pane', icon: PanelRightIcon, run: () => (diffOpen = !diffOpen) },
+			{ label: 'Show diff', icon: FileDiffIcon, run: () => show('diff') },
+			{ label: 'Show files', icon: FolderTreeIcon, run: () => show('files') }
+		];
+		if (owner) c.push({ label: 'Open terminal', icon: SquareTerminalIcon, run: () => show('terminal') });
+		if (isSnoozed(t)) c.push({ label: 'Unsnooze', icon: BellOffIcon, run: () => act(snooze(t)) });
+		else
+			for (const [label, date] of [presets[0], presets[2]])
+				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
+		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
+		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
+		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
+		if (owner) {
+			c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
+			c.push(t.mode === Mode.CHAT
+				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
+				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });
+		}
+		ui.commands = c;
+		// When the next thread page has already registered its own, leave them.
+		return () => {
+			if (!page.params.id || page.params.id === id) ui.commands = [];
+		};
+	});
+
 	async function send({ text }: { text: string }) {
 		if (!text.trim()) return;
 		const message = {
@@ -170,8 +216,8 @@
 		{#if thread}<StatusDot status={thread.status} label />{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-0.5">
-			{#if thread?.status === Status.WORKING}
-				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={() => act(api.interrupt({ threadId: id }))} />
+			{#if owner && thread?.status === Status.WORKING}
+				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={interrupt} />
 			{/if}
 			{#if thread}
 				<IconButton
@@ -179,12 +225,12 @@
 					label={thread.mode === Mode.CHAT ? 'Chat mode: switch to agent mode' : 'Agent mode: switch to chat mode'}
 					variant={thread.mode === Mode.CHAT ? 'secondary' : 'ghost'}
 					disabled={!owner}
-					onclick={() => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }))}
+					onclick={toggleMode}
 				/>
 				<ThreadActions {thread} {act} />
 			{/if}
 			{#if owner}
-				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={() => act(api.push({ threadId: id }))} />
+				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 			{/if}
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
 		</div>
@@ -281,7 +327,7 @@
 						<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
 						<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
 						{#if owner}
-							<Button size="sm" onclick={() => act(api.retry({ threadId: id }))}><RotateCcwIcon /> Retry</Button>
+							<Button size="sm" onclick={retry}><RotateCcwIcon /> Retry</Button>
 						{/if}
 					</div>
 				{:else if !chat.items.length}

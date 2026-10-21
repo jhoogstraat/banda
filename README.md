@@ -18,6 +18,8 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
 4. `mise run down` stops the servers and the kind node.
 
+In the app, Cmd/Ctrl-K opens the command palette and `?` lists the keyboard shortcuts.
+
 `mise run image` rebuilds the sandbox image after changing `cmd/runner` or `deploy/sandbox.Dockerfile`; `mise run gen` regenerates `gen/` from `proto/`. Server logs are in `/tmp/banda-run/`.
 
 For private repos, add a `GIT_TOKEN` secret in Settings. Secrets are environment variables in all your threads, applied when a thread's environment next starts, and redacted from everything the agent reports. A shared fallback for everyone:
