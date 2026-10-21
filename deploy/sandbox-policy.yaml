@@ -4,8 +4,9 @@
 # API's runner port, nothing else in the cluster or on private networks, and
 # nothing connects to them: runners dial out, previews and terminals go
 # through their connection. An API running outside the cluster (dev) gets a
-# policy of its own: see host_api in deploy/dev.sh. A git host on a private
-# network needs one too.
+# policy of its own: see host_api in deploy/dev.sh. Private networks
+# (production, a git host) are opened by SANDBOX_EGRESS_ALLOW: the API applies
+# the policy sandboxes-allow (internal/sandbox).
 # Apply it to every namespace with sandboxes: kubectl apply -n <ns> -f deploy/sandbox-policy.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -26,3 +27,19 @@ spec:
             # Pods, services, nodes (their kubelet and NodePorts), the host and
             # the LAN, cloud metadata.
             except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]
+---
+# The API in the cluster (deploy/banda.yaml) takes sandboxes only on its runner
+# port, also when an allowed range covers its pod: anyone else on any port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: banda-api
+spec:
+  podSelector: {matchLabels: {app: banda-api}}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8787}]
+    - from:
+        - namespaceSelector: {}
+          podSelector: {matchExpressions: [{key: banda.dev/sandbox, operator: DoesNotExist}]}
+        - ipBlock: {cidr: 0.0.0.0/0, except: [10.244.0.0/16]} # kind's pod network
