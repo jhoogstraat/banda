@@ -261,7 +261,7 @@
 		if (!t) return;
 		const c: Command[] = [
 			{ label: 'Toggle right pane', icon: PanelRightIcon, run: () => (diffOpen = !diffOpen) },
-			{ label: 'Show diff', icon: FileDiffIcon, run: () => show('diff') },
+			...(t.repoUrl ? [{ label: 'Show diff', icon: FileDiffIcon, run: () => show('diff') }] : []),
 			{ label: 'Show files', icon: FolderTreeIcon, run: () => show('files') }
 		];
 		if (owner) c.push({ label: 'Open terminal', icon: SquareTerminalIcon, run: () => show('terminal') });
@@ -278,7 +278,7 @@
 		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner) {
-			if (!pr) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
+			if (!pr && t.repoUrl) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
 				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
 				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });

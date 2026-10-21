@@ -106,23 +106,29 @@
 						<span>{e.turns} {e.turns === 1 ? 'turn' : 'turns'}</span>
 						<span>${e.costUsd.toFixed(2)}</span>
 						<span>{seconds(e.durationMs)}</span>
-						<span>
-							{s.files} {s.files === 1 ? 'file' : 'files'}
-							<span class="text-emerald-600 dark:text-emerald-400">+{s.add}</span>
-							<span class="text-red-600 dark:text-red-400">−{s.del}</span>
-						</span>
+						{#if t.repoUrl}
+							<span>
+								{s.files} {s.files === 1 ? 'file' : 'files'}
+								<span class="text-emerald-600 dark:text-emerald-400">+{s.add}</span>
+								<span class="text-red-600 dark:text-red-400">−{s.del}</span>
+							</span>
+						{/if}
 					</div>
 				</div>
-				<div class="min-h-0 flex-1 overflow-auto">
-					<DiffView
-						diff={t.diff}
-						bind:pending={reviews[t.id].pending}
-						bind:ask={reviews[t.id].ask}
-						bind:focus={reviews[t.id].focus}
-						posted={[]}
-						onsend={(summary) => review(t.id, summary)}
-					/>
-				</div>
+				{#if t.repoUrl}
+					<div class="min-h-0 flex-1 overflow-auto">
+						<DiffView
+							diff={t.diff}
+							bind:pending={reviews[t.id].pending}
+							bind:ask={reviews[t.id].ask}
+							bind:focus={reviews[t.id].focus}
+							posted={[]}
+							onsend={(summary) => review(t.id, summary)}
+						/>
+					</div>
+				{:else}
+					<p class="p-4 text-sm text-muted-foreground">No repository, so no diff: open the try to read its work.</p>
+				{/if}
 			</section>
 		{:else}
 			<p class="p-6 text-sm text-muted-foreground">{error ? '' : loaded ? 'Nothing to compare: no such tries.' : 'Loading…'}</p>

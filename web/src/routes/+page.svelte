@@ -17,7 +17,7 @@
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { AuthMethod, LoginState, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes } from '#lib/permissions.js';
-	import { projects, threads } from '#lib/threads.svelte.js';
+	import { noRepo, projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
 	// (the app is a client-only SPA, so localStorage is always there).
@@ -67,14 +67,15 @@
 		busy = true;
 		error = '';
 		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
+		const repo = repoUrl === noRepo ? '' : repoUrl;
 		try {
 			const race = raceTries(tries, model, effort);
 			const permissionMode = permissionModes[permissions] ?? PermissionMode.BYPASS;
 			if (race.length > 1) {
-				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race, permissionMode });
+				const { threads } = await api.race({ repoUrl: repo, baseBranch, prompt: text, tries: race, permissionMode });
 				await goto(`/compare?race=${threads[0].raceId}`);
 			} else {
-				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text, permissionMode });
+				const { thread } = await api.createThread({ repoUrl: repo, baseBranch, model, effort, prompt: text, permissionMode });
 				await goto(`/t/${thread!.id}`);
 			}
 		} catch (err) {
@@ -91,7 +92,7 @@
 	<div class="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
 		<ConversationEmptyState
 			title="What should the agent work on?"
-			description="It works in its own sandbox, on its own branch. Teammates can follow along and join in."
+			description={`It works in its own sandbox, ${repoUrl === noRepo ? 'in an empty folder' : 'on its own branch'}. Teammates can follow along and join in.`}
 		>
 			{#snippet icon()}<BotIcon class="size-8" />{/snippet}
 		</ConversationEmptyState>

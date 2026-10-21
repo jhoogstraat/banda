@@ -16,7 +16,7 @@
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { size, type Family } from '#lib/inbox.js';
-	import { askNotify, matches, projectName, projects, sidebarSections, threads, unfolded, unread, userName } from '#lib/threads.svelte.js';
+	import { askNotify, matches, noRepo, projectName, projects, sidebarSections, threads, unfolded, unread, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	const sections = $derived.by(sidebarSections);
@@ -124,7 +124,7 @@
 					<DropdownMenu.RadioGroup bind:value={threads.project}>
 						<DropdownMenu.RadioItem value="">All projects</DropdownMenu.RadioItem>
 						{#each projects() as p (p)}
-							<DropdownMenu.RadioItem value={p} title={p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
+							<DropdownMenu.RadioItem value={p} title={p === noRepo ? undefined : p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
 						{/each}
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>
