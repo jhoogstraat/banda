@@ -156,6 +156,8 @@ message ToolCall {
   string id = 1;
   string name = 2;
   string input_json = 3;
+  // Set when a subagent made the call: the id of the Task tool call that started it.
+  string parent_tool_call_id = 4;
 }
 
 message ToolResult {

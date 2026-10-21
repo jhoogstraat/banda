@@ -49,15 +49,22 @@ var authErrors = map[string]bool{"authentication_failed": true, "oauth_org_not_a
 
 // translate maps one stream-json line to Banda events. authFailed reports a
 // retry loop caused by a bad login, which the caller should interrupt.
-// ponytail: subagent (Task tool) internals are dropped; show them nested when the UI wants them.
+// A subagent's (Task tool's) lines carry parent_tool_use_id: only its tool
+// calls and results are kept, tagged with the parent call, so the chat can nest
+// them. Its prompt, text and deltas are dropped; the Task result has its answer.
 func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool) {
 	var l line
-	if json.Unmarshal(raw, &l) != nil || l.ParentToolUseID != nil {
+	if json.Unmarshal(raw, &l) != nil {
 		return nil, false, false
+	}
+	sub := l.ParentToolUseID != nil
+	parent := ""
+	if sub {
+		parent = *l.ParentToolUseID
 	}
 	switch l.Type {
 	case "stream_event":
-		if l.Event.Type == "content_block_delta" && l.Event.Delta.Type == "text_delta" {
+		if !sub && l.Event.Type == "content_block_delta" && l.Event.Delta.Type == "text_delta" {
 			events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentTextDelta{AgentTextDelta: &bandav1.AgentTextDelta{Text: l.Event.Delta.Text}}})
 		}
 	case "assistant", "user":
@@ -66,6 +73,9 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 			return nil, false, false // plain string content is our own prompt echoed back
 		}
 		for _, b := range blocks {
+			if sub && b.Type != "tool_use" && b.Type != "tool_result" {
+				continue
+			}
 			switch b.Type {
 			case "text":
 				events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: b.Text}}})
@@ -74,12 +84,15 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 					events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentThinking{AgentThinking: &bandav1.AgentThinking{Text: b.Thinking}}})
 				}
 			case "tool_use":
-				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Id: b.ID, Name: b.Name, InputJson: string(b.Input)}}})
+				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Id: b.ID, Name: b.Name, InputJson: string(b.Input), ParentToolCallId: parent}}})
 			case "tool_result":
 				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolResult{ToolResult: &bandav1.ToolResult{ToolCallId: b.ToolUseID, Output: text(b.Content), IsError: b.IsError}}})
 			}
 		}
 	case "result":
+		if sub {
+			return nil, false, false
+		}
 		te := &bandav1.TurnEnded{IsError: l.IsError, DurationMs: l.DurationMS, CostUsd: l.TotalCostUSD}
 		if l.IsError {
 			te.Error = l.Result

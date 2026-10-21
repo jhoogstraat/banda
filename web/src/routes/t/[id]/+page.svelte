@@ -26,7 +26,6 @@
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
-	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import DiffView from '#lib/components/diff-view.svelte';
@@ -41,14 +40,15 @@
 	import ThreadActions from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
-	import ToolCall from '#lib/components/tool-call.svelte';
+	import Plan from '#lib/components/plan.svelte';
+	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
 	import { api } from '#lib/api.js';
-	import { apply, type Chat } from '#lib/events.js';
+	import { apply, newChat, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
 
@@ -56,7 +56,7 @@
 	const id = page.params.id!;
 
 	let thread = $state<Thread>();
-	const chat = $state<Chat>({ items: [], streaming: '' });
+	const chat = $state<Chat>(newChat());
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
 	// The terminal and the file browser mount when their tab is first opened and then stay alive.
@@ -210,13 +210,8 @@
 						</div>
 					{:else if item.kind === 'text'}
 						{@render agentText(item.text)}
-					{:else if item.kind === 'thinking'}
-						<Reasoning defaultOpen={false} class="mb-0">
-							<ReasoningTrigger><BrainIcon class="size-4" /> Thinking</ReasoningTrigger>
-							<ReasoningContent content={item.text} />
-						</Reasoning>
-					{:else if item.kind === 'tool'}
-						<ToolCall call={item.call} result={item.result} />
+					{:else if item.kind === 'steps'}
+						<ToolSteps steps={item.steps} />
 					{:else if item.kind === 'turn'}
 						{#if item.turn.isError}
 							{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
@@ -295,6 +290,7 @@
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
+		<Plan plan={chat.plan} />
 		<PromptInput.Root onSubmit={send}>
 			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
 				<PromptInput.Body>
