@@ -1,5 +1,5 @@
 // Run: node src/lib/events.check.ts
-import { apply, newChat } from './events.ts';
+import { apply, newChat, typingNow } from './events.ts';
 import type { Event } from './gen/banda/v1/banda_pb.ts';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
@@ -71,4 +71,14 @@ for (let i = 0; i < 20000; i++) {
 	if (i % 10 === 0) apply(big, ev({ case: 'agentText', value: { text: 'x' } }));
 }
 if (performance.now() - t0 > 1000) throw new Error('20k tool calls took over a second');
+
+const m = count();
+apply(chat, ev({ case: 'presenceChanged', value: { userIds: ['alice', 'bob'] } }, 0n));
+if (chat.present.join() !== 'alice,bob' || count() !== m) throw new Error('presence should replace the present set, not add items');
+apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'bob' });
+apply(chat, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'carol' });
+if (typingNow(chat, Date.now()).join() !== 'bob,carol' || count() !== m) throw new Error('typing should be tracked per person');
+if (typingNow(chat, Date.now() + 6000).length) throw new Error('typing should expire');
+apply(chat, { ...ev({ case: 'message', value: { text: 'hi' } }), actor: 'bob' });
+if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
 console.log('ok');
