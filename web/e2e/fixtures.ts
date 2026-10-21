@@ -1,7 +1,7 @@
 // The e2e harness: `mise run e2e` starts a world of its own (see e2e() in deploy/dev.sh) and passes
 // it in E2E_* variables. Every test gets its own users, so tests run in parallel and never see each
 // other's threads, settings or volumes.
-import { test as base, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { test as base, expect, type Browser, type BrowserContext, type BrowserContextOptions, type Page } from '@playwright/test';
 import { create, toJsonString } from '@bufbuild/protobuf';
 import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { createClient, type Interceptor } from '@connectrpc/connect';
@@ -155,9 +155,14 @@ function newUser(id: string, browser: () => Promise<Browser>, api = API) {
 			expect(r.status, await r.clone().text()).toBe(200);
 			return ((await r.json()) as { id: string }).id;
 		},
-		/** A browser tab signed in as this user (dev auth), sharing one context per user. */
-		async page(): Promise<Page> {
-			context ??= browser().then((b) => b.newContext({ baseURL: api, extraHTTPHeaders: { 'X-Banda-User': id } }));
+		/**
+		 * A browser tab signed in as this user (dev auth). Tabs share one context per user (its
+		 * page.context().setOffline() cuts them all off); options, e.g. devices['iPhone 13'], get a context of their own.
+		 */
+		async page(options?: BrowserContextOptions): Promise<Page> {
+			const open = () => browser().then((b) => b.newContext({ ...options, baseURL: api, extraHTTPHeaders: { 'X-Banda-User': id } }));
+			if (options) return (await open()).newPage();
+			context ??= open();
 			return (await context).newPage();
 		},
 		/** Collects a terminal's output until it exits (with a command) or timeout. */
