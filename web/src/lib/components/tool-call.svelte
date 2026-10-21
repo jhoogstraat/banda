@@ -9,6 +9,8 @@
 	import ToolInput from '#lib/components/ai-elements/tool/tool-input.svelte';
 	import ToolOutput from '#lib/components/ai-elements/tool/tool-output.svelte';
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
+	import { page } from '$app/state';
+	import { api } from '#lib/api.js';
 	import { todos, type Tool } from '#lib/events.js';
 	import { describe, diff, exitCode, icons, input, lines } from '#lib/tools.js';
 	import Self from './tool-call.svelte';
@@ -26,6 +28,24 @@
 	// Long outputs show their first lines; "show more" renders the rest.
 	const FOLD = 20;
 	let full = $state(false);
+
+	// The stream cuts large inputs and outputs; this loads both events in full.
+	let loading = $state(false);
+	async function loadAll() {
+		loading = true;
+		try {
+			for (const seq of [tool.seq, tool.resultSeq]) {
+				if (!seq) continue;
+				const [e] = (await api.history({ threadId: page.params.id!, beforeSeq: seq + 1n, limit: 1, full: true })).events;
+				if (e?.kind.case === 'toolCall') tool.call = e.kind.value;
+				if (e?.kind.case === 'toolResult') tool.result = e.kind.value;
+			}
+			tool.cut = false;
+			full = true;
+		} finally {
+			loading = false;
+		}
+	}
 	const tone = (l: string) =>
 		l === '@@'
 			? 'text-muted-foreground/60'
@@ -68,6 +88,11 @@
 		<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90" />
 	</CollapsibleTrigger>
 	<CollapsibleContent class="mb-1 ml-4 border-l pl-2">
+		{#if tool.cut}
+			<button class="px-1 text-xs text-muted-foreground hover:text-foreground" disabled={loading} onclick={loadAll}>
+				{loading ? 'Loading…' : 'Cut at 4 KB · load all'}
+			</button>
+		{/if}
 		{@const edits = diff(tool)}
 		{#if name === 'Bash'}
 			{@const out = lines(result?.output)}

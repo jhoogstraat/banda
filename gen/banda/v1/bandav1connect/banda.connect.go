@@ -55,6 +55,8 @@ const (
 	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
 	// ThreadServiceWatchThreadProcedure is the procedure name of the ThreadService's WatchThread RPC.
 	ThreadServiceWatchThreadProcedure = "/banda.v1.ThreadService/WatchThread"
+	// ThreadServiceHistoryProcedure is the procedure name of the ThreadService's History RPC.
+	ThreadServiceHistoryProcedure = "/banda.v1.ThreadService/History"
 	// ThreadServiceListMentionedProcedure is the procedure name of the ThreadService's ListMentioned
 	// RPC.
 	ThreadServiceListMentionedProcedure = "/banda.v1.ThreadService/ListMentioned"
@@ -200,6 +202,13 @@ var (
 			Procedure:  ThreadServiceWatchThreadProcedure,
 		}
 	})
+	threadServiceHistorySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("History"),
+			Procedure:  ThreadServiceHistoryProcedure,
+		}
+	})
 	threadServiceListMentionedSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -317,8 +326,11 @@ type ThreadServiceClient interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
-	// Replays stored events with seq > after_seq, then streams live events.
+	// Replays stored events with seq > after_seq (or the last `tail`), then
+	// streams live events. Large payloads are cut (Event.truncated).
 	WatchThread(context.Context, *v1.WatchThreadRequest) (ThreadServiceWatchThreadClientStream, error)
+	// Older stored events, for paging back from a tail, or one event in full.
+	History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
 	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
 	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
@@ -461,8 +473,11 @@ type ThreadServiceHandler interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
-	// Replays stored events with seq > after_seq, then streams live events.
+	// Replays stored events with seq > after_seq (or the last `tail`), then
+	// streams live events. Large payloads are cut (Event.truncated).
 	WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error
+	// Older stored events, for paging back from a tail, or one event in full.
+	History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error)
 	// Other users' threads in which the caller is mentioned and hasn't answered.
 	ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error)
 	// Per-viewer snooze; an unset `until` clears it. The owner snoozing also
@@ -516,6 +531,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
 		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
+		connect.Method{Spec: threadServiceHistorySpec(), Handler: adapter.history},
 		connect.Method{Spec: threadServiceListMentionedSpec(), Handler: adapter.listMentioned},
 		connect.Method{Spec: threadServiceSnoozeSpec(), Handler: adapter.snooze},
 		connect.Method{Spec: threadServiceSettleSpec(), Handler: adapter.settle},
@@ -645,6 +661,10 @@ func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest
 
 func (UnimplementedThreadServiceHandler) WatchThread(context.Context, *v1.WatchThreadRequest, ThreadServiceWatchThreadServerStream) error {
 	return connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.WatchThread is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) History(context.Context, *v1.HistoryRequest) (*v1.HistoryResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.History is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) ListMentioned(context.Context, *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
@@ -801,6 +821,14 @@ func (c *threadServiceClient) WatchThread(ctx context.Context, req *v1.WatchThre
 		return ThreadServiceWatchThreadClientStream{}, err
 	}
 	return ThreadServiceWatchThreadClientStream{stream: stream}, nil
+}
+
+func (c *threadServiceClient) History(ctx context.Context, req *v1.HistoryRequest) (*v1.HistoryResponse, error) {
+	var res v1.HistoryResponse
+	if err := c.client.CallUnary(ctx, threadServiceHistorySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *threadServiceClient) ListMentioned(ctx context.Context, req *v1.ListMentionedRequest) (*v1.ListMentionedResponse, error) {
@@ -1055,6 +1083,18 @@ func (h threadServiceHandler) watchThread(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	return h.svc.WatchThread(ctx, &req, ThreadServiceWatchThreadServerStream{stream: stream})
+}
+
+func (h threadServiceHandler) history(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HistoryRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.History(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }
 
 func (h threadServiceHandler) listMentioned(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {

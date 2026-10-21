@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { tick } from 'svelte';
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
@@ -57,7 +58,7 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
-	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
+	import { apply, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
@@ -68,6 +69,12 @@
 
 	let thread = $state<Thread>();
 	const chat = $state<Chat>(newChat());
+	// Opening replays only the last TAIL events; older ones load a page at a time when scrolling up.
+	const TAIL = 500;
+	const PAGE = 500;
+	let oldest = $state(0n); // the oldest loaded event's seq; history starts at 1
+	let loadingOlder = $state(false);
+	let scroller = $state<HTMLElement | null>(null);
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
 	// The terminal, the file browser and the browser mount when their tab is first opened and then stay alive.
@@ -151,10 +158,15 @@
 		while (!signal.aborted) {
 			chat.streaming = ''; // deltas are not replayed, drop a half-finished bubble
 			try {
-				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq }, { signal })) {
+				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq, tail: TAIL }, { signal })) {
 					if (!event) continue;
 					offline = false;
+					if (event.context) {
+						apply(chat, event);
+						continue;
+					}
 					if (event.seq) {
+						if (!oldest) oldest = event.seq;
 						seq = event.seq;
 						markRead();
 					}
@@ -169,6 +181,35 @@
 			await new Promise((r) => setTimeout(r, 1000));
 		}
 	}
+
+	async function loadOlder() {
+		if (loadingOlder || oldest <= 1n || !scroller) return;
+		loadingOlder = true;
+		try {
+			const { events } = await api.history({ threadId: id, beforeSeq: oldest, limit: PAGE });
+			const el = scroller;
+			const height = el.scrollHeight;
+			const top = el.scrollTop;
+			prepend(chat, events);
+			oldest = events[0]?.seq ?? 1n;
+			await tick();
+			// Keep what the reader sees in place, unless the browser's scroll anchoring already did.
+			if (el.scrollTop === top) el.scrollTop = top + el.scrollHeight - height;
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			loadingOlder = false;
+		}
+	}
+
+	// Scrolling up near the top loads older history. Only upward scrolls count: the scroll to the
+	// bottom on open starts at the top too.
+	let lastTop = 0;
+	const onScroll = () => {
+		const top = scroller?.scrollTop ?? 0;
+		if (top < lastTop && top < 1500) loadOlder();
+		lastTop = top;
+	};
 
 	$effect(() => {
 		const ctrl = new AbortController();
@@ -350,111 +391,119 @@
 	</PageHeader>
 
 	<Conversation class="min-h-0 flex-1">
-		<ConversationContent class="min-h-0 flex-1 overflow-y-auto">
+		<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
 			<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
-				{#each chat.items as item, i (i)}
-					{#if item.kind === 'message'}
-						{@const name = userName(item.actor)}
-						<div class="flex gap-3">
-							<UserAvatar {name} class="mt-0.5 size-7" />
-							<div class="min-w-0 flex-1 space-y-1">
-								<div class="flex items-baseline gap-2">
-									<span class="text-sm font-medium">{name}</span>
+				{#if oldest > 1n}
+					<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={loadOlder}>
+						{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
+					</Button>
+				{/if}
+				{#each chat.items as item (item.key)}
+					<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
+					<div class="[contain-intrinsic-size:auto_80px] [content-visibility:auto]">
+						{#if item.kind === 'message'}
+							{@const name = userName(item.actor)}
+							<div class="flex gap-3">
+								<UserAvatar {name} class="mt-0.5 size-7" />
+								<div class="min-w-0 flex-1 space-y-1">
+									<div class="flex items-baseline gap-2">
+										<span class="text-sm font-medium">{name}</span>
+										<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+									</div>
+									{#if item.text}
+										<Message from="user" class="ml-0 max-w-full">
+											<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+										</Message>
+									{/if}
+									{@render reviewCards(item.review)}
+								</div>
+							</div>
+						{:else if item.kind === 'request'}
+							{@const name = userName(item.actor)}
+							{@const ownerName = userName(thread?.ownerId ?? '')}
+							<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+								<div class="flex items-center gap-2">
+									<UserAvatar {name} class="size-5" />
+									<span><span class="font-medium">{name}</span> asks the agent:</span>
 									<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 								</div>
-								{#if item.text}
-									<Message from="user" class="ml-0 max-w-full">
-										<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
-									</Message>
-								{/if}
+								{#if item.text}<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>{/if}
 								{@render reviewCards(item.review)}
+								{#if item.resolved}
+									<p class="text-xs text-muted-foreground">
+										{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
+									</p>
+								{:else if owner}
+									{@const seq = String(item.seq)}
+									<div class="flex flex-wrap items-center gap-2">
+										<Button size="sm" onclick={() => act(api.approveTurn({ threadId: id, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
+										<Input bind:value={notes[seq]} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
+										<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId: id, requestSeq: item.seq, note: notes[seq] ?? '' }))}>
+											<XIcon /> Decline
+										</Button>
+									</div>
+									<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
+								{:else}
+									<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+								{/if}
 							</div>
-						</div>
-					{:else if item.kind === 'request'}
-						{@const name = userName(item.actor)}
-						{@const ownerName = userName(thread?.ownerId ?? '')}
-						<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-							<div class="flex items-center gap-2">
-								<UserAvatar {name} class="size-5" />
-								<span><span class="font-medium">{name}</span> asks the agent:</span>
-								<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
-							</div>
-							{#if item.text}<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>{/if}
-							{@render reviewCards(item.review)}
-							{#if item.resolved}
-								<p class="text-xs text-muted-foreground">
-									{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
-								</p>
-							{:else if owner}
-								{@const seq = String(item.seq)}
-								<div class="flex flex-wrap items-center gap-2">
-									<Button size="sm" onclick={() => act(api.approveTurn({ threadId: id, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
-									<Input bind:value={notes[seq]} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
-									<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId: id, requestSeq: item.seq, note: notes[seq] ?? '' }))}>
-										<XIcon /> Decline
-									</Button>
-								</div>
-								<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
+						{:else if item.kind === 'text'}
+							{@render agentText(item.text)}
+						{:else if item.kind === 'steps'}
+							<ToolSteps steps={item.steps} />
+						{:else if item.kind === 'turn'}
+							{#if item.turn.isError}
+								{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
 							{:else}
-								<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+								{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`)}
 							{/if}
-						</div>
-					{:else if item.kind === 'text'}
-						{@render agentText(item.text)}
-					{:else if item.kind === 'steps'}
-						<ToolSteps steps={item.steps} />
-					{:else if item.kind === 'turn'}
-						{#if item.turn.isError}
-							{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
-						{:else}
-							{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`)}
+						{:else if item.kind === 'notice'}
+							<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+								<Response content={item.text} class="h-auto" />
+								{#if owner && loginNeeded(item.text)}
+									<Button size="sm" class="mt-2" onclick={() => (loginOpen = true)}>Log in to Claude Code</Button>
+								{/if}
+							</div>
+						{:else if item.kind === 'setup'}
+							<div>
+								{#each item.steps as step (step.id)}
+									{@const failed = step.state === SetupState.FAILED}
+									<Tool class="group/tool mb-0 border-0" open={failed}>
+										<CollapsibleTrigger
+											disabled={!step.output}
+											class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {step.state === SetupState.SKIPPED
+												? 'text-muted-foreground'
+												: ''}"
+										>
+											{#if step.state === SetupState.DONE}
+												<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
+											{:else if failed}
+												<XCircleIcon class="size-3.5 shrink-0 text-destructive" />
+											{:else if step.state === SetupState.SKIPPED}
+												<CircleMinusIcon class="size-3.5 shrink-0" />
+											{:else}
+												<Loader size={14} class="text-muted-foreground" />
+											{/if}
+											<span class="min-w-0 flex-1 truncate">{step.title}{step.state === SetupState.SKIPPED ? ' (skipped)' : ''}</span>
+											{#if step.output}
+												<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90" />
+											{/if}
+										</CollapsibleTrigger>
+										<ToolContent class="ml-4 border-l pl-2">
+											<pre
+												class="my-1 max-h-64 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap {failed
+													? 'bg-destructive/10 text-destructive'
+													: 'bg-muted/50'}">{step.output}</pre>
+										</ToolContent>
+									</Tool>
+								{/each}
+							</div>
+						{:else if item.kind === 'mode'}
+							{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
+						{:else if item.kind === 'settings'}
+							{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
 						{/if}
-					{:else if item.kind === 'notice'}
-						<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-							<Response content={item.text} class="h-auto" />
-							{#if owner && loginNeeded(item.text)}
-								<Button size="sm" class="mt-2" onclick={() => (loginOpen = true)}>Log in to Claude Code</Button>
-							{/if}
-						</div>
-					{:else if item.kind === 'setup'}
-						<div>
-							{#each item.steps as step (step.id)}
-								{@const failed = step.state === SetupState.FAILED}
-								<Tool class="group/tool mb-0 border-0" open={failed}>
-									<CollapsibleTrigger
-										disabled={!step.output}
-										class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {step.state === SetupState.SKIPPED
-											? 'text-muted-foreground'
-											: ''}"
-									>
-										{#if step.state === SetupState.DONE}
-											<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
-										{:else if failed}
-											<XCircleIcon class="size-3.5 shrink-0 text-destructive" />
-										{:else if step.state === SetupState.SKIPPED}
-											<CircleMinusIcon class="size-3.5 shrink-0" />
-										{:else}
-											<Loader size={14} class="text-muted-foreground" />
-										{/if}
-										<span class="min-w-0 flex-1 truncate">{step.title}{step.state === SetupState.SKIPPED ? ' (skipped)' : ''}</span>
-										{#if step.output}
-											<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90" />
-										{/if}
-									</CollapsibleTrigger>
-									<ToolContent class="ml-4 border-l pl-2">
-										<pre
-											class="my-1 max-h-64 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap {failed
-												? 'bg-destructive/10 text-destructive'
-												: 'bg-muted/50'}">{step.output}</pre>
-									</ToolContent>
-								</Tool>
-							{/each}
-						</div>
-					{:else if item.kind === 'mode'}
-						{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
-					{:else if item.kind === 'settings'}
-						{@render divider(`${userName(item.actor)} switched to ${item.settings.model} · ${item.settings.effort}`)}
-					{/if}
+					</div>
 				{/each}
 
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}

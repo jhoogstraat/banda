@@ -88,3 +88,6 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+
+-- Finds the latest plan before a tail without scanning the thread.
+CREATE INDEX IF NOT EXISTS events_plan ON events (thread_id, seq) WHERE body->'toolCall'->>'name' = 'TodoWrite';

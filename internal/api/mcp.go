@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -128,14 +129,15 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			if err != nil {
 				return nil, nil, err
 			}
-			// ponytail: reads the whole history; add a LIMITed store query when threads get long.
-			events, err := s.store.Events(ctx, t.ID, 0)
-			if err != nil {
-				return nil, nil, err
-			}
 			limit := in.Limit
 			if limit <= 0 {
 				limit = 50
+			}
+			// ponytail: about half of the events make a line (results, setup steps don't); a turn
+			// of mostly subagent calls can leave fewer than limit lines.
+			events, err := s.store.Before(ctx, t.ID, math.MaxInt64, limit*10)
+			if err != nil {
+				return nil, nil, err
 			}
 			names := s.names(ctx)
 			var b strings.Builder

@@ -21,8 +21,11 @@ service ThreadService {
   rpc DeclineTurn(DeclineTurnRequest) returns (DeclineTurnResponse);
   // Owner only: whether teammates can start turns without approval.
   rpc Trust(TrustRequest) returns (TrustResponse);
-  // Replays stored events with seq > after_seq, then streams live events.
+  // Replays stored events with seq > after_seq (or the last `tail`), then
+  // streams live events. Large payloads are cut (Event.truncated).
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
+  // Older stored events, for paging back from a tail, or one event in full.
+  rpc History(HistoryRequest) returns (HistoryResponse);
   // Other users' threads in which the caller is mentioned and hasn't answered.
   rpc ListMentioned(ListMentionedRequest) returns (ListMentionedResponse);
   // Per-viewer snooze; an unset `until` clears it. The owner snoozing also
@@ -146,6 +149,12 @@ message Event {
   google.protobuf.Timestamp time = 3;
   // User id, "agent" or "system".
   string actor = 4;
+  // Sent before a tail for its context, not in seq order: the latest plan
+  // (TodoWrite call) from before the tail. Not part of the chat.
+  bool context = 5;
+  // A large payload (a tool call's input strings, a tool result's output) was
+  // cut to a few KB. History with full loads the whole event.
+  bool truncated = 6;
   oneof kind {
     Message message = 10;
     AgentText agent_text = 11;
@@ -606,6 +615,21 @@ message InboxMarkReadResponse {}
 message WatchThreadRequest {
   string thread_id = 1;
   int64 after_seq = 2;
+  // With after_seq 0: replay only the last `tail` stored events (0: all).
+  int32 tail = 3;
+}
+
+message HistoryRequest {
+  string thread_id = 1;
+  // The newest `limit` events (at most 1000) with seq < before_seq, in seq order.
+  int64 before_seq = 2;
+  int32 limit = 3;
+  // Don't cut large payloads.
+  bool full = 4;
+}
+
+message HistoryResponse {
+  repeated Event events = 1;
 }
 
 message WatchThreadResponse {
