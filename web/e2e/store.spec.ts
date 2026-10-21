@@ -41,3 +41,15 @@ test('a 20k-event thread: posting, resolving turn requests and forking stay fast
 	const fork = await fastest(() => alice.threads.fork({ threadId: t.id }));
 	expect(Math.max(post, resolve, fork), `ms: ${JSON.stringify({ post, resolve, fork })}`).toBeLessThan(50);
 });
+
+// B14: the runner reports the diff after every turn, and each report was a diffChanged that made every viewer fetch it.
+test('turns that change no file store no diffChanged', async ({ as }) => {
+	const t = await as('alice').create(); // writes hello1.txt
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.turn(() => t.send('e2e-noop'));
+	await t.turn(() => t.send('e2e-noop'));
+	await t.turn(() => t.send('write another')); // its diff comes after the noops' on the runner's stream
+	await expect.poll(async () => (await t.events()).filter((e) => e.kind.case === 'diffChanged').length).toBe(2);
+	await new Promise((r) => setTimeout(r, 1000));
+	expect((await t.events()).filter((e) => e.kind.case === 'diffChanged')).toHaveLength(2);
+});

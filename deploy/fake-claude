@@ -24,6 +24,7 @@
 #   e2e-crash:<name>  makes a tool call and exits 1 mid-turn, without a result,
 #                     once per thread: a redelivered prompt runs normally.
 #   e2e-cost:<usd>    the turn's result reports this total_cost_usd (default 0.01).
+#   e2e-noop          replies and ends the turn, changing no file.
 #   e2e-mcp:<tool>:<base64 JSON arguments>
 #                     calls that tool of the Banda MCP server, as the agent
 #                     would, and says "MCP <tool>: <result text>".
@@ -178,6 +179,7 @@ while next; do
     *'"subtype":"interrupt"'*) ack "$line" ;; # idle: no turn to end
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
+    *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;
     *e2e-ask*'"type":"user"'*)
       tool "toolu_ask$RANDOM" Bash '{"command":"echo e2e-permitted >> permitted.txt","description":"Append a line, not '"${E2E_SECRET:-}"'"}' ran
       if [ -n "$ok" ]; then echo e2e-permitted >> permitted.txt; say "Ran it"; else say "Not allowed: $out"; fi
