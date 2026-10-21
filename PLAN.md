@@ -33,6 +33,7 @@ Banda is a web app where a team builds software together with coding agents. Eac
 | Cross-thread MCP | Served by the API at `/mcp`, authenticated with the calling thread's runner token. Tools: `list_threads`, `read_thread`, `post_message`, `create_thread`. An agent may only start turns in threads of the same owner. |
 | Chat context | When the agent is asked something, the prompt includes the thread messages it hasn't seen yet (chat between people, posts by other agents) and who is asking. |
 | Local runtime | Shared `podman-machine-default` (root connection), kind cluster `banda`. |
+| Model and effort | The owner can change them at any time from the composer chips; the chat records it as a divider. `claude` takes them only as start flags, so the runner restarts it with `--resume` once no turn is running (closing its stdin, so it exits by itself), never cutting a turn short. Prompts sent before the change still run on the old settings. A paused environment starts with the new ones. |
 
 ## Constraint: Claude subscriptions
 
@@ -144,6 +145,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 - Sidebar: search, project filter (by repository) and new-thread button on top; Mentioned, Needs input, then collapsed Working, Snoozed, Settled; mentions-only toggle; browse other people's threads; account footer.
 - New thread is an empty chat: the first message creates the thread; repository, branch, model and effort are chips in the composer.
 - Per-user snooze and settle; @mentions with autocomplete; mentions are answered when the mentioned person posts.
+- Changing model and effort mid-thread (owner only): applied between turns by restarting Claude Code with `--resume`.
 - Environment lifecycle: suspend after 30 min idle, when the owner snoozes or settles; resume on the next prompt or when the owner opens the terminal; Claude Code session resumed with `--resume`.
 - Files tab (everyone, read-only): the runner lists and reads the checkout on request, confined to it (`os.Root`) and redacted; it never wakes a paused environment.
 - Terminal tab (owner only) and the "Log in to Claude Code" button; Push button with a pull-request link for GitHub remotes.
@@ -159,7 +161,7 @@ Everything below is implemented on branch `v1` and checked by `mise run e2e` aga
 **Not yet**
 - Permission prompts (`--permission-prompt-tool stdio`); turns run with `--dangerously-skip-permissions` inside the sandbox.
 - Deleting settled sandboxes (`shutdownTime`): waits until branches are pushed by default, so no work is lost.
-- A browser pane in the right pane; changing model or effort mid-thread.
+- A browser pane in the right pane.
 - Codex and other harnesses (check their subscription terms first).
 - Several API replicas (needs `LISTEN/NOTIFY` fan-out).
 
