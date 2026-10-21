@@ -119,7 +119,7 @@ func run(ctx context.Context) error {
 				return
 			}
 			switch k := msg.Kind.(type) {
-			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop:
+			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop, *bandav1.ConnectResponse_Permission:
 				cmds <- msg
 			case *bandav1.ConnectResponse_AgentSettings:
 				// Set now so a claude that hasn't started yet starts with them;
@@ -173,12 +173,16 @@ func run(ctx context.Context) error {
 			claude.cmd.Wait()
 		}
 	}()
+	perms := newPermissions()
 	for first := true; ; first = false {
 		running := want.get()
 		if claude, err = startClaude(ctx, running); err != nil {
 			claude = nil
 			notice("Could not start Claude Code: " + err.Error())
 			return fmt.Errorf("%w: %w", errSetup, err)
+		}
+		if l := perms.modeLine(); l != nil { // a new process starts in default mode
+			claude.write(l)
 		}
 		if first {
 			if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Ready{Ready: &bandav1.Ready{}}}); err != nil {
@@ -223,6 +227,12 @@ func run(ctx context.Context) error {
 					err = claude.interrupt()
 				case *bandav1.ConnectResponse_AgentSettings:
 					restart = want.get() != running
+				case *bandav1.ConnectResponse_Permission:
+					for _, l := range perms.apply(k.Permission) {
+						if err = claude.write(l); err != nil {
+							break
+						}
+					}
 				}
 				if err != nil {
 					return err
@@ -233,9 +243,21 @@ func run(ctx context.Context) error {
 				}
 				events, turnEnded, authFailed := translate(raw)
 				for _, e := range events {
+					if r := e.GetPermissionRequested(); r != nil {
+						if auto := perms.ask(r); auto != nil { // always allowed in this thread
+							claude.write(auto)
+							continue
+						}
+					}
+					if r := e.GetPermissionResolved(); r != nil {
+						perms.drop(r.Id)
+					}
 					if err := send(e); err != nil {
 						return err
 					}
+				}
+				if id, ok := unsupportedRequest(raw); ok { // never leave the CLI waiting
+					claude.write(map[string]any{"type": "control_response", "response": map[string]any{"subtype": "error", "request_id": id, "error": "not supported by Banda"}})
 				}
 				if authFailed && !authNoticed {
 					authNoticed = true
@@ -249,6 +271,7 @@ func run(ctx context.Context) error {
 				}
 				if turnEnded {
 					authNoticed = false
+					perms.clear()
 					pending = max(0, pending-1) // an interrupt while idle ends no prompt
 					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
 						return err
@@ -373,7 +396,10 @@ type claudeProc struct {
 
 func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	args := []string{"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-		"--include-partial-messages", "--dangerously-skip-permissions"} // the sandbox is the boundary
+		"--include-partial-messages",
+		// Permission prompts come to the runner as control requests (permissions.go). The API sets
+		// the thread's mode once the runner is ready; bypass must be allowed for it to be one.
+		"--permission-mode", "default", "--permission-prompt-tool", "stdio", "--allow-dangerously-skip-permissions"}
 	if s.model != "" {
 		args = append(args, "--model", s.model)
 	}
@@ -433,7 +459,11 @@ func (c *claudeProc) write(v any) error {
 }
 
 func (c *claudeProc) interrupt() error {
-	return c.write(map[string]any{"type": "control_request", "request_id": rand.Text(), "request": map[string]any{"subtype": "interrupt"}})
+	return c.write(controlRequest(map[string]any{"subtype": "interrupt"}))
+}
+
+func controlRequest(req map[string]any) map[string]any {
+	return map[string]any{"type": "control_request", "request_id": rand.Text(), "request": req}
 }
 
 // sessionID derives a stable UUID from the thread id, so a restarted runner

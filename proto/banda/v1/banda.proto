@@ -57,6 +57,13 @@ service ThreadService {
   // Tells the thread's watchers that the caller is typing. The composer calls
   // it every few seconds while typing; clients forget it after a few seconds.
   rpc SendTyping(TypingRequest) returns (TypingResponse);
+  // Answers the agent's pending permission request: the owner, or anyone in
+  // a trusted thread. Approving a plan (ExitPlanMode) is for the owner only
+  // and switches the thread to `mode`.
+  rpc PermissionAnswer(PermissionAnswerRequest) returns (PermissionAnswerResponse);
+  // Sets which tool calls the agent must ask for (owner only). Applies to the
+  // running agent at once.
+  rpc PermissionSetMode(PermissionSetModeRequest) returns (PermissionSetModeResponse);
 }
 
 service UserService {
@@ -131,6 +138,35 @@ message Thread {
   bool trusted = 19;
   // The thread has events the caller hasn't seen (see InboxMarkRead).
   bool unread = 16;
+  PermissionMode permission_mode = 24;
+  // The agent waits for an answer to a permission request.
+  bool permission_pending = 25;
+}
+
+// Which tool calls the agent asks for, mapped to Claude Code's
+// --permission-mode. Requests arrive as PermissionRequested events.
+enum PermissionMode {
+  PERMISSION_MODE_UNSPECIFIED = 0;
+  // Nothing asks (bypassPermissions): the sandbox is the boundary.
+  PERMISSION_MODE_BYPASS = 1;
+  // Reads run, edits and commands ask (default).
+  PERMISSION_MODE_ASK = 2;
+  // Reads and edits run, other commands ask (acceptEdits).
+  PERMISSION_MODE_ACCEPT_EDITS = 3;
+  // Read-only planning until the owner approves the plan (plan).
+  PERMISSION_MODE_PLAN = 4;
+}
+
+enum PermissionDecision {
+  PERMISSION_DECISION_UNSPECIFIED = 0;
+  PERMISSION_DECISION_ALLOW = 1;
+  // Allow, and allow this tool without asking for the rest of the thread.
+  PERMISSION_DECISION_ALLOW_ALWAYS = 2;
+  PERMISSION_DECISION_DENY = 3;
+  // The agent withdrew the request, e.g. the turn was interrupted.
+  PERMISSION_DECISION_CANCELED = 4;
+  // The environment restarted before an answer; that turn is gone.
+  PERMISSION_DECISION_LOST = 5;
 }
 
 message User {
@@ -167,6 +203,8 @@ message Event {
     Typing typing = 23;
     // The owner changed the model or effort; actor is the owner.
     AgentSettings agent_settings = 26;
+    PermissionRequested permission_requested = 30;
+    PermissionResolved permission_resolved = 31;
   }
 }
 
@@ -608,6 +646,50 @@ message WatchThreadRequest {
   int64 after_seq = 2;
 }
 
+// The agent asks before running a tool call. Usually follows that call's
+// ToolCall event.
+message PermissionRequested {
+  // Claude Code's request id; PermissionResolved and PermissionAnswer refer to it.
+  string id = 1;
+  string tool_call_id = 2;
+  string tool_name = 3;
+  // Redacted.
+  string input_json = 4;
+  // Why Claude Code asks, if it said.
+  string reason = 5;
+}
+
+// The answer to a PermissionRequested, by the event's actor (a user, or
+// "system" for CANCELED and LOST).
+message PermissionResolved {
+  string id = 1;
+  PermissionDecision decision = 2;
+  // The reason given with a denial.
+  string message = 3;
+  // A plan approval switched the thread to this mode.
+  PermissionMode mode = 4;
+}
+
+message PermissionAnswerRequest {
+  string thread_id = 1;
+  string request_id = 2;
+  // ALLOW, ALLOW_ALWAYS or DENY.
+  PermissionDecision decision = 3;
+  // Optional, for DENY: told to the agent.
+  string message = 4;
+  // Required to approve a plan: the mode to work in afterwards.
+  PermissionMode mode = 5;
+}
+
+message PermissionAnswerResponse {}
+
+message PermissionSetModeRequest {
+  string thread_id = 1;
+  PermissionMode mode = 2;
+}
+
+message PermissionSetModeResponse {}
+
 message WatchThreadResponse {
   Event event = 1;
 }
@@ -682,7 +764,21 @@ message ConnectResponse {
     // them when no turn is running.
     AgentSettings agent_settings = 9;
     HttpTunnel http_tunnel = 11;
+    PermissionCommand permission = 14;
   }
+}
+
+// Answers a pending permission request (request_id set), or else configures
+// the agent: sent when the runner is ready and whenever the owner changes
+// the mode or always allows a tool.
+message PermissionCommand {
+  string request_id = 1;
+  PermissionDecision decision = 2;
+  string message = 3;
+  // The mode to run in from now on. Unset with an answer: keep it.
+  PermissionMode mode = 4;
+  // Tools the runner allows without asking.
+  repeated string allowed_tools = 5;
 }
 
 message Prompt {

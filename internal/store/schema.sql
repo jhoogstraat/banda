@@ -88,3 +88,8 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS requests int NOT NULL DEFAULT 0;
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS trusted boolean NOT NULL DEFAULT false;
 -- The last event seq each viewer has seen; later events make the thread unread.
 ALTER TABLE thread_views ADD COLUMN IF NOT EXISTS seen_seq bigint NOT NULL DEFAULT 0;
+-- Which tool calls the agent asks for; its pending permission requests (id ->
+-- tool name); and the tools allowed without asking for the rest of the thread.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permission_mode text NOT NULL DEFAULT 'bypass';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS permissions jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS allowed_tools text[] NOT NULL DEFAULT '{}';
