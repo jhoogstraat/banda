@@ -69,7 +69,8 @@ func Open(ctx context.Context, url string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(ctx, schema); err != nil {
+	// One statement list is one transaction; the lock keeps APIs starting together from deadlocking on it.
+	if _, err := db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema); err != nil {
 		db.Close()
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 // A thread from start to its first turn: checkout, setup, the agent's work, settings, failures.
 import { SetupState } from '../src/lib/gen/banda/v1/banda_pb.ts';
-import { expect, kube, refused, repo, Status, test, type Thread } from './fixtures.ts';
+import { DB, expect, kube, refused, repo, sql, Status, test, type Thread } from './fixtures.ts';
 
 const steps = async (t: Thread, id: string, state: SetupState) => (await t.of('setupStep')).filter((s) => s.id === id && s.state === state);
 
@@ -72,4 +72,15 @@ test('a bad base branch errors once, without a crash loop', async ({ as }) => {
 	await new Promise((r) => setTimeout(r, 15_000));
 	expect(await kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.containerStatuses[0].restartCount}')).toBe('0');
 	expect(await steps(t, 'checkout', SetupState.FAILED)).toHaveLength(1);
+});
+
+test('APIs starting together on a fresh database all come up: they apply the schema one at a time', async ({ startApi }) => {
+	const db = `${DB}_${Date.now()}`;
+	await sql(`CREATE DATABASE ${db}`);
+	try {
+		const url = process.env.DATABASE_URL!.replace(/\/[^/?]*(\?|$)/, `/${db}$1`);
+		await Promise.all([1, 2, 3, 4].map(() => startApi({ DATABASE_URL: url })));
+	} finally {
+		await sql(`DROP DATABASE ${db} WITH (FORCE)`);
+	}
 });

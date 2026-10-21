@@ -100,10 +100,11 @@ e2e() {
 	wait $web || { tail -30 "$LOG/web.log"; exit 1; }
 	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
 	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
-	until_ok api listening "$p" # it creates the schema: one at a time
+	local api_pid=$PID
 	OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
 		ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://host.containers.internal:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
 	until_ok oidc-api listening "$op"
+	PID=$api_pid until_ok api listening "$p"
 	kc -n "$ns" wait --for=condition=Ready pod/e2e-git --timeout=120s >/dev/null
 	wait $chromium
 	echo "e2e world $ns: API http://localhost:$p (log $LOG/api.log), OIDC API http://localhost:$op, Dex :$dp"
