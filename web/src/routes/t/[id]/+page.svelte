@@ -11,6 +11,10 @@
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import XIcon from '@lucide/svelte/icons/x';
+	import BellOffIcon from '@lucide/svelte/icons/bell-off';
+	import FileDiffIcon from '@lucide/svelte/icons/file-diff';
+	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
+	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -26,7 +30,6 @@
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
-	import { Reasoning, ReasoningContent, ReasoningTrigger } from '#lib/components/ai-elements/reasoning/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
 	import DiffView from '#lib/components/diff-view.svelte';
@@ -38,26 +41,30 @@
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SidePane from '#lib/components/side-pane.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
-	import ThreadActions from '#lib/components/thread-actions.svelte';
+	import ThreadActions, { isSnoozed, presets, settle, snooze } from '#lib/components/thread-actions.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import Terminal from '#lib/components/terminal.svelte';
-	import ToolCall from '#lib/components/tool-call.svelte';
+	import Plan from '#lib/components/plan.svelte';
+	import ToolSteps from '#lib/components/tool-steps.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.js';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
-	import { apply, type Chat } from '#lib/events.js';
+	import { apply, newChat, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { loadThreads, threads, userName } from '#lib/threads.svelte.js';
+	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
+	import { threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
+	visited(id);
 
 	let thread = $state<Thread>();
-	const chat = $state<Chat>({ items: [], streaming: '' });
+	const chat = $state<Chat>(newChat());
 	// Unset: the pane picks its own default (open on desktop, closed on phones).
 	let diffOpen = $state<boolean>();
 	// The terminal and the file browser mount when their tab is first opened and then stay alive.
@@ -75,6 +82,21 @@
 	let reason = $state('');
 	let offline = $state(false);
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// Ticks so typing expires; `others` drops the viewer from presence and typing.
+	let now = $state(Date.now());
+	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
+	const here = $derived(others(chat.present));
+	const typing = $derived(others(typingNow(chat, now)).map(userName));
+	const typingText = $derived(
+		typing.length > 2 ? `${typing.length} people are typing…` : typing.length ? `${typing.join(' and ')} ${typing.length > 1 ? 'are' : 'is'} typing…` : ''
+	);
+	// The composer reports typing at most every 2.5 s; posting resets it.
+	let typedAt = 0;
+	function typed() {
+		if (Date.now() - typedAt < 2500) return;
+		typedAt = Date.now();
+		api.sendTyping({ threadId: id }).catch(() => {});
+	}
 
 	// The review being written in the Diff tab, kept in this browser until it is sent.
 	const reviewKey = `banda-review-${id}`;
@@ -88,8 +110,7 @@
 	let focus = $state<Comment>();
 	const posted = $derived(chat.items.flatMap((i) => (i.kind === 'message' ? i.review.map((c) => ({ ...c, by: i.actor })) : [])));
 	function reveal(c: Comment) {
-		diffOpen = true;
-		tab = 'diff';
+		show('diff');
 		focus = c;
 	}
 
@@ -99,7 +120,6 @@
 	async function load() {
 		try {
 			thread = (await api.getThread({ threadId: id })).thread;
-			loadThreads().catch(() => {});
 		} catch (e) {
 			error = (e as Error).message;
 		}
@@ -112,6 +132,13 @@
 		timer = setTimeout(load, 200);
 	};
 
+	// Marks the thread read while it is on screen, after a burst of events or when the tab comes back.
+	let readTimer: ReturnType<typeof setTimeout>;
+	const markRead = () => {
+		clearTimeout(readTimer);
+		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
+	};
+
 	async function watch(signal: AbortSignal) {
 		let seq = 0n;
 		while (!signal.aborted) {
@@ -120,7 +147,10 @@
 				for await (const { event } of api.watchThread({ threadId: id, afterSeq: seq }, { signal })) {
 					if (!event) continue;
 					offline = false;
-					if (event.seq) seq = event.seq;
+					if (event.seq) {
+						seq = event.seq;
+						markRead();
+					}
 					apply(chat, event);
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged'].includes(event.kind.case!)) refresh();
@@ -137,9 +167,12 @@
 		const ctrl = new AbortController();
 		load();
 		watch(ctrl.signal);
+		const tick = setInterval(() => (now = Date.now()), 1000);
 		return () => {
 			ctrl.abort();
 			clearTimeout(timer);
+			clearTimeout(readTimer);
+			clearInterval(tick);
 		};
 	});
 
@@ -154,6 +187,46 @@
 			return false;
 		}
 	}
+
+	// Shared by the header buttons and the command palette.
+	const interrupt = () => act(api.interrupt({ threadId: id }));
+	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
+	const push = () => act(api.push({ threadId: id }));
+	const retry = () => act(api.retry({ threadId: id }));
+	const show = (t: string) => {
+		tab = t;
+		diffOpen = true;
+	};
+
+	// The palette's "This thread" actions, each only where it applies.
+	$effect(() => {
+		const t = thread;
+		if (!t) return;
+		const c: Command[] = [
+			{ label: 'Toggle right pane', icon: PanelRightIcon, run: () => (diffOpen = !diffOpen) },
+			{ label: 'Show diff', icon: FileDiffIcon, run: () => show('diff') },
+			{ label: 'Show files', icon: FolderTreeIcon, run: () => show('files') }
+		];
+		if (owner) c.push({ label: 'Open terminal', icon: SquareTerminalIcon, run: () => show('terminal') });
+		if (isSnoozed(t)) c.push({ label: 'Unsnooze', icon: BellOffIcon, run: () => act(snooze(t)) });
+		else
+			for (const [label, date] of [presets[0], presets[2]])
+				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
+		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
+		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
+		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
+		if (owner) {
+			c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
+			c.push(t.mode === Mode.CHAT
+				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
+				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });
+		}
+		ui.commands = c;
+		// When the next thread page has already registered its own, leave them.
+		return () => {
+			if (!page.params.id || page.params.id === id) ui.commands = [];
+		};
+	});
 
 	function message(text: string, review: Comment[] = []) {
 		const all = [text, ...review.map((c) => c.body)].join('\n');
@@ -170,6 +243,7 @@
 		if (!text.trim()) return;
 		// Throwing keeps the text in the prompt box so it can be retried.
 		if (!(await act(api.sendMessage({ threadId: id, message: message(text) })))) throw new Error(error);
+		typedAt = 0;
 	}
 
 	async function sendReview(summary: string) {
@@ -180,6 +254,8 @@
 		return ok;
 	}
 </script>
+
+<svelte:document onvisibilitychange={markRead} />
 
 {#snippet divider(text: string, tone = 'text-muted-foreground')}
 	<div class="flex items-center gap-3 text-xs {tone}">
@@ -201,8 +277,32 @@
 		{#if thread}<StatusDot status={thread.status} label />{/if}
 		{#if offline}<span class="shrink-0 text-xs text-muted-foreground">reconnecting…</span>{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-0.5">
-			{#if thread?.status === Status.WORKING}
-				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={() => act(api.interrupt({ threadId: id }))} />
+			{#if here.length}
+				<div class="mr-1.5 flex -space-x-1.5" aria-label="Here now">
+					{#each here.slice(0, 4) as u (u)}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props}><UserAvatar name={userName(u)} class="size-6 ring-2 ring-background" /></span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{userName(u)} · here now</TooltipContent>
+						</Tooltip>
+					{/each}
+					{#if here.length > 4}
+						<Tooltip>
+							<TooltipTrigger>
+								{#snippet child({ props })}
+									<span {...props} class="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium ring-2 ring-background">+{here.length - 4}</span>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent>{here.slice(4).map(userName).join(', ')} · here now</TooltipContent>
+						</Tooltip>
+					{/if}
+				</div>
+			{/if}
+			{#if owner && thread?.status === Status.WORKING}
+				<IconButton icon={SquareIcon} label="Interrupt the agent" variant="destructive" onclick={interrupt} />
 			{/if}
 			{#if thread}
 				<IconButton
@@ -210,12 +310,12 @@
 					label={thread.mode === Mode.CHAT ? 'Chat mode: switch to agent mode' : 'Agent mode: switch to chat mode'}
 					variant={thread.mode === Mode.CHAT ? 'secondary' : 'ghost'}
 					disabled={!owner}
-					onclick={() => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }))}
+					onclick={toggleMode}
 				/>
 				<ThreadActions {thread} {act} />
 			{/if}
 			{#if owner}
-				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={() => act(api.push({ threadId: id }))} />
+				<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 			{/if}
 			<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (diffOpen = !diffOpen)} />
 		</div>
@@ -257,13 +357,8 @@
 						</div>
 					{:else if item.kind === 'text'}
 						{@render agentText(item.text)}
-					{:else if item.kind === 'thinking'}
-						<Reasoning defaultOpen={false} class="mb-0">
-							<ReasoningTrigger><BrainIcon class="size-4" /> Thinking</ReasoningTrigger>
-							<ReasoningContent content={item.text} />
-						</Reasoning>
-					{:else if item.kind === 'tool'}
-						<ToolCall call={item.call} result={item.result} />
+					{:else if item.kind === 'steps'}
+						<ToolSteps steps={item.steps} />
 					{:else if item.kind === 'turn'}
 						{#if item.turn.isError}
 							{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
@@ -319,8 +414,6 @@
 				{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 				{#if thread?.status === Status.STARTING}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
-				{:else if thread?.status === Status.WORKING}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> <span class="animate-pulse">Working…</span></div>
 				{:else if thread?.status === Status.SUSPENDED}
 					<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 				{:else if thread?.status === Status.ERRORED}
@@ -328,7 +421,7 @@
 						<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
 						<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
 						{#if owner}
-							<Button size="sm" onclick={() => act(api.retry({ threadId: id }))}><RotateCcwIcon /> Retry</Button>
+							<Button size="sm" onclick={retry}><RotateCcwIcon /> Retry</Button>
 						{/if}
 					</div>
 				{:else if !chat.items.length}
@@ -340,10 +433,22 @@
 	</Conversation>
 
 	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+		<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
+		<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+			{#if thread?.status === Status.WORKING}
+				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
+			{/if}
+			{#if typingText}
+				{#if thread?.status === Status.WORKING}<span>·</span>{/if}
+				<span class="flex gap-0.5"><span class="size-1 animate-bounce rounded-full bg-current"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:150ms]"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:300ms]"></span></span>
+				<span class="truncate">{typingText}</span>
+			{/if}
+		</div>
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
 		{#if thread}<ThreadBanners {thread} {act} />{/if}
+		<Plan plan={chat.plan} />
 		<PromptInput.Root onSubmit={send}>
-			<fieldset disabled={thread?.status === Status.STARTING} class="contents">
+			<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 				<PromptInput.Body>
 					<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
 				</PromptInput.Body>

@@ -34,6 +34,14 @@ service ThreadService {
   // running environment. Fails while it is not running.
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  // The caller's sidebar: sent at once, then again whenever one of its
+  // threads changes or the caller is mentioned somewhere new.
+  rpc InboxWatch(InboxWatchRequest) returns (stream InboxWatchResponse);
+  // Marks the thread read for the caller, up to its latest event.
+  rpc InboxMarkRead(InboxMarkReadRequest) returns (InboxMarkReadResponse);
+  // Tells the thread's watchers that the caller is typing. The composer calls
+  // it every few seconds while typing; clients forget it after a few seconds.
+  rpc SendTyping(TypingRequest) returns (TypingResponse);
 }
 
 service UserService {
@@ -102,6 +110,8 @@ message Thread {
   // The caller's own view of the thread.
   google.protobuf.Timestamp snoozed_until = 14;
   bool settled = 15;
+  // The thread has events the caller hasn't seen (see InboxMarkRead).
+  bool unread = 16;
 }
 
 message User {
@@ -130,6 +140,10 @@ message Event {
     DiffChanged diff_changed = 19;
     Notice notice = 20;
     SetupStep setup_step = 21;
+    // Ephemeral (seq 0): who is watching the thread.
+    PresenceChanged presence_changed = 22;
+    // Ephemeral (seq 0): the actor is typing in the composer.
+    Typing typing = 23;
   }
 }
 
@@ -172,6 +186,8 @@ message ToolCall {
   string id = 1;
   string name = 2;
   string input_json = 3;
+  // Set when a subagent made the call: the id of the Task tool call that started it.
+  string parent_tool_call_id = 4;
 }
 
 message ToolResult {
@@ -213,6 +229,21 @@ message SetupStep {
   // Redacted, truncated output; set when the step has finished.
   string output = 4;
 }
+
+// Sent whenever someone starts watching the thread or the last tab of a user
+// stops.
+message PresenceChanged {
+  // Every user with at least one open WatchThread stream, sorted.
+  repeated string user_ids = 1;
+}
+
+message Typing {}
+
+message TypingRequest {
+  string thread_id = 1;
+}
+
+message TypingResponse {}
 
 enum SetupState {
   SETUP_STATE_UNSPECIFIED = 0;
@@ -454,6 +485,20 @@ message ResizeLoginTerminalRequest {
   uint32 cols = 2;
   uint32 rows = 3;
 }
+
+message InboxWatchRequest {}
+
+message InboxWatchResponse {
+  // As ListThreads and ListMentioned return them.
+  repeated Thread threads = 1;
+  repeated Thread mentioned = 2;
+}
+
+message InboxMarkReadRequest {
+  string thread_id = 1;
+}
+
+message InboxMarkReadResponse {}
 
 message WatchThreadRequest {
   string thread_id = 1;

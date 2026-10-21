@@ -29,6 +29,7 @@ func TestTranscript(t *testing.T) {
 	events := []*bandav1.Event{
 		ev("u1", &bandav1.Message{Text: "fix it"}),
 		ev("agent", &bandav1.ToolCall{Name: "Bash", InputJson: `{"command":"secret"}`}),
+		ev("agent", &bandav1.ToolCall{Name: "Grep", ParentToolCallId: "t1"}),
 		ev("agent", &bandav1.ToolResult{Output: "secret output"}),
 		ev("agent", &bandav1.AgentText{Text: "done"}),
 		ev("agent", &bandav1.TurnEnded{IsError: true, Error: "boom"}),
