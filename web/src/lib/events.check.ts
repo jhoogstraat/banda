@@ -1,7 +1,7 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
 import { apply, itemAt, newChat, prepend, typingNow, type Chat } from './events.ts';
-import type { Event } from './gen/banda/v1/banda_pb.ts';
+import { AutoPushState, PermissionDecision, SetupState, Status, type Event } from './gen/banda/v1/banda_pb.js';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
 const chat = newChat();
@@ -23,24 +23,24 @@ if (tool.kind !== 'steps' || tool.steps[0].kind !== 'tool' || tool.steps[0].resu
 apply(chat, ev({ case: 'notice', value: { text: 'not logged in: run `claude`' } }));
 if (chat.items[2]?.kind !== 'notice') throw new Error('notice should become a chat item');
 
-const step = (id: string, state: number, output = '') => ev({ case: 'setupStep', value: { id, title: id, state, output } });
-apply(chat, step('checkout', 1));
-apply(chat, step('tools', 1));
-apply(chat, step('checkout', 2));
-apply(chat, step('tools', 3, 'mise: boom'));
+const step = (id: string, state: SetupState, output = '') => ev({ case: 'setupStep', value: { id, title: id, state, output } });
+apply(chat, step('checkout', SetupState.RUNNING));
+apply(chat, step('tools', SetupState.RUNNING));
+apply(chat, step('checkout', SetupState.DONE));
+apply(chat, step('tools', SetupState.FAILED, 'mise: boom'));
 const setup = chat.items[3];
 if (count() !== 4 || setup.kind !== 'setup') throw new Error('setup steps should form one checklist');
-if (setup.steps.map((s) => `${s.id}:${s.state}`).join() !== 'checkout:2,tools:3' || setup.steps[1].output !== 'mise: boom')
+if (setup.steps.map((s) => `${s.id}:${s.state}`).join() !== `checkout:${SetupState.DONE},tools:${SetupState.FAILED}` || setup.steps[1].output !== 'mise: boom')
 	throw new Error('a setup step should replace the earlier one with its id');
 apply(chat, ev({ case: 'notice', value: { text: 'later' } }));
-apply(chat, step('tools', 2));
+apply(chat, step('tools', SetupState.DONE));
 const rerun = chat.items[5];
-if (count() !== 6 || setup.steps[1].state !== 3 || rerun.kind !== 'setup' || rerun.steps[0].state !== 2)
+if (count() !== 6 || setup.steps[1].state !== SetupState.FAILED || rerun.kind !== 'setup' || rerun.steps[0].state !== SetupState.DONE)
 	throw new Error('a step after other items should start a new checklist, leaving the old one alone');
-apply(chat, step('setup', 1));
-apply(chat, step('setup', 3));
-apply(chat, step('setup', 1)); // retry: only status changes in between, which add no item
-if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== 3)
+apply(chat, step('setup', SetupState.RUNNING));
+apply(chat, step('setup', SetupState.FAILED));
+apply(chat, step('setup', SetupState.RUNNING)); // retry: only status changes in between, which add no item
+if (count() !== 7 || rerun.kind !== 'setup' || rerun.steps[1].state !== SetupState.FAILED)
 	throw new Error('a finished step running again should start a new checklist');
 apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'agentSettings', value: { model: 'm', effort: 'low' } } } as Event);
 const switched = chat.items.at(-1);
@@ -107,7 +107,7 @@ if (both.old || both.startLine !== 4 || both.endLine !== 4 || removed.startLine 
 	throw new Error('a range should be numbered in the branch, or in the base if it only removes lines');
 if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, code: '-x' }, f.lines[3]))
 	throw new Error('a comment should mark its last line while that line is unchanged');
-apply(chat, ev({ case: 'autoPush', value: { state: 3, detail: 'origin cannot be pushed to' } }));
+apply(chat, ev({ case: 'autoPush', value: { state: AutoPushState.UNAVAILABLE, detail: 'origin cannot be pushed to' } }));
 const push = chat.items.at(-1);
 if (push?.kind !== 'push' || push.pushed) throw new Error('autoPush should become a chat item');
 
@@ -122,7 +122,7 @@ for (let t = 0; t < 4; t++) {
 	if (t !== 3) add({ case: 'toolCall', value: { id: `todo${t}`, name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } });
 	call(`r${t}`, 'Read');
 	if (t === 1) add({ case: 'permissionRequested', value: { id: 'p1', toolCallId: 'r1', toolName: 'Read', inputJson: '{}' } });
-	if (t === 2) add({ case: 'permissionResolved', value: { id: 'p1', decision: 1, message: '' } }, { actor: 'dev' });
+	if (t === 2) add({ case: 'permissionResolved', value: { id: 'p1', decision: PermissionDecision.ALLOW, message: '' } }, { actor: 'dev' });
 	add({ case: 'agentThinking', value: { text: 'hmm' } });
 	call(`task${t}`, 'Task');
 	call(`g${t}`, 'Grep', `task${t}`);
@@ -173,7 +173,7 @@ if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a con
 	const [, p1, p2] = c.items;
 	if (p1?.kind !== 'permission' || p1.tool !== c.tools.get('tb') || p2?.kind !== 'permission' || p2.tool.call.name !== 'Write')
 		throw new Error('a permission request should point at its tool call, or one made from the request');
-	apply(c, { seq: 9n, actor: 'ann', kind: { case: 'permissionResolved', value: { id: 'r1', decision: 3, message: 'no' } } } as Event);
+	apply(c, { seq: 9n, actor: 'ann', kind: { case: 'permissionResolved', value: { id: 'r1', decision: PermissionDecision.DENY, message: 'no' } } } as Event);
 	if (p1.resolved?.by !== 'ann' || p1.resolved.message !== 'no' || p2.resolved) throw new Error('an answer should resolve only its request');
 }
 apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
@@ -189,7 +189,7 @@ if (itemAt(jump, 3n) !== 0 || itemAt(jump, 6n) !== 1 || itemAt(jump, 5n) !== 1 |
 	throw new Error('a seq should map to the item that shows it, or -1 before it arrived');
 
 const parent = newChat();
-apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: 3, text: 'Fixed it.' } }));
+apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: Status.AWAITING_INPUT, text: 'Fixed it.' } }));
 const sub = parent.items[0];
 if (sub?.kind !== 'lineage' || sub.update.threadId !== 'c1' || sub.update.text !== 'Fixed it.') throw new Error('a lineage update should become a chat item');
 console.log('ok');

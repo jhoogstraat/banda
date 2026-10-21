@@ -1,20 +1,22 @@
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
-import type {
-	AgentSettings,
-	Attachment,
-	Event,
-	ForkNote,
-	LineageUpdate,
-	Mode,
-	PermissionRequested,
-	PermissionResolved,
-	ReviewComment,
-	SetupStep,
-	ToolCall,
-	ToolResult,
-	TurnEnded,
-	TurnRequestResolved
-} from './gen/banda/v1/banda_pb.ts';
+import {
+	AutoPushState,
+	SetupState,
+	type AgentSettings,
+	type Attachment,
+	type Event,
+	type ForkNote,
+	type LineageUpdate,
+	type Mode,
+	type PermissionRequested,
+	type PermissionResolved,
+	type ReviewComment,
+	type SetupStep,
+	type ToolCall,
+	type ToolResult,
+	type TurnEnded,
+	type TurnRequestResolved
+} from './gen/banda/v1/banda_pb.js';
 
 // A subagent's (Task's) calls nest in `children`. `seq` and `resultSeq` are the events' seqs;
 // `cut` says the stream cut a large input or output (History with `full` loads it).
@@ -207,8 +209,7 @@ export function apply(chat: Chat, e: Event) {
 			const step = k.value;
 			const last = chat.items.at(-1);
 			const at = last?.kind === 'setup' ? last.steps.findIndex((s) => s.id === step.id) : -1;
-			// 1 is SetupState.RUNNING (node's type stripping, used by events.check.ts, can't import enums).
-			if (last?.kind !== 'setup' || (at >= 0 && last.steps[at].state !== 1))
+			if (last?.kind !== 'setup' || (at >= 0 && last.steps[at].state !== SetupState.RUNNING))
 				chat.items.push({ key, kind: 'setup', steps: [step] });
 			else if (at >= 0) last.steps[at] = step;
 			else last.steps.push(step);
@@ -221,8 +222,7 @@ export function apply(chat: Chat, e: Event) {
 			chat.typing[e.actor] = Date.now();
 			break;
 		case 'autoPush':
-			// 1 is AutoPushState.PUSHED.
-			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === 1 });
+			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === AutoPushState.PUSHED });
 			break;
 		case 'modeChanged':
 			chat.items.push({ key, kind: 'mode', mode: k.value.mode });

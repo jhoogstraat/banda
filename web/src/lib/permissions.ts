@@ -1,4 +1,4 @@
-import { PermissionMode } from './gen/banda/v1/banda_pb.ts';
+import { PermissionMode } from './gen/banda/v1/banda_pb.js';
 
 // The composer chip's labels for the thread's permission mode, in menu order.
 export const permissionModes: Record<string, PermissionMode> = {

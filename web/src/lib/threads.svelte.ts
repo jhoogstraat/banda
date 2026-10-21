@@ -1,7 +1,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api, userApi } from './api';
-import type { Thread, User } from './gen/banda/v1/banda_pb';
+import type { Thread, User } from './gen/banda/v1/banda_pb.js';
 import { alerts, families, sectionOf, type Family, type Inbox } from './inbox';
 
 // `search` and `project` (a repo URL) filter the sidebar's threads.

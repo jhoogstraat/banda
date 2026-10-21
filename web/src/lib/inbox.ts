@@ -1,8 +1,5 @@
 import { timestampMs } from '@bufbuild/protobuf/wkt';
-import type { Thread } from './gen/banda/v1/banda_pb.ts';
-
-// Status values: node's type stripping (inbox.check.ts) can't load the generated enum.
-const STARTING = 1, WORKING = 2, AWAITING_INPUT = 3, ERRORED = 4;
+import { Status, type Thread } from './gen/banda/v1/banda_pb.js';
 
 export type Inbox = { threads: Thread[]; mentioned: Thread[] };
 
@@ -13,7 +10,7 @@ export const sectionOf = (t: Thread, now = Date.now()) =>
 		? 'settled'
 		: t.snoozedUntil && timestampMs(t.snoozedUntil) > now
 			? 'snoozed'
-			: !t.turnRequests && !t.permissionPending && (t.status === STARTING || t.status === WORKING)
+			: !t.turnRequests && !t.permissionPending && (t.status === Status.STARTING || t.status === Status.WORKING)
 				? 'working'
 				: 'needs';
 
@@ -53,8 +50,8 @@ export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = 
 		if (t.turnRequests > (asks.get(t.id) ?? 0)) out.push({ thread: t, title: 'A teammate asks to run your agent' });
 		if (t.permissionPending && !asking.has(t.id)) out.push({ thread: t, title: 'Your agent asks for permission' });
 		if (was.get(t.id) === t.status) continue;
-		if (t.status === AWAITING_INPUT) out.push({ thread: t, title: 'Your agent needs input' });
-		if (t.status === ERRORED) out.push({ thread: t, title: 'Your thread failed' });
+		if (t.status === Status.AWAITING_INPUT) out.push({ thread: t, title: 'Your agent needs input' });
+		if (t.status === Status.ERRORED) out.push({ thread: t, title: 'Your thread failed' });
 	}
 	const mentioned = new Set(prev.mentioned.map((t) => t.id));
 	for (const t of next.mentioned) {

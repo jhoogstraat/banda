@@ -1,7 +1,7 @@
 import { Code, ConnectError, createClient, type Interceptor } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { fromJson } from '@bufbuild/protobuf';
-import { AttachmentSchema, SettingsService, ThreadService, UserService, type Attachment } from './gen/banda/v1/banda_pb';
+import { AttachmentSchema, SettingsService, ThreadService, UserService, type Attachment } from './gen/banda/v1/banda_pb.js';
 
 // Signed out (or session expired): sign in again and come back to this page.
 // ponytail: unary calls only. Streams report errors while iterating, but every page makes a unary call first.

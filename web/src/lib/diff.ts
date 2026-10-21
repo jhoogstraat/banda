@@ -1,4 +1,4 @@
-import type { ReviewComment } from './gen/banda/v1/banda_pb.ts';
+import type { ReviewComment } from './gen/banda/v1/banda_pb.js';
 
 // A diff line numbered in the base (`old`) and the branch (`new`) version of its file.
 // Hunk headers and "\ No newline" lines have neither.
