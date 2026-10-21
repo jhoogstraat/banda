@@ -1,6 +1,6 @@
 // The thread page in a browser: the chat, its cards, the right pane and the header's actions, as each user sees them.
 import { devices, type Page } from '@playwright/test';
-import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { AutoPushState, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, repo, Status, test, type Thread, type User } from './fixtures.ts';
 
 const composer = (page: Page) => page.getByPlaceholder('Message the agent. Use @agent to mention it in chat mode.');
@@ -81,16 +81,37 @@ test('turn requests: bob asks the agent and waits; alice approves one, which run
 
 	await post(bobPage, '@agent e2e: from bob');
 	await expect(bobPage.getByText(`Waiting for ${alice.id} to approve`)).toBeVisible();
-	await expect(page.getByText(`${bob.id} asks the agent:`)).toBeVisible();
+	await expect(page.getByText('asks the agent')).toBeVisible();
+	// The card is compact: the subscription note is behind an info button, the decline note behind its own.
+	await expect(page.getByRole('button', { name: 'Runs on your Claude subscription' })).toBeVisible();
+	await expect(page.getByText(/in this thread's environment/)).toBeHidden();
+	await expect(page.getByRole('textbox', { name: 'Decline note' })).toBeHidden();
+	await expect(page.getByRole('button', { name: /^Approve all/ })).toBeHidden();
 	await page.getByRole('button', { name: 'Approve', exact: true }).click();
 	await expect(bobPage.getByText(`Approved by ${alice.id}`)).toBeVisible();
 	await expect(bobPage.getByText('Created hello2.txt')).toBeVisible({ timeout: 60_000 });
 
 	await post(bobPage, '@agent not this one');
+	await page.getByRole('button', { name: 'Add a note to the decline' }).click();
 	await page.getByRole('textbox', { name: 'Decline note' }).fill('not now');
 	await page.getByRole('button', { name: 'Decline', exact: true }).click();
 	await expect(bobPage.getByText(`Declined by ${alice.id}: not now`)).toBeVisible();
 	expect(await t.of('turnEnded')).toHaveLength(2);
+});
+
+test('turn requests: with several waiting, alice approves them all at once, in the order they were posted', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+	for (const n of [1, 2, 3]) await post(bobPage, `@agent e2e: request ${n}`);
+	await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(3);
+	await page.getByRole('button', { name: 'Approve all (3)' }).click();
+	await expect(bobPage.getByText(`Approved by ${alice.id}`)).toHaveCount(3);
+	await expect(page.getByRole('button', { name: /^Approve/ })).toHaveCount(0);
+	const requests = (await t.events()).filter((e) => e.kind.case === 'turnRequest').map((e) => e.seq);
+	const resolved = await t.of('turnRequestResolved');
+	expect(resolved.map((r) => [r.requestSeq, r.approved])).toEqual(requests.map((s) => [s, true]));
 });
 
 test('review: alice comments on a line of the diff and sends the review; the chat shows it and the agent addresses it', async ({ as }) => {
@@ -218,12 +239,67 @@ test('a thread page whose first loads fail (the thread, who is signed in) shows 
 	expect(failed).toBeGreaterThan(0);
 });
 
-test('a thread that doesn’t exist says so, with no composer to post into (B21)', async ({ as }) => {
+test('a thread that doesn’t exist says so, with no composer to post into (B21), no empty thread or pane, and a way home', async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/t/nosuchthread');
-	await expect(page.getByText('Thread not found')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Thread not found' })).toBeVisible();
 	await expect(composer(page)).toHaveCount(0);
 	await expect(page.getByText('reconnecting…')).toBeHidden();
+	await expect(page.getByText('Untitled thread')).toBeHidden();
+	await expect(page.getByText('No messages yet')).toBeHidden();
+	await expect(page.getByText(/not_found/)).toBeHidden();
+	await expect(page.getByRole('tab', { name: 'Diff' })).toHaveCount(0);
+	await page.getByRole('link', { name: 'Go to your threads' }).click();
+	await expect(page).toHaveURL('/');
+});
+
+test('a thread that fails to load says why and loads on Try again', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await alice.page();
+	const getThread = /\/banda\.v1\.ThreadService\/GetThread$/;
+	await page.route(getThread, (route) => route.fulfill({ status: 503, body: 'down' }));
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByRole('heading', { name: "Couldn't load this thread" })).toBeVisible();
+	await expect(composer(page)).toHaveCount(0);
+	await page.unroute(getThread);
+	await page.getByRole('button', { name: 'Try again' }).click();
+	await expect(page.getByRole('heading', { name: (await t.get()).title })).toBeVisible();
+	await expect(composer(page)).toBeVisible();
+});
+
+test('an errored thread says which setup step failed with the end of its output; alice retries or opens the terminal, bob is told who can fix it', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create({ repoUrl: repo('setup-fails'), prompt: 'e2e: never runs' });
+	await t.waitForStatus(Status.ERRORED, 120_000);
+	const step = (await t.of('setupStep')).find((s) => s.output.includes('setup sees'))!;
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+	const card = page.getByRole('alert').filter({ hasText: 'Setup failed' });
+	await expect(card).toContainText(`Setup failed: ${step.title}`);
+	await expect(card.getByLabel(`Output of ${step.title}`)).toContainText(/setup sees[\s\S]*exit status 7/);
+	await expect(card.getByRole('button', { name: 'Retry' })).toBeVisible();
+	await card.getByRole('button', { name: 'Open terminal' }).click();
+	await expect(page.getByRole('tab', { name: 'Terminal' })).toHaveAttribute('aria-selected', 'true');
+
+	const bobCard = bobPage.getByRole('alert').filter({ hasText: 'Setup failed' });
+	await expect(bobCard).toContainText(`Only ${alice.id} can retry this thread.`);
+	await expect(bobCard.getByRole('button')).toHaveCount(0);
+});
+
+test('a thread that can’t push tells only its owner, compactly, with a link to add GIT_TOKEN in Settings', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create({ repoUrl: 'https://github.com/e2e/plain.git' }); // https pushes only with a token
+	await t.waitFor('unpushable', (i) => i.autoPush === AutoPushState.UNAVAILABLE);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	await expect(bobPage.getByText('Created hello1.txt')).toBeVisible();
+	const add = page.getByRole('link', { name: 'Add GIT_TOKEN in Settings' });
+	await expect(add).toHaveCount(1);
+	await expect(bobPage.getByText(/GIT_TOKEN/)).toHaveCount(0);
+	await add.click();
+	await expect(page).toHaveURL(/\/settings\?secret=GIT_TOKEN#secrets$/);
+	await expect(page.getByRole('textbox', { name: 'Name' })).toHaveValue('GIT_TOKEN');
 });
 
 test('phone: the sidebar is a drawer that lists the thread and closes once one is opened', async ({ as }) => {

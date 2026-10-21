@@ -41,7 +41,8 @@ export type Item = { key: number } & (
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
-	| { kind: 'push'; text: string; pushed: boolean }
+	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
+	| { kind: 'push'; text: string; pushed: boolean; unavailable: boolean }
 	| { kind: 'fork'; actor: string; note: ForkNote }
 	| { kind: 'setup'; steps: SetupStep[] }
 );
@@ -233,9 +234,12 @@ export function apply(chat: Chat, e: Event) {
 		case 'typing':
 			chat.typing[e.actor] = Date.now();
 			break;
-		case 'autoPush':
-			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === AutoPushState.PUSHED });
+		case 'autoPush': {
+			const unavailable = k.value.state === AutoPushState.UNAVAILABLE;
+			if (unavailable && chat.items.some((i) => i.kind === 'push' && i.unavailable)) break;
+			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === AutoPushState.PUSHED, unavailable });
 			break;
+		}
 		case 'modeChanged':
 			chat.items.push({ key, kind: 'mode', mode: k.value.mode });
 			break;

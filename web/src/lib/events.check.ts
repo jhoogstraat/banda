@@ -110,6 +110,9 @@ if (f.lines.findIndex((l) => endsAt(removed, l)) !== 3 || endsAt({ ...removed, c
 apply(chat, ev({ case: 'autoPush', value: { state: AutoPushState.UNAVAILABLE, detail: 'origin cannot be pushed to' } }));
 const push = chat.items.at(-1);
 if (push?.kind !== 'push' || push.pushed) throw new Error('autoPush should become a chat item');
+const pushes = count();
+apply(chat, ev({ case: 'autoPush', value: { state: AutoPushState.UNAVAILABLE, detail: 'origin cannot be pushed to' } }));
+if (count() !== pushes) throw new Error('a thread should say once that origin cannot be pushed to');
 
 // Paging: a tail plus older pages prepended one by one gives the same chat as the full replay,
 // wherever the page edges fall (inside groups, between a call and its result, inside a subagent).
