@@ -3,6 +3,9 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+// BANDA_API lets a second checkout run its own API and web server side by side.
+const api = process.env.BANDA_API ?? 'http://localhost:8787';
+
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
@@ -19,8 +22,8 @@ export default defineConfig({
 	// /dex reaches the dev Dex, so LAN clients sign in through this one port.
 	server: {
 		proxy: {
-			'/banda.v1.': 'http://localhost:8787',
-			'/auth': 'http://localhost:8787',
+			'/banda.v1.': api,
+			'/auth': api,
 			'/dex': 'http://localhost:5556'
 		}
 	}
