@@ -98,7 +98,7 @@ func run(ctx context.Context) error {
 	// queueCmd never blocks: setup and the login wait can take long, and the
 	// terminal, files and previews keep working meanwhile.
 	queueCmd, cmds := unbounded[*bandav1.ConnectResponse]()
-	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT")}}
+	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT"), os.Getenv("BANDA_PROFILE")}}
 	pushes := &pusher{report: send}
 	lastDiff := "" // the first turn after a start always pushes
 	term := &terminal{send: sendReq}
@@ -126,7 +126,7 @@ func run(ctx context.Context) error {
 			case *bandav1.ConnectResponse_AgentSettings:
 				// Set now so a claude that hasn't started yet starts with them;
 				// queued so a running one restarts after the prompts sent before.
-				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort})
+				want.set(settings{k.AgentSettings.Model, k.AgentSettings.Effort, k.AgentSettings.Profile})
 				queueCmd(msg)
 			case *bandav1.ConnectResponse_Push:
 				if k.Push.Suspend {
@@ -316,7 +316,7 @@ func run(ctx context.Context) error {
 }
 
 // settings are what claude runs with.
-type settings struct{ model, effort string }
+type settings struct{ model, effort, profile string }
 
 // wanted holds the settings claude should run with. The API sends them on
 // connect and on every change.
