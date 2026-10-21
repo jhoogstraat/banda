@@ -83,13 +83,16 @@
 		{#each entries as e (e.thread!.id)}
 			{@const t = e.thread!}
 			{@const s = stats(t.diff)}
+			{@const picked = entries.length > 1 && !t.settled && entries.every((o) => o === e || o.thread!.settled)}
 			<section class="flex min-h-0 min-w-0 flex-col border-r last:border-r-0">
 				<div class="space-y-1.5 border-b p-3">
 					<div class="flex items-center gap-2">
 						<StatusDot status={t.status} label />
 						<a class="min-w-0 flex-1 truncate text-sm font-medium hover:underline" href="/t/{t.id}">{t.title}</a>
 						{#if t.ownerId === threads.me?.id}
-							{#if t.settled}
+							{#if picked}
+								<Badge><TrophyIcon /> Picked</Badge>
+							{:else if t.settled}
 								<Badge variant="outline" class="font-normal text-muted-foreground">Settled</Badge>
 							{:else}
 								<Button size="xs" variant="outline" onclick={() => pick(t.id)}><TrophyIcon /> Pick this one</Button>

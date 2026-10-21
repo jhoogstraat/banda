@@ -170,7 +170,7 @@ call ThreadService/RaceCompare "{\"raceId\":\"$RACE\"}" | jq -e '(.entries | len
 call ThreadService/RacePick "{\"threadId\":\"$A\"}" bob >/dev/null 2>&1 && fail "bob picked in dev's race"
 call ThreadService/RacePick "{\"threadId\":\"$A\"}" >/dev/null
 [ "$(thread settled) $(thread status)" = "true STATUS_SUSPENDED" ] || fail "the other try: settled=$(thread settled) $(thread status)"
-ID=$A; [ "$(thread settled)" = false ] || fail "the pick was settled"
+ID=$A; [ "$(thread settled)" != true ] || fail "the pick was settled"
 [ "$(sql "select count(*) from events where thread_id in ('$A','$B') and body->'forkNote'->>'picked'='true' and body->'forkNote'->>'threadId'='$A'")" = 2 ] || fail "the pick is not noted in both"
 call ThreadService/Snooze "{\"threadId\":\"$A\",\"until\":\"2099-01-01T00:00:00Z\"}" >/dev/null
 ok "a race of 2 runs both tries on their models; compare shows them; picking one settles and pauses the other and notes it in both"

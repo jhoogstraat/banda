@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"connectrpc.com/connect/v2"
@@ -113,6 +114,7 @@ func (s *Service) RaceCompare(ctx context.Context, req *bandav1.RaceCompareReque
 	if err != nil {
 		return nil, err
 	}
+	sort.SliceStable(threads, func(i, j int) bool { return threads[i].CreatedAt.Before(threads[j].CreatedAt) }) // stable columns
 	var ids []string
 	for _, t := range threads {
 		ids = append(ids, t.ID)
