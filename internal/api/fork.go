@@ -87,6 +87,9 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
 	}
+	if err := checkRepoURL(req.RepoUrl); err != nil {
+		return nil, err
+	}
 	if len(req.Tries) < 2 || len(req.Tries) > maxTries {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Sprintf("a race has 2 to %d tries", maxTries))
 	}
