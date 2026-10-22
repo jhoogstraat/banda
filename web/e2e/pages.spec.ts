@@ -30,6 +30,15 @@ test('home: a prompt raced two ways opens compare; picking one settles the other
 	await expect(page.getByText('Settled', { exact: true })).toBeVisible();
 });
 
+test('home: picking “No repository” closes the repository menu, though the menu shrinks under the pointer', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Choose repository' }).click();
+	await page.getByRole('menuitemradio', { name: 'No repository' }).click();
+	await expect(page.getByRole('menu')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'No repository' })).toBeVisible();
+});
+
 test('compare without a race lists mine and teammates’ races; a bad link says there is no such race', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const prompt = `e2e-noop ${word()}`;

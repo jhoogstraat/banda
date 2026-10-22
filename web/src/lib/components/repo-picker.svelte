@@ -66,7 +66,9 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="start" class="w-80">
 		<DropdownMenu.Label>Repository</DropdownMenu.Label>
-		<DropdownMenu.RadioGroup bind:value={repoUrl}>
+		<!-- Closes on a pick itself: picking No repository drops the base branch below, the items move under the pointer
+		     between press and release, and the menu's own close on release misses. -->
+		<DropdownMenu.RadioGroup bind:value={repoUrl} onValueChange={() => (open = false)}>
 			{#each known as url (url)}
 				<DropdownMenu.RadioItem value={url} title={url}><span class="truncate">{projectName(url)}</span></DropdownMenu.RadioItem>
 			{/each}
