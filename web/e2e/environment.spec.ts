@@ -126,6 +126,7 @@ test('B6: a terminal open during Retry ends; the thread is then idle-suspended w
 	const page = await alice.page();
 	await page.goto(`/t/${t.id}`);
 	await t.waitForStatus(Status.ERRORED, 120_000);
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 	await page.getByRole('tab', { name: 'Terminal' }).click();
 	const term = page.locator('.xterm');
 	await expect(term).toContainText('$', { timeout: 30_000 }); // the shell's prompt

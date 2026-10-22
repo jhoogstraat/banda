@@ -11,6 +11,9 @@ export const ui = $state({ palette: false, help: false, commands: [] as Command[
 
 export const mod = typeof navigator !== 'undefined' && /Mac|iP/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
+// The thread page's single-key actions, run through `ui.commands` (see onkeydown).
+export const threadKeys = { pane: 'P', diff: 'D', mode: 'M', fork: 'F', spawn: 'B', settle: 'E' };
+
 // The cheat sheet; also the hints in the palette.
 export const shortcuts: [string, string][] = [
 	[`${mod}K`, 'Command palette'],
@@ -22,6 +25,12 @@ export const shortcuts: [string, string][] = [
 	['/', 'Focus the message box'],
 	[`${mod}B`, 'Toggle the sidebar'],
 	['Esc', 'Leave the message box, close dialogs'],
+	[threadKeys.pane, 'Thread: toggle the right pane'],
+	[threadKeys.diff, 'Thread: show the diff'],
+	[threadKeys.mode, 'Thread: switch agent / chat mode (owner)'],
+	[threadKeys.fork, 'Thread: fork'],
+	[threadKeys.spawn, 'Thread: spawn a sub-thread'],
+	[threadKeys.settle, 'Thread: settle / unsettle'],
 	['?', 'This cheat sheet']
 ];
 
@@ -74,6 +83,10 @@ export function onkeydown(e: KeyboardEvent) {
 	else if (e.key === 'j' || e.key === 'k') step(e.key === 'j' ? 1 : -1);
 	else if (e.key === '/') focusComposer();
 	else if (e.key === '?') ui.help = true;
-	else return;
+	else {
+		const c = ui.commands.find((c) => c.keys?.toLowerCase() === e.key);
+		if (!c) return;
+		c.run();
+	}
 	e.preventDefault();
 }

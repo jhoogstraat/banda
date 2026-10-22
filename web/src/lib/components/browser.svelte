@@ -14,7 +14,8 @@
 
 	// The app running in the thread's environment, framed from the preview origin (see internal/api/preview.go).
 	// Like Files it never wakes a paused environment; the owner can.
-	let { threadId, status, owner }: { threadId: string; status?: Status; owner: boolean } = $props();
+	// want: a port to show once it listens (a chat link asked for it).
+	let { threadId, status, owner, want = $bindable() }: { threadId: string; status?: Status; owner: boolean; want?: number } = $props();
 
 	let running = $state<boolean>();
 	let ports = $state<PreviewPort[]>([]);
@@ -60,6 +61,10 @@
 			error = ConnectError.from(e).rawMessage;
 		}
 	}
+
+	$effect(() => {
+		if (want && ports.some((p) => p.port === want)) [port, want] = [want, undefined];
+	});
 
 	$effect(() => {
 		if (port && running) go('/');

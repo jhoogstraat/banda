@@ -22,6 +22,7 @@
 		pending = $bindable(),
 		focus = $bindable(),
 		ask = $bindable(),
+		port = $bindable(),
 		posted,
 		onsend
 	}: {
@@ -33,6 +34,8 @@
 		pending: Comment[];
 		focus?: Comment;
 		ask: boolean;
+		// A port for the Browser tab to show (see Browser's want).
+		port?: number;
 		posted: (Comment & { by: string })[];
 		onsend: (summary: string) => Promise<boolean>;
 	} = $props();
@@ -66,7 +69,7 @@
 		{#if browserOpened}
 			<!-- Hidden rather than unmounted, so the framed app keeps its state. -->
 			<div class="min-h-0 flex-1 {tab === 'browser' ? '' : 'hidden'}">
-				<Browser {threadId} status={thread?.status} {owner} />
+				<Browser {threadId} status={thread?.status} {owner} bind:want={port} />
 			</div>
 		{/if}
 		{#if owner && termOpened}
