@@ -99,6 +99,16 @@
 	<Command.Group heading="General">
 		{#each global as c (c.label)}{@render item(c)}{/each}
 	</Command.Group>
+	<!-- Teammates' pages only while searching ("go to bob"), so the list stays short. -->
+	{#if query}
+		<Command.Group heading="People">
+			{#each threads.users as u (u.id)}
+				<Command.Item value="Go to {u.name} {u.email}{u.id === threads.me?.id ? ' your profile' : ''}" onSelect={() => run({ label: u.id, run: () => goto(`/u/${u.id}`) })}>
+					<UserAvatar name={u.name} class="size-4" />Go to {u.id === threads.me?.id ? 'your profile' : u.name}
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
 {/snippet}
 
 <Command.Dialog bind:open={ui.palette} {filter} title="Command palette" description="Search threads and actions">

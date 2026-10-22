@@ -32,7 +32,8 @@ test('alice and bob sign in through Dex side by side; signing out ends only alic
 	const [alice, bob] = [await signIn(browser, 'alice'), await signIn(browser, 'bob', '/search?q=hello')];
 	expect((await (await me(alice)).json()).user).toMatchObject({ name: 'alice', email: 'alice@example.com' });
 	expect((await (await me(bob)).json()).user).toMatchObject({ name: 'bob', email: 'bob@example.com' });
-	await alice.getByText('Sign out').click();
+	await alice.getByRole('button', { name: 'Account' }).click();
+	await alice.getByRole('menuitem', { name: 'Sign out' }).click();
 	await expect(alice).toHaveURL(`${OIDC_API}/signin?signed-out`);
 	await expect(alice.getByRole('status')).toHaveText('You signed out.');
 	expect((await me(alice)).status()).toBe(401);

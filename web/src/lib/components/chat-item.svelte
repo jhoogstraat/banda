@@ -119,7 +119,11 @@
 		<UserAvatar {name} class="mt-0.5 size-7" />
 		<div class="min-w-0 flex-1 space-y-1">
 			<div class="flex items-baseline gap-2">
-				<span class="text-sm font-medium">{name}</span>
+				{#if item.actor.startsWith('agent:')}
+					<span class="text-sm font-medium">{name}</span>
+				{:else}
+					<a href="/u/{item.actor}" class="text-sm font-medium hover:underline">{name}</a>
+				{/if}
 				<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			</div>
 			{#if item.text}

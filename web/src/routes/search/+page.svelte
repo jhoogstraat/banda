@@ -87,7 +87,11 @@
 			{:else if results?.length}
 				<ul class="divide-y rounded-lg border">
 					{#each results as hit (`${hit.threadId}#${hit.seq}`)}
-						<li><a href="/t/{hit.threadId}#{hit.seq}" class="flex px-4 py-3 hover:bg-muted/50"><SearchHit {hit} /></a></li>
+						<!-- The row opens the message (its link covers the row); the author's name on top opens their page. -->
+						<li class="relative flex px-4 py-3 hover:bg-muted/50">
+							<a href="/t/{hit.threadId}#{hit.seq}" class="absolute inset-0" aria-label="Open in {hit.threadTitle || 'Untitled thread'}"></a>
+							<SearchHit {hit} people />
+						</li>
 					{/each}
 				</ul>
 			{:else if results}

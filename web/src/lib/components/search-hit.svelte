@@ -6,8 +6,9 @@
 	import { projectName, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
-	// One search result: who, where and when, then the passage with the matched words marked.
-	let { hit, compact = false }: { hit: SearchResult; compact?: boolean } = $props();
+	// One search result: who, where and when, then the passage with the matched words marked. `people`: the author's
+	// name links to their page (when the row's own link lies under it).
+	let { hit, compact = false, people = false }: { hit: SearchResult; compact?: boolean; people?: boolean } = $props();
 	const agent = $derived(hit.actor === 'agent' || hit.actor.startsWith('agent:'));
 </script>
 
@@ -20,7 +21,11 @@
 		{:else}
 			<UserAvatar name={userName(hit.actor)} class="size-4" />
 		{/if}
-		<span class="shrink-0 font-medium text-foreground">{agent ? 'Agent' : userName(hit.actor)}</span>
+		{#if people && !agent && hit.kind !== SearchKind.CODE}
+			<a href="/u/{hit.actor}" class="relative shrink-0 font-medium text-foreground hover:underline">{userName(hit.actor)}</a>
+		{:else}
+			<span class="shrink-0 font-medium text-foreground">{agent ? 'Agent' : userName(hit.actor)}</span>
+		{/if}
 		<span class="min-w-0 truncate">in {hit.threadTitle || 'Untitled thread'}{compact ? '' : ` · ${projectName(hit.repoUrl)}`}</span>
 		<span class="ml-auto shrink-0">{ago(hit.time)}</span>
 	</div>

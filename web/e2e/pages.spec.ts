@@ -155,10 +155,11 @@ test('search finds a teammate’s words and opens the thread at them; the palett
 	await test.step('the search page', async () => {
 		await page.goto('/search');
 		await page.getByRole('textbox', { name: 'Search', exact: true }).fill(secret);
-		const hit = page.getByRole('link', { name: new RegExp(secret) }).first();
+		const hit = page.getByRole('listitem').filter({ hasText: secret }).first();
 		await expect(hit).toContainText(`in e2e: about the ${secret}`);
 		await expect(page).toHaveURL(new RegExp(`\\?q=${secret}`)); // shareable
-		await hit.click();
+		await expect(page.getByRole('link', { name: bob.id, exact: true }).first()).toHaveAttribute('href', `/u/${bob.id}`); // the author
+		await hit.getByRole('link', { name: `Open in e2e: about the ${secret}` }).click();
 		await expect(page).toHaveURL(new RegExp(`/t/${t.id}#\\d+$`));
 		await expect(page.getByRole('heading', { name: `e2e: about the ${secret}` })).toBeVisible();
 	});

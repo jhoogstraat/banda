@@ -77,6 +77,11 @@
 			</span>
 		{/if}
 	{/if}
+	{#if thread && !owner}
+		<a href="/u/{thread.ownerId}" class="hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground @lg:flex" title="Owner">
+			<UserAvatar name={userName(thread.ownerId)} class="size-5" />{userName(thread.ownerId)}
+		</a>
+	{/if}
 	{#if thread?.parentId}
 		<a href="/t/{thread.parentId}" class="hidden max-w-48 min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground @3xl:flex" title="Spawned from {thread.parentTitle}">
 			<CornerLeftUpIcon class="size-3.5 shrink-0" /><span class="truncate">from {thread.parentTitle || 'its parent'}</span>

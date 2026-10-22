@@ -1,7 +1,8 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api, userApi } from './api';
-import type { Decision, Thread, User } from './gen/banda/v1/banda_pb.js';
+import { timestampMs } from '@bufbuild/protobuf/wkt';
+import { Status, type Decision, type Thread, type User } from './gen/banda/v1/banda_pb.js';
 import { alerts, asking, asks, families, sectionOf, type Alert, type AlertKind, type Family, type Inbox } from './inbox';
 
 // `search` and `project` (a repo URL, or noRepo) filter the sidebar's threads.
@@ -140,3 +141,32 @@ export const visible = (f: Family): Thread[] =>
 
 // The sidebar's threads top to bottom, for j/k.
 export const sidebarOrder = () => [threads.mentioned.filter(matches), ...Object.values(sidebarSections()).flat().map(visible)].flat();
+
+// Keeps a team board live: `on` gets each TeamWatch snapshot (everyone's recent, unsettled threads with who is in
+// them), and undefined while reconnecting.
+export async function watchTeam(signal: AbortSignal, on: (threads?: Thread[]) => void) {
+	while (!signal.aborted) {
+		try {
+			for await (const res of api.teamWatch({}, { signal })) on(res.threads);
+		} catch {
+			if (signal.aborted) return;
+		}
+		on(undefined);
+		await new Promise((r) => setTimeout(r, 1000));
+	}
+}
+
+export const lastActive = (t: Thread) => {
+	const ts = t.activity?.time ?? t.updatedAt;
+	return ts ? timestampMs(ts) : 0;
+};
+
+// A person's board threads by what matters, as the sidebar sorts them: blocked on them (a request or a failure), the
+// agent working, finished (Ready, or paused in the last day), and paused before (only counted).
+export type BoardGroups = { needs: Thread[]; working: Thread[]; done: Thread[]; older: Thread[] };
+export function boardGroup(t: Thread): keyof BoardGroups {
+	if (t.turnRequests || t.permissionPending || t.status === Status.ERRORED) return 'needs';
+	if (t.status === Status.STARTING || t.status === Status.WORKING) return 'working';
+	if (t.status !== Status.SUSPENDED) return 'done';
+	return threads.now - lastActive(t) < 86_400_000 ? 'done' : 'older';
+}

@@ -2,12 +2,16 @@
 	import { page } from '$app/state';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import InboxIcon from '@lucide/svelte/icons/inbox';
+	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
+	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
@@ -37,6 +41,17 @@
 {#snippet title(text: string, n: number)}
 	{text}
 	<span class="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[10px] tabular-nums">{n}</span>
+{/snippet}
+
+<!-- An account menu entry; sign-out leaves the SPA with a full reload. -->
+{#snippet link(href: string, Icon: typeof UserIcon, label: string, keys = '', reload = false)}
+	<DropdownMenu.Item>
+		{#snippet child({ props })}
+			<a {href} {...props} data-sveltekit-reload={reload || undefined}>
+				<Icon />{label}{#if keys}<DropdownMenu.Shortcut>{keys}</DropdownMenu.Shortcut>{/if}
+			</a>
+		{/snippet}
+	</DropdownMenu.Item>
 {/snippet}
 
 <!-- A thread, or with race the race's row: its most urgent try t, its title and count, linking to compare. -->
@@ -171,16 +186,26 @@
 		{@render section('Snoozed', sections.snoozed, true)}
 		{@render section('Settled', sections.settled, true)}
 	</Sidebar.Content>
-	<Sidebar.Footer class="flex-row items-center gap-2 border-t p-3">
-		<UserAvatar {name} class="size-7" />
-		<div class="min-w-0 flex-1 leading-tight">
-			<div class="truncate text-sm">{name}</div>
-			<a href="/auth/logout" data-sveltekit-reload class="text-xs text-muted-foreground hover:underline">Sign out</a>
-		</div>
-		{#if threads.notify === 'default'}
-			<IconButton icon={BellIcon} label="Notify me when I'm mentioned or my agent needs me" onclick={askNotify} />
-		{/if}
-		<IconButton icon={SettingsIcon} label="Settings" keys="G S" href="/settings" variant={page.url.pathname === '/settings' ? 'secondary' : 'ghost'} />
+	<Sidebar.Footer class="border-t p-2">
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger class="flex w-full items-center gap-2 rounded-md p-1 text-left hover:bg-sidebar-accent/50" aria-label="Account">
+				<UserAvatar {name} class="size-7" />
+				<span class="min-w-0 flex-1 truncate text-sm">{name}</span>
+				<ChevronsUpDownIcon class="size-4 shrink-0 text-muted-foreground" />
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content side="top" align="start" class="w-(--bits-dropdown-menu-anchor-width) min-w-56">
+				{@render link(`/u/${threads.me?.id ?? ''}`, UserIcon, 'Your profile')}
+				{@render link('/settings', SettingsIcon, 'Settings', 'G S')}
+				{#if threads.notify === 'default'}
+					<DropdownMenu.Item onSelect={askNotify}><BellIcon />Enable notifications</DropdownMenu.Item>
+				{:else}
+					{@render link('/settings#notifications', BellIcon, 'Notifications')}
+				{/if}
+				{@render link('/settings#shortcuts', KeyboardIcon, 'Keyboard shortcuts')}
+				<DropdownMenu.Separator />
+				{@render link('/auth/logout', LogOutIcon, 'Sign out', '', true)}
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	</Sidebar.Footer>
 </Sidebar.Root>
 <NewThreadDialog bind:open={newOpen} />
