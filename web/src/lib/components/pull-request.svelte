@@ -10,12 +10,13 @@
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import LoadState from '#lib/components/load-state.svelte';
+	import PullRequestLabels from '#lib/components/pull-request-labels.svelte';
+	import ReviewerInput from '#lib/components/reviewer-input.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { NativeSelect, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
-	import XIcon from '@lucide/svelte/icons/x';
 	import {
 		Mergeable,
 		PullState,
@@ -25,7 +26,7 @@
 		type PullRequestComment,
 		type Thread
 	} from '#lib/gen/banda/v1/banda_pb.js';
-	import { checkStates, checksSummary, duration, live, noun, pullStates, ref, reviewLabels } from '#lib/pullrequests.js';
+	import { checkStates, checksSummary, duration, live, logins, noun, pullStates, ref, reviewLabels } from '#lib/pullrequests.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
@@ -59,7 +60,6 @@
 		api.pullRequestChoices({ threadId: thread.id }).then((c) => (choices = c)).catch(() => {});
 	});
 	const reviewerChoices = $derived((choices?.reviewers ?? []).filter((l) => l !== pr?.author && !pr?.reviewers.some((r) => r.login === l)));
-	const labelChoices = $derived((choices?.labels ?? []).filter((l) => !pr?.labels.includes(l)));
 
 	async function load(refresh = false) {
 		try {
@@ -101,14 +101,9 @@
 		if (await act(api.pullRequestUpdate({ threadId, title, body }))) editing = false;
 	}
 	async function requestReview() {
-		const logins = reviewers.split(/[\s,]+/).map((l) => l.replace(/^@/, '')).filter(Boolean);
-		if (logins.length && (await act(api.pullRequestUpdate({ threadId, addReviewers: logins })))) reviewers = '';
+		const asked = logins(reviewers);
+		if (asked.length && (await act(api.pullRequestUpdate({ threadId, addReviewers: asked })))) reviewers = '';
 	}
-	const addLabel = (e: Event & { currentTarget: HTMLSelectElement }) => {
-		const label = e.currentTarget.value;
-		e.currentTarget.value = '';
-		if (label) act(api.pullRequestUpdate({ threadId, addLabels: [label] }));
-	};
 	const resolve = (c: PullRequestComment) => act(api.pullRequestResolve({ threadId, reviewThread: c.threadId, resolved: !c.resolved }));
 	async function send(e: SubmitEvent) {
 		e.preventDefault();
@@ -248,26 +243,14 @@
 			{/if}
 		</section>
 
-		{#if pr.labels.length || (owner && live(s) && labelChoices.length)}
-			<section class="flex flex-wrap items-center gap-1" aria-label="Labels">
-				{#each pr.labels as l (l)}
-					<span class="flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs">
-						{l}
-						{#if owner && live(s)}
-							<button class="text-muted-foreground hover:text-foreground" aria-label="Remove label {l}" disabled={busy} onclick={() => act(api.pullRequestUpdate({ threadId, removeLabels: [l] }))}>
-								<XIcon class="size-3" />
-							</button>
-						{/if}
-					</span>
-				{/each}
-				{#if owner && live(s) && labelChoices.length}
-					<NativeSelect size="sm" aria-label="Add label" disabled={busy} onchange={addLabel}>
-						<NativeSelectOption value="">Add label…</NativeSelectOption>
-						{#each labelChoices as l (l)}<NativeSelectOption value={l}>{l}</NativeSelectOption>{/each}
-					</NativeSelect>
-				{/if}
-			</section>
-		{/if}
+		<PullRequestLabels
+			labels={pr.labels}
+			choices={choices?.labels ?? []}
+			editable={owner && live(s)}
+			disabled={busy}
+			onadd={(l) => act(api.pullRequestUpdate({ threadId, addLabels: [l] }))}
+			onremove={(l) => act(api.pullRequestUpdate({ threadId, removeLabels: [l] }))}
+		/>
 
 		<section class="space-y-1.5" aria-label="Reviewers">
 			<h3 class="text-xs font-medium text-muted-foreground">Reviewers</h3>
@@ -278,10 +261,7 @@
 			{/each}
 			{#if owner && live(s)}
 				<form class="flex gap-2" onsubmit={(e) => (e.preventDefault(), requestReview())}>
-					<Input bind:value={reviewers} list="pr-reviewer-choices" placeholder={reviewerChoices.length ? 'Pick or type logins' : 'Logins, comma-separated'} aria-label="Reviewers to ask" class="h-7 text-xs" />
-					<datalist id="pr-reviewer-choices">
-						{#each reviewerChoices as l (l)}<option value={l}></option>{/each}
-					</datalist>
+					<ReviewerInput bind:value={reviewers} choices={reviewerChoices} id="pr-reviewer-choices" />
 					<Button type="submit" size="sm" variant="outline" disabled={busy || !reviewers.trim()}>Ask for review</Button>
 				</form>
 			{/if}

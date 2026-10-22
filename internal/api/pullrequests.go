@@ -321,7 +321,20 @@ func (s *Service) PullRequestCreate(ctx context.Context, req *bandav1.PullReques
 	if err != nil {
 		return nil, forgeError(err)
 	}
+	// The forges open it first, then ask for reviews and add labels; a refusal there leaves it opened and linked.
+	var editErr error
+	if len(req.Reviewers) > 0 || len(req.Labels) > 0 {
+		opened := &bandav1.PullRequest{Summary: &bandav1.PullRequestSummary{Number: int32(n), Title: req.Title}}
+		editErr = f.Update(ctx, opened, forge.Edit{Reviewers: req.Reviewers, AddLabels: req.Labels})
+	}
 	pr, err = s.link(ctx, t, f, n, "opened")
+	if err == nil && editErr != nil {
+		msg, ce := editErr.Error(), (*connect.Error)(nil)
+		if editErr = forgeError(editErr); errors.As(editErr, &ce) {
+			msg = ce.Message()
+		}
+		err = connect.NewError(connect.CodeOf(editErr), fmt.Sprintf("#%d was opened, but reviewers or labels weren't added: %s", n, msg))
+	}
 	return &bandav1.PullRequestCreateResponse{PullRequest: pr}, err
 }
 

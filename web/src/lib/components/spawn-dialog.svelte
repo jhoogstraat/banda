@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
+	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
+	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
 	import OptionMenu from '#lib/components/option-menu.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
-	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { api } from '#lib/api.js';
+	import { api, upload } from '#lib/api.js';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
 	import { threads } from '#lib/threads.svelte.js';
@@ -18,17 +20,19 @@
 	let error = $state('');
 	let busy = $state(false);
 
-	async function spawn(e?: Event) {
-		e?.preventDefault();
-		if (!prompt.trim() || busy) return;
+	// Attachments go with the first message and prompt, as on the new-thread page.
+	async function spawn({ text, attachments: files }: PromptInputMessage) {
+		if (!text.trim() || busy) return;
 		busy = true;
 		try {
-			const { thread: child } = await api.spawnThread({ parentId: thread.id, prompt, profile });
+			const attachments = await Promise.all(files.map((f) => upload(f.file)));
+			const { thread: child } = await api.spawnThread({ parentId: thread.id, prompt: text, profile, attachments });
 			open = false;
-			prompt = error = '';
+			error = '';
 			goto(`/t/${child!.id}`);
 		} catch (err) {
 			error = (err as Error).message;
+			throw err; // keeps the typed prompt and the files
 		} finally {
 			busy = false;
 		}
@@ -49,18 +53,23 @@
 				{#if threads.me?.id !== thread.ownerId}It is yours and runs on your Claude subscription.{/if}
 			</Dialog.Description>
 		</Dialog.Header>
-		<form class="space-y-3" onsubmit={spawn}>
-			<Textarea
-				bind:value={prompt}
-				rows={5}
-				placeholder="What should it work on?"
-				aria-label="Prompt"
-				onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && spawn(e)}
-			/>
-			{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
-			<Dialog.Footer class="items-center sm:justify-between">
-				<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
-				<Button type="submit" disabled={!prompt.trim() || busy}>Spawn</Button></Dialog.Footer>
-		</form>
+		{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
+		<PromptInput.Root onSubmit={spawn} {...attachLimits} onError={(e) => (error = e.message)}>
+			<fieldset disabled={busy} class="contents">
+				<PromptInput.Attachments class="px-2">
+					{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
+				</PromptInput.Attachments>
+				<PromptInput.Body>
+					<PromptInput.Textarea bind:value={prompt} placeholder="What should it work on?" class="min-h-28" />
+				</PromptInput.Body>
+				<PromptInput.Toolbar>
+					<PromptInput.Tools>
+						<AttachButton />
+						<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
+					</PromptInput.Tools>
+					<Button type="submit" size="sm" disabled={!prompt.trim() || busy}>Spawn</Button>
+				</PromptInput.Toolbar>
+			</fieldset>
+		</PromptInput.Root>
 	</Dialog.Content>
 </Dialog.Root>

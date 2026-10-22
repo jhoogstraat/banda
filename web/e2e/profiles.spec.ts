@@ -137,7 +137,7 @@ test('browser: the spawn dialog’s Profile chip starts at the parent’s and pi
 	const dialog = page.getByRole('dialog');
 	await dialog.getByRole('button', { name: 'Profile: Specification' }).click();
 	await page.getByRole('menuitemradio', { name: 'Business' }).click();
-	await dialog.getByRole('textbox', { name: 'Prompt' }).fill('e2e: a business sub-thread');
+	await dialog.getByPlaceholder('What should it work on?').fill('e2e: a business sub-thread');
 	await dialog.getByRole('button', { name: 'Spawn' }).click();
 	await expect(page).toHaveURL(/\/t\//);
 	await expect(page).not.toHaveURL(`/t/${parent.id}`);

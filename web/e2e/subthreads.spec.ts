@@ -1,5 +1,5 @@
 // The Banda MCP server, sub-threads and search.
-import { expect, mcpDirective, repo, Status, test } from './fixtures.ts';
+import { expect, mcpDirective, png, refused, repo, Status, test } from './fixtures.ts';
 
 test('the Banda MCP server is reachable from the sandbox', async ({ as }) => {
 	const t = await as('alice').create();
@@ -91,4 +91,26 @@ test('F5: agents spawn sub-threads only to a depth and only so many at once per 
 		await child.waitForStatus(Status.SUSPENDED);
 		expect(await root.mcp('create_thread', { prompt: 'e2e: sibling' })).toMatch(/thread_id/);
 	});
+});
+
+test('"Spawn sub-thread" takes attachments like a new thread: in the first message, images wait with the first prompt, only the spawner’s own uploads', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const parent = await alice.create();
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	await refused(bob.threads.spawnThread({ parentId: parent.id, prompt: 'e2e', attachments: [{ id: await alice.attach('dot.png', 'image/png', png) }] }));
+
+	const page = await bob.page();
+	await page.goto(`/t/${parent.id}`);
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await page.getByRole('menuitem', { name: /^Spawn a sub-thread/ }).click();
+	const dialog = page.getByRole('dialog');
+	await dialog.locator('input[type=file]').setInputFiles({ name: 'dot.png', mimeType: 'image/png', buffer: png });
+	await dialog.getByPlaceholder('What should it work on?').fill('e2e: what is in the picture');
+	await dialog.getByRole('button', { name: 'Spawn' }).click();
+	await expect(page).not.toHaveURL(`/t/${parent.id}`);
+	await expect(page).toHaveURL(/\/t\//);
+	const child = bob.thread(page.url().split('/t/')[1]);
+	await child.waitForStatus(Status.AWAITING_INPUT);
+	expect((await child.of('agentText')).map((a) => a.text)).toContain('Received 1 image blocks (image/png) and 0 text files');
+	expect((await child.of('message'))[0].attachments.map((a) => a.name)).toEqual(['dot.png']);
 });

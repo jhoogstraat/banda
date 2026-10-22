@@ -81,8 +81,8 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Several API replicas: Postgres `LISTEN/NOTIFY` fan-out; the in-memory "suspend after the turn" moves to the database.
 - [ ] A GitHub App (per-user OAuth) instead of personal tokens; webhooks as an add-on to polling for installs that can receive them.
 - [x] Pull requests: search on the forge in the repo picker; reviewers and labels from lists; resolving review threads; spotting a pull request the agent opened itself (fake forge only, like the rest).
-- [ ] Reviewers and labels in the create dialog, not only the Pull request tab.
-- [x] New threads and races with attachments; "Spawn sub-thread" with a profile chip; agents handing off through MCP (`handoff_thread`).
+- [x] Reviewers and labels in the create dialog, not only the Pull request tab.
+- [x] New threads and races with attachments; "Spawn sub-thread" with a profile chip and attachments; agents handing off through MCP (`handoff_thread`).
 - [x] Files tab ignore rules without git; adding a repository to a repo-less thread.
 - [ ] Per-thread preview origins (needs wildcard DNS).
 - [ ] Codex and other harnesses, only after checking their terms (non-goal until Claude Code is proven).

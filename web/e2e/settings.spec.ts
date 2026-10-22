@@ -1,6 +1,7 @@
 // A user's settings: the Claude login environment, secrets, the API key, the git identity, new threads' defaults,
 // notifications, the theme and the section nav.
 import { AuthMethod, AutoPushState, LoginAction, LoginState, PermissionMode, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
+import type { Page } from '@playwright/test';
 import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
 
 const loginState = async (u: User) => (await u.settings.getSettings({})).accounts[0]?.loginState;
@@ -98,11 +99,9 @@ test('defaults for new threads: set in Settings, the composer starts with them a
 	expect(await t.get()).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
 });
 
-test('notifications: the section enables them and turns a kind off in this browser', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
-	const page = await alice.page();
-	// The browser's Notification, recorded: asks once, then shows.
-	await page.addInitScript(() => {
+/** The browser's Notification, recorded: asks once, then shows. */
+const stubNotification = (page: Page) =>
+	page.addInitScript(() => {
 		const w = window as unknown as { shown: string[]; Notification: unknown };
 		w.shown = [];
 		w.Notification = class {
@@ -116,6 +115,11 @@ test('notifications: the section enables them and turns a kind off in this brows
 			close() {}
 		};
 	});
+
+test('notifications: the section enables them and turns a kind off in this browser', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const page = await alice.page();
+	await stubNotification(page);
 	const shown = () => page.evaluate(() => (window as unknown as { shown: string[] }).shown);
 	await page.goto('/settings#notifications');
 	const section = page.getByRole('region', { name: 'Notifications' });
@@ -159,8 +163,30 @@ test('the section nav links to every section; the shortcuts are listed', async (
 		await expect(nav.locator(`a[href="#${id}"]`)).toHaveCount(1);
 		await expect(page.locator(`section#${id}`)).toHaveCount(1);
 	}
+	// It marks the section in view, following clicks and scrolling.
+	const current = nav.locator('a[aria-current="location"]');
+	await expect(current).toHaveText('Claude Code');
+	await nav.getByRole('link', { name: 'Notifications' }).click();
+	await expect(current).toHaveText('Notifications');
 	await nav.getByRole('link', { name: 'Keyboard shortcuts' }).click();
 	const shortcuts = page.getByRole('region', { name: 'Keyboard shortcuts' });
 	await expect(shortcuts).toBeInViewport();
 	await expect(shortcuts.getByText('Command palette')).toBeVisible();
+	await expect(current).toHaveText('Keyboard shortcuts');
+	await page.locator('section#git').evaluate((s) => s.scrollIntoView());
+	await expect(current).toHaveText('Git identity');
+});
+
+test('the account menu’s "Enable notifications" asks the browser once, then links to the settings', async ({ as }) => {
+	const page = await as('alice').page();
+	await stubNotification(page);
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Account' }).click();
+	await page.getByRole('menuitem', { name: 'Enable notifications' }).click();
+	await expect.poll(() => page.evaluate(() => Notification.permission)).toBe('granted');
+	await page.getByRole('button', { name: 'Account' }).click();
+	await expect(page.getByRole('menuitem', { name: 'Enable notifications' })).toHaveCount(0);
+	await page.getByRole('menuitem', { name: 'Notifications' }).click();
+	await expect(page).toHaveURL(/\/settings#notifications$/);
+	await expect(page.getByRole('region', { name: 'Notifications' }).getByText('On in this browser.')).toBeVisible();
 });

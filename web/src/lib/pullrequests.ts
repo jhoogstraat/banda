@@ -115,3 +115,6 @@ export function duration(start?: Date, end?: Date): string {
 	const s = Math.max(0, Math.round(((end ?? new Date()).getTime() - start.getTime()) / 1000));
 	return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
+
+/** The logins typed for a review: comma- or space-separated, an @ allowed. */
+export const logins = (s: string) => s.split(/[\s,]+/).map((l) => l.replace(/^@/, '')).filter(Boolean);

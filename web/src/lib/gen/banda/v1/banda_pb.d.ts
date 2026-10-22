@@ -1776,6 +1776,13 @@ export declare type SpawnThreadRequest = Message$1<"banda.v1.SpawnThreadRequest"
    * @generated from field: string profile = 6;
    */
   profile: string;
+
+  /**
+   * As CreateThreadRequest's: the first message's and the first prompt's.
+   *
+   * @generated from field: repeated banda.v1.Attachment attachments = 7;
+   */
+  attachments: Attachment[];
 };
 
 /**
@@ -5163,6 +5170,19 @@ export declare type PullRequestCreateRequest = Message$1<"banda.v1.PullRequestCr
    * @generated from field: bool draft = 4;
    */
   draft: boolean;
+
+  /**
+   * Logins (GitLab: usernames) to ask for a review, and labels to add, right
+   * after it is opened.
+   *
+   * @generated from field: repeated string reviewers = 5;
+   */
+  reviewers: string[];
+
+  /**
+   * @generated from field: repeated string labels = 6;
+   */
+  labels: string[];
 };
 
 /**

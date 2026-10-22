@@ -158,6 +158,18 @@
 		['team-secrets', 'Team secrets'],
 		['shortcuts', 'Keyboard shortcuts']
 	];
+	// The nav marks the section in view: the last whose top has scrolled past the top, the last one at the bottom.
+	let scroller = $state<HTMLElement>();
+	let current = $state('claude');
+	function spy() {
+		if (!scroller) return;
+		const top = scroller.getBoundingClientRect().top + 32;
+		let at = sections[0][0];
+		for (const [id] of sections) if ((document.getElementById(id)?.getBoundingClientRect().top ?? Infinity) <= top) at = id;
+		if (scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) at = sections.at(-1)![0];
+		current = at;
+	}
+	$effect(spy);
 
 	// Secrets: the add form (?secret=NAME fills in the name, e.g. from a thread that needs GIT_TOKEN), and the row being replaced.
 	let name = $state(page.url.searchParams.get('secret') ?? '');
@@ -197,14 +209,19 @@
 <div class="flex min-w-0 flex-1 flex-col">
 	<PageHeader><h1 class="text-sm font-medium">Settings</h1></PageHeader>
 
-	<div class="min-h-0 flex-1 overflow-y-auto">
+	<div class="min-h-0 flex-1 overflow-y-auto" bind:this={scroller} onscroll={spy}>
 		<!-- The section nav: a sticky column on desktop, a row of links above the sections on a phone. -->
 		<div class="mx-auto w-full max-w-5xl p-4 md:flex md:gap-8">
 			<nav aria-label="Settings sections" class="mb-6 md:sticky md:top-4 md:mb-0 md:w-44 md:shrink-0 md:self-start">
 				<ul class="flex flex-wrap gap-1 md:flex-col">
 					{#each sections as [id, label] (id)}
 						<li>
-							<a href="#{id}" class="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">{label}</a>
+							<a
+								href="#{id}"
+								aria-current={current === id ? 'location' : undefined}
+								class="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
+								>{label}</a
+							>
 						</li>
 					{/each}
 				</ul>

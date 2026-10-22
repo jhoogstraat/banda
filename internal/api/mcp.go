@@ -323,7 +323,7 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			if err := s.checkFanOut(ctx, caller); err != nil {
 				return nil, createOut{}, err
 			}
-			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort, in.Profile, in.WakeParent)
+			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", &bandav1.Message{Text: in.Prompt}, in.RepoURL, in.BaseBranch, in.Model, in.Effort, in.Profile, in.WakeParent)
 			if err != nil {
 				return nil, createOut{}, err
 			}

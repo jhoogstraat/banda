@@ -703,6 +703,8 @@ message SpawnThreadRequest {
   string effort = 5;
   // Empty: the parent's.
   string profile = 6;
+  // As CreateThreadRequest's: the first message's and the first prompt's.
+  repeated Attachment attachments = 7;
 }
 
 message SpawnThreadResponse {
@@ -1629,6 +1631,10 @@ message PullRequestCreateRequest {
   string title = 2;
   string body = 3;
   bool draft = 4;
+  // Logins (GitLab: usernames) to ask for a review, and labels to add, right
+  // after it is opened.
+  repeated string reviewers = 5;
+  repeated string labels = 6;
 }
 
 message PullRequestCreateResponse {

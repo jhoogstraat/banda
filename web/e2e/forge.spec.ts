@@ -154,6 +154,31 @@ test('a self-hosted GitLab (FORGE_HOSTS): link the open merge request of the bra
 	await expect(page.getByRole('button', { name: 'MR !1 · Merged' })).toBeVisible();
 });
 
+test('the create dialog asks for reviewers and adds labels from the forge’s lists', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge);
+	const page = await open(alice, t.id);
+	await page.getByRole('button', { name: 'Create a pull request' }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog.locator('#pr-create-reviewer-choices option')).toHaveCount(4);
+	await dialog.getByLabel('Reviewers to ask').fill('bob, @carol');
+	await dialog.getByLabel('Add label').selectOption('bug');
+	await dialog.getByLabel('Add label').selectOption('ui');
+	await dialog.getByRole('button', { name: 'Remove label ui' }).click();
+	await expect(dialog.getByRole('button', { name: 'Remove label bug' })).toBeVisible();
+	await dialog.getByRole('button', { name: 'Create pull request' }).click();
+	await expect(dialog).toBeHidden();
+	expect(forge.pull(1)).toMatchObject({ reviewers: ['bob', 'carol'], labels: ['e2e', 'bug'] }); // the fake opens it with e2e
+	await page.getByRole('button', { name: /^PR #1/ }).click();
+	await expect(pane(page).getByRole('region', { name: 'Reviewers' })).toContainText('carolReview requested');
+	await expect(pane(page).getByRole('button', { name: 'Remove label bug' })).toBeVisible();
+});
+
+test('GitLab: a merge request created with reviewers and labels gets them', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge, { FORGE_HOSTS: 'github.com=gitlab' });
+	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: '', reviewers: ['bob'], labels: ['bug'] });
+	expect(forge.pull(1)).toMatchObject({ reviewers: ['bob'], labels: ['e2e', 'bug'] });
+});
+
 test('the new-thread composer lists my repositories from the forge, filtered as I type and searched on the forge', async ({ as, startApi, forge }) => {
 	const api = await startApi({ TEST_FORGE_URL: forge.url });
 	const alice = as('alice', api);
