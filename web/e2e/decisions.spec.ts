@@ -14,8 +14,10 @@ function inbox(u: User) {
 	return { ...l, latest };
 }
 
-test('the inbox lists what I can decide: my agent’s permission requests and plans, teammates’ turn requests; trusted teammates get the permission requests, never the plan', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+test('the inbox lists what I can decide: my agent’s permission requests and plans, teammates’ turn requests; trusted teammates get the permission requests, never the plan', async ({ as, startApi }) => {
+	// A world of its own: a trusted thread's requests are every user's decisions, other tests' users too.
+	const api = await startApi();
+	const [alice, bob] = [as('alice', api), as('bob', api)];
 	const t = await alice.create({ prompt: 'e2e: permissions', permissionMode: PermissionMode.ASK });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [mine, theirs] = [inbox(alice), inbox(bob)];
@@ -55,8 +57,9 @@ test('the inbox lists what I can decide: my agent’s permission requests and pl
 	theirs.stop();
 });
 
-test('the Decisions page: requests appear live; y allows, n denies with a note, a always allows, o opens the thread at the card; the header says what the thread waits for', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+test('the Decisions page: requests appear live; y allows, n denies with a note, a always allows, o opens the thread at the card; the header says what the thread waits for', async ({ as, startApi }) => {
+	const api = await startApi(); // only this test's decisions: other tests trust teammates
+	const [alice, bob] = [as('alice', api), as('bob', api)];
 	const t = await alice.create({ prompt: 'e2e: permissions', permissionMode: PermissionMode.ASK });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const page = await alice.page();
@@ -132,7 +135,7 @@ test('the Decisions page works on a phone: the cards’ own buttons answer', asy
 	const page = await alice.page({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 	await page.goto('/decisions');
 	await t.as(bob).send('@agent e2e: from bob', { mentionsAgent: true });
-	const card = page.getByRole('article', { name: /^Decision in / });
+	const card = page.getByRole('article', { name: 'Decision in e2e', exact: true });
 	await card.getByRole('button', { name: 'Approve', exact: true }).tap();
 	await expect(card).toHaveCount(0);
 	await t.waitFor('the approved turn', (i) => i.turnRequests === 0);
