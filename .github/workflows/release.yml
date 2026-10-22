@@ -43,7 +43,7 @@ jobs:
       - run: mkdir digests && touch "digests/${DIGEST#sha256:}"
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.image }}-${{ matrix.platform.arch }}
           path: digests/*
