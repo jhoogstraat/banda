@@ -225,6 +225,7 @@ Everything below is implemented on `main` and checked by `mise run e2e` against 
 - Preview: one preview cookie per browser, so two windows previewing different threads share the one opened last until reloaded; per-thread origins would need wildcard DNS. The preview origin shares the host (and so cookies) with Banda, and the previewed apps of all threads share it with each other: for a hardened setup, serve Banda over https and point `PREVIEW_URL` at a sibling subdomain (see open risk 6). The address bar can't follow navigation inside the frame (cross-origin).
 - Forks: commit history is squashed into one commit and binary files don't carry over (the stored diff has neither); a fork's first prompt has the source's messages and replies, not its tool calls. The compare view polls while a try runs.
 - Threads without a repository: nothing shows what a turn changed (no diff), the Files tab has no ignore rules (a big `node_modules` crowds the list past 5000 files), and a repository can't be added later.
+- Egress allowlist: APIs sharing a sandbox namespace apply their own `SANDBOX_EGRESS_ALLOW` at startup, so in dev the last checkout's `mise run api` wins (one without the setting deletes the policy).
 - Codex and other harnesses (check their subscription terms first).
 - Several API replicas (needs `LISTEN/NOTIFY` fan-out).
 
