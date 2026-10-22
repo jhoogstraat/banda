@@ -89,7 +89,7 @@ type (
 	}
 	createIn struct {
 		Prompt     string `json:"prompt" jsonschema:"the task for the new thread's agent"`
-		RepoURL    string `json:"repo_url,omitempty" jsonschema:"git repository to clone (default: this thread's)"`
+		RepoURL    string `json:"repo_url,omitempty" jsonschema:"git repository to clone (default: this thread's, none if it has none)"`
 		BaseBranch string `json:"base_branch,omitempty" jsonschema:"branch to start from (default: this thread's branch if it was pushed, else this thread's base branch)"`
 		Model      string `json:"model,omitempty" jsonschema:"model (default: this thread's)"`
 		Effort     string `json:"effort,omitempty" jsonschema:"effort (default: this thread's)"`
@@ -186,8 +186,12 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			}
 			names := s.names(ctx)
 			var b strings.Builder
-			fmt.Fprintf(&b, "Thread %s: %s\nOwner: %s (%s)\nStatus: %s, mode: %s, profile: %s\nRepo: %s, branch %s\nUpdated: %s\n\nTranscript:\n%s\n",
-				t.ID, t.Title, actorName(names, t.OwnerID), t.OwnerID, t.Status, t.Mode, t.Profile, t.RepoURL, t.Branch,
+			repo := "none"
+			if t.RepoURL != "" {
+				repo = t.RepoURL + ", branch " + t.Branch
+			}
+			fmt.Fprintf(&b, "Thread %s: %s\nOwner: %s (%s)\nStatus: %s, mode: %s, profile: %s\nRepo: %s\nUpdated: %s\n\nTranscript:\n%s\n",
+				t.ID, t.Title, actorName(names, t.OwnerID), t.OwnerID, t.Status, t.Mode, t.Profile, repo,
 				t.UpdatedAt.Format(time.RFC3339), transcript(names, events, limit))
 			if in.IncludeDiff {
 				d := t.Diff

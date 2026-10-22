@@ -7,7 +7,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { projectName, threads, unread, userName } from '#lib/threads.svelte.js';
+	import { noRepo, projectName, projectOf, threads, unread, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	// Everyone's recent, unsettled threads, live from TeamWatch.
@@ -34,11 +34,11 @@
 	});
 
 	const me = $derived(threads.me?.id ?? '');
-	const projects = $derived([...new Set(board.map((t) => t.repoUrl))]);
+	const projects = $derived([...new Set(board.map(projectOf))]);
 	// Paused threads sink; otherwise most recently active first (the server's order).
 	const shown = $derived(
 		board
-			.filter((t) => !threads.project || t.repoUrl === threads.project)
+			.filter((t) => !threads.project || projectOf(t) === threads.project)
 			.toSorted((a, b) => Number(a.status === Status.SUSPENDED) - Number(b.status === Status.SUSPENDED))
 	);
 	// One column per person: me first, then whoever was active most recently. Quiet teammates are listed at the end.
@@ -79,7 +79,7 @@
 					<DropdownMenu.RadioGroup bind:value={threads.project}>
 						<DropdownMenu.RadioItem value="">All projects</DropdownMenu.RadioItem>
 						{#each projects as p (p)}
-							<DropdownMenu.RadioItem value={p} title={p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
+							<DropdownMenu.RadioItem value={p} title={p === noRepo ? undefined : p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
 						{/each}
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>

@@ -10,7 +10,7 @@
 	import { NativeSelect, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import { api } from '#lib/api.js';
 	import { SearchKind, type SearchResult } from '#lib/gen/banda/v1/banda_pb.js';
-	import { projectName, projects, threads } from '#lib/threads.svelte.js';
+	import { noRepo, projectName, projects, threads } from '#lib/threads.svelte.js';
 
 	// Everything the team and its agents said, searchable; the filters live in the URL so a search can be shared.
 	const p = page.url.searchParams;
@@ -42,7 +42,8 @@
 			replaceState(`?${new URLSearchParams(Object.entries(f).filter(([, v]) => v))}`, {});
 			if (!q.trim()) return (results = undefined);
 			try {
-				const res = await api.search({ query: q, actor, repoUrl: repo, kind: kinds[kind], after: day(after), before: day(before, 1), limit: 50 });
+				const repoUrl = repo === noRepo ? '' : repo || undefined; // unset is any project
+				const res = await api.search({ query: q, actor, repoUrl, kind: kinds[kind], after: day(after), before: day(before, 1), limit: 50 });
 				if (n === asked) [results, error] = [res.results, ''];
 			} catch (e) {
 				if (n === asked) error = ConnectError.from(e).rawMessage;

@@ -31,8 +31,18 @@ type setup struct {
 }
 
 // prepare runs the setup steps. When it returns an error, the failed step
-// has been reported.
+// has been reported. Without a repository there is only the login: the agent
+// works in an empty folder on the thread's volume.
 func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(string) error, loginStatus func(bool) error, forkPatch func(context.Context) (*bandav1.ForkPatchResponse, error)) error {
+	if repoURL == "" {
+		_, err := os.Stat(work)
+		s := setup{send: send, fresh: err != nil}
+		if err := os.MkdirAll(work, 0o755); err != nil {
+			s.report("folder", "Create the working folder", bandav1.SetupState_SETUP_STATE_FAILED, err.Error())
+			return err
+		}
+		return s.login(ctx, notice, loginStatus)
+	}
 	_, err := os.Stat(filepath.Join(work, ".git"))
 	s := setup{send: send, fresh: err != nil}
 	title := "Check out " + os.Getenv("BANDA_BRANCH")
@@ -72,7 +82,11 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 	} else if err := s.once(ctx, "setup", script, b, "bash .banda/setup.sh"); err != nil {
 		return err
 	}
+	return s.login(ctx, notice, loginStatus)
+}
 
+// login waits for the subscription login, or checks for the API key.
+func (s setup) login(ctx context.Context, notice func(string) error, loginStatus func(bool) error) error {
 	if !apiKey {
 		return s.waitForLogin(ctx, notice, loginStatus)
 	}

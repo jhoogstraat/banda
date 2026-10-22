@@ -80,3 +80,23 @@ spec:
   ports:
     - port: 5556
       nodePort: 30556
+---
+# Like Postgres's (deploy/postgres.yaml): the API and browsers (through the
+# NodePort or a port-forward) reach Dex, sandboxes don't, even when an allowed
+# range (SANDBOX_EGRESS_ALLOW) covers it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dex
+  namespace: banda
+spec:
+  podSelector:
+    matchLabels:
+      app: dex
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: banda-api}}
+        - ipBlock: {cidr: 0.0.0.0/0, except: [10.244.0.0/16]} # kind's pod network
+      ports:
+        - port: 5556

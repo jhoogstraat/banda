@@ -34,6 +34,7 @@ var (
 	threadID  = os.Getenv("BANDA_THREAD_ID")
 	loginUser = os.Getenv("BANDA_LOGIN_USER_ID")
 	apiKey    = os.Getenv("BANDA_AUTH_METHOD") == "api_key" // the user chose an API key over their subscription
+	repoURL   = os.Getenv("BANDA_REPO_URL")                 // empty: no repository, work is an empty folder
 	work      = filepath.Join(os.Getenv("HOME"), "work")
 	base      = "origin/" + os.Getenv("BANDA_BASE_BRANCH")
 	// errSetup: preparing the environment failed in a way a restart won't fix,
@@ -289,6 +290,8 @@ func run(ctx context.Context) error {
 				if turnEnded {
 					authNoticed = false
 					perms.clear()
+				}
+				if turnEnded && repoURL != "" { // without a repository there is no diff and nothing to push
 					d := redact(diff(ctx))
 					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: d}}}); err != nil {
 						return err

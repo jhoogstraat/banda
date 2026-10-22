@@ -8,12 +8,14 @@ import (
 )
 
 // SearchQuery filters by every field that is set. Kind is "people",
-// "agent" or "code" (tool calls and review comments).
+// "agent" or "code" (tool calls and review comments). RepoURL is set when
+// not nil: empty is the threads without a repository.
 type SearchQuery struct {
-	Words                string
-	Actor, RepoURL, Kind string
-	After, Before        *time.Time
-	Limit                int
+	Words         string
+	Actor, Kind   string
+	RepoURL       *string
+	After, Before *time.Time
+	Limit         int
 }
 
 type SearchHit struct {
@@ -62,7 +64,7 @@ WITH hits AS (
   FROM events e, to_tsquery('english', $1) q
   WHERE e.search @@ q
     AND ($2 = '' OR e.body->>'actor' = $2)
-    AND ($3 = '' OR e.thread_id IN (SELECT id FROM threads WHERE repo_url = $3))
+    AND ($3::text IS NULL OR e.thread_id IN (SELECT id FROM threads WHERE repo_url = $3))
     AND ($4 = '' OR $4 = `+searchKind+` OR $4 = 'code' AND jsonb_array_length(coalesce(`+searchReview+`, '[]')) > 0)
     AND ($5::timestamptz IS NULL OR (e.body->>'time')::timestamptz >= $5)
     AND ($6::timestamptz IS NULL OR (e.body->>'time')::timestamptz < $6)
