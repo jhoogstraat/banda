@@ -9,12 +9,14 @@
 	import SplitIcon from '@lucide/svelte/icons/split';
 	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
+	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import OptionMenu, { efforts, models, raceTries, tryOptions } from '#lib/components/option-menu.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import RepoPicker from '#lib/components/repo-picker.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { api, settingsApi } from '#lib/api.js';
+	import { api, settingsApi, upload } from '#lib/api.js';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { AuthMethod, LoginState, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes } from '#lib/permissions.js';
@@ -63,7 +65,7 @@
 	let busy = $state(false);
 	let error = $state('');
 
-	async function submit({ text }: { text: string }) {
+	async function submit({ text, attachments: files }: PromptInputMessage) {
 		if (!text.trim()) return;
 		if (!repoUrl) {
 			error = 'Choose a repository first.';
@@ -74,13 +76,14 @@
 		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
 		const repo = repoUrl === noRepo ? '' : repoUrl;
 		try {
+			const attachments = await Promise.all(files.map((f) => upload(f.file)));
 			const race = raceTries(tries, model, effort);
 			const permissionMode = permissionModes[permissions] ?? PermissionMode.BYPASS;
 			if (race.length > 1) {
-				const { threads } = await api.race({ repoUrl: repo, baseBranch, prompt: text, tries: race, permissionMode, profile });
+				const { threads } = await api.race({ repoUrl: repo, baseBranch, prompt: text, tries: race, permissionMode, profile, attachments });
 				await goto(`/compare?race=${threads[0].raceId}`);
 			} else {
-				const { thread } = await api.createThread({ repoUrl: repo, baseBranch, model, effort, prompt: text, permissionMode, profile });
+				const { thread } = await api.createThread({ repoUrl: repo, baseBranch, model, effort, prompt: text, permissionMode, profile, attachments });
 				await goto(`/t/${thread!.id}`);
 			}
 		} catch (err) {
@@ -117,13 +120,17 @@
 			</div>
 		{/if}
 		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
-		<PromptInput.Root onSubmit={submit}>
+		<PromptInput.Root onSubmit={submit} {...attachLimits} onError={(e) => (error = e.message)}>
 			<fieldset disabled={busy} class="contents">
+				<PromptInput.Attachments class="px-2">
+					{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
+				</PromptInput.Attachments>
 				<PromptInput.Body>
 					<PromptInput.Textarea placeholder="Describe the task. Enter sends, Shift+Enter adds a line." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar>
 					<PromptInput.Tools class="min-w-0 flex-wrap">
+						<AttachButton />
 						<RepoPicker bind:repoUrl bind:baseBranch />
 						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
 						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />

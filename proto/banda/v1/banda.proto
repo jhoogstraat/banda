@@ -559,6 +559,9 @@ message CreateThreadRequest {
   PermissionMode permission_mode = 6;
   // Empty: the owner's default profile.
   string profile = 7;
+  // Files uploaded with POST /files, as for Message: the first message's and
+  // the first prompt's.
+  repeated Attachment attachments = 8;
 }
 
 message CreateThreadResponse {
@@ -679,6 +682,8 @@ message SpawnThreadRequest {
   string base_branch = 3;
   string model = 4;
   string effort = 5;
+  // Empty: the parent's.
+  string profile = 6;
 }
 
 message SpawnThreadResponse {
@@ -1361,6 +1366,8 @@ message RaceRequest {
   PermissionMode permission_mode = 5;
   // Every try's; empty: the caller's default profile.
   string profile = 6;
+  // Every try's first message's, as for CreateThread.
+  repeated Attachment attachments = 7;
 }
 
 message RaceResponse {

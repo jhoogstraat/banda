@@ -1230,6 +1230,14 @@ export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadReques
    * @generated from field: string profile = 7;
    */
   profile: string;
+
+  /**
+   * Files uploaded with POST /files, as for Message: the first message's and
+   * the first prompt's.
+   *
+   * @generated from field: repeated banda.v1.Attachment attachments = 8;
+   */
+  attachments: Attachment[];
 };
 
 /**
@@ -1752,6 +1760,13 @@ export declare type SpawnThreadRequest = Message$1<"banda.v1.SpawnThreadRequest"
    * @generated from field: string effort = 5;
    */
   effort: string;
+
+  /**
+   * Empty: the parent's.
+   *
+   * @generated from field: string profile = 6;
+   */
+  profile: string;
 };
 
 /**
@@ -4361,6 +4376,13 @@ export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
    * @generated from field: string profile = 6;
    */
   profile: string;
+
+  /**
+   * Every try's first message's, as for CreateThread.
+   *
+   * @generated from field: repeated banda.v1.Attachment attachments = 7;
+   */
+  attachments: Attachment[];
 };
 
 /**

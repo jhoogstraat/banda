@@ -23,7 +23,7 @@ The permission chip in the composer sets what the agent asks for in that thread:
 
 ## Profiles
 
-The profile chip in the composer sets who the agent works with in that thread: **Engineer** (Claude Code as it is, the default), **Specification** (talks through what you want in plain language and writes it up as a spec with you; once you confirm it, an Engineer sub-thread builds it, and the agent tells you what came of it), **DevOps** (explores and explains production with the credentials in your environment, read-only first, asking before any change) or **Business** (does business work for you, such as documents, data and automation, and shows results, not code). A profile changes how the agent talks and works with you, never what it may do. Settings sets the profile new threads start with; the owner switches it in a thread, applied once the agent's turns have ended.
+The profile chip in the composer sets who the agent works with in that thread: **Engineer** (Claude Code as it is, the default), **Specification** (talks through what you want in plain language and writes it up as a spec with you; once you confirm it, an Engineer sub-thread builds it, and the agent tells you what came of it), **DevOps** (explores and explains production with the credentials in your environment, read-only first, asking before any change) or **Business** (does business work for you, such as documents, data and automation, and shows results, not code). A profile changes how the agent talks and works with you, never what it may do. Settings sets the profile new threads start with; the owner switches it in a thread, applied once the agent's turns have ended. A sub-thread starts with its parent's; the spawn dialog's chip picks another.
 
 ## Work without a repository
 

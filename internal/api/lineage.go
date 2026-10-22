@@ -18,7 +18,7 @@ func (s *Service) SpawnThread(ctx context.Context, req *bandav1.SpawnThreadReque
 	if err != nil {
 		return nil, err
 	}
-	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort, "", false)
+	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort, req.Profile, false)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 	}
 	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, ParentID: parent.ID, RepoURL: repo,
 		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort), Profile: or(profile, parent.Profile),
-		PermissionMode: parent.PermissionMode, WakeParent: wake}, by, prompt) // an agent's sub-thread asks no less than it does
+		PermissionMode: parent.PermissionMode, WakeParent: wake}, by, &bandav1.Message{Text: prompt}) // an agent's sub-thread asks no less than it does
 	if err != nil {
 		return child, err
 	}

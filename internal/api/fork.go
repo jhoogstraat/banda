@@ -84,8 +84,10 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 }
 
 func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.RaceResponse, error) {
-	if strings.TrimSpace(req.Prompt) == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
+	first := &bandav1.Message{Text: req.Prompt, Attachments: req.Attachments}
+	prompt, images, err := s.firstPrompt(ctx, first, user(ctx))
+	if err != nil {
+		return nil, err
 	}
 	if err := checkRepoURL(req.RepoUrl); err != nil {
 		return nil, err
@@ -108,10 +110,11 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 			Model:          try.Model,
 			Effort:         try.Effort,
 			Profile:        req.Profile,
-			PendingPrompt:  req.Prompt,
+			PendingPrompt:  prompt,
+			PendingImages:  images,
 			RaceID:         race,
 			PermissionMode: mode,
-		}, user(ctx), &bandav1.Message{Text: req.Prompt})
+		}, user(ctx), first)
 		if err != nil {
 			return nil, err
 		}

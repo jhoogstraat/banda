@@ -22,7 +22,7 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 		return nil, err
 	}
 	t, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: user(ctx)}, RepoURL: req.RepoUrl,
-		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, Profile: req.Profile, PermissionMode: mode}, user(ctx), req.Prompt)
+		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, Profile: req.Profile, PermissionMode: mode}, user(ctx), &bandav1.Message{Text: req.Prompt, Attachments: req.Attachments})
 	if err != nil {
 		return nil, err
 	}
@@ -30,14 +30,33 @@ func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadReq
 }
 
 // create starts a thread (owner, repo, base, model, effort, profile, permission
-// mode and parent taken from t, see start) with its first prompt, posted by `by`.
-func (s *Service) create(ctx context.Context, t store.Thread, by, prompt string) (store.Thread, error) {
-	if strings.TrimSpace(prompt) == "" {
-		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
+// mode and parent taken from t, see start) with its first message, posted by `by`.
+func (s *Service) create(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
+	var err error
+	if t.PendingPrompt, t.PendingImages, err = s.firstPrompt(ctx, first, by); err != nil {
+		return t, err
 	}
-	t.Title, t.PendingPrompt = title(prompt), prompt
+	t.Title = title(first.Text)
 	t.Status, t.Mode = thread.Starting, thread.AgentMode
-	return s.start(ctx, t, by, &bandav1.Message{Text: prompt})
+	return s.start(ctx, t, by, first)
+}
+
+// firstPrompt is a new thread's first prompt, from its first message (whose
+// attachments it checks): text files inlined, images named in the text and
+// returned as ids, which wait with the prompt while the environment starts.
+func (s *Service) firstPrompt(ctx context.Context, m *bandav1.Message, by string) (string, []string, error) {
+	if strings.TrimSpace(m.Text) == "" {
+		return "", nil, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
+	}
+	if err := s.checkAttachments(ctx, m, by); err != nil {
+		return "", nil, err
+	}
+	texts, err := textAttachments(ctx, s.store, []*bandav1.Message{m})
+	if err != nil {
+		return "", nil, err
+	}
+	prompt, images := messageBody(m, texts)
+	return prompt, images, nil
 }
 
 // scpLike is git's short ssh form, user@host:path.

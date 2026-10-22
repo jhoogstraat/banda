@@ -10,7 +10,7 @@
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
-	import AttachButton from '#lib/components/attach-button.svelte';
+	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
 	import Plan from '#lib/components/plan.svelte';
@@ -100,7 +100,7 @@
 	{#if error}<p role="alert" class="mb-2 text-sm text-destructive">{error}</p>{/if}
 	{#if thread}<ThreadBanners {thread} />{/if}
 	<Plan plan={chat.plan} />
-	<PromptInput.Root onSubmit={send} multiple maxFiles={5} maxFileSize={5 << 20} onError={(e) => (error = e.message)}>
+	<PromptInput.Root onSubmit={send} {...attachLimits} onError={(e) => (error = e.message)}>
 		<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 			<PromptInput.Attachments class="px-2">
 				{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}

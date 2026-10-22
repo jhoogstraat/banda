@@ -19,22 +19,29 @@ import (
 // conversation and the briefing the agent wrote for them.
 
 func (s *Service) HandoffOffer(ctx context.Context, req *bandav1.HandoffOfferRequest) (*bandav1.HandoffOfferResponse, error) {
-	by, to, note := user(ctx), req.ToUserId, strings.TrimSpace(req.Note)
+	return &bandav1.HandoffOfferResponse{}, s.offer(ctx, req.ThreadId, user(ctx), user(ctx), req.ToUserId, req.Note)
+}
+
+// offer offers thread id to the teammate `to` for its owner `by`, posted as
+// actor: the owner, or their agent ("agent:<id>", through MCP), whose note is
+// its briefing: the offer then gives no reason for lacking one.
+func (s *Service) offer(ctx context.Context, id, by, actor, to, note string) error {
+	note = strings.TrimSpace(note)
 	names := s.names(ctx)
 	if names[to] == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "no such teammate")
+		return connect.NewError(connect.CodeInvalidArgument, "no such teammate")
 	}
 	var effect thread.Effect
 	var prompt string
 	var images []string
-	unlock := s.lockDelivery(req.ThreadId)
+	unlock := s.lockDelivery(id)
 	var stored []*bandav1.Event
 	err := retryStale(func() error {
-		u, err := s.readUnseen(ctx, req.ThreadId, nil)
+		u, err := s.readUnseen(ctx, id, nil)
 		if err != nil {
 			return err
 		}
-		_, stored, err = s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		_, stored, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 			next, eff, err := thread.Apply(t.State, thread.Offer{By: by, To: to})
 			if err != nil {
 				return nil, err
@@ -46,11 +53,11 @@ func (s *Service) HandoffOffer(ctx context.Context, req *bandav1.HandoffOfferReq
 					return nil, err
 				}
 				prompt, images = turnPrompt(t, eff, names, u.events, by, &bandav1.Message{Text: briefingRequest(names, by, to, note)}, u.texts)
-			} else {
+			} else if actor == by {
 				offer.NoBriefing = map[thread.Status]string{thread.Working: "the agent is working", thread.Suspended: "the environment is paused",
 					thread.Starting: "the environment is starting", thread.Errored: "the environment is unavailable"}[t.Status]
 			}
-			events := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_HandoffOffered{HandoffOffered: offer}}}, stateEvents(t.State, next)...)
+			events := append([]*bandav1.Event{{Actor: actor, Kind: &bandav1.Event_HandoffOffered{HandoffOffered: offer}}}, stateEvents(t.State, next)...)
 			t.State = next
 			return events, nil
 		})
@@ -58,15 +65,15 @@ func (s *Service) HandoffOffer(ctx context.Context, req *bandav1.HandoffOfferReq
 	})
 	if err != nil {
 		unlock()
-		return nil, err
+		return err
 	}
-	s.broadcast(req.ThreadId, stored)
+	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, req.ThreadId, prompt, images)
+		s.deliver(ctx, id, prompt, images)
 	}
 	unlock()
 	s.pokeInbox(to)
-	return &bandav1.HandoffOfferResponse{}, nil
+	return nil
 }
 
 // briefingRequest asks the agent, as the owner's last turn, to brief the
@@ -168,7 +175,10 @@ func handoffPrompt(names map[string]string, t store.Thread, events []*bandav1.Ev
 		"This is a new Claude Code session: the checkout holds all the work so far. The conversation so far (people's messages and your replies, without tool calls):\n\n",
 		t.ID, t.Title, t.Branch, actorName(names, t.OwnerID), actorName(names, to))
 	b.WriteString(conversation(names, said))
-	if note := offer.GetHandoffOffered().GetNote(); note != "" {
+	note := offer.GetHandoffOffered().GetNote()
+	if strings.HasPrefix(offer.GetActor(), "agent:") { // the agent's own briefing
+		briefing = append([]string{note}, briefing...)
+	} else if note != "" {
 		fmt.Fprintf(&b, "\n\n%s's note on the handover: %s", actorName(names, t.OwnerID), note)
 	}
 	if len(briefing) > 0 {

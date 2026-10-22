@@ -1,7 +1,7 @@
 // Handing a thread to a teammate (HandoffOffer); handoff.spec.ts is the Specification agent's handoff to an Engineer.
 // Handing a thread to a teammate: the offer and briefing, accepting (the environment restarts as theirs),
 // declining, cancelling, and who may do what.
-import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
+import { expect, kube, mcpDirective, refused, Status, test, userHash, type User } from './fixtures.ts';
 
 /** A teammate who has signed in once, so others can hand them threads. */
 const teammate = async (u: User) => (await u.users.me({}), u);
@@ -121,4 +121,22 @@ test('in the browser: alice hands off from the header, bob accepts from the card
 	await expect(card.getByText(`${bob.id} accepted`)).toBeVisible();
 	await t.as(bob).waitFor('to be bob’s and idle', (x) => x.ownerId === bob.id && x.status === Status.AWAITING_INPUT);
 	await expect(await menu(bobs)).toBeVisible();
+});
+
+test('an agent offers its own thread through MCP (handoff_thread): the same card, by the agent, with its briefing; the teammate still accepts and the new session gets the briefing', async ({ as }) => {
+	const [alice, bob] = [await teammate(as('alice')), await teammate(as('bob'))];
+	const briefing = 'Done: the file. Next: tests. e2e-echo';
+	const t = await alice.create({ prompt: mcpDirective('handoff_thread', { to: bob.id, briefing }) });
+	await t.waitForStatus(Status.AWAITING_INPUT); // its turn wrote no other briefing
+	expect(await t.reply()).toBe(`MCP handoff_thread: Offered this thread to ${bob.id}; they still have to accept it.`);
+	const offers = (await t.events()).filter((e) => e.kind.case === 'handoffOffered');
+	expect(offers.map((e) => [e.actor, e.kind.value])).toMatchObject([[`agent:${t.id}`, { toUserId: bob.id, note: briefing, noBriefing: '' }]]);
+	expect((await t.get()).ownerId).toBe(alice.id);
+	expect((await bob.threads.listMentioned({})).threads.map((x) => x.id)).toContain(t.id);
+	expect(await t.mcp('handoff_thread', { to: 'nobody-e2e', briefing })).toContain('no such teammate');
+
+	const bt = t.as(bob);
+	await bt.turn(() => bob.threads.handoffAccept({ threadId: t.id }));
+	expect((await bt.get()).ownerId).toBe(bob.id);
+	expect((await bt.prompts()).at(-1)).toContain(`Your briefing for ${bob.id}, written before the handover:\n\n${briefing}`);
 });

@@ -97,6 +97,10 @@ type (
 		Profile    string `json:"profile,omitempty" jsonschema:"who the new agent works with: engineer, spec, devops or business (default: this thread's)"`
 		WakeParent bool   `json:"wake_parent,omitempty" jsonschema:"when the sub-thread finishes its turns or fails, also start a turn of yours to act on it (default false)"`
 	}
+	handoffIn struct {
+		To       string `json:"to" jsonschema:"the teammate to hand this thread to: their user id or name (see owner_id and owner_name in list_threads)"`
+		Briefing string `json:"briefing" jsonschema:"for them: the state of the work, what's done, what's next and the open risks"`
+	}
 	createOut struct {
 		ThreadID string `json:"thread_id"`
 	}
@@ -326,6 +330,22 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, createOut{child.ID}, nil
 		})
 
+	addTool(ts, &mcp.Tool{Name: "handoff_thread", Description: "Offer this thread to a teammate, for the person you work for, when they asked you to hand it over: its next turns would run on the teammate's Claude subscription with their secrets, in a new Claude Code session that gets the conversation and your briefing. " +
+		"It only posts the offer in this thread's chat; the teammate accepts or declines it, and your owner can cancel it. One offer at a time."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in handoffIn) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(in.Briefing) == "" {
+				return nil, nil, connect.NewError(connect.CodeInvalidArgument, "a briefing is required")
+			}
+			to, err := s.teammate(ctx, in.To)
+			if err != nil {
+				return nil, nil, err
+			}
+			if err := s.offer(ctx, caller.ID, caller.OwnerID, "agent:"+caller.ID, to, in.Briefing); err != nil {
+				return nil, nil, err
+			}
+			return textResult("Offered this thread to " + actorName(s.names(ctx), to) + "; they still have to accept it."), nil, nil
+		})
+
 	addTool(ts, &mcp.Tool{Name: "read_pull_request", Description: "Read a thread's pull request (GitLab: merge request), this thread's by default: its state, checks with their status and links (failing first), reviewers and their verdicts, mergeability, description and the conversation, review comments with their file and line. Use it to act on failing checks and review comments. Banda refreshes it from the forge every few minutes; refresh fetches it now."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in prIn) (*mcp.CallToolResult, any, error) {
 			res, err := s.PullRequestGet(WithUser(ctx, caller.OwnerID), &bandav1.PullRequestGetRequest{ThreadId: or(in.ThreadID, caller.ID), Refresh: in.Refresh})
@@ -348,11 +368,28 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 
 	srv := mcp.NewServer(&mcp.Implementation{Name: "banda", Version: "1"}, &mcp.ServerOptions{SchemaCache: mcpSchemas,
 		Instructions: "Banda's tools (" + strings.Join(ts.names, ", ") + ") let you see the team's other threads, search them, " +
-			"post into them and start sub-threads of this one."})
+			"post into them, start sub-threads of this one and offer it to a teammate."})
 	for _, add := range ts.add {
 		add(srv)
 	}
 	return srv
+}
+
+// teammate is the id of the user with that id or (case-insensitively) name.
+func (s *Service) teammate(ctx context.Context, idOrName string) (string, error) {
+	var found []string
+	for id, name := range s.names(ctx) {
+		if id == idOrName {
+			return id, nil
+		}
+		if strings.EqualFold(name, strings.TrimSpace(idOrName)) {
+			found = append(found, id)
+		}
+	}
+	if len(found) != 1 {
+		return "", connect.NewError(connect.CodeInvalidArgument, "no such teammate, or several by that name: use their user id")
+	}
+	return found[0], nil
 }
 
 // transcript renders the last limit lines of a thread's history: messages,

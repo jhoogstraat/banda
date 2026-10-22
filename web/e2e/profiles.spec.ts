@@ -70,6 +70,8 @@ test('sub-threads (people’s and agents’), forks and races keep the profile; 
 	await parent.waitForStatus(Status.AWAITING_INPUT);
 	const spawned = (await bob.threads.spawnThread({ parentId: parent.id, prompt: 'e2e: bob’s sub-thread' })).thread!;
 	expect(spawned.profile).toBe('spec');
+	expect((await bob.threads.spawnThread({ parentId: parent.id, prompt: 'e2e: bob’s business', profile: 'business' })).thread!.profile).toBe('business');
+	await refused(bob.threads.spawnThread({ parentId: parent.id, prompt: 'e2e', profile: 'nobody' }));
 	const out = await parent.mcp('create_thread', { prompt: 'e2e: an agent’s sub-thread' });
 	const child = alice.thread(out.match(/thread_id[^a-z0-9]+([a-z0-9]{26})/)![1]);
 	expect((await child.get()).profile).toBe('spec');
@@ -123,4 +125,21 @@ test('browser: the new-thread composer’s Profile chip starts at the default fr
 	await expect(bobPage.getByText(`${alice.id} switched to DevOps`)).toBeVisible();
 	await expect(bobPage.getByText('DevOps', { exact: true })).toBeVisible();
 	await expect(chip(bobPage, 'DevOps')).toHaveCount(0);
+});
+
+test('browser: the spawn dialog’s Profile chip starts at the parent’s and picks the sub-thread’s', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const parent = await alice.create({ profile: 'spec' });
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(bob, parent);
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await page.getByRole('menuitem', { name: /^Spawn a sub-thread/ }).click();
+	const dialog = page.getByRole('dialog');
+	await dialog.getByRole('button', { name: 'Profile: Specification' }).click();
+	await page.getByRole('menuitemradio', { name: 'Business' }).click();
+	await dialog.getByRole('textbox', { name: 'Prompt' }).fill('e2e: a business sub-thread');
+	await dialog.getByRole('button', { name: 'Spawn' }).click();
+	await expect(page).toHaveURL(/\/t\//);
+	await expect(page).not.toHaveURL(`/t/${parent.id}`);
+	expect((await bob.thread(page.url().split('/t/')[1]).get()).profile).toBe('business');
 });

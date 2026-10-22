@@ -1,15 +1,20 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
+	import OptionMenu from '#lib/components/option-menu.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
 	import { threads } from '#lib/threads.svelte.js';
 
 	let { open = $bindable(false), thread }: { open: boolean; thread: Thread } = $props();
 
 	let prompt = $state('');
+	// Starts at the parent's, as in the API.
+	let profile = $derived(thread.profile);
 	let error = $state('');
 	let busy = $state(false);
 
@@ -18,7 +23,7 @@
 		if (!prompt.trim() || busy) return;
 		busy = true;
 		try {
-			const { thread: child } = await api.spawnThread({ parentId: thread.id, prompt });
+			const { thread: child } = await api.spawnThread({ parentId: thread.id, prompt, profile });
 			open = false;
 			prompt = error = '';
 			goto(`/t/${child!.id}`);
@@ -53,7 +58,9 @@
 				onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && spawn(e)}
 			/>
 			{#if error}<p class="text-sm text-destructive">{error}</p>{/if}
-			<Dialog.Footer><Button type="submit" disabled={!prompt.trim() || busy}>Spawn</Button></Dialog.Footer>
+			<Dialog.Footer class="items-center sm:justify-between">
+				<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
+				<Button type="submit" disabled={!prompt.trim() || busy}>Spawn</Button></Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
