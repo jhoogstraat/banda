@@ -17,7 +17,7 @@ export function narrowRule(tool: string, args: Record<string, any>): string {
 		const command = String(args.command ?? '').trim();
 		if (!command || /[;&|<>$`()\n\\]/.test(command)) return '';
 		const [a, b] = command.split(/\s+/);
-		return `Bash(${b && /^[a-z][\w:.-]*$/.test(b) ? `${a} ${b}` : a}:*)`;
+		return `Bash(${b && /^[a-z][\w:-]*$/.test(b) ? `${a} ${b}` : a}:*)`;
 	}
 	if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
 		const path = String(args.file_path ?? args.notebook_path ?? '').replace(/^\/home\/banda\/work\//, '');
