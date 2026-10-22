@@ -171,3 +171,7 @@ CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
 -- profile for new threads that don't name one.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS profile text NOT NULL DEFAULT 'engineer';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS default_profile text NOT NULL DEFAULT 'engineer';
+-- A sub-thread whose reports (finished, failed) also start a turn of its
+-- parent's agent (create_thread's wake_parent), and when one last did.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS wake_parent boolean NOT NULL DEFAULT false;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS woke_parent_at timestamptz;
