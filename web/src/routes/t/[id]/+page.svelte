@@ -48,7 +48,8 @@
 	import type { Comment } from '#lib/diff.js';
 	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { ui, visited, type Command } from '#lib/shortcuts.svelte.js';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.js';
+	import { threadKeys, ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
@@ -63,9 +64,14 @@
 	let oldest = $state(0n); // the oldest loaded event's seq; history starts at 1
 	let loadingOlder = $state(false);
 	let scroller = $state<HTMLElement | null>(null);
-	// Unset: the pane picks its own default (open on desktop, closed on phones).
-	let diffOpen = $state<boolean>();
+	// The right pane opens when asked for, or for the first port that starts listening while the page is open.
+	let diffOpen = $state(false);
 	let tab = $state('diff');
+	let previewPort = $state<number>();
+	let autoOpened = false;
+	// Events after the replay: the first presence event follows it (the server sends it on joining).
+	let live = false;
+	const mobile = new IsMobile();
 	let loginOpen = $state(false);
 	let forkOpen = $state(false);
 	let spawnOpen = $state(false);
@@ -194,6 +200,12 @@
 						markRead();
 					}
 					apply(chat, event);
+					if (event.kind.case === 'presenceChanged') live = true;
+					// On phones the pane covers the chat: only the link in the chat opens it there.
+					if (event.kind.case === 'portOpened' && live && !autoOpened && !diffOpen && !mobile.current) {
+						autoOpened = true;
+						show('browser', event.kind.value.port);
+					}
 					if (event.kind.case === 'lineageUpdate') lineage++;
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved'].includes(event.kind.case!)) refresh();
@@ -273,8 +285,9 @@
 	const recreate = () => act(api.environmentRecreate({ threadId: id }));
 	const pr = $derived(thread?.pullRequestUrl ?? '');
 	const retry = () => act(api.retry({ threadId: id }));
-	const show = (t: string) => {
+	const show = (t: string, port?: number) => {
 		tab = t;
+		if (port) previewPort = port;
 		diffOpen = true;
 	};
 
@@ -283,8 +296,8 @@
 		const t = thread;
 		if (!t) return;
 		const c: Command[] = [
-			{ label: 'Toggle right pane', icon: PanelRightIcon, run: () => (diffOpen = !diffOpen) },
-			...(t.repoUrl ? [{ label: 'Show diff', icon: FileDiffIcon, run: () => show('diff') }] : []),
+			{ label: 'Toggle right pane', icon: PanelRightIcon, keys: threadKeys.pane, run: () => (diffOpen = !diffOpen) },
+			...(t.repoUrl ? [{ label: 'Show diff', icon: FileDiffIcon, keys: threadKeys.diff, run: () => show('diff') }] : []),
 			{ label: 'Show files', icon: FolderTreeIcon, run: () => show('files') }
 		];
 		if (owner) c.push({ label: 'Open terminal', icon: SquareTerminalIcon, run: () => show('terminal') });
@@ -292,9 +305,9 @@
 		else
 			for (const [label, date] of [presets[0], presets[2]])
 				c.push({ label: `Snooze ${label === '1 hour' ? 'for 1 hour' : `until ${label.toLowerCase()}`}`, icon: BellOffIcon, run: () => act(snooze(t, date())) });
-		c.push({ label: 'Fork this thread', icon: GitForkIcon, run: () => (forkOpen = true) });
-		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, run: () => act(settle(t)) });
-		c.push({ label: 'Spawn sub-thread', icon: GitBranchPlusIcon, run: () => (spawnOpen = true) });
+		c.push({ label: 'Fork this thread', icon: GitForkIcon, keys: threadKeys.fork, run: () => (forkOpen = true) });
+		c.push({ label: t.settled ? 'Unsettle' : 'Settle', icon: CheckIcon, keys: threadKeys.settle, run: () => act(settle(t)) });
+		c.push({ label: 'Spawn sub-thread', icon: GitBranchPlusIcon, keys: threadKeys.spawn, run: () => (spawnOpen = true) });
 		if (t.parentId) c.push({ label: `Go to parent: ${t.parentTitle}`, icon: CornerLeftUpIcon, run: () => goto(`/t/${t.parentId}`) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
@@ -304,8 +317,8 @@
 		if (owner) {
 			if (!pr && t.repoUrl) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
-				? { label: 'Switch to agent mode', icon: BotIcon, run: toggleMode }
-				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, run: toggleMode });
+				? { label: 'Switch to agent mode', icon: BotIcon, keys: threadKeys.mode, run: toggleMode }
+				: { label: 'Switch to chat mode', icon: MessagesSquareIcon, keys: threadKeys.mode, run: toggleMode });
 		}
 		ui.commands = c;
 		// When the next thread page has already registered its own, leave them.
@@ -350,7 +363,7 @@
 
 <svelte:document onvisibilitychange={markRead} />
 
-<div class="flex min-w-0 flex-1 flex-col">
+<div class="@container flex min-w-0 flex-1 flex-col">
 	{#if missing}
 		<PageHeader />
 		<LoadState title="Thread not found" description="It doesn't exist, it was deleted, or the link is wrong." />
@@ -358,7 +371,7 @@
 		<PageHeader />
 		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
-		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {push} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
 		<Overlaps overlaps={thread?.overlaps ?? []} />
 
@@ -378,7 +391,7 @@
 								? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
 								: ''}"
 						>
-							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} />
+							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} />
 						</div>
 					{/each}
 
@@ -405,12 +418,12 @@
 			<ConversationScrollButton />
 		</Conversation>
 
-		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} />
+		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} {toggleMode} />
 	{/if}
 </div>
 
 {#if !missing && !failed}
-	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask {posted} onsend={sendReview} />
+	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask bind:port={previewPort} {posted} onsend={sendReview} />
 {/if}
 
 <LoginDialog bind:open={loginOpen} />

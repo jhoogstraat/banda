@@ -567,6 +567,15 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: HandoffResolved;
     case: "handoffResolved";
+  } | {
+    /**
+     * A port started listening in the environment (see PreviewWatch); the
+     * ports already listening when a runner connects aren't announced.
+     *
+     * @generated from field: banda.v1.PreviewPort port_opened = 40;
+     */
+    value: PreviewPort;
+    case: "portOpened";
   } | { case: undefined; value?: undefined };
 };
 
@@ -989,6 +998,9 @@ export declare type StatusChanged = Message$1<"banda.v1.StatusChanged"> & {
 export declare const StatusChangedSchema: GenMessage<StatusChanged>;
 
 /**
+ * The actor is who changed it: the owner, or the poster whose message
+ * switched the thread to chat mode (`reason` says why). Older events: "system".
+ *
  * @generated from message banda.v1.ModeChanged
  */
 export declare type ModeChanged = Message$1<"banda.v1.ModeChanged"> & {
@@ -996,6 +1008,14 @@ export declare type ModeChanged = Message$1<"banda.v1.ModeChanged"> & {
    * @generated from field: banda.v1.Mode mode = 1;
    */
   mode: Mode;
+
+  /**
+   * Set when a post switched the mode: "posted" (a teammate) or "mentioned
+   * someone".
+   *
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
 };
 
 /**

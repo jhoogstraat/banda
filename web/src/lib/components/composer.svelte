@@ -1,7 +1,9 @@
 <script lang="ts">
+	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -17,11 +19,12 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import type { Chat } from '#lib/events.js';
-	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes, ruleLabel } from '#lib/permissions.js';
 	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
+	import { userName } from '#lib/threads.svelte.js';
 
-	// The bottom of a thread: who is producing something, the error, banners, the plan and the prompt box.
+	// The bottom of a thread: the context line (activity, typing, mode), the error, banners, the plan and the prompt box.
 	// typing: the names of the others typing. send throws to keep the prompt; typed reports typing.
 	let {
 		thread,
@@ -32,7 +35,8 @@
 		act,
 		send,
 		typed,
-		setAgent
+		setAgent,
+		toggleMode
 	}: {
 		thread?: Thread;
 		owner: boolean;
@@ -43,29 +47,58 @@
 		send: (m: PromptInputMessage) => Promise<void>;
 		typed: () => void;
 		setAgent: (change: { model?: string; effort?: string; profile?: string }) => void;
+		toggleMode: () => void;
 	} = $props();
 
 	const typingText = $derived(
 		typing.length > 2 ? `${typing.length} people are typing…` : typing.length ? `${typing.join(' and ')} ${typing.length > 1 ? 'are' : 'is'} typing…` : ''
 	);
+	const chatMode = $derived(thread?.mode === Mode.CHAT);
+	// Says what a post does here: the owner's starts a turn in agent mode; in chat mode, and for teammates, only @agent does.
+	const placeholder = $derived(
+		!thread
+			? 'Message…'
+			: !owner
+				? `Reply to ${userName(thread.ownerId)} — @agent to ${thread.trusted ? 'ask the agent' : 'request a turn'}`
+				: chatMode
+					? 'Message the team — @agent to ask the agent'
+					: 'Ask the agent…'
+	);
 </script>
 
 <div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-	<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
-	<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
-		{#if thread?.permissionPending}
-			<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
-		{:else if thread?.status === Status.WORKING}
-			<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
-		{/if}
-		{#if typingText}
-			{#if thread?.status === Status.WORKING}<span>·</span>{/if}
-			<span class="flex gap-0.5"><span class="size-1 animate-bounce rounded-full bg-current"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:150ms]"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:300ms]"></span></span>
-			<span class="truncate">{typingText}</span>
+	<!-- One line of context: who is producing something right now (the agent while it works, people typing) and the mode.
+	     Always takes its line, so the composer doesn't jump. -->
+	<div class="flex h-7 items-center gap-2 text-xs text-muted-foreground">
+		<div class="flex min-w-0 flex-1 items-center gap-2" aria-live="polite">
+			{#if thread?.permissionPending}
+				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
+			{:else if thread?.status === Status.WORKING}
+				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
+			{/if}
+			{#if typingText}
+				{#if thread?.status === Status.WORKING}<span>·</span>{/if}
+				<span class="flex gap-0.5"><span class="size-1 animate-bounce rounded-full bg-current"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:150ms]"></span><span class="size-1 animate-bounce rounded-full bg-current [animation-delay:300ms]"></span></span>
+				<span class="truncate">{typingText}</span>
+			{/if}
+		</div>
+		{#if thread}
+			{@const label = chatMode ? 'Chat · @agent to ask' : 'Agent'}
+			<!-- The owner switches the mode here; for everyone else it only says what a post does. -->
+			<button
+				class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 enabled:hover:bg-muted enabled:hover:text-foreground {chatMode ? 'border-sky-500/40 text-sky-600 dark:text-sky-400' : ''}"
+				disabled={!owner}
+				aria-label={owner ? `${chatMode ? 'Chat mode' : 'Agent mode'}: switch to ${chatMode ? 'agent' : 'chat'} mode` : `${chatMode ? 'Chat mode' : 'Agent mode'}`}
+				title={owner ? `Switch to ${chatMode ? 'agent mode: your posts go to the agent' : 'chat mode: only @agent starts a turn'}` : undefined}
+				onclick={toggleMode}
+			>
+				{#if chatMode}<MessagesSquareIcon class="size-3" />{:else}<BotIcon class="size-3" />{/if}
+				{label}
+			</button>
 		{/if}
 	</div>
 	{#if error}<p role="alert" class="mb-2 text-sm text-destructive">{error}</p>{/if}
-	{#if thread}<ThreadBanners {thread} {act} />{/if}
+	{#if thread}<ThreadBanners {thread} />{/if}
 	<Plan plan={chat.plan} />
 	<PromptInput.Root onSubmit={send} multiple maxFiles={5} maxFileSize={5 << 20} onError={(e) => (error = e.message)}>
 		<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
@@ -73,7 +106,7 @@
 				{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
 			</PromptInput.Attachments>
 			<PromptInput.Body>
-				<MentionInput placeholder="Message the agent. Use @agent to mention it in chat mode." />
+				<MentionInput {placeholder} />
 			</PromptInput.Body>
 			<PromptInput.Toolbar>
 				<div class="flex items-center gap-1.5 pl-1">

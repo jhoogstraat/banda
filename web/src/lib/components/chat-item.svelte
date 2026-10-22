@@ -7,6 +7,7 @@
 <script lang="ts">
 	// One item of a thread's chat (see events.ts).
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+	import AppWindowIcon from '@lucide/svelte/icons/app-window';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
@@ -51,7 +52,8 @@
 		act,
 		waiting = [],
 		onreveal,
-		onlogin
+		onlogin,
+		onshow
 	}: {
 		item: Item;
 		threadId: string;
@@ -62,6 +64,8 @@
 		waiting?: Item[];
 		onreveal: (c: Comment) => void;
 		onlogin: () => void;
+		// Opens a tab of the right pane: "diff", or "browser" on a port. Without it (no pane) the chat has no such links.
+		onshow?: (tab: string, port?: number) => void;
 	} = $props();
 
 	// The owner's optional note when declining a turn request, behind its note button.
@@ -94,10 +98,10 @@
 	{/each}
 {/snippet}
 
-{#snippet divider(text: string, tone = 'text-muted-foreground')}
+{#snippet divider(text: string, tone = 'text-muted-foreground', link?: [string, () => void])}
 	<div class="flex items-center gap-3 text-xs {tone}">
 		<div class="h-px flex-1 bg-border"></div>
-		{text}
+		<span>{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={link[1]}>{link[0]}</button>{/if}</span>
 		<div class="h-px flex-1 bg-border"></div>
 	</div>
 {/snippet}
@@ -215,7 +219,7 @@
 	{#if item.turn.isError}
 		{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
 	{:else}
-		{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`)}
+		{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`, undefined, item.diff && onshow ? ['View diff', () => onshow('diff')] : undefined)}
 	{/if}
 {:else if item.kind === 'lineage'}
 	{@const u = item.update}
@@ -287,7 +291,21 @@
 {:else if item.kind === 'push'}
 	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
 {:else if item.kind === 'mode'}
-	{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
+	{@const name = userName(item.actor)}
+	{#if item.reason}
+		{@render divider(`Chat mode: ${name} ${item.reason}, so the agent answers only @agent`)}
+	{:else if item.actor !== 'system'}
+		{@render divider(item.mode === Mode.CHAT ? `${name} switched to chat mode` : `${name} switched back to agent mode`)}
+	{:else}
+		{@render divider(item.mode === Mode.CHAT ? 'Chat mode on' : 'Agent mode')}
+	{/if}
+{:else if item.kind === 'port'}
+	{@const p = item.port}
+	<div class="flex items-center gap-2 text-xs text-muted-foreground">
+		<AppWindowIcon class="size-3.5 shrink-0" />
+		<span>{p.process || 'Something'} is listening on :{p.port}</span>
+		{#if onshow}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={() => onshow('browser', p.port)}>Open preview</button>{/if}
+	</div>
 {:else if item.kind === 'settings'}
 	{@const s = item.settings}
 	<!-- The event has the model and effort if they changed, the profile if it did. -->

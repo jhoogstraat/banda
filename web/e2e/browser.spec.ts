@@ -3,7 +3,7 @@ import { devices } from '@playwright/test';
 import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, repo, Status, test } from './fixtures.ts';
 
-const composer = 'Message the agent. Use @agent to mention it in chat mode.';
+const composer = 'Ask the agent…'; // the owner's, in agent mode
 
 test('a thread created from the home page streams the agent’s reply in', async ({ as }) => {
 	const page = await as('alice').page();

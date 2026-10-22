@@ -61,6 +61,14 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 				prompt, images = turnPrompt(t, eff, names, u.events, by, m, u.texts)
 			}
 			events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
+			for _, e := range events[1:] {
+				if mc := e.GetModeChanged(); mc != nil { // the chat says who switched it and why
+					e.Actor, mc.Reason = by, "posted"
+					if by == t.OwnerID {
+						mc.Reason = "mentioned someone"
+					}
+				}
+			}
 			t.State = next
 			return events, nil
 		})

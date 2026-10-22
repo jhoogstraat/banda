@@ -3,7 +3,8 @@ import { devices, type Page } from '@playwright/test';
 import { AutoPushState, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, repo, Status, test, type Thread, type User } from './fixtures.ts';
 
-const composer = (page: Page) => page.getByPlaceholder('Message the agent. Use @agent to mention it in chat mode.');
+// Its placeholder (the accessible name) says what a post does, for the owner or a teammate.
+const composer = (page: Page) => page.getByRole('textbox', { name: /^(Ask the agent…|Message the team|Reply to )/ });
 
 /** The thread's page as user, once its header shows the thread. */
 async function open(user: User, t: Thread, options?: Parameters<User['page']>[0]) {
@@ -25,7 +26,7 @@ test('a turn streams in: the working agent, its running tool call, then the fold
 	const page = await open(alice, t);
 	await expect(page.getByText('Holding stream')).toBeVisible({ timeout: 90_000 });
 	await expect(page.getByText('Agent is working…')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Interrupt the agent' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
 	await expect(page.getByRole('button', { name: /wait for stream/ })).toBeVisible();
 
 	await t.release('stream');
@@ -181,6 +182,7 @@ test('review: alice comments on a line of the diff and sends the review; the cha
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const page = await open(alice, t);
+	await page.getByRole('button', { name: 'View diff' }).click(); // the turn that changed it links the diff
 	const file = page.locator('[data-file="hello1.txt"]');
 	await file.getByRole('button', { name: 'Comment on line 1' }).click();
 	await page.getByPlaceholder('Comment on this line').fill('e2e: say hello back');
@@ -198,7 +200,10 @@ test('the right pane: the files tab reads the checkout, the owner’s terminal r
 	const t = await alice.create({ prompt: 'start the preview' });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.turn(() => t.send('e2e: a file'));
+	// Before the page opens: a port that starts listening while it is open opens the pane by itself.
+	await t.waitForEvent((e) => e.kind.case === 'portOpened', 'portOpened');
 	const page = await open(alice, t);
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 
 	await test.step('files', async () => {
 		await page.getByRole('tab', { name: 'Files' }).click();
@@ -223,6 +228,7 @@ test('the right pane: the files tab reads the checkout, the owner’s terminal r
 	});
 	await test.step('a teammate gets no terminal', async () => {
 		const bobPage = await open(bob, t);
+		await bobPage.getByRole('button', { name: 'Toggle right pane' }).click();
 		await bobPage.getByRole('tab', { name: 'Terminal' }).click();
 		await expect(bobPage.getByText('Only the thread owner can open the terminal.')).toBeVisible();
 	});
@@ -246,24 +252,26 @@ test('the model chip switches the model; a switch that fails to save goes back t
 	expect((await t.get()).model).toBe('claude-sonnet-5-5');
 });
 
-test('settle and snooze from the header; the sidebar files the thread under Settled, then Snoozed', async ({ as }) => {
+test('settle and snooze from the header’s menu; the sidebar files the thread under Settled, then Snoozed', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const page = await open(alice, t);
 	const title = (await t.get()).title;
 	const section = (name: string) => page.getByRole('group', { name, exact: true });
+	const menu = (item: string | RegExp) => page.getByRole('button', { name: 'More actions' }).click().then(() => page.getByRole('menuitem', { name: item }));
 
-	await page.getByRole('button', { name: 'Settle', exact: true }).click();
-	await expect(page.getByRole('button', { name: 'Unsettle' })).toBeVisible();
+	await (await menu(/^Settle/)).click();
 	await section('Settled').locator('summary').click();
 	await expect(section('Settled').getByRole('link', { name: title })).toBeVisible();
-	await page.getByRole('button', { name: 'Unsettle' }).click();
-	await expect(page.getByRole('button', { name: 'Settle', exact: true })).toBeVisible();
+	await (await menu(/^Unsettle/)).click();
+	await expect(section('Settled')).toBeHidden();
 
-	await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+	await (await menu('Snooze')).click();
 	await page.getByRole('menuitem', { name: '1 hour' }).click();
-	await expect(page.getByRole('button', { name: /^Snoozed until / })).toBeVisible();
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await expect(page.getByRole('menuitem', { name: /^Snoozed until / })).toBeVisible();
+	await page.keyboard.press('Escape');
 	await section('Snoozed').locator('summary').click();
 	await expect(section('Snoozed').getByRole('link', { name: title })).toBeVisible();
 });
@@ -381,4 +389,90 @@ test('phone: the sidebar is a drawer that lists the thread and closes once one i
 	await expect(page.getByRole('tab', { name: 'Diff' })).toBeVisible();
 	await page.getByRole('button', { name: 'Close the pane' }).click();
 	await expect(composer(page)).toBeVisible();
+});
+
+test('the header keeps the title in view, on a phone too; the rest is in a labelled menu with shortcuts, the trust switch included', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e: a long title that would never fit next to a row of a dozen icon buttons on a phone' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const { defaultBrowserType: _, ...phone } = devices['iPhone 13'];
+	const page = await open(alice, t, phone);
+	const width = page.viewportSize()!.width;
+	expect((await page.getByRole('heading', { level: 1 }).boundingBox())!.width).toBeGreaterThan(100);
+	for (const control of await page.locator('header').getByRole('button').all()) {
+		const box = (await control.boundingBox())!;
+		expect(box.x + box.width).toBeLessThanOrEqual(width);
+	}
+
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await expect(page.getByRole('menuitem', { name: /^Fork: try another way/ })).toContainText('F');
+	await expect(page.getByRole('menuitem', { name: /^Spawn a sub-thread/ })).toContainText('B');
+	await expect(page.getByRole('menuitem', { name: /^Switch to chat mode/ })).toContainText('M');
+	const trust = page.getByRole('menuitemcheckbox', { name: /^Teammates can run the agent/ });
+	await expect(trust).toHaveAttribute('aria-checked', 'false');
+	await trust.click();
+	await expect.poll(async () => (await t.get()).trusted).toBe(true);
+	await expect(trust).toHaveAttribute('aria-checked', 'true');
+});
+
+test('a teammate’s post switches to chat mode: the chat says who and why, the owner’s mode chip switches back, placeholders say what a post does', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+	await expect(page.getByPlaceholder('Ask the agent…')).toBeVisible();
+	await expect(bobPage.getByPlaceholder(`Reply to ${alice.id} — @agent to request a turn`)).toBeVisible();
+
+	await post(bobPage, 'e2e: nice work');
+	await expect(page.getByText(`Chat mode: ${bob.id} posted, so the agent answers only @agent`)).toBeVisible();
+	await expect(page.getByPlaceholder('Message the team — @agent to ask the agent')).toBeVisible();
+	await expect(bobPage.getByRole('button', { name: 'Chat mode', exact: true })).toBeDisabled();
+
+	await page.getByRole('button', { name: 'Chat mode: switch to agent mode' }).click();
+	await expect(page.getByText(`${alice.id} switched back to agent mode`)).toBeVisible();
+	await expect(page.getByPlaceholder('Ask the agent…')).toBeVisible();
+	await expect(bobPage.getByRole('button', { name: 'Agent mode', exact: true })).toBeVisible();
+});
+
+test('the right pane stays closed until asked for, resizes by its divider (remembered), and opens on the first dev server; the chat links preview and diff', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	const tab = (name: string) => page.getByRole('tab', { name });
+	await expect(tab('Diff')).toBeHidden();
+
+	await test.step('the divider resizes the pane, by keyboard and by dragging; the width survives a reload', async () => {
+		await page.keyboard.press('p'); // the pane's shortcut
+		const divider = page.getByRole('separator', { name: 'Resize the pane' });
+		const width = Number(await divider.getAttribute('aria-valuenow'));
+		await divider.focus();
+		await page.keyboard.press('ArrowLeft');
+		await expect(divider).toHaveAttribute('aria-valuenow', String(width + 24));
+		const box = (await divider.boundingBox())!;
+		await page.mouse.move(box.x + 2, box.y + 200);
+		await page.mouse.down();
+		await page.mouse.move(box.x - 98, box.y + 200, { steps: 5 });
+		await page.mouse.up();
+		await expect.poll(async () => Number(await divider.getAttribute('aria-valuenow'))).toBeGreaterThan(width + 100);
+		const dragged = await divider.getAttribute('aria-valuenow');
+		await page.reload();
+		await expect(tab('Diff')).toBeHidden();
+		await page.getByRole('button', { name: 'Toggle right pane' }).click();
+		await expect(divider).toHaveAttribute('aria-valuenow', dragged!);
+		await page.getByRole('button', { name: 'Toggle right pane' }).click();
+		await expect(tab('Diff')).toBeHidden();
+	});
+
+	await test.step('a dev server starting opens the Browser tab on it; the chat links it and the diff', async () => {
+		await t.send('start the preview');
+		await expect(tab('Browser')).toHaveAttribute('aria-selected', 'true', { timeout: 60_000 });
+		await expect(page.frameLocator('iframe[title="Preview of port 5173"]').getByText('e2e-preview-page')).toBeVisible();
+		await expect(page.getByText('http.server is listening on :5173')).toBeVisible();
+		await page.getByRole('button', { name: 'View diff' }).click();
+		await expect(tab('Diff')).toHaveAttribute('aria-selected', 'true');
+		await page.getByRole('button', { name: 'Open preview' }).click();
+		await expect(tab('Browser')).toHaveAttribute('aria-selected', 'true');
+	});
 });

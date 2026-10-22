@@ -101,14 +101,16 @@ test('in the browser: alice hands off from the header, bob accepts from the card
 
 	const page = await alice.page();
 	await page.goto(`/t/${t.id}`);
-	await page.getByRole('button', { name: 'Hand off to a teammate' }).click();
+	const menu = (p: typeof page) => p.getByRole('button', { name: 'More actions' }).click().then(() => p.getByRole('menuitem', { name: 'Hand off to a teammate' }));
+	await (await menu(page)).click();
 	await page.getByRole('combobox', { name: 'Teammate' }).selectOption(bob.id);
 	await page.getByRole('textbox', { name: 'Note' }).fill('over to you');
 	await page.getByRole('button', { name: 'Hand off', exact: true }).click();
 	const card = page.getByRole('group', { name: `Handoff to ${bob.id}` });
 	await expect(card.getByText('over to you')).toBeVisible();
 	await expect(card.getByText(`Waiting for ${bob.id} to accept`)).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Hand off to a teammate' })).toBeHidden();
+	await expect(await menu(page)).toHaveCount(0);
+	await page.keyboard.press('Escape');
 
 	const bobs = await bob.page();
 	await bobs.goto('/');
@@ -118,5 +120,5 @@ test('in the browser: alice hands off from the header, bob accepts from the card
 	await accept.click();
 	await expect(card.getByText(`${bob.id} accepted`)).toBeVisible();
 	await t.as(bob).waitFor('to be bob’s and idle', (x) => x.ownerId === bob.id && x.status === Status.AWAITING_INPUT);
-	await expect(bobs.getByRole('button', { name: 'Hand off to a teammate' })).toBeVisible();
+	await expect(await menu(bobs)).toBeVisible();
 });

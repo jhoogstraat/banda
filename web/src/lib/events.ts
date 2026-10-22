@@ -14,6 +14,7 @@ import {
 	type PermissionMode,
 	type PermissionRequested,
 	type PermissionResolved,
+	type PreviewPort,
 	type ReviewComment,
 	type SetupStep,
 	type ToolCall,
@@ -39,12 +40,16 @@ export type Item = { key: number } & (
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
 	// `votes` are teammates' latest votes on a question (AskUserQuestion), by user.
 	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string }; votes: Record<string, Record<string, string>> }
-	| { kind: 'turn'; turn: TurnEnded }
+	// `diff`: the turn changed the diff (the diffChanged event right after it).
+	| { kind: 'turn'; turn: TurnEnded; diff?: boolean }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
 	// The thread now changes files another one changes too.
 	| { kind: 'overlap'; overlap: Overlap }
-	| { kind: 'mode'; mode: Mode }
+	// `actor` switched it; `reason` is set when their post did (see ModeChanged).
+	| { kind: 'mode'; actor: string; mode: Mode; reason: string }
+	// A port started listening in the environment.
+	| { kind: 'port'; port: PreviewPort }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
 	| { kind: 'revoked'; actor: string; rule: string }
@@ -267,8 +272,16 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		}
 		case 'modeChanged':
-			chat.items.push({ key, kind: 'mode', mode: k.value.mode });
+			chat.items.push({ key, kind: 'mode', actor: e.actor, mode: k.value.mode, reason: k.value.reason });
 			break;
+		case 'portOpened':
+			chat.items.push({ key, kind: 'port', port: k.value });
+			break;
+		case 'diffChanged': {
+			const turn = chat.items.findLast((i) => i.kind === 'turn');
+			if (turn) turn.diff = true;
+			break;
+		}
 		case 'agentSettings':
 			chat.items.push({ key, kind: 'settings', actor: e.actor, settings: k.value });
 			break;
@@ -294,7 +307,8 @@ export function apply(chat: Chat, e: Event) {
 // Prepends older history (the events right before the oldest loaded one, in seq order), giving the
 // same chat as applying everything in order: a group split by the page edge is joined, and calls and
 // results waiting for their tool call are attached.
-// ponytail: a setup checklist split by the page edge stays two checklists.
+// ponytail: a setup checklist split by the page edge stays two checklists, and a turn whose diffChanged
+// starts the newer page has no "View diff".
 export function prepend(chat: Chat, events: Event[]) {
 	const old = newChat();
 	for (const e of events) apply(old, e);

@@ -1,7 +1,7 @@
 // Run: node src/lib/events.check.ts
 import { endsAt, locate, parseDiff } from './diff.ts';
 import { apply, itemAt, newChat, prepend, typingNow, type Chat } from './events.ts';
-import { AutoPushState, PermissionDecision, SetupState, Status, type Event } from './gen/banda/v1/banda_pb.js';
+import { AutoPushState, Mode, PermissionDecision, SetupState, Status, type Event } from './gen/banda/v1/banda_pb.js';
 
 const ev = (kind: unknown, seq = 1n) => ({ seq, actor: 'agent', kind }) as Event;
 const chat = newChat();
@@ -46,6 +46,17 @@ apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'agentSettings', value: { m
 const switched = chat.items.at(-1);
 if (switched?.kind !== 'settings' || switched.actor !== 'alice' || switched.settings.model !== 'm')
 	throw new Error('agentSettings should become a divider naming who switched');
+
+apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));
+apply(chat, ev({ case: 'diffChanged', value: {} }));
+const changed = chat.items.at(-1);
+if (changed?.kind !== 'turn' || !changed.diff) throw new Error('diffChanged should mark the turn before it');
+apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'modeChanged', value: { mode: Mode.CHAT, reason: 'posted' } } } as Event);
+const mode = chat.items.at(-1);
+if (mode?.kind !== 'mode' || mode.actor !== 'bob' || mode.reason !== 'posted') throw new Error('modeChanged should say who switched and why');
+apply(chat, ev({ case: 'portOpened', value: { port: 5173, process: 'vite' } }));
+const port = chat.items.at(-1);
+if (port?.kind !== 'port' || port.port.port !== 5173) throw new Error('portOpened should become a chat item');
 
 // Steps between texts fold into one group; a subagent's calls nest in its Task call; TodoWrite sets the plan.
 const plan = (statuses: string[]) =>

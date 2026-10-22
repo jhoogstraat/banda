@@ -77,11 +77,12 @@ test('browser: a thread started with “No repository” shows its files, no dif
 	await expect(page.getByText('No repository', { exact: true })).toBeVisible();
 	await expect(page.getByText('Created hello1.txt')).toBeVisible({ timeout: 90_000 });
 
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 	const pane = page.getByRole('tabpanel', { name: 'Files' }); // the pane opens on Files: there is no Diff tab
 	await expect(pane.getByRole('button', { name: 'hello1.txt', exact: true })).toBeVisible();
 	await expect(page.getByRole('tab', { name: 'Diff' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Push the branch to origin' })).toHaveCount(0);
-	const composer = page.getByPlaceholder('Message the agent. Use @agent to mention it in chat mode.');
+	const composer = page.getByPlaceholder('Ask the agent…');
 	await composer.fill('e2e: another file');
 	await composer.press('Enter');
 	await expect(pane.getByRole('button', { name: 'hello2.txt', exact: true })).toBeVisible({ timeout: 90_000 }); // listed once the turn ends
