@@ -17,9 +17,6 @@ import (
 )
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
-	if req.RepoUrl == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
-	}
 	mode, err := newPermissionMode(req.PermissionMode)
 	if err != nil {
 		return nil, err
@@ -49,9 +46,9 @@ var scpLike = regexp.MustCompile(`^\w[\w.~-]*@\w[\w.-]*:[\w./~-]+$`)
 // checkRepoURL accepts only URLs that git clones plainly: anything else may
 // reach git as a transport that runs commands (ext::) or as an option. It
 // refuses credentials in an https URL: everyone sees a thread's repository,
-// forks reuse it, and the runner redacts only GIT_TOKEN.
+// forks reuse it, and the runner redacts only GIT_TOKEN. Empty is no repository.
 func checkRepoURL(repo string) error {
-	if scpLike.MatchString(repo) {
+	if repo == "" || scpLike.MatchString(repo) {
 		return nil
 	}
 	u, err := url.Parse(repo) // refuses control characters
@@ -67,6 +64,7 @@ func checkRepoURL(repo string) error {
 // start stores a new thread, posts its first message (if any) as `by` (the
 // owner, or the agent that spawned it) and provisions its environment. It sets the id and branch,
 // and the defaults for what t leaves empty (the profile: the owner's default).
+// A thread without a repository has no branches.
 func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
 	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	t.PermissionMode = or(t.PermissionMode, "bypass")
@@ -85,6 +83,9 @@ func (s *Service) start(ctx context.Context, t store.Thread, by string, first *b
 	}
 	t.ID = strings.ToLower(rand.Text())
 	t.Branch = "banda/" + t.ID
+	if t.RepoURL == "" {
+		t.BaseBranch, t.Branch = "", ""
+	}
 	if err := s.store.Create(ctx, t); err != nil {
 		return t, err
 	}

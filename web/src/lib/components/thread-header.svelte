@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import CornerLeftUpIcon from '@lucide/svelte/icons/corner-left-up';
+	import FolderIcon from '@lucide/svelte/icons/folder';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
@@ -50,6 +51,11 @@
 <PageHeader>
 	<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
 	{#if thread}<StatusDot status={thread.status} label />{/if}
+	{#if thread && !thread.repoUrl}
+		<span class="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title="The agent works in a folder that lives only in this thread's environment: nothing is pushed.">
+			<FolderIcon class="size-3.5" />No repository
+		</span>
+	{/if}
 	{#if thread?.parentId}
 		<a href="/t/{thread.parentId}" class="flex min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground" title="Spawned from {thread.parentTitle}">
 			<CornerLeftUpIcon class="size-3.5 shrink-0" /><span class="truncate">from {thread.parentTitle || 'its parent'}</span>
@@ -98,7 +104,7 @@
 		{/if}
 		{#if pr}
 			<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
-		{:else if owner}
+		{:else if owner && thread?.repoUrl}
 			<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" onclick={() => (paneOpen = !paneOpen)} />

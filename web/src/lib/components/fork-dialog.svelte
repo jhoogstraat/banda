@@ -46,7 +46,10 @@
 		<Dialog.Header>
 			<Dialog.Title>Fork this thread</Dialog.Title>
 			<Dialog.Description>
-				New threads of yours that start from its changes and know its conversation. This thread stays as it is.
+				{thread.repoUrl
+					? 'New threads of yours that start from its changes and know its conversation.'
+					: 'New threads of yours that know its conversation. Without a repository its files stay here.'}
+				This thread stays as it is.
 			</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex flex-col gap-3" onsubmit={fork}>

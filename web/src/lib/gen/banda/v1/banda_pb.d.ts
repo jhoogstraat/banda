@@ -31,6 +31,8 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
   title: string;
 
   /**
+   * Empty: the thread has no repository, and so no branches and no diff.
+   *
    * @generated from field: string repo_url = 4;
    */
   repoUrl: string;
@@ -1021,6 +1023,8 @@ export declare const TypingResponseSchema: GenMessage<TypingResponse>;
  */
 export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadRequest"> & {
   /**
+   * Empty: no repository (base_branch is ignored).
+   *
    * @generated from field: string repo_url = 1;
    */
   repoUrl: string;
@@ -3559,6 +3563,8 @@ export declare const ForkResponseSchema: GenMessage<ForkResponse>;
  */
 export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
   /**
+   * Empty: no repository, as for CreateThread.
+   *
    * @generated from field: string repo_url = 1;
    */
   repoUrl: string;
@@ -3783,9 +3789,11 @@ export declare type SearchRequest = Message$1<"banda.v1.SearchRequest"> & {
   actor: string;
 
   /**
-   * @generated from field: string repo_url = 3;
+   * Unset means any; empty, threads without a repository.
+   *
+   * @generated from field: optional string repo_url = 3;
    */
-  repoUrl: string;
+  repoUrl?: string | undefined;
 
   /**
    * @generated from field: banda.v1.SearchKind kind = 4;

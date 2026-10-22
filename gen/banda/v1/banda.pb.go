@@ -581,12 +581,13 @@ type Thread struct {
 	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	OwnerId string                 `protobuf:"bytes,2,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
 	Title   string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	RepoUrl string                 `protobuf:"bytes,4,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
-	Branch  string                 `protobuf:"bytes,5,opt,name=branch,proto3" json:"branch,omitempty"`
-	Model   string                 `protobuf:"bytes,6,opt,name=model,proto3" json:"model,omitempty"`
-	Effort  string                 `protobuf:"bytes,7,opt,name=effort,proto3" json:"effort,omitempty"`
-	Status  Status                 `protobuf:"varint,8,opt,name=status,proto3,enum=banda.v1.Status" json:"status,omitempty"`
-	Mode    Mode                   `protobuf:"varint,9,opt,name=mode,proto3,enum=banda.v1.Mode" json:"mode,omitempty"`
+	// Empty: the thread has no repository, and so no branches and no diff.
+	RepoUrl string `protobuf:"bytes,4,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
+	Branch  string `protobuf:"bytes,5,opt,name=branch,proto3" json:"branch,omitempty"`
+	Model   string `protobuf:"bytes,6,opt,name=model,proto3" json:"model,omitempty"`
+	Effort  string `protobuf:"bytes,7,opt,name=effort,proto3" json:"effort,omitempty"`
+	Status  Status `protobuf:"varint,8,opt,name=status,proto3,enum=banda.v1.Status" json:"status,omitempty"`
+	Mode    Mode   `protobuf:"varint,9,opt,name=mode,proto3,enum=banda.v1.Mode" json:"mode,omitempty"`
 	// Unified diff of the branch against its base, refreshed after each turn.
 	Diff       string                 `protobuf:"bytes,10,opt,name=diff,proto3" json:"diff,omitempty"`
 	CreatedAt  *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -2700,12 +2701,13 @@ func (*TypingResponse) Descriptor() ([]byte, []int) {
 }
 
 type CreateThreadRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	RepoUrl    string                 `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
-	BaseBranch string                 `protobuf:"bytes,2,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
-	Model      string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Effort     string                 `protobuf:"bytes,4,opt,name=effort,proto3" json:"effort,omitempty"`
-	Prompt     string                 `protobuf:"bytes,5,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty: no repository (base_branch is ignored).
+	RepoUrl    string `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
+	BaseBranch string `protobuf:"bytes,2,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
+	Model      string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	Effort     string `protobuf:"bytes,4,opt,name=effort,proto3" json:"effort,omitempty"`
+	Prompt     string `protobuf:"bytes,5,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	// Unspecified: bypass.
 	PermissionMode PermissionMode `protobuf:"varint,6,opt,name=permission_mode,json=permissionMode,proto3,enum=banda.v1.PermissionMode" json:"permission_mode,omitempty"`
 	// Empty: the owner's default profile.
@@ -8819,10 +8821,11 @@ func (x *ForkResponse) GetThreads() []*Thread {
 }
 
 type RaceRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	RepoUrl    string                 `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
-	BaseBranch string                 `protobuf:"bytes,2,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
-	Prompt     string                 `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty: no repository, as for CreateThread.
+	RepoUrl    string `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
+	BaseBranch string `protobuf:"bytes,2,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
+	Prompt     string `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	// 2 to 4.
 	Tries []*RaceTry `protobuf:"bytes,4,rep,name=tries,proto3" json:"tries,omitempty"`
 	// Every try's; unspecified: bypass.
@@ -9307,8 +9310,9 @@ type SearchRequest struct {
 	// "authentication").
 	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	// Filters; empty or unset means any.
-	Actor   string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
-	RepoUrl string                 `protobuf:"bytes,3,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
+	Actor string `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	// Unset means any; empty, threads without a repository.
+	RepoUrl *string                `protobuf:"bytes,3,opt,name=repo_url,json=repoUrl,proto3,oneof" json:"repo_url,omitempty"`
 	Kind    SearchKind             `protobuf:"varint,4,opt,name=kind,proto3,enum=banda.v1.SearchKind" json:"kind,omitempty"`
 	After   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=after,proto3" json:"after,omitempty"`
 	Before  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=before,proto3" json:"before,omitempty"`
@@ -9363,8 +9367,8 @@ func (x *SearchRequest) GetActor() string {
 }
 
 func (x *SearchRequest) GetRepoUrl() string {
-	if x != nil {
-		return x.RepoUrl
+	if x != nil && x.RepoUrl != nil {
+		return *x.RepoUrl
 	}
 	return ""
 }
@@ -10091,15 +10095,16 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tR\x05token\"C\n" +
 	"\x11ForkPatchResponse\x12\x14\n" +
 	"\x05patch\x18\x01 \x01(\tR\x05patch\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xfc\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x8e\x02\n" +
 	"\rSearchRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n" +
-	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x19\n" +
-	"\brepo_url\x18\x03 \x01(\tR\arepoUrl\x12(\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x1e\n" +
+	"\brepo_url\x18\x03 \x01(\tH\x00R\arepoUrl\x88\x01\x01\x12(\n" +
 	"\x04kind\x18\x04 \x01(\x0e2\x14.banda.v1.SearchKindR\x04kind\x120\n" +
 	"\x05after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x05after\x122\n" +
 	"\x06before\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\x12\x14\n" +
-	"\x05limit\x18\a \x01(\x05R\x05limit\"\x85\x02\n" +
+	"\x05limit\x18\a \x01(\x05R\x05limitB\v\n" +
+	"\t_repo_url\"\x85\x02\n" +
 	"\fSearchResult\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12!\n" +
 	"\fthread_title\x18\x02 \x01(\tR\vthreadTitle\x12\x19\n" +
@@ -10687,6 +10692,7 @@ func file_banda_v1_banda_proto_init() {
 		(*ConnectResponse_Permission)(nil),
 		(*ConnectResponse_Ping)(nil),
 	}
+	file_banda_v1_banda_proto_msgTypes[150].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

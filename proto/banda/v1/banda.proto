@@ -151,6 +151,7 @@ message Thread {
   string id = 1;
   string owner_id = 2;
   string title = 3;
+  // Empty: the thread has no repository, and so no branches and no diff.
   string repo_url = 4;
   string branch = 5;
   string model = 6;
@@ -437,6 +438,7 @@ enum SetupState {
 }
 
 message CreateThreadRequest {
+  // Empty: no repository (base_branch is ignored).
   string repo_url = 1;
   string base_branch = 2;
   string model = 3;
@@ -1086,6 +1088,7 @@ message ForkResponse {
 }
 
 message RaceRequest {
+  // Empty: no repository, as for CreateThread.
   string repo_url = 1;
   string base_branch = 2;
   string prompt = 3;
@@ -1153,7 +1156,8 @@ message SearchRequest {
   string query = 1;
   // Filters; empty or unset means any.
   string actor = 2;
-  string repo_url = 3;
+  // Unset means any; empty, threads without a repository.
+  optional string repo_url = 3;
   SearchKind kind = 4;
   google.protobuf.Timestamp after = 5;
   google.protobuf.Timestamp before = 6;
