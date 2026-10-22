@@ -48,11 +48,12 @@ policies() {
 }
 
 # The host as sandboxes see it, for an API running here: Podman's host.containers.internal, or with
-# Docker on Linux the gateway of kind's network. HOST_IP overrides it (Docker Desktop).
+# Docker on Linux the gateway of kind's network, the node's default route (`docker network inspect kind`
+# may list its subnets without a Gateway). HOST_IP overrides it (Docker Desktop).
 host_ip() {
 	if [ -n "${HOST_IP:-}" ]; then echo "$HOST_IP"
 	elif [ "$C" = podman ]; then echo 192.168.127.254
-	else docker network inspect kind | jq -r '[.[0].IPAM.Config[].Gateway | select(contains("."))][0]'
+	else $C exec banda-control-plane ip -4 route show default | awk '{print $3; exit}'
 	fi
 }
 
