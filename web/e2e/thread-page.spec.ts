@@ -297,12 +297,13 @@ test('a thread page whose first loads fail (the thread, who is signed in) shows 
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const page = await alice.page();
-	// Longer than the replay's refresh: only a retry brings the thread.
-	const down = Date.now() + 3000;
-	let failed = 0;
-	await page.route(/\/banda\.v1\.(ThreadService\/GetThread|UserService\/Me)$/, (route) =>
-		Date.now() < down ? (failed++, route.fulfill({ status: 503, body: 'down' })) : route.fallback()
-	);
+	// Longer than the replay's refresh: only a retry brings the thread. From the first load, however long
+	// the page takes to start (over 3 s on Actions).
+	let [down, failed] = [0, 0];
+	await page.route(/\/banda\.v1\.(ThreadService\/GetThread|UserService\/Me)$/, (route) => {
+		down ||= Date.now() + 3000;
+		return Date.now() < down ? (failed++, route.fulfill({ status: 503, body: 'down' })) : route.fallback();
+	});
 	await page.goto(`/t/${t.id}`);
 	await expect(page.getByText('Created hello1.txt')).toBeVisible();
 	await expect(page.getByRole('heading', { name: (await t.get()).title })).toBeVisible();
