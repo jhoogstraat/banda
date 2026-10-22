@@ -22,14 +22,21 @@ test('watchers see who is here and who is typing, and nothing of it is stored', 
 	expect((await t.events()).filter((e) => e.kind.case === 'presenceChanged' || e.kind.case === 'typing')).toEqual([]);
 });
 
-test('a teammate’s post switches to chat mode; only the owner ends it', async ({ as }) => {
+test('a teammate’s post switches to chat mode; only the owner ends it; the chat records who switched and why', async ({ as }) => {
 	const bob = as('bob');
 	const t = await as('alice').create();
+	const switches = async () => (await t.events()).filter((e) => e.kind.case === 'modeChanged').map((e) => [e.actor, (e.kind.value as { reason: string }).reason]);
 	await t.as(bob).send('nice, carol what do you think?', { attachments: [{ id: await bob.attach('dot.png', 'image/png', png) }] });
 	expect((await t.get()).mode).toBe(Mode.CHAT);
 	await refused(bob.threads.setMode({ threadId: t.id, mode: Mode.AGENT }));
 	await t.user.threads.setMode({ threadId: t.id, mode: Mode.AGENT });
 	expect((await t.get()).mode).toBe(Mode.AGENT);
+	await t.send(`@${bob.id} have a look`, { mentionedUserIds: [bob.id] });
+	expect(await switches()).toEqual([
+		[bob.id, 'posted'],
+		[t.user.id, ''],
+		[t.user.id, 'mentioned someone']
+	]);
 });
 
 test('the inbox stream pushes a new mention live; a teammate’s post makes the thread unread until it is read', async ({ as }) => {

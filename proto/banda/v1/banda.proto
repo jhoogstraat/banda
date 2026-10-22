@@ -272,6 +272,9 @@ message Event {
     LineageUpdate lineage_update = 32;
     // The owner changed the permission mode; actor is the owner.
     PermissionModeChanged permission_mode_changed = 34;
+    // A port started listening in the environment (see PreviewWatch); the
+    // ports already listening when a runner connects aren't announced.
+    PreviewPort port_opened = 40;
   }
 }
 
@@ -384,8 +387,13 @@ message StatusChanged {
   string reason = 2;
 }
 
+// The actor is who changed it: the owner, or the poster whose message
+// switched the thread to chat mode (`reason` says why). Older events: "system".
 message ModeChanged {
   Mode mode = 1;
+  // Set when a post switched the mode: "posted" (a teammate) or "mentioned
+  // someone".
+  string reason = 2;
 }
 
 message DiffChanged {}

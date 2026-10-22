@@ -125,6 +125,9 @@ func (s *Service) applyBecause(ctx context.Context, id string, a thread.Action, 
 			if sc := c.GetStatusChanged(); sc != nil {
 				sc.Reason = reason
 			}
+			if m, ok := a.(thread.SetMode); ok && c.GetModeChanged() != nil {
+				c.Actor = m.By
+			}
 		}
 		out := append(events, changes...)
 		t.State = next

@@ -44,6 +44,9 @@ test('the preview lists the dev server the agent started, to teammates too, and 
 	await expect
 		.poll(async () => (await ports(bob, t.id)).at(-1), { timeout: 60_000 })
 		.toMatchObject({ running: true, ports: [{ port: 5173, process: 'http.server' }] });
+	// The chat says so once: a port that starts listening while the runner is connected.
+	await t.waitForEvent((e) => e.kind.case === 'portOpened', 'portOpened');
+	expect(await t.of('portOpened')).toMatchObject([{ port: 5173, process: 'http.server' }]);
 
 	await test.step('the preview serves the page and its absolute-path asset, only with the cookie from PreviewOpen', async () => {
 		const { url } = await bob.threads.previewOpen({ threadId: t.id, port: 5173, path: '/' });

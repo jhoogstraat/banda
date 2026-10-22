@@ -28,6 +28,9 @@ type runner struct {
 	tunnels *tunnel.Mux
 	ports   []*bandav1.PreviewPort
 	pong    chan struct{}
+	// seen holds the ports this connection reported so far (nil before the
+	// first report); only its receive loop uses it.
+	seen map[uint32]bool
 }
 
 func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServiceConnectServerStream) error {
@@ -213,6 +216,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 				s.previewChanged(id)
 			}
 			s.mu.Unlock()
+			s.announcePorts(bg, id, r, k.PreviewPorts.Ports)
 		case *bandav1.ConnectRequest_Diff:
 			// The runner sends it after every turn: only a change makes viewers fetch it again.
 			_, events, err := s.store.Update(bg, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
@@ -346,4 +350,29 @@ func (r *runner) send(msg *bandav1.ConnectResponse) bool {
 	case <-time.After(10 * time.Second):
 	}
 	return false
+}
+
+// announcePorts tells the chat about each port that starts listening while
+// the runner is connected, once per connection. The ports of its first report
+// were up before (a reconnect after an API restart) and aren't announced.
+func (s *Service) announcePorts(ctx context.Context, id string, r *runner, ports []*bandav1.PreviewPort) {
+	first := r.seen == nil
+	if first {
+		r.seen = map[uint32]bool{}
+	}
+	var events []*bandav1.Event
+	for _, p := range ports {
+		if !first && !r.seen[p.Port] {
+			events = append(events, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_PortOpened{PortOpened: p}})
+		}
+		r.seen[p.Port] = true
+	}
+	if len(events) == 0 {
+		return
+	}
+	_, stored, err := s.store.Update(ctx, id, func(*store.Store, *store.Thread) ([]*bandav1.Event, error) { return events, nil })
+	if err != nil {
+		slog.Error("store opened ports", "thread", id, "err", err)
+	}
+	s.broadcast(id, stored)
 }
