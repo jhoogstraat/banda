@@ -1,0 +1,157 @@
+// Pull requests through the forges' APIs: each test runs an API of its own against a fake forge (./forge.ts)
+// that knows the run's git server, so a pull request needs the thread's branch really pushed.
+import type { Page } from '@playwright/test';
+import { test as base, expect, refused, type Api, type User } from './fixtures';
+import { FakeForge } from './forge';
+import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
+
+const test = base.extend<{ forge: FakeForge }>({
+	forge: async ({}, use) => {
+		const forge = await new FakeForge().start();
+		await use(forge);
+		await forge.stop();
+	}
+});
+
+const repoUrl = 'https://github.com/e2e/plain.git'; // the run's git server, for git (deploy/sandbox.Dockerfile)
+
+/** alice's thread whose agent committed and pushed, on an API that talks to the fake forge; bob is a teammate. */
+async function world(as: (name: string, api?: Api) => User, startApi: (env?: Record<string, string>) => Promise<Api>, forge: FakeForge, env: Record<string, string> = {}) {
+	const api = await startApi({ TEST_FORGE_URL: forge.url, PULL_REQUEST_POLL: '1s', ...env });
+	const alice = as('alice', api);
+	const bob = as('bob', api);
+	forge.tokens = { 'alice-token': 'alice', 'bob-token': 'bob' };
+	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'alice-token' }); // pushes over https need it too
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+	return { api, alice, bob, t };
+}
+
+async function open(user: User, id: string) {
+	const page = await user.page();
+	await page.goto(`/t/${id}`);
+	return page;
+}
+
+const pane = (page: Page) => page.getByRole('tabpanel');
+
+test('the owner opens a pull request from the dialog; the header chip, the tab and a line when its checks fail, which reaches the agent', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge);
+	const title = (await t.get()).title;
+	const page = await open(alice, t.id);
+	await page.getByRole('button', { name: 'Create a pull request' }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog.getByLabel('Title')).toHaveValue(title);
+	await expect(dialog.getByLabel('Description')).not.toHaveValue(''); // the agent's last reply
+	await dialog.getByLabel('Description').fill('Adds **hello1.txt**.');
+	await dialog.getByRole('button', { name: 'Create pull request' }).click();
+	await expect(dialog).toBeHidden();
+	expect(forge.pull(1)).toMatchObject({ head: (await t.get()).branch, base: 'main', body: 'Adds **hello1.txt**.', author: 'alice', draft: false });
+
+	await expect(page.getByText(`${alice.id} opened pull request #1`)).toBeVisible();
+	const chip = page.getByRole('button', { name: /^PR #1 · Open/ });
+	await chip.click();
+	await expect(pane(page).getByRole('heading', { name: `${title} #1` })).toBeVisible();
+	await expect(pane(page).getByText('hello1.txt', { exact: true })).toBeVisible(); // the description as markdown
+	await expect(pane(page).getByText('Checks · No checks reported')).toBeVisible();
+
+	// The forge reports a review comment and failing checks; the open page hears of them within a poll.
+	forge.comment(1, { login: 'carol', body: 'Why `hello1`?', path: 'hello1.txt', line: 1 });
+	forge.pull(1).checks = [
+		{ name: 'lint', status: 'completed', conclusion: 'success' },
+		{ name: 'test', status: 'completed', conclusion: 'failure' }
+	];
+	await expect(page.getByText('Checks failed on pull request #1')).toBeVisible({ timeout: 15_000 });
+	await expect(page.getByRole('button', { name: 'PR #1 · Open · checks failed' })).toBeVisible();
+	await expect(pane(page).getByText('Checks · 1 of 2 failing')).toBeVisible();
+	await expect(pane(page).getByRole('article', { name: 'Comment by carol' })).toContainText('hello1.txt:1');
+	if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: '../docs/screenshots/pull-request.png' });
+
+	// Like other quiet lines, it reaches the agent with its next prompt.
+	await t.turn(() => t.send('e2e-echo e2e-noop'));
+	expect((await t.prompts()).at(-1)).toContain(`[Pull request #1 "${title}" has failing checks: ${forge.url}/e2e/plain/pull/1]`);
+});
+
+test('anyone comments with their own token: a teammate without one is told how, with one comments and replies as themselves', async ({ as, startApi, forge }) => {
+	const { alice, bob, t } = await world(as, startApi, forge);
+	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: 'B' });
+	forge.comment(1, { login: 'carol', body: 'Why this name?', path: 'hello1.txt', line: 1 });
+
+	expect(await refused(bob.threads.pullRequestComment({ threadId: t.id, body: 'hi' }))).toContain('You have no token for github.com: add GIT_TOKEN in Settings');
+	let page = await open(bob, t.id);
+	await page.getByRole('button', { name: /^PR #1/ }).click();
+	await expect(pane(page).getByText('Comments go out with your own token')).toBeVisible();
+
+	await bob.settings.setSecret({ name: 'GIT_TOKEN', value: 'bob-token' });
+	await page.reload();
+	await page.getByRole('button', { name: /^PR #1/ }).click();
+	await pane(page).getByLabel('Comment', { exact: true }).fill('Looks good to me');
+	await pane(page).getByRole('button', { name: 'Comment', exact: true }).click();
+	await expect(pane(page).getByRole('article', { name: 'Comment by bob' })).toContainText('Looks good to me');
+	await pane(page).getByRole('button', { name: 'Reply', exact: true }).click();
+	await pane(page).getByLabel('Reply to carol').fill('It greets.');
+	await pane(page).getByRole('button', { name: 'Reply', exact: true }).click();
+	await expect(pane(page).getByText('It greets.')).toBeVisible();
+	const carols = forge.pull(1).comments.find((c) => c.login === 'carol')!;
+	expect(forge.pull(1).comments.filter((c) => c.login === 'bob')).toMatchObject([{ body: 'Looks good to me' }, { body: 'It greets.', inReplyTo: carols.id }]);
+});
+
+test('the owner merges with a merge method; a teammate is refused and sees who merges', async ({ as, startApi, forge }) => {
+	const { alice, bob, t } = await world(as, startApi, forge);
+	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: '', draft: true });
+	expect(forge.pull(1).draft).toBe(true);
+	expect(await refused(bob.threads.pullRequestMerge({ threadId: t.id, method: 'merge' }))).toContain('only the thread owner can do this');
+	expect(await refused(bob.threads.pullRequestUpdate({ threadId: t.id, draft: false }))).toContain('only the thread owner can do this');
+
+	const bobs = await open(bob, t.id);
+	await bobs.getByRole('button', { name: /^PR #1 · Draft/ }).click();
+	await expect(pane(bobs).getByText(`${alice.id} merges it`)).toBeVisible();
+	await expect(pane(bobs).getByRole('button', { name: 'Merge', exact: true })).toHaveCount(0);
+
+	const page = await open(alice, t.id);
+	await page.getByRole('button', { name: /^PR #1 · Draft/ }).click();
+	await pane(page).getByRole('button', { name: 'Ready for review' }).click();
+	await expect(page.getByText(`Pull request #1 was marked ready for review by ${alice.id}`)).toBeVisible();
+	await pane(page).getByLabel('Merge method').selectOption('merge');
+	await pane(page).getByRole('button', { name: 'Merge', exact: true }).click();
+	await expect(page.getByText(`Pull request #1 was merged by ${alice.id}`)).toBeVisible();
+	await expect(page.getByRole('button', { name: 'PR #1 · Merged' })).toBeVisible();
+	await expect(pane(page).getByText('Merged by alice')).toBeVisible();
+	expect(forge.pull(1)).toMatchObject({ state: 'merged', mergedBy: 'alice', mergeMethod: 'merge' });
+	await expect(bobs.getByRole('button', { name: 'PR #1 · Merged' })).toBeVisible(); // live for the teammate too
+});
+
+test('a self-hosted GitLab (FORGE_HOSTS): link the open merge request of the branch, an approval and the pipeline, merged squashed', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge, { FORGE_HOSTS: 'github.com=gitlab' });
+	const { branch } = await t.get();
+	expect(await refused(alice.threads.pullRequestLink({ threadId: t.id }))).toContain(`no open pull request has ${branch} as its branch`);
+	await forge.open(branch, 'From the forge');
+	const { pullRequest } = await alice.threads.pullRequestLink({ threadId: t.id });
+	expect(pullRequest?.summary).toMatchObject({ forge: 'gitlab', number: 1, title: 'From the forge' });
+
+	const page = await open(alice, t.id);
+	await expect(page.getByText(`${alice.id} linked merge request !1`)).toBeVisible();
+	forge.pull(1).checks = [{ name: 'unit', status: 'in_progress' }];
+	forge.comment(1, { login: 'carol', body: '', review: 'APPROVED' });
+	await expect(page.getByText('Merge request !1 was approved')).toBeVisible({ timeout: 15_000 });
+	await page.getByRole('button', { name: 'MR !1 · Open · checks running · approved' }).click();
+	await expect(pane(page).getByRole('region', { name: 'Reviewers' })).toContainText('carolApproved');
+	await expect(pane(page).getByText('Checks · 1 of 1 running')).toBeVisible();
+
+	await alice.threads.pullRequestMerge({ threadId: t.id, method: 'squash' });
+	expect(forge.pull(1)).toMatchObject({ state: 'merged', mergeMethod: 'squash' });
+	await expect(page.getByRole('button', { name: 'MR !1 · Merged' })).toBeVisible();
+});
+
+test('without a token for the forge, the header keeps the link to its compare page', async ({ as }) => {
+	const alice = as('alice'); // the run's API: no forge calls happen here
+	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'e2e' });
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+	const page = await open(alice, t.id);
+	await expect(page.getByRole('button', { name: 'Create a pull request' })).toBeVisible();
+	await alice.settings.deleteSecret({ name: 'GIT_TOKEN' });
+	await page.reload();
+	await expect(page.getByRole('link', { name: 'Open a pull request' })).toHaveAttribute('href', /^https:\/\/github\.com\/e2e\/plain\/compare\/main\.\.\./);
+	expect((await t.get()).forgeReady).toBe(false);
+});

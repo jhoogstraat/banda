@@ -1,6 +1,7 @@
 <script lang="ts">
 	import XIcon from '@lucide/svelte/icons/x';
 	import Browser from '#lib/components/browser.svelte';
+	import PullRequest from '#lib/components/pull-request.svelte';
 	import DiffView from '#lib/components/diff-view.svelte';
 	import FileBrowser from '#lib/components/file-browser.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
@@ -23,6 +24,7 @@
 		focus = $bindable(),
 		ask = $bindable(),
 		port = $bindable(),
+		prVersion = 0,
 		posted,
 		onsend
 	}: {
@@ -38,6 +40,8 @@
 		port?: number;
 		posted: (Comment & { by: string })[];
 		onsend: (summary: string) => Promise<boolean>;
+		// Bumped when the thread hears its pull request changed.
+		prVersion?: number;
 	} = $props();
 
 	// The terminal, the file browser and the browser mount when their tab is first opened and then stay alive.
@@ -62,6 +66,9 @@
 			{#if !noRepo}
 				<TabsTrigger value="diff">Diff{#if pending.length}<Badge variant="secondary" class="ml-1 h-4 px-1 text-[10px]">{pending.length}</Badge>{/if}</TabsTrigger>
 			{/if}
+			{#if thread?.pullRequest}
+				<TabsTrigger value="pull">{thread.forge === 'gitlab' ? 'Merge request' : 'Pull request'}</TabsTrigger>
+			{/if}
 			<TabsTrigger value="files">Files</TabsTrigger>
 			<TabsTrigger value="browser">Browser</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
@@ -69,6 +76,9 @@
 		</TabsList>
 		<TabsContent value="diff" class="flex min-h-0 flex-col">
 			<DiffView diff={thread?.diff ?? ''} overlaps={thread?.overlaps ?? []} bind:pending bind:focus bind:ask {posted} {onsend} />
+		</TabsContent>
+		<TabsContent value="pull" class="min-h-0 overflow-auto">
+			{#if thread?.pullRequest}<PullRequest {thread} {owner} version={prVersion} ondiff={() => (tab = 'diff')} />{/if}
 		</TabsContent>
 		<TabsContent value="files" class="min-h-0 overflow-auto">
 			{#if filesOpened}<FileBrowser {threadId} version={noRepo ? String(thread?.status) : (thread?.diff ?? '')} />{/if}

@@ -15,6 +15,7 @@ import {
 	type PermissionRequested,
 	type PermissionResolved,
 	type PreviewPort,
+	type PullRequestChanged,
 	type ReviewComment,
 	type SetupStep,
 	type ToolCall,
@@ -46,6 +47,8 @@ export type Item = { key: number } & (
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
 	// The thread now changes files another one changes too.
 	| { kind: 'overlap'; overlap: Overlap }
+	// The pull request was opened or linked (by `actor`), or changed notably.
+	| { kind: 'pullRequest'; actor: string; changed: PullRequestChanged }
 	// `actor` switched it; `reason` is set when their post did (see ModeChanged).
 	| { kind: 'mode'; actor: string; mode: Mode; reason: string }
 	// A port started listening in the environment.
@@ -163,6 +166,10 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'overlap':
 			chat.items.push({ key, kind: 'overlap', overlap: k.value });
+			break;
+		case 'pullRequestChanged':
+			// Without a change it only says the pull request changed (the page refetches it).
+			if (k.value.change) chat.items.push({ key, kind: 'pullRequest', actor: e.actor, changed: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];

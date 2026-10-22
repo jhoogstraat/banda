@@ -36,6 +36,7 @@
 	import LoadState from '#lib/components/load-state.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import Overlaps from '#lib/components/overlaps.svelte';
+	import PullRequestDialog from '#lib/components/pull-request-dialog.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SpawnDialog from '#lib/components/spawn-dialog.svelte';
 	import SubThreads from '#lib/components/sub-threads.svelte';
@@ -51,6 +52,7 @@
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.js';
 	import { threadKeys, ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
+	import { noun } from '#lib/pullrequests.js';
 
 	// The layout re-creates this page for every thread, so the id never changes.
 	const id = page.params.id!;
@@ -76,6 +78,9 @@
 	let forkOpen = $state(false);
 	let spawnOpen = $state(false);
 	let handoffOpen = $state(false);
+	let prOpen = $state(false);
+	// Bumped when the thread hears its pull request changed, so the Pull request tab reloads it.
+	let prVersion = $state(0);
 	// Bumped by lineage events, so the sub-thread strip refetches.
 	let lineage = $state(0);
 	let error = $state('');
@@ -207,6 +212,10 @@
 						show('browser', event.kind.value.port);
 					}
 					if (event.kind.case === 'lineageUpdate') lineage++;
+					if (event.kind.case === 'pullRequestChanged') {
+						prVersion++;
+						refresh();
+					}
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
 					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved'].includes(event.kind.case!)) refresh();
 				}
@@ -285,6 +294,11 @@
 	const recreate = () => act(api.environmentRecreate({ threadId: id }));
 	const pr = $derived(thread?.pullRequestUrl ?? '');
 	const retry = () => act(api.retry({ threadId: id }));
+	// The agent's latest reply: a pull request's description to start from.
+	const lastReply = $derived.by(() => {
+		const i = chat.items.findLast((i) => i.kind === 'text');
+		return i?.kind === 'text' ? i.text : '';
+	});
 	const show = (t: string, port?: number) => {
 		tab = t;
 		if (port) previewPort = port;
@@ -311,7 +325,9 @@
 		if (t.parentId) c.push({ label: `Go to parent: ${t.parentTitle}`, icon: CornerLeftUpIcon, run: () => goto(`/t/${t.parentId}`) });
 		if (owner && t.status === Status.WORKING) c.push({ label: 'Interrupt the agent', icon: SquareIcon, run: interrupt });
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
-		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
+		if (t.pullRequest) c.push({ label: `Show the ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => show('pull') });
+		else if (pr && owner && t.forgeReady) c.push({ label: `Create a ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => (prOpen = true) });
+		else if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
 		if (owner) {
@@ -371,7 +387,7 @@
 		<PageHeader />
 		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
-		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
 		<Overlaps overlaps={thread?.overlaps ?? []} />
 
@@ -423,10 +439,11 @@
 </div>
 
 {#if !missing && !failed}
-	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask bind:port={previewPort} {posted} onsend={sendReview} />
+	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask bind:port={previewPort} {posted} {prVersion} onsend={sendReview} />
 {/if}
 
 <LoginDialog bind:open={loginOpen} />
 {#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}
 {#if thread}<SpawnDialog bind:open={spawnOpen} {thread} />{/if}
 {#if thread}<HandoffDialog bind:open={handoffOpen} {thread} />{/if}
+{#if thread}<PullRequestDialog bind:open={prOpen} {thread} summary={lastReply} ondone={refresh} />{/if}

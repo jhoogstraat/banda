@@ -3,7 +3,10 @@
 	import CornerLeftUpIcon from '@lucide/svelte/icons/corner-left-up';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import GitPullRequestCreateIcon from '@lucide/svelte/icons/git-pull-request-create';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import PullRequestChip from '#lib/components/pull-request-chip.svelte';
+	import { noun } from '#lib/pullrequests.js';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import IconButton from '#lib/components/icon-button.svelte';
@@ -30,6 +33,8 @@
 		toggleMode,
 		retry,
 		push,
+		onpull,
+		oncreate,
 		forkOpen = $bindable(),
 		spawnOpen = $bindable(),
 		handoffOpen = $bindable(),
@@ -44,6 +49,9 @@
 		toggleMode: () => void;
 		retry: () => void;
 		push: () => void;
+		// Opens the Pull request tab; opens the dialog that creates one.
+		onpull: () => void;
+		oncreate: () => void;
 		forkOpen: boolean;
 		spawnOpen: boolean;
 		handoffOpen: boolean;
@@ -107,7 +115,11 @@
 		{#if owner && thread?.status === Status.WORKING}
 			<Button variant="destructive" size="sm" class="mr-1 h-7" onclick={interrupt}><SquareIcon class="fill-current" /> Stop</Button>
 		{/if}
-		{#if pr}
+		{#if thread?.pullRequest}
+			<PullRequestChip pr={thread.pullRequest} onclick={onpull} />
+		{:else if pr && owner && thread?.forgeReady}
+			<IconButton icon={GitPullRequestCreateIcon} label="Create a {noun(thread.forge)}" onclick={oncreate} />
+		{:else if pr}
 			<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
 		{:else if owner && thread?.repoUrl}
 			<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />

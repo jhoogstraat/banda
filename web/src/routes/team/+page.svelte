@@ -4,6 +4,7 @@
 	import IconButton from '#lib/components/icon-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
+	import PullRequestChip from '#lib/components/pull-request-chip.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
@@ -213,6 +214,7 @@
 		<div class="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
 			<span class="truncate">{projectName(t.repoUrl)}</span>
 			<span class="shrink-0 tabular-nums">{ago(t.activity?.time ?? t.updatedAt, threads.now)}</span>
+			{#if t.pullRequest}<PullRequestChip pr={t.pullRequest} small />{/if}
 			{#if t.overlaps.length}
 				{@const label = `Overlaps with ${t.overlaps.map((o) => o.title || 'Untitled thread').join(', ')}`}
 				<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400" aria-label={label} title={label}>

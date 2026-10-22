@@ -15,6 +15,7 @@
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import NewThreadDialog from '#lib/components/new-thread-dialog.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
+	import PullRequestChip from '#lib/components/pull-request-chip.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { asking, asks, raceTitle, size, type Family } from '#lib/inbox.js';
@@ -59,6 +60,8 @@
 		</span>
 		{#if wait && !byline}
 			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-500" title={wait}>{asking(asks(t))}</span>
+		{:else if t.pullRequest && !race}
+			<PullRequestChip pr={t.pullRequest} small />
 		{/if}
 		{#if fresh}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
 		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {fresh ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>

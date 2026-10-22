@@ -276,7 +276,8 @@ test('settle and snooze from the header’s menu; the sidebar files the thread u
 	await expect(section('Snoozed').getByRole('link', { name: title })).toBeVisible();
 });
 
-test('the pull request link replaces Push once the agent’s work is pushed, without a reload (B17)', async ({ as }) => {
+// With a token the owner gets "Create a pull request" (forge.spec.ts); without one, the link to the forge.
+test('the pull request button replaces Push once the agent’s work is pushed, without a reload (B17)', async ({ as }) => {
 	const alice = as('alice');
 	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'e2e' }); // https remotes push only with a token
 	const t = await alice.create({ repoUrl: 'https://github.com/e2e/plain.git', prompt: 'e2e: commit' });
@@ -288,7 +289,7 @@ test('the pull request link replaces Push once the agent’s work is pushed, wit
 	await expect(page.getByRole('button', { name: 'Push the branch to origin' })).toBeVisible();
 	await t.releasePush();
 	await expect(page.getByText(/Pushed banda\/\w+ to origin\./)).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Open a pull request' })).toHaveAttribute('href', /^https:\/\/github\.com\/e2e\/plain\/compare\/main\.\.\./);
+	await expect(page.getByRole('button', { name: 'Create a pull request' })).toBeVisible();
 });
 
 test('a thread page whose first loads fail (the thread, who is signed in) shows the thread to its owner once retries succeed (B21)', async ({ as }) => {

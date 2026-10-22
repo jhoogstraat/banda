@@ -43,6 +43,7 @@
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
+	import { changeText, checkStates, pullStates } from '#lib/pullrequests.js';
 
 	let {
 		item,
@@ -234,6 +235,16 @@
 		<GitMergeConflictIcon class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
 		<span class="truncate">Now overlaps with <span class="font-medium text-foreground">{o.title || 'Untitled thread'}</span> by {userName(o.ownerId)}: <span class="font-mono">{o.paths.join(', ')}</span></span>
 	</a>
+{:else if item.kind === 'pullRequest'}
+	{@const p = item.changed.pullRequest!}
+	{@const look = item.changed.change.startsWith('checks_') ? checkStates[p.checks] : pullStates[p.state]}
+	<div class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+		<look.icon class="size-3.5 shrink-0 {look.class}" />
+		<span class="truncate"
+			>{changeText(item.changed, item.actor === 'system' ? '' : userName(item.actor))}: <span class="font-medium text-foreground">{p.title}</span></span
+		>
+		{#if onshow}<button class="shrink-0 underline-offset-2 hover:text-foreground hover:underline" onclick={() => onshow('pull')}>View</button>{/if}
+	</div>
 {:else if item.kind === 'notice'}
 	<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
 		<Response content={item.text} class="h-auto" />
