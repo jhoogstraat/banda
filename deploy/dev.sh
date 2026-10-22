@@ -98,7 +98,7 @@ e2e() {
 	go build -o "$LOG/api" ./cmd/api & local api=$!
 	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!
 	pnpm -C web exec playwright install chromium >/dev/null & local chromium=$!
-	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
+	e2e_wipe
 	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
 	kc create ns "$ns" >/dev/null
 	kc -n "$ns" apply -f deploy/sandbox-policy.yaml >/dev/null
@@ -148,10 +148,15 @@ e2e_down() {
 	if [ -n "${E2E_KEEP:-}" ]; then
 		echo "kept namespace $ns and database $db"
 	else
-		kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null || true
+		e2e_wipe || true
 		pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" || true
 	fi
 	rm -f "$LOG/pid"
+}
+# The run's namespace and those of its tests' own APIs (startApi in web/e2e/fixtures.ts).
+e2e_wipe() {
+	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
+	kc delete ns -l "banda.dev/e2e-run=$ns" --timeout=300s >/dev/null
 }
 pg() { kc -n banda exec postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 "$@"; }
 

@@ -26,6 +26,9 @@ rules:
   - apiGroups: [""]
     resources: [secrets] # users' banda-env-* and banda-auth-*, the team's banda-env-team
     verbs: [create, patch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies] # sandboxes-allow, from SANDBOX_EGRESS_ALLOW
+    verbs: [create, patch, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
