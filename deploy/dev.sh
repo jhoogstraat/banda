@@ -128,6 +128,8 @@ EOF
 	wait $api
 	wait $web || { tail -30 "$LOG/web.log"; exit 1; }
 	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
+	# Every thread on the plain repo writes hello1.txt: overlaps would tie all tests together. Their test turns them on.
+	export OVERLAP_WINDOW=0
 	host_api "$ns" "$p"; host_api "$ns" "$op"
 	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
 	local api_pid=$PID

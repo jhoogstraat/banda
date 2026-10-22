@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import GitMergeConflictIcon from '@lucide/svelte/icons/git-merge-conflict';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -10,13 +11,15 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { endsAt, locate, parseDiff, tone, type Comment } from '#lib/diff.js';
+	import type { Overlap } from '#lib/gen/banda/v1/banda_pb.js';
 	import { userName } from '#lib/threads.svelte.js';
 
 	// A unified diff to review: click a line number (drag or shift-click for a range) to comment.
 	// Comments collect in `pending` until the review is sent; `posted` (from the chat) show where they still apply.
-	// Setting `focus` scrolls to a comment's lines.
+	// Setting `focus` scrolls to a comment's lines. Files that `overlaps` (other threads) change too are marked.
 	let {
 		diff,
+		overlaps = [],
 		pending = $bindable(),
 		posted,
 		focus = $bindable(),
@@ -24,6 +27,7 @@
 		onsend
 	}: {
 		diff: string;
+		overlaps?: Overlap[];
 		pending: Comment[];
 		posted: (Comment & { by: string })[];
 		focus?: Comment;
@@ -37,6 +41,12 @@
 	let open = $state<Record<string, boolean>>({});
 	const isOpen = (f: { path: string; lines: unknown[] }) => open[f.path] ?? f.lines.length <= BIG;
 	let listOpen = $state(false);
+	// Per file, what the threads that also change it are called.
+	const shared = $derived.by(() => {
+		const by = new Map<string, string[]>();
+		for (const o of overlaps) for (const p of o.paths) by.set(p, [...(by.get(p) ?? []), o.title || 'Untitled thread']);
+		return by;
+	});
 	let scroller = $state<HTMLElement>();
 
 	// Comments by file and the index of the line they end at.
@@ -108,6 +118,14 @@
 
 <svelte:window onpointerup={() => sel && (sel.drag = false)} />
 
+{#snippet overlapMark(path: string)}
+	{#if shared.has(path)}
+		<span role="img" class="shrink-0 text-amber-600 dark:text-amber-400" aria-label="Also changed in {shared.get(path)!.join(', ')}" title="Also changed in {shared.get(path)!.join(', ')}">
+			<GitMergeConflictIcon class="size-3" />
+		</span>
+	{/if}
+{/snippet}
+
 {#snippet note(c: Comment, by: string | undefined, index: number | undefined)}
 	<div class="my-1 ml-[4.5rem] mr-2 rounded-md border bg-card px-3 py-2 font-sans text-sm {index === undefined ? '' : 'border-amber-500/50'}">
 		<div class="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -146,6 +164,7 @@
 						<li>
 							<button class="flex w-full items-center gap-2 px-3 py-0.5 pl-8 text-left hover:bg-muted/50" onclick={() => show(f.path)}>
 								<span class="min-w-0 flex-1 truncate font-mono" title={f.path}>{f.path}</span>
+								{@render overlapMark(f.path)}
 								<span class="shrink-0 font-mono text-green-400">+{f.add}</span>
 								<span class="shrink-0 font-mono text-red-400">−{f.del}</span>
 							</button>
@@ -163,6 +182,7 @@
 						<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform {isOpen(f) ? 'rotate-90' : ''}" />
 						<span class="min-w-0 flex-1 truncate font-mono" title={f.path}>{f.path}</span>
 						{#if fileNotes?.size}<MessageSquareIcon class="size-3 shrink-0 text-muted-foreground" />{/if}
+						{@render overlapMark(f.path)}
 						<span class="shrink-0 font-mono text-green-400">+{f.add}</span>
 						<span class="shrink-0 font-mono text-red-400">−{f.del}</span>
 					</button>

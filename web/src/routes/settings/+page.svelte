@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
@@ -95,8 +96,8 @@
 		if (!(await act('profile', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
 	}
 
-	// Secrets: the add form, and the row being replaced.
-	let name = $state('');
+	// Secrets: the add form (?secret=NAME fills in the name, e.g. from a thread that needs GIT_TOKEN), and the row being replaced.
+	let name = $state(page.url.searchParams.get('secret') ?? '');
 	let value = $state('');
 	let replacing = $state('');
 	let newValue = $state('');
@@ -218,7 +219,7 @@
 				</fieldset>
 			</section>
 
-			<section aria-label="Secrets & variables">
+			<section id="secrets" aria-label="Secrets & variables">
 				{@render heading('secrets', 'Secrets & variables', 'passed to all your threads as environment variables')}
 				<div class="divide-y rounded-lg border">
 					{#each secrets as s (s.name)}

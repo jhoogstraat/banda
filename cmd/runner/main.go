@@ -273,6 +273,11 @@ func run(ctx context.Context) error {
 					if err := send(e); err != nil {
 						return err
 					}
+					if m := perms.agentMode(e); m != nil {
+						if err := send(m); err != nil {
+							return err
+						}
+					}
 				}
 				if id, ok := unsupportedRequest(raw); ok { // never leave the CLI waiting
 					claude.write(map[string]any{"type": "control_response", "response": map[string]any{"subtype": "error", "request_id": id, "error": "not supported by Banda"}})

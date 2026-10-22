@@ -30,6 +30,7 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -48,7 +49,8 @@
 		toggleMode,
 		retry,
 		onfork,
-		onspawn
+		onspawn,
+		onhandoff
 	}: {
 		thread: Thread;
 		owner: boolean;
@@ -57,6 +59,7 @@
 		retry: () => void;
 		onfork: () => void;
 		onspawn: () => void;
+		onhandoff: () => void;
 	} = $props();
 
 	const when = (d: Date) => d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
@@ -80,6 +83,7 @@
 	<Menu.Content align="end" class="w-64">
 		<Menu.Item onclick={onfork}><GitForkIcon /> Fork: try another way<Menu.Shortcut>{threadKeys.fork}</Menu.Shortcut></Menu.Item>
 		<Menu.Item onclick={onspawn}><GitBranchPlusIcon /> Spawn a sub-thread<Menu.Shortcut>{threadKeys.spawn}</Menu.Shortcut></Menu.Item>
+		{#if owner && !thread.handoffTo}<Menu.Item onclick={onhandoff}><HandshakeIcon /> Hand off to a teammate</Menu.Item>{/if}
 		<Menu.Separator />
 		<Menu.Sub>
 			<Menu.SubTrigger><BellOffIcon /> {snoozed ? `Snoozed until ${when(until!)}` : 'Snooze'}</Menu.SubTrigger>

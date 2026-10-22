@@ -4,7 +4,9 @@
 	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
@@ -14,10 +16,11 @@
 	import Plan from '#lib/components/plan.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import type { Chat } from '#lib/events.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { permissionLabel, permissionModes } from '#lib/permissions.js';
+	import { permissionLabel, permissionModes, ruleLabel } from '#lib/permissions.js';
 	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
 	import { userName } from '#lib/threads.svelte.js';
 
@@ -69,7 +72,7 @@
 	<div class="flex h-7 items-center gap-2 text-xs text-muted-foreground">
 		<div class="flex min-w-0 flex-1 items-center gap-2" aria-live="polite">
 			{#if thread?.permissionPending}
-				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for permission</span>
+				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
 			{:else if thread?.status === Status.WORKING}
 				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 			{/if}
@@ -129,6 +132,30 @@
 						<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><ContactRoundIcon /> {profileLabel(thread.profile)}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><ShieldIcon /> {permissionLabel(thread.permissionMode)}</Badge>
+					{/if}
+					{#if thread?.allowedTools.length}
+						<!-- What the agent does without asking in this thread; whoever answers its requests can take it back. -->
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<PromptInput.Button {...props} size="sm" aria-label="Allowed: {thread!.allowedTools.length}"><ShieldCheckIcon /> Allowed · {thread!.allowedTools.length}</PromptInput.Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="start" class="w-64">
+								<DropdownMenu.Label>Runs without asking</DropdownMenu.Label>
+								{#each thread.allowedTools as rule (rule)}
+									<DropdownMenu.Item
+										disabled={!owner && !thread.trusted}
+										onSelect={() => act(api.permissionRevoke({ threadId: thread!.id, rule }))}
+										aria-label="Stop allowing {ruleLabel(rule)}"
+										class="font-mono text-xs"
+									>
+										<span class="min-w-0 flex-1 truncate">{ruleLabel(rule)}</span>
+										{#if owner || thread.trusted}<XIcon class="text-muted-foreground" />{/if}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					{/if}
 				</div>
 				<PromptInput.Submit />

@@ -2,6 +2,8 @@
 	import { page } from '$app/state';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import InboxIcon from '@lucide/svelte/icons/inbox';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
@@ -15,8 +17,8 @@
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { size, type Family } from '#lib/inbox.js';
-	import { askNotify, matches, noRepo, projectName, projects, sidebarSections, threads, unfolded, unread, userName } from '#lib/threads.svelte.js';
+	import { asking, asks, raceTitle, size, type Family } from '#lib/inbox.js';
+	import { askNotify, matches, noRepo, projectName, projects, sidebarSections, threads, unfolded, unread, userName, waiting } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	const sections = $derived.by(sidebarSections);
@@ -36,27 +38,30 @@
 	<span class="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[10px] tabular-nums">{n}</span>
 {/snippet}
 
-{#snippet row(t: Thread, byline = false)}
+<!-- A thread, or with race the race's row: its most urgent try t, its title and count, linking to compare. -->
+{#snippet row(t: Thread, byline = false, race?: Family)}
+	{@const fresh = race ? race.children.some((c) => unread(c.thread)) : unread(t)}
+	{@const wait = waiting(t)}
 	<a
-		href="/t/{t.id}"
-		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {page.params.id === t.id
+		href={race ? `/compare?race=${race.race}` : `/t/${t.id}`}
+		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {!race && page.params.id === t.id
 			? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
 			: ''}"
 	>
 		{#if byline}
 			<span class="relative shrink-0">
 				<UserAvatar name={userName(t.ownerId)} class="size-5" />
-				<span class="absolute -right-0.5 -bottom-0.5 flex rounded-full bg-sidebar p-px"><StatusDot status={t.status} /></span>
+				<span class="absolute -right-0.5 -bottom-0.5 flex rounded-full bg-sidebar p-px"><StatusDot status={t.status} waiting={wait} /></span>
 			</span>
-		{:else}<StatusDot status={t.status} />{/if}
-		<span class="truncate {unread(t) ? 'font-semibold text-sidebar-foreground' : ''}">{t.title || t.repoUrl.split('/').pop() || t.id}</span>
-		{#if t.turnRequests && !byline}
-			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-400" title="Teammates ask to run the agent">
-				{t.turnRequests} ask{t.turnRequests > 1 ? 's' : ''}
-			</span>
+		{:else}<StatusDot status={t.status} waiting={wait} />{/if}
+		<span class="truncate {fresh ? 'font-semibold text-sidebar-foreground' : ''}">
+			{race ? `${raceTitle(t)} · ${race.children.length} tries` : t.title || t.repoUrl.split('/').pop() || t.id}
+		</span>
+		{#if wait && !byline}
+			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-500" title={wait}>{asking(asks(t))}</span>
 		{/if}
-		{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
-		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {unread(t) ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>
+		{#if fresh}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
+		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {fresh ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>
 	</a>
 {/snippet}
 
@@ -64,15 +69,15 @@
 {#snippet family(f: Family, byline = false)}
 	{@const open = unfolded(f)}
 	<div class="flex items-center">
-		<div class="min-w-0 flex-1">{@render row(f.thread, byline)}</div>
+		<div class="min-w-0 flex-1">{@render row(f.thread, byline, f.race ? f : undefined)}</div>
 		{#if f.children.length}
 			<button
 				class="flex shrink-0 items-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] text-muted-foreground tabular-nums hover:bg-sidebar-accent/50"
 				aria-expanded={open}
-				aria-label="{open ? 'Fold' : 'Unfold'} {f.children.length} sub-threads"
-				onclick={() => (threads.expanded[f.thread.id] = !open)}
+				aria-label="{open ? 'Fold' : 'Unfold'} {f.children.length} {f.race ? 'tries' : 'sub-threads'}"
+				onclick={() => (threads.expanded[f.race ?? f.thread.id] = !open)}
 			>
-				{#if !open}{#each f.children.slice(0, 4) as c (c.thread.id)}<StatusDot status={c.thread.status} />{/each}{/if}
+				{#if !open}{#each f.children.slice(0, 4) as c (c.thread.id)}<StatusDot status={c.thread.status} waiting={waiting(c.thread)} />{/each}{/if}
 				{f.children.length}
 				<ChevronRightIcon class="size-3 transition-transform {open ? 'rotate-90' : ''}" />
 			</button>
@@ -85,18 +90,26 @@
 
 {#snippet section(text: string, list: Family[], fold = false, byline = false)}
 	{@const n = list.reduce((n, f) => n + size(f), 0)}
-	{#if list.length && fold}
+	{#if text === 'Needs input' && threads.loginNeeded}
+		<section class="space-y-0.5" aria-label={text}>
+			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, n + 1)}</h2>
+			<a href="/settings" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-sidebar-accent/50">
+				<KeyRoundIcon class="size-3.5 text-amber-500" /> Log in to Claude
+			</a>
+			{#each list as f (f.race ?? f.thread.id)}{@render family(f, byline)}{/each}
+		</section>
+	{:else if list.length && fold}
 		<details class="group space-y-0.5" aria-label={text}>
 			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
 				<ChevronRightIcon class="size-3 transition-transform group-open:rotate-90" />
 				{@render title(text, n)}
 			</summary>
-			{#each list as f (f.thread.id)}{@render family(f)}{/each}
+			{#each list as f (f.race ?? f.thread.id)}{@render family(f)}{/each}
 		</details>
 	{:else if list.length}
 		<section class="space-y-0.5" aria-label={text}>
 			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, n)}</h2>
-			{#each list as f (f.thread.id)}{@render family(f, byline)}{/each}
+			{#each list as f (f.race ?? f.thread.id)}{@render family(f, byline)}{/each}
 		</section>
 	{/if}
 {/snippet}
@@ -134,9 +147,24 @@
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content class="space-y-3 px-2 pb-3">
+		<a
+			href="/decisions"
+			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {page.url.pathname === '/decisions'
+				? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
+				: ''}"
+		>
+			<InboxIcon class="size-4 text-muted-foreground" /> Decisions
+			{#if threads.decisions.length}
+				<span class="ml-auto rounded-full bg-amber-400 px-1.5 text-[10px] font-semibold text-black tabular-nums" aria-label="{threads.decisions.length} pending">
+					{threads.decisions.length}
+				</span>
+			{/if}
+		</a>
 		{@render section('Mentioned', threads.mentioned.filter(matches).map((thread) => ({ thread, children: [] })), false, true)}
 		{@render section('Needs input', sections.needs)}
+		{@render section('Ready', sections.ready)}
 		{@render section('Working', sections.working, true)}
+		{@render section('Earlier', sections.earlier, true)}
 		{@render section('Snoozed', sections.snoozed, true)}
 		{@render section('Settled', sections.settled, true)}
 	</Sidebar.Content>

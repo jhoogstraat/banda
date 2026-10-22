@@ -226,7 +226,7 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	// The CLI records the system prompt on a session's first request and resends that record on
 	// resume, so without snapshot off a switched profile would never reach the model.
 	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", prompt, "--system-prompt-snapshot", "off")
-	sid := sessionID(threadID)
+	sid := sessionID(threadID + os.Getenv("BANDA_SESSION_KEY"))
 	if hasTranscript(sid) {
 		args = append(args, "--resume", sid)
 	} else {
@@ -299,8 +299,9 @@ func controlRequest(req map[string]any) map[string]any {
 	return map[string]any{"type": "control_request", "request_id": rand.Text(), "request": req}
 }
 
-// sessionID derives a stable UUID from the thread id, so a restarted runner
-// resumes the same Claude Code session.
+// sessionID derives a stable UUID from the thread id (and BANDA_SESSION_KEY,
+// which changes with each handoff), so a restarted runner resumes the same
+// Claude Code session.
 func sessionID(thread string) string {
 	h := sha256.Sum256([]byte(thread))
 	h[6] = h[6]&0x0f | 0x40

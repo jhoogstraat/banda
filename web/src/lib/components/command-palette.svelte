@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { timestampMs } from '@bufbuild/protobuf/wkt';
 	import { computeCommandScore } from 'bits-ui';
+	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -16,7 +17,7 @@
 	import { api } from '#lib/api.js';
 	import type { SearchResult, Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { newThread, recent, shortcuts, ui, type Command as Cmd } from '#lib/shortcuts.svelte.js';
-	import { projectName, threads, userName } from '#lib/threads.svelte.js';
+	import { projectName, threads, userName, waiting } from '#lib/threads.svelte.js';
 
 	let query = $state('');
 	// Teammates' threads, loaded each time the palette opens.
@@ -61,6 +62,7 @@
 
 	const global: Cmd[] = [
 		{ label: 'New thread', icon: SquarePenIcon, keys: 'C', run: newThread },
+		{ label: 'Go to Decisions', icon: InboxIcon, keys: 'G D', run: () => goto('/decisions') },
 		{ label: 'Go to Team', icon: UsersIcon, keys: 'G T', run: () => goto('/team') },
 		{ label: 'Search messages', icon: SearchIcon, run: () => goto('/search') },
 		{ label: 'Go to Settings', icon: SettingsIcon, keys: 'G S', run: () => goto('/settings') },
@@ -109,7 +111,7 @@
 			{#each query ? all : all.slice(0, 8) as t (t.id)}
 				{@const owner = userName(t.ownerId)}
 				<Command.Item value="{t.title} {projectName(t.repoUrl)} {owner} {t.id} {t.parentTitle}" onSelect={() => run({ label: t.id, run: () => goto(`/t/${t.id}`) })}>
-					<StatusDot status={t.status} />
+					<StatusDot status={t.status} waiting={waiting(t)} />
 					<span class="truncate">{t.title || 'Untitled thread'}</span>
 					{#if t.parentId}<span class="min-w-0 shrink truncate text-xs text-muted-foreground">↖ {t.parentTitle}</span>{/if}
 					<span class="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">

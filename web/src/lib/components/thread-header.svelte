@@ -15,7 +15,7 @@
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { threadKeys } from '#lib/shortcuts.svelte.js';
-	import { userName } from '#lib/threads.svelte.js';
+	import { userName, waiting } from '#lib/threads.svelte.js';
 
 	// The title gets the room; at a glance: status, Stop, Push or the pull request, presence, the pane. The rest is in
 	// the "…" menu (ThreadActions). here: the others with the thread open. The actions are the command palette's too.
@@ -32,6 +32,7 @@
 		push,
 		forkOpen = $bindable(),
 		spawnOpen = $bindable(),
+		handoffOpen = $bindable(),
 		paneOpen = $bindable()
 	}: {
 		thread?: Thread;
@@ -45,6 +46,7 @@
 		push: () => void;
 		forkOpen: boolean;
 		spawnOpen: boolean;
+		handoffOpen: boolean;
 		paneOpen?: boolean;
 	} = $props();
 
@@ -54,8 +56,8 @@
 <PageHeader>
 	<h1 class="min-w-0 flex-1 truncate text-sm font-medium" title={thread?.title}>{thread?.title || 'Untitled thread'}</h1>
 	{#if thread}
-		<span class="@lg:hidden"><StatusDot status={thread.status} /></span>
-		<span class="hidden @lg:contents"><StatusDot status={thread.status} label /></span>
+		<span class="@lg:hidden"><StatusDot status={thread.status} waiting={waiting(thread)} /></span>
+		<span class="hidden @lg:contents"><StatusDot status={thread.status} label waiting={waiting(thread)} /></span>
 		{#if thread.settled}
 			<span class="hidden text-xs text-muted-foreground @2xl:inline">Settled</span>
 		{:else if isSnoozed(thread)}
@@ -112,7 +114,7 @@
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" keys={threadKeys.pane} variant={paneOpen ? 'secondary' : 'ghost'} onclick={() => (paneOpen = !paneOpen)} />
 		{#if thread}
-			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} />
+			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} />
 		{/if}
 	</div>
 </PageHeader>

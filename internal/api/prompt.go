@@ -22,7 +22,7 @@ func actorName(names map[string]string, id string) string {
 }
 
 // promptKinds are the kinds of events postedSince uses.
-var promptKinds = []string{"message", "lineageUpdate"}
+var promptKinds = []string{"message", "lineageUpdate", "overlap"}
 
 // agentPrompt hands the agent the thread messages it hasn't seen yet (chat
 // between people, posts by other agents) and says who is asking when it
@@ -45,7 +45,7 @@ func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event,
 	return posted + actorName(names, by) + ": " + text, images
 }
 
-// postedSince lists the messages and sub-thread reports among events for the
+// postedSince lists the messages, sub-thread reports and overlaps among events for the
 // agent, a line each, with the images attached to them.
 func postedSince(names map[string]string, events []*bandav1.Event, texts map[string]string) (string, []string) {
 	var b strings.Builder
@@ -61,6 +61,8 @@ func postedSince(names map[string]string, events []*bandav1.Event, texts map[str
 			}
 		} else if u := e.GetLineageUpdate(); u != nil {
 			b.WriteString(lineageLine(u) + "\n")
+		} else if o := e.GetOverlap(); o != nil {
+			b.WriteString(overlapLine(names, o) + "\n")
 		}
 	}
 	return b.String(), images

@@ -2,10 +2,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"maps"
+	"path"
 	"slices"
+	"strings"
 
 	"connectrpc.com/connect/v2"
 
@@ -20,8 +23,13 @@ import (
 // inbox can show it as needing input. Only the owner answers (their machine,
 // their subscription), or anyone once they trust teammates; a plan only the
 // owner approves, since that changes how the agent works from then on.
+// A question (AskUserQuestion) is answered the same way, with the answers;
+// anyone may vote on it first.
 
-const exitPlanMode = "ExitPlanMode"
+const (
+	exitPlanMode    = "ExitPlanMode"
+	askUserQuestion = "AskUserQuestion"
+)
 
 var (
 	permissionModeToProto = map[string]bandav1.PermissionMode{
@@ -111,23 +119,115 @@ func answerPermission(t *store.Thread, by string, req *bandav1.PermissionAnswerR
 	if !ok {
 		return nil, nil, errNoPermission
 	}
-	plan := tool == exitPlanMode
-	if plan && t.CheckOwner(by) != nil || !t.Trusts(by) {
+	plan, question, deny := tool == exitPlanMode, tool == askUserQuestion, d == bandav1.PermissionDecision_PERMISSION_DECISION_DENY
+	if plan && t.CheckOwner(by) != nil || !t.Trusts(by) || req.UpdatedInputJson != "" && t.CheckOwner(by) != nil {
 		return nil, nil, thread.ErrForbidden
 	}
-	res := &bandav1.PermissionResolved{Id: req.RequestId, Decision: d, Message: req.Message}
+	if req.UpdatedInputJson != "" && (plan || question || deny || !isObject(req.UpdatedInputJson)) {
+		return nil, nil, connect.NewError(connect.CodeInvalidArgument, "only an allowed tool call's input can be changed, to a JSON object")
+	}
+	res := &bandav1.PermissionResolved{Id: req.RequestId, Decision: d, Message: req.Message, UpdatedInputJson: req.UpdatedInputJson}
 	switch {
-	case plan && d != bandav1.PermissionDecision_PERMISSION_DECISION_DENY:
+	case plan && !deny:
 		mode, ok := permissionModeFromProto[req.Mode]
 		if !ok || mode == "plan" {
 			return nil, nil, connect.NewError(connect.CodeInvalidArgument, "approving a plan needs the mode to work in")
 		}
 		t.PermissionMode, res.Mode, res.Decision = mode, req.Mode, bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW
-	case d == bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW_ALWAYS && !slices.Contains(t.AllowedTools, tool):
-		t.AllowedTools = append(t.AllowedTools, tool)
+	case question && !deny:
+		if d != bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW || len(req.Answers) == 0 {
+			return nil, nil, connect.NewError(connect.CodeInvalidArgument, "a question is answered with allow and the answers")
+		}
+		res.Answers = req.Answers
+	case d == bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW_ALWAYS:
+		res.Rule = tool
+		if req.Rule != "" {
+			if !validRule(req.Rule, tool) {
+				return nil, nil, connect.NewError(connect.CodeInvalidArgument, `a rule is "Bash(<command>:*)" for Bash or "Edit(<directory>/**)" for edits`)
+			}
+			res.Rule = req.Rule
+		}
+		if !slices.Contains(t.AllowedTools, res.Rule) {
+			t.AllowedTools = append(t.AllowedTools, res.Rule)
+		}
 	}
 	delete(t.Permissions, req.RequestId)
-	return res, &bandav1.PermissionCommand{RequestId: req.RequestId, Decision: res.Decision, Message: req.Message, Mode: res.Mode, AllowedTools: t.AllowedTools}, nil
+	return res, &bandav1.PermissionCommand{RequestId: req.RequestId, Decision: res.Decision, Message: req.Message, Mode: res.Mode, AllowedTools: t.AllowedTools,
+		Answers: res.Answers, UpdatedInputJson: req.UpdatedInputJson}, nil
+}
+
+func isObject(s string) bool {
+	var m map[string]any
+	return json.Unmarshal([]byte(s), &m) == nil && m != nil
+}
+
+// validRule reports whether rule is a narrower "always allow" for tool than
+// the whole tool: a command prefix for Bash, a directory of the checkout for
+// the edit tools. The runner matches them (cmd/runner/permissions.go).
+func validRule(rule, tool string) bool {
+	if prefix, ok := strings.CutPrefix(rule, "Bash("); ok && tool == "Bash" {
+		prefix, ok = strings.CutSuffix(prefix, ":*)")
+		return ok && strings.TrimSpace(prefix) == prefix && prefix != "" && !strings.ContainsAny(prefix, ";&|<>$`()\n\\")
+	}
+	if dir, ok := strings.CutPrefix(rule, "Edit("); ok && slices.Contains([]string{"Edit", "Write", "MultiEdit", "NotebookEdit"}, tool) {
+		dir, ok = strings.CutSuffix(dir, "/**)")
+		return ok && dir != "" && !path.IsAbs(dir) && path.Clean(dir) == dir && dir != ".." && !strings.HasPrefix(dir, "../")
+	}
+	return false
+}
+
+func (s *Service) PermissionVote(ctx context.Context, req *bandav1.PermissionVoteRequest) (*bandav1.PermissionVoteResponse, error) {
+	by := user(ctx)
+	_, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		if t.Permissions[req.RequestId] != askUserQuestion {
+			return nil, errNoPermission
+		}
+		return []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_PermissionVoted{PermissionVoted: &bandav1.PermissionVoted{Id: req.RequestId, Answers: req.Answers}}}}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.broadcast(req.ThreadId, events)
+	return &bandav1.PermissionVoteResponse{}, nil
+}
+
+func (s *Service) PermissionRevoke(ctx context.Context, req *bandav1.PermissionRevokeRequest) (*bandav1.PermissionRevokeResponse, error) {
+	by := user(ctx)
+	t, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		if !t.Trusts(by) {
+			return nil, thread.ErrForbidden
+		}
+		i := slices.Index(t.AllowedTools, req.Rule)
+		if i < 0 {
+			return nil, nil
+		}
+		t.AllowedTools = slices.Delete(t.AllowedTools, i, i+1)
+		return []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_PermissionRevoked{PermissionRevoked: &bandav1.PermissionRevoked{Rule: req.Rule}}}}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.broadcast(req.ThreadId, events)
+	if len(events) > 0 {
+		s.configure(t)
+	}
+	return &bandav1.PermissionRevokeResponse{}, nil
+}
+
+// agentMode records the agent entering plan mode itself (EnterPlanMode).
+func (s *Service) agentMode(ctx context.Context, id string, e *bandav1.Event) {
+	mode, ok := permissionModeFromProto[e.GetPermissionModeChanged().Mode]
+	_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		if !ok || t.PermissionMode == mode {
+			return nil, nil
+		}
+		t.PermissionMode = mode
+		return []*bandav1.Event{e}, nil
+	})
+	if err != nil {
+		slog.Error("store agent permission mode", "thread", id, "err", err)
+	}
+	s.broadcast(id, events)
 }
 
 // configure sends the thread's permission settings to its runner, if any.

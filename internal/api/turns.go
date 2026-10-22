@@ -274,7 +274,7 @@ func (s *Service) deliver(ctx context.Context, id, prompt string, images []strin
 	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
 		t.PendingImages = lastImages(append(t.PendingImages, images...))
-		return envLost(t, 1), nil
+		return envLost(t, 1, reasonUnreachable), nil
 	})
 	if err != nil {
 		slog.Error("keep undelivered prompt", "thread", id, "err", err)

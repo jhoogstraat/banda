@@ -105,16 +105,32 @@ const (
 	// ThreadServicePermissionSetModeProcedure is the procedure name of the ThreadService's
 	// PermissionSetMode RPC.
 	ThreadServicePermissionSetModeProcedure = "/banda.v1.ThreadService/PermissionSetMode"
+	// ThreadServicePermissionVoteProcedure is the procedure name of the ThreadService's PermissionVote
+	// RPC.
+	ThreadServicePermissionVoteProcedure = "/banda.v1.ThreadService/PermissionVote"
+	// ThreadServicePermissionRevokeProcedure is the procedure name of the ThreadService's
+	// PermissionRevoke RPC.
+	ThreadServicePermissionRevokeProcedure = "/banda.v1.ThreadService/PermissionRevoke"
 	// ThreadServiceForkProcedure is the procedure name of the ThreadService's Fork RPC.
 	ThreadServiceForkProcedure = "/banda.v1.ThreadService/Fork"
 	// ThreadServiceRaceProcedure is the procedure name of the ThreadService's Race RPC.
 	ThreadServiceRaceProcedure = "/banda.v1.ThreadService/Race"
 	// ThreadServiceRaceCompareProcedure is the procedure name of the ThreadService's RaceCompare RPC.
 	ThreadServiceRaceCompareProcedure = "/banda.v1.ThreadService/RaceCompare"
+	// ThreadServiceRaceListProcedure is the procedure name of the ThreadService's RaceList RPC.
+	ThreadServiceRaceListProcedure = "/banda.v1.ThreadService/RaceList"
 	// ThreadServiceRacePickProcedure is the procedure name of the ThreadService's RacePick RPC.
 	ThreadServiceRacePickProcedure = "/banda.v1.ThreadService/RacePick"
 	// ThreadServiceSearchProcedure is the procedure name of the ThreadService's Search RPC.
 	ThreadServiceSearchProcedure = "/banda.v1.ThreadService/Search"
+	// ThreadServiceHandoffOfferProcedure is the procedure name of the ThreadService's HandoffOffer RPC.
+	ThreadServiceHandoffOfferProcedure = "/banda.v1.ThreadService/HandoffOffer"
+	// ThreadServiceHandoffAcceptProcedure is the procedure name of the ThreadService's HandoffAccept
+	// RPC.
+	ThreadServiceHandoffAcceptProcedure = "/banda.v1.ThreadService/HandoffAccept"
+	// ThreadServiceHandoffDeclineProcedure is the procedure name of the ThreadService's HandoffDecline
+	// RPC.
+	ThreadServiceHandoffDeclineProcedure = "/banda.v1.ThreadService/HandoffDecline"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -389,6 +405,20 @@ var (
 			Procedure:  ThreadServicePermissionSetModeProcedure,
 		}
 	})
+	threadServicePermissionVoteSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionVote"),
+			Procedure:  ThreadServicePermissionVoteProcedure,
+		}
+	})
+	threadServicePermissionRevokeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PermissionRevoke"),
+			Procedure:  ThreadServicePermissionRevokeProcedure,
+		}
+	})
 	threadServiceForkSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -410,6 +440,13 @@ var (
 			Procedure:  ThreadServiceRaceCompareProcedure,
 		}
 	})
+	threadServiceRaceListSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("RaceList"),
+			Procedure:  ThreadServiceRaceListProcedure,
+		}
+	})
 	threadServiceRacePickSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -422,6 +459,27 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Search"),
 			Procedure:  ThreadServiceSearchProcedure,
+		}
+	})
+	threadServiceHandoffOfferSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffOffer"),
+			Procedure:  ThreadServiceHandoffOfferProcedure,
+		}
+	})
+	threadServiceHandoffAcceptSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffAccept"),
+			Procedure:  ThreadServiceHandoffAcceptProcedure,
+		}
+	})
+	threadServiceHandoffDeclineSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("HandoffDecline"),
+			Procedure:  ThreadServiceHandoffDeclineProcedure,
 		}
 	})
 )
@@ -502,19 +560,41 @@ type ThreadServiceClient interface {
 	// Sets which tool calls the agent must ask for (owner only). Applies to the
 	// running agent at once.
 	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
+	// Votes for answers to the agent's pending question (AskUserQuestion):
+	// anyone, shown on the card for whoever answers. A new vote replaces the
+	// caller's last one.
+	PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error)
+	// Removes a tool or rule from the thread's "always allow" list: the owner,
+	// or anyone in a trusted thread.
+	PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error)
 	// Starts threads (one per try) from another thread's current changes and
 	// conversation, owned by the caller. Anyone who can see a thread can fork it.
 	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
 	// Starts sibling threads with the same prompt, one per try.
 	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
-	// Status, cost, time and diff of threads, side by side.
+	// Status, cost, time, latest reply and diff of threads, side by side.
+	// NotFound when there are none.
 	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Everyone's most recent races, newest first: the threads of each, without
+	// diffs.
+	RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error)
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
 	// Full-text search over every thread's messages, review comments, agent
 	// text and tool calls, best matches first.
 	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
+	// Offers the thread to a teammate (owner only). If the agent is idle, it
+	// first writes a briefing for them, as the owner's last turn. The next
+	// turns run on the recipient's subscription once they accept.
+	HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error)
+	// Takes the offered thread (the recipient only): its environment restarts
+	// with the recipient's Claude login and secrets, in a new Claude Code
+	// session that gets the conversation so far. Refused while the agent works.
+	HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error)
+	// Withdraws the pending offer: declined by the recipient, or cancelled by
+	// the owner.
+	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -702,19 +782,41 @@ type ThreadServiceHandler interface {
 	// Sets which tool calls the agent must ask for (owner only). Applies to the
 	// running agent at once.
 	PermissionSetMode(context.Context, *v1.PermissionSetModeRequest) (*v1.PermissionSetModeResponse, error)
+	// Votes for answers to the agent's pending question (AskUserQuestion):
+	// anyone, shown on the card for whoever answers. A new vote replaces the
+	// caller's last one.
+	PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error)
+	// Removes a tool or rule from the thread's "always allow" list: the owner,
+	// or anyone in a trusted thread.
+	PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error)
 	// Starts threads (one per try) from another thread's current changes and
 	// conversation, owned by the caller. Anyone who can see a thread can fork it.
 	Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error)
 	// Starts sibling threads with the same prompt, one per try.
 	Race(context.Context, *v1.RaceRequest) (*v1.RaceResponse, error)
-	// Status, cost, time and diff of threads, side by side.
+	// Status, cost, time, latest reply and diff of threads, side by side.
+	// NotFound when there are none.
 	RaceCompare(context.Context, *v1.RaceCompareRequest) (*v1.RaceCompareResponse, error)
+	// Everyone's most recent races, newest first: the threads of each, without
+	// diffs.
+	RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error)
 	// Keeps one thread of a race (owner only): settles its siblings for the
 	// caller and notes the pick in each.
 	RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error)
 	// Full-text search over every thread's messages, review comments, agent
 	// text and tool calls, best matches first.
 	Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error)
+	// Offers the thread to a teammate (owner only). If the agent is idle, it
+	// first writes a briefing for them, as the owner's last turn. The next
+	// turns run on the recipient's subscription once they accept.
+	HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error)
+	// Takes the offered thread (the recipient only): its environment restarts
+	// with the recipient's Claude login and secrets, in a new Claude Code
+	// session that gets the conversation so far. Refused while the agent works.
+	HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error)
+	// Withdraws the pending offer: declined by the recipient, or cancelled by
+	// the owner.
+	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -755,11 +857,17 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceTeamWatchSpec(), Handler: adapter.teamWatch},
 		connect.Method{Spec: threadServicePermissionAnswerSpec(), Handler: adapter.permissionAnswer},
 		connect.Method{Spec: threadServicePermissionSetModeSpec(), Handler: adapter.permissionSetMode},
+		connect.Method{Spec: threadServicePermissionVoteSpec(), Handler: adapter.permissionVote},
+		connect.Method{Spec: threadServicePermissionRevokeSpec(), Handler: adapter.permissionRevoke},
 		connect.Method{Spec: threadServiceForkSpec(), Handler: adapter.fork},
 		connect.Method{Spec: threadServiceRaceSpec(), Handler: adapter.race},
 		connect.Method{Spec: threadServiceRaceCompareSpec(), Handler: adapter.raceCompare},
+		connect.Method{Spec: threadServiceRaceListSpec(), Handler: adapter.raceList},
 		connect.Method{Spec: threadServiceRacePickSpec(), Handler: adapter.racePick},
 		connect.Method{Spec: threadServiceSearchSpec(), Handler: adapter.search},
+		connect.Method{Spec: threadServiceHandoffOfferSpec(), Handler: adapter.handoffOffer},
+		connect.Method{Spec: threadServiceHandoffAcceptSpec(), Handler: adapter.handoffAccept},
+		connect.Method{Spec: threadServiceHandoffDeclineSpec(), Handler: adapter.handoffDecline},
 	)
 }
 
@@ -976,6 +1084,14 @@ func (UnimplementedThreadServiceHandler) PermissionSetMode(context.Context, *v1.
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionSetMode is not implemented")
 }
 
+func (UnimplementedThreadServiceHandler) PermissionVote(context.Context, *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionVote is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PermissionRevoke(context.Context, *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PermissionRevoke is not implemented")
+}
+
 func (UnimplementedThreadServiceHandler) Fork(context.Context, *v1.ForkRequest) (*v1.ForkResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Fork is not implemented")
 }
@@ -988,12 +1104,28 @@ func (UnimplementedThreadServiceHandler) RaceCompare(context.Context, *v1.RaceCo
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RaceCompare is not implemented")
 }
 
+func (UnimplementedThreadServiceHandler) RaceList(context.Context, *v1.RaceListRequest) (*v1.RaceListResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RaceList is not implemented")
+}
+
 func (UnimplementedThreadServiceHandler) RacePick(context.Context, *v1.RacePickRequest) (*v1.RacePickResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RacePick is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) Search(context.Context, *v1.SearchRequest) (*v1.SearchResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Search is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffOffer(context.Context, *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffOffer is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffAccept(context.Context, *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffAccept is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffDecline is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1264,6 +1396,22 @@ func (c *threadServiceClient) PermissionSetMode(ctx context.Context, req *v1.Per
 	return &res, nil
 }
 
+func (c *threadServiceClient) PermissionVote(ctx context.Context, req *v1.PermissionVoteRequest) (*v1.PermissionVoteResponse, error) {
+	var res v1.PermissionVoteResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionVoteSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PermissionRevoke(ctx context.Context, req *v1.PermissionRevokeRequest) (*v1.PermissionRevokeResponse, error) {
+	var res v1.PermissionRevokeResponse
+	if err := c.client.CallUnary(ctx, threadServicePermissionRevokeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func (c *threadServiceClient) Fork(ctx context.Context, req *v1.ForkRequest) (*v1.ForkResponse, error) {
 	var res v1.ForkResponse
 	if err := c.client.CallUnary(ctx, threadServiceForkSpec(), req, &res); err != nil {
@@ -1288,6 +1436,14 @@ func (c *threadServiceClient) RaceCompare(ctx context.Context, req *v1.RaceCompa
 	return &res, nil
 }
 
+func (c *threadServiceClient) RaceList(ctx context.Context, req *v1.RaceListRequest) (*v1.RaceListResponse, error) {
+	var res v1.RaceListResponse
+	if err := c.client.CallUnary(ctx, threadServiceRaceListSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func (c *threadServiceClient) RacePick(ctx context.Context, req *v1.RacePickRequest) (*v1.RacePickResponse, error) {
 	var res v1.RacePickResponse
 	if err := c.client.CallUnary(ctx, threadServiceRacePickSpec(), req, &res); err != nil {
@@ -1299,6 +1455,30 @@ func (c *threadServiceClient) RacePick(ctx context.Context, req *v1.RacePickRequ
 func (c *threadServiceClient) Search(ctx context.Context, req *v1.SearchRequest) (*v1.SearchResponse, error) {
 	var res v1.SearchResponse
 	if err := c.client.CallUnary(ctx, threadServiceSearchSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffOffer(ctx context.Context, req *v1.HandoffOfferRequest) (*v1.HandoffOfferResponse, error) {
+	var res v1.HandoffOfferResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffOfferSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffAccept(ctx context.Context, req *v1.HandoffAcceptRequest) (*v1.HandoffAcceptResponse, error) {
+	var res v1.HandoffAcceptResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffAcceptSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) HandoffDecline(ctx context.Context, req *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
+	var res v1.HandoffDeclineResponse
+	if err := c.client.CallUnary(ctx, threadServiceHandoffDeclineSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -1682,6 +1862,30 @@ func (h threadServiceHandler) permissionSetMode(ctx context.Context, _ connect.S
 	return stream.Send(res)
 }
 
+func (h threadServiceHandler) permissionVote(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionVoteRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionVote(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) permissionRevoke(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PermissionRevokeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PermissionRevoke(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
 func (h threadServiceHandler) fork(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.ForkRequest
 	if err := stream.Receive(&req); err != nil {
@@ -1718,6 +1922,18 @@ func (h threadServiceHandler) raceCompare(ctx context.Context, _ connect.Spec, s
 	return stream.Send(res)
 }
 
+func (h threadServiceHandler) raceList(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RaceListRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RaceList(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
 func (h threadServiceHandler) racePick(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.RacePickRequest
 	if err := stream.Receive(&req); err != nil {
@@ -1736,6 +1952,42 @@ func (h threadServiceHandler) search(ctx context.Context, _ connect.Spec, stream
 		return err
 	}
 	res, err := h.svc.Search(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffOffer(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffOfferRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffOffer(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffAccept(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffAcceptRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffAccept(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) handoffDecline(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.HandoffDeclineRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.HandoffDecline(ctx, &req)
 	if err != nil {
 		return err
 	}

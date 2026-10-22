@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +35,9 @@ type Service struct {
 	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
 	// MaxAgentThreads how many sub-threads started by agents may run per owner.
 	MaxSubthreadDepth, MaxAgentThreads int
+	// OverlapWindow is how recently two threads must have changed for their
+	// shared files to count as an overlap; zero turns overlaps off.
+	OverlapWindow time.Duration
 	// SuspendPause holds every suspend between the thread's status and its
 	// environment, so tests can race it. Zero outside tests.
 	SuspendPause time.Duration
@@ -94,6 +99,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		LoginIdle:          10 * time.Minute,
 		MaxSubthreadDepth:  3,
 		MaxAgentThreads:    8,
+		OverlapWindow:      7 * 24 * time.Hour,
 		WatchBuffer:        256,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
@@ -257,8 +263,11 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Activity:           t.Activity,
 		PermissionMode:     permissionModeToProto[t.PermissionMode],
 		PermissionPending:  len(t.Permissions) > 0,
+		PermissionTools:    slices.Sorted(maps.Values(t.Permissions)),
+		AllowedTools:       t.AllowedTools,
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
+		HandoffTo:          t.HandoffTo,
 	}
 	if t.ForkedFrom != "" {
 		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}

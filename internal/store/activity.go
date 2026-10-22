@@ -26,6 +26,10 @@ func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 		text = toolSummary(k.ToolCall)
 	case *bandav1.Event_PermissionRequested:
 		text = "asks permission: " + k.PermissionRequested.ToolName
+		var q struct{ Questions []struct{ Question string } }
+		if k.PermissionRequested.ToolName == "AskUserQuestion" && json.Unmarshal([]byte(k.PermissionRequested.InputJson), &q) == nil && len(q.Questions) > 0 {
+			text = "asks: " + q.Questions[0].Question
+		}
 	case *bandav1.Event_TurnEnded:
 		text = "finished the turn"
 		if k.TurnEnded.IsError {

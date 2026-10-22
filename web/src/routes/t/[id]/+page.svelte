@@ -7,13 +7,13 @@
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CornerLeftUpIcon from '@lucide/svelte/icons/corner-left-up';
 	import FileDiffIcon from '@lucide/svelte/icons/file-diff';
 	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import PauseIcon from '@lucide/svelte/icons/pause';
@@ -32,10 +32,15 @@
 	import ChatItem, { agentText } from '#lib/components/chat-item.svelte';
 	import Composer from '#lib/components/composer.svelte';
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
+	import HandoffDialog from '#lib/components/handoff-dialog.svelte';
+	import LoadState from '#lib/components/load-state.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
+	import Overlaps from '#lib/components/overlaps.svelte';
+	import PageHeader from '#lib/components/page-header.svelte';
 	import SpawnDialog from '#lib/components/spawn-dialog.svelte';
 	import SubThreads from '#lib/components/sub-threads.svelte';
 	import { isSnoozed, presets, settle, snooze } from '#lib/components/thread-actions.svelte';
+	import ThreadError from '#lib/components/thread-error.svelte';
 	import ThreadHeader from '#lib/components/thread-header.svelte';
 	import ThreadPane from '#lib/components/thread-pane.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -70,14 +75,18 @@
 	let loginOpen = $state(false);
 	let forkOpen = $state(false);
 	let spawnOpen = $state(false);
+	let handoffOpen = $state(false);
 	// Bumped by lineage events, so the sub-thread strip refetches.
 	let lineage = $state(0);
 	let error = $state('');
 	// The reason of the latest status change, e.g. why the environment failed.
 	let reason = $state('');
 	let offline = $state(false);
-	// GetThread said there is no such thread.
+	// GetThread said there is no such thread (or none the viewer may open).
 	let missing = $state(false);
+	// Why the thread couldn't be loaded yet; retried every 2 s, or now from the page.
+	let loadError = $state('');
+	const failed = $derived(!thread && !!loadError);
 	let closed = false;
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
 	// Ticks so typing expires; `others` drops the viewer from presence and typing.
@@ -103,21 +112,26 @@
 		ask = owner;
 	});
 	let focus = $state<Comment>();
+	const waiting = $derived(chat.items.filter((i) => i.kind === 'request' && !i.resolved));
 	const posted = $derived(chat.items.flatMap((i) => (i.kind === 'message' || i.kind === 'request' ? i.review.map((c) => ({ ...c, by: i.actor })) : [])));
 	function reveal(c: Comment) {
 		show('diff');
 		focus = c;
 	}
 
-	// A failed load tries again: a quiet thread sends no event that would refresh it.
-	let loadError = '';
+	// A failed load tries again: a quiet thread sends no event that would refresh it. Before the thread
+	// first loads, the page shows the failure instead of an empty thread; after, the composer's error line.
 	async function load() {
+		clearTimeout(timer);
 		try {
 			thread = (await api.getThread({ threadId: id })).thread;
 			if (error === loadError) error = '';
+			loadError = '';
 		} catch (e) {
-			if (ConnectError.from(e).code === Code.NotFound) return void (missing = true);
-			error = loadError = (e as Error).message;
+			const code = ConnectError.from(e).code;
+			if (code === Code.NotFound || code === Code.PermissionDenied) return void (missing = true);
+			loadError = (e as Error).message;
+			if (thread) error = loadError;
 			if (!closed) timer = setTimeout(load, 2000);
 		}
 	}
@@ -143,6 +157,15 @@
 	$effect(() => {
 		const hash = page.url.hash;
 		if (/^#\d+$/.test(hash)) target = BigInt(hash.slice(1));
+	});
+	// /t/<id>?file=<path> (from an overlap) opens the diff at that file once the thread is loaded.
+	let shownFile = '';
+	$effect(() => {
+		const path = page.url.searchParams.get('file') ?? '';
+		if (!path || !thread || path === shownFile) return;
+		shownFile = path;
+		show('diff');
+		focus = { path, body: '', startLine: 0, endLine: 0, old: false, code: '' }; // no line: the file itself
 	});
 	$effect(() => {
 		if (target === undefined || !oldest) return;
@@ -185,7 +208,7 @@
 					}
 					if (event.kind.case === 'lineageUpdate') lineage++;
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'autoPush'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -290,6 +313,7 @@
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
 		if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
+		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
 		if (owner) {
 			if (!pr && t.repoUrl) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
@@ -340,12 +364,17 @@
 <svelte:document onvisibilitychange={markRead} />
 
 <div class="@container flex min-w-0 flex-1 flex-col">
-	<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} bind:forkOpen bind:spawnOpen bind:paneOpen={diffOpen} />
-	<SubThreads threadId={id} version={lineage} />
-
 	{#if missing}
-		<ConversationEmptyState class="flex-1" title="Thread not found" description="It doesn't exist, or the link is wrong." />
+		<PageHeader />
+		<LoadState title="Thread not found" description="It doesn't exist, it was deleted, or the link is wrong." />
+	{:else if failed}
+		<PageHeader />
+		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
+		<SubThreads threadId={id} version={lineage} />
+		<Overlaps overlaps={thread?.overlaps ?? []} />
+
 		<Conversation class="min-h-0 flex-1">
 			<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
 				<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -362,7 +391,7 @@
 								? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
 								: ''}"
 						>
-							<ChatItem {item} threadId={id} {thread} {owner} {act} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} />
+							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} />
 						</div>
 					{/each}
 
@@ -380,13 +409,7 @@
 					{:else if thread?.status === Status.SUSPENDED}
 						<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 					{:else if thread?.status === Status.ERRORED}
-						<div class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-							<CircleAlertIcon class="size-4 shrink-0 text-destructive" />
-							<span class="flex-1">{reason || 'The environment failed or was lost.'}</span>
-							{#if owner}
-								<Button size="sm" onclick={retry}><RotateCcwIcon /> Retry</Button>
-							{/if}
-						</div>
+						<ThreadError {thread} {owner} {reason} {chat} {retry} onterminal={() => show('terminal')} />
 					{:else if !chat.items.length}
 						<ConversationEmptyState title="No messages yet" description="" />
 					{/if}
@@ -399,10 +422,11 @@
 	{/if}
 </div>
 
-{#if !missing}
+{#if !missing && !failed}
 	<ThreadPane threadId={id} {thread} {owner} bind:open={diffOpen} bind:tab bind:pending bind:focus bind:ask bind:port={previewPort} {posted} onsend={sendReview} />
 {/if}
 
 <LoginDialog bind:open={loginOpen} />
 {#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}
 {#if thread}<SpawnDialog bind:open={spawnOpen} {thread} />{/if}
+{#if thread}<HandoffDialog bind:open={handoffOpen} {thread} />{/if}

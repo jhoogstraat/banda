@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GitMergeConflictIcon from '@lucide/svelte/icons/git-merge-conflict';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
@@ -7,7 +8,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { noRepo, projectName, projectOf, threads, unread, userName } from '#lib/threads.svelte.js';
+	import { noRepo, projectName, projectOf, threads, unread, userName, waiting } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 
 	// Everyone's recent, unsettled threads, live from TeamWatch.
@@ -51,7 +52,8 @@
 	const busy = (list: Thread[]) => list.filter((t) => t.status === Status.WORKING || t.status === Status.STARTING).length;
 
 	function doing(t: Thread) {
-		if (t.status === Status.AWAITING_INPUT) return `Waiting for ${t.ownerId === me ? 'you' : userName(t.ownerId)}`;
+		if (waiting(t)) return waiting(t);
+		if (t.status === Status.AWAITING_INPUT) return `Ready for ${t.ownerId === me ? 'you' : userName(t.ownerId)}`;
 		if (t.status === Status.SUSPENDED) return 'Paused';
 		const a = t.activity;
 		if (!a?.text) return t.status === Status.ERRORED ? 'Errored' : '';
@@ -109,7 +111,7 @@
 								: ''}"
 						>
 							<div class="flex items-center gap-2">
-								<StatusDot status={t.status} />
+								<StatusDot status={t.status} waiting={waiting(t)} />
 								<span class="truncate {unread(t) ? 'font-semibold' : ''}">{t.title || 'Untitled thread'}</span>
 								{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
 							</div>
@@ -119,6 +121,12 @@
 							<div class="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
 								<span class="truncate">{projectName(t.repoUrl)}</span>
 								<span class="shrink-0 tabular-nums">{ago(t.activity?.time ?? t.updatedAt, threads.now)}</span>
+								{#if t.overlaps.length}
+									{@const label = `Overlaps with ${t.overlaps.map((o) => o.title || 'Untitled thread').join(', ')}`}
+									<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400" aria-label={label} title={label}>
+										<GitMergeConflictIcon class="size-3" />{t.overlaps.length}
+									</span>
+								{/if}
 								{#if t.presentUserIds.length}
 									<span class="ml-auto flex shrink-0 -space-x-1.5" title="Here now: {t.presentUserIds.map(userName).join(', ')}">
 										{#each t.presentUserIds.slice(0, 3) as u (u)}

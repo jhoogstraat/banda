@@ -75,7 +75,7 @@ type (
 		Threads []threadInfo `json:"threads"`
 	}
 	readIn struct {
-		ThreadID    string `json:"thread_id" jsonschema:"id of the thread to read"`
+		ThreadID    string `json:"thread_id,omitempty" jsonschema:"id of the thread to read (default: this thread)"`
 		Limit       int    `json:"limit,omitempty" jsonschema:"how many of the most recent transcript lines to return (default 50)"`
 		IncludeDiff bool   `json:"include_diff,omitempty" jsonschema:"also return the thread's git diff, truncated to 20 KB"`
 	}
@@ -168,9 +168,9 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, s.threadInfos(ctx, threads), nil
 		})
 
-	addTool(ts, &mcp.Tool{Name: "read_thread", Description: "Read another thread: its metadata and a compact transcript of its most recent events (messages with their authors, agent text, tool names, turn ends with errors, notices). Optionally include its current git diff."},
+	addTool(ts, &mcp.Tool{Name: "read_thread", Description: "Read a thread (this one too): its metadata, the other active threads whose diffs change the same files, and a compact transcript of its most recent events (messages with their authors, agent text, tool names, turn ends with errors, notices). Optionally include its current git diff."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, any, error) {
-			t, err := s.store.Get(ctx, in.ThreadID)
+			t, err := s.store.Get(ctx, or(in.ThreadID, caller.ID))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -193,6 +193,17 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			fmt.Fprintf(&b, "Thread %s: %s\nOwner: %s (%s)\nStatus: %s, mode: %s, profile: %s\nRepo: %s\nUpdated: %s\n\nTranscript:\n%s\n",
 				t.ID, t.Title, actorName(names, t.OwnerID), t.OwnerID, t.Status, t.Mode, t.Profile, repo,
 				t.UpdatedAt.Format(time.RFC3339), transcript(names, events, limit))
+			overlaps, err := s.overlaps(ctx, t.ID)
+			if err != nil {
+				return nil, nil, err
+			}
+			if len(overlaps[t.ID]) > 0 {
+				b.WriteString("\nOverlaps (other active threads on this repository and base branch that change the same files; coordinate with their agents and owners):\n")
+				for _, o := range overlaps[t.ID] {
+					fmt.Fprintf(&b, "- %s %q by %s (%s): %s\n", o.ThreadId, o.Title, actorName(names, o.OwnerId),
+						strings.ToLower(strings.TrimPrefix(o.Status.String(), "STATUS_")), strings.Join(o.Paths, ", "))
+				}
+			}
 			if in.IncludeDiff {
 				d := t.Diff
 				if len(d) > maxDiff {
@@ -271,6 +282,8 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 			lines = append(lines, actorName(names, e.Actor)+": "+messageText(k.Message)+attached(k.Message))
 		case *bandav1.Event_LineageUpdate:
 			lines = append(lines, lineageLine(k.LineageUpdate))
+		case *bandav1.Event_Overlap:
+			lines = append(lines, overlapLine(names, k.Overlap))
 		case *bandav1.Event_TurnRequest:
 			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+messageText(k.TurnRequest.GetMessage())+attached(k.TurnRequest.GetMessage()))
 		case *bandav1.Event_TurnRequestResolved:
