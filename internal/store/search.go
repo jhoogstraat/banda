@@ -45,7 +45,7 @@ func tsquery(words string) string {
 const (
 	searchKind   = `CASE WHEN e.body ? 'agentText' THEN 'agent' WHEN e.body ? 'toolCall' THEN 'code' ELSE 'people' END`
 	searchReview = `coalesce(e.body->'message'->'review', e.body->'turnRequest'->'message'->'review')`
-	// The readable text of an event, close to what schema.sql indexes.
+	// The readable text of an event, close to what migrations/0001_baseline.sql indexes.
 	searchDoc = `coalesce(e.body->'message'->>'text', e.body->'turnRequest'->'message'->>'text', e.body->'agentText'->>'text', '') ||
 	coalesce(' ' || (SELECT string_agg((r->>'path') || ': ' || (r->>'body'), ' · ') FROM jsonb_array_elements(` + searchReview + `) r), '') ||
 	coalesce(e.body->'toolCall'->>'name' || ' ' || regexp_replace(regexp_replace(e.body->'toolCall'->>'inputJson', '"\w+":|[][{}",]', ' ', 'g'), '\s+', ' ', 'g'), '')`

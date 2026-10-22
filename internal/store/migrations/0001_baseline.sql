@@ -1,3 +1,10 @@
+-- The baseline: the schema up to versioned migrations, idempotent so it
+-- brings a database of any earlier version (or none) up to date. It is
+-- frozen: never edit it. Every change from now on is a new file here,
+-- NNNN_what.sql numbered after the last, applied once, in order, in a
+-- transaction, and recorded in schema_migrations (see migrate in store.go).
+-- A migration that fails stops the API. Never edit or renumber an applied one.
+
 CREATE TABLE IF NOT EXISTS threads (
   id             text PRIMARY KEY,
   owner_id       text NOT NULL,
@@ -214,3 +221,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS git_email text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS default_model text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS default_effort text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS default_permission_mode text NOT NULL DEFAULT '';
+
+-- Replaced by schema_migrations.
+DROP TABLE IF EXISTS schema_applied;

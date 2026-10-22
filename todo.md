@@ -47,7 +47,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] Ingress with TLS for `banda.<domain>` and `preview.banda.<domain>` in the chart (`ingress.*`); `PUBLIC_URL`, `PREVIEW_URL` follow.
 - [ ] Ingress on a real cluster: check the controller keeps thread streams open (read timeouts).
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
-- [ ] Versioned schema migrations before the first column change (`internal/store/store.go`).
+- [x] Versioned schema migrations: `internal/store/migrations/NNNN_*.sql`, each once, under an advisory lock (docs/development.md).
 - [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", is the start; it needs a run on a real cluster.
 - [ ] Decide on Claude: confirm the persistent login volume and teammate turns with Anthropic (PLAN.md, open question 3) before more than the core team uses it.
 

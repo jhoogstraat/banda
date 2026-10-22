@@ -4,10 +4,10 @@ package store
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	_ "embed"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 	"time"
@@ -22,8 +22,10 @@ import (
 	"github.com/jhoogstraat/banda/internal/thread"
 )
 
-//go:embed schema.sql
-var schema string
+// The schema: see migrations/0001_baseline.sql for the rules.
+//
+//go:embed migrations/*.sql
+var migrations embed.FS
 
 var ErrNotFound = errors.New("thread not found")
 
@@ -80,36 +82,70 @@ type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// Open connects and applies the schema unless the database has it already.
-// ponytail: idempotent schema file, switch to versioned migrations once a column changes.
+// Open connects and applies the migrations the database doesn't have yet.
 func Open(ctx context.Context, url string) (*Store, error) {
 	db, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	// Its ALTERs lock tables even when there is nothing to change, so applying it to a live database can
-	// deadlock with the traffic of another API on it: skip it when it's current.
-	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(schema)))
-	var applied string
-	if db.QueryRow(ctx, `SELECT hash FROM schema_applied`).Scan(&applied); applied != sum {
-		err = applySchema(ctx, db, sum)
-	}
-	if err != nil {
+	sub, _ := fs.Sub(migrations, "migrations")
+	if err := migrate(ctx, db, sub); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return &Store{db}, nil
 }
 
-// applySchema applies the schema and records its hash. One statement list is one transaction; the lock
-// keeps APIs starting together from deadlocking on it. It can still deadlock with another API's traffic,
-// and Postgres may pick it as the victim: try again.
-func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
+// migrate applies the *.sql files of fsys in name order, each once, recorded in schema_migrations.
+// Skipping the recorded ones without a lock matters: the baseline's ALTERs lock tables even when there
+// is nothing to change, which can deadlock with the traffic of another API on a live database.
+func migrate(ctx context.Context, db *pgxpool.Pool, fsys fs.FS) error {
+	names, err := fs.Glob(fsys, "*.sql")
+	if err != nil {
+		return err
+	}
+	done := map[string]bool{}
+	if rows, err := db.Query(ctx, `SELECT name FROM schema_migrations`); err == nil { // missing on a fresh database
+		applied, _ := pgx.CollectRows(rows, pgx.RowTo[string])
+		for _, n := range applied {
+			done[n] = true
+		}
+	}
+	for _, name := range names {
+		if done[name] {
+			continue
+		}
+		body, err := fs.ReadFile(fsys, name)
+		if err == nil {
+			err = applyMigration(ctx, db, name, string(body))
+		}
+		if err != nil {
+			return fmt.Errorf("schema migration %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// applyMigration applies one migration in a transaction unless it is recorded. The lock keeps APIs
+// starting together from applying it twice or deadlocking on it. It can still deadlock with another API's
+// traffic, and Postgres may pick it as the victim: try again.
+func applyMigration(ctx context.Context, db *pgxpool.Pool, name, body string) error {
 	for try := 1; ; try++ {
-		_, err := db.Exec(ctx, "SELECT pg_advisory_xact_lock(4242);\n"+schema+`
-			CREATE TABLE IF NOT EXISTS schema_applied (hash text NOT NULL);
-			DELETE FROM schema_applied;
-			INSERT INTO schema_applied VALUES ('`+sum+`');`)
+		err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(4242);
+				CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
+				return err
+			}
+			var done bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT FROM schema_migrations WHERE name = $1)`, name).Scan(&done); err != nil || done {
+				return err
+			}
+			if _, err := tx.Exec(ctx, body); err != nil {
+				return err
+			}
+			_, err := tx.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1)`, name)
+			return err
+		})
 		var pe *pgconn.PgError
 		if err == nil || try == 5 || !errors.As(err, &pe) || pe.Code != "40P01" {
 			return err
