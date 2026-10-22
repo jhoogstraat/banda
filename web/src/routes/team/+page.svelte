@@ -45,13 +45,14 @@
 		return ts ? timestampMs(ts) : 0;
 	};
 
-	// Each person's threads by what matters: blocked on them or with fresh results (paused after 30 min idle), the
-	// agent working, paused in the last day, and paused before (only counted). The server's order: latest first.
+	// Each person's threads by what matters, as the sidebar sorts them: blocked on them (a request or a failure), the
+	// agent working, finished (Ready, or paused in the last day), and paused before (only counted). The server's
+	// order: latest first.
 	type Groups = { needs: Thread[]; working: Thread[]; done: Thread[]; older: Thread[] };
 	function group(t: Thread): keyof Groups {
-		if (t.turnRequests || t.permissionPending) return 'needs';
+		if (t.turnRequests || t.permissionPending || t.status === Status.ERRORED) return 'needs';
 		if (t.status === Status.STARTING || t.status === Status.WORKING) return 'working';
-		if (t.status !== Status.SUSPENDED) return 'needs';
+		if (t.status !== Status.SUSPENDED) return 'done';
 		return threads.now - last(t) < 86_400_000 ? 'done' : 'older';
 	}
 	// Me first, then whoever was active most recently; people with nothing but older threads are quiet.

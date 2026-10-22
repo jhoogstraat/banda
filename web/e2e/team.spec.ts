@@ -24,6 +24,7 @@ test('team board: alice’s threads grouped by what needs her, paused ones folde
 		alice.create({ prompt: 'e2e: done last week' })
 	]);
 	await Promise.all([waiting, done, older].map((t) => t.waitForStatus(Status.AWAITING_INPUT)));
+	await waiting.as(bob).send('@agent e2e: from bob', { mentionsAgent: true }); // a turn request: blocked on alice
 	await Promise.all([done, older].map((t) => t.snooze()));
 	await Promise.all([done, older].map((t) => t.waitForStatus(Status.SUSPENDED)));
 	// Paused 3 days ago; again if the suspend's last events (the push report) land after it.
