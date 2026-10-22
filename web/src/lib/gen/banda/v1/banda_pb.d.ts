@@ -3670,6 +3670,13 @@ export declare type RaceEntry = Message$1<"banda.v1.RaceEntry"> & {
    * @generated from field: int64 duration_ms = 4;
    */
   durationMs: bigint;
+
+  /**
+   * The agent's latest reply.
+   *
+   * @generated from field: string reply = 5;
+   */
+  reply: string;
 };
 
 /**
@@ -3677,6 +3684,36 @@ export declare type RaceEntry = Message$1<"banda.v1.RaceEntry"> & {
  * Use `create(RaceEntrySchema)` to create a new message.
  */
 export declare const RaceEntrySchema: GenMessage<RaceEntry>;
+
+/**
+ * @generated from message banda.v1.RaceListRequest
+ */
+export declare type RaceListRequest = Message$1<"banda.v1.RaceListRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.RaceListRequest.
+ * Use `create(RaceListRequestSchema)` to create a new message.
+ */
+export declare const RaceListRequestSchema: GenMessage<RaceListRequest>;
+
+/**
+ * @generated from message banda.v1.RaceListResponse
+ */
+export declare type RaceListResponse = Message$1<"banda.v1.RaceListResponse"> & {
+  /**
+   * Grouped by race_id, newest race first.
+   *
+   * @generated from field: repeated banda.v1.Thread threads = 1;
+   */
+  threads: Thread[];
+};
+
+/**
+ * Describes the message banda.v1.RaceListResponse.
+ * Use `create(RaceListResponseSchema)` to create a new message.
+ */
+export declare const RaceListResponseSchema: GenMessage<RaceListResponse>;
 
 /**
  * @generated from message banda.v1.RacePickRequest
@@ -4592,7 +4629,8 @@ export declare const ThreadService: GenService<{
     output: typeof RaceResponseSchema;
   },
   /**
-   * Status, cost, time and diff of threads, side by side.
+   * Status, cost, time, latest reply and diff of threads, side by side.
+   * NotFound when there are none.
    *
    * @generated from rpc banda.v1.ThreadService.RaceCompare
    */
@@ -4600,6 +4638,17 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof RaceCompareRequestSchema;
     output: typeof RaceCompareResponseSchema;
+  },
+  /**
+   * Everyone's most recent races, newest first: the threads of each, without
+   * diffs.
+   *
+   * @generated from rpc banda.v1.ThreadService.RaceList
+   */
+  raceList: {
+    methodKind: "unary";
+    input: typeof RaceListRequestSchema;
+    output: typeof RaceListResponseSchema;
   },
   /**
    * Keeps one thread of a race (owner only): settles its siblings for the

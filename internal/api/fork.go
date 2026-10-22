@@ -123,6 +123,9 @@ func (s *Service) RaceCompare(ctx context.Context, req *bandav1.RaceCompareReque
 	if err != nil {
 		return nil, err
 	}
+	if len(threads) == 0 {
+		return nil, connect.NewError(connect.CodeNotFound, "no such tries")
+	}
 	sort.SliceStable(threads, func(i, j int) bool { return threads[i].CreatedAt.Before(threads[j].CreatedAt) }) // stable columns
 	var ids []string
 	for _, t := range threads {
@@ -135,7 +138,26 @@ func (s *Service) RaceCompare(ctx context.Context, req *bandav1.RaceCompareReque
 	res := &bandav1.RaceCompareResponse{}
 	for _, t := range threads {
 		tt := totals[t.ID]
-		res.Entries = append(res.Entries, &bandav1.RaceEntry{Thread: toProto(t), Turns: int32(tt.Turns), CostUsd: tt.CostUSD, DurationMs: tt.DurationMS})
+		reply, err := s.store.LastAgentText(ctx, t.ID)
+		if err != nil {
+			return nil, err
+		}
+		res.Entries = append(res.Entries, &bandav1.RaceEntry{Thread: toProto(t), Turns: int32(tt.Turns), CostUsd: tt.CostUSD, DurationMs: tt.DurationMS, Reply: reply})
+	}
+	return res, nil
+}
+
+// recentRaces is how many races RaceList returns.
+const recentRaces = 30
+
+func (s *Service) RaceList(ctx context.Context, _ *bandav1.RaceListRequest) (*bandav1.RaceListResponse, error) {
+	threads, err := s.store.Races(ctx, user(ctx), recentRaces)
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.RaceListResponse{}
+	for _, t := range threads {
+		res.Threads = append(res.Threads, toProto(t))
 	}
 	return res, nil
 }

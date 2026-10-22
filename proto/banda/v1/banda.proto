@@ -84,8 +84,12 @@ service ThreadService {
   rpc Fork(ForkRequest) returns (ForkResponse);
   // Starts sibling threads with the same prompt, one per try.
   rpc Race(RaceRequest) returns (RaceResponse);
-  // Status, cost, time and diff of threads, side by side.
+  // Status, cost, time, latest reply and diff of threads, side by side.
+  // NotFound when there are none.
   rpc RaceCompare(RaceCompareRequest) returns (RaceCompareResponse);
+  // Everyone's most recent races, newest first: the threads of each, without
+  // diffs.
+  rpc RaceList(RaceListRequest) returns (RaceListResponse);
   // Keeps one thread of a race (owner only): settles its siblings for the
   // caller and notes the pick in each.
   rpc RacePick(RacePickRequest) returns (RacePickResponse);
@@ -1112,6 +1116,15 @@ message RaceEntry {
   int32 turns = 2;
   double cost_usd = 3;
   int64 duration_ms = 4;
+  // The agent's latest reply.
+  string reply = 5;
+}
+
+message RaceListRequest {}
+
+message RaceListResponse {
+  // Grouped by race_id, newest race first.
+  repeated Thread threads = 1;
 }
 
 message RacePickRequest {

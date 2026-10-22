@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -201,6 +202,30 @@ func (s *Store) Compared(ctx context.Context, raceID string, ids []string, viewe
 			err = s.db.QueryRow(ctx, `SELECT diff FROM threads WHERE id = $1`, threads[i].ID).Scan(&threads[i].Diff)
 		}
 	}
+	return threads, err
+}
+
+// Races returns the threads of the latest n races, everyone's, newest race
+// first and in order of creation within one.
+func (s *Store) Races(ctx context.Context, viewerID string, n int) ([]Thread, error) {
+	threads, err := s.listWithView(ctx, `t.race_id IN (SELECT race_id FROM threads WHERE race_id <> ''
+		GROUP BY race_id ORDER BY max(created_at) DESC LIMIT $2)`, viewerID, n)
+	started := map[string]time.Time{}
+	for _, t := range threads {
+		if s, ok := started[t.RaceID]; !ok || t.CreatedAt.Before(s) {
+			started[t.RaceID] = t.CreatedAt
+		}
+	}
+	sort.SliceStable(threads, func(i, j int) bool {
+		a, b := threads[i], threads[j]
+		if a.RaceID != b.RaceID {
+			if sa, sb := started[a.RaceID], started[b.RaceID]; !sa.Equal(sb) {
+				return sa.After(sb)
+			}
+			return a.RaceID < b.RaceID
+		}
+		return a.CreatedAt.Before(b.CreatedAt)
+	})
 	return threads, err
 }
 

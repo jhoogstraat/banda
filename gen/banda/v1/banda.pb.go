@@ -9022,9 +9022,11 @@ type RaceEntry struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Thread *Thread                `protobuf:"bytes,1,opt,name=thread,proto3" json:"thread,omitempty"`
 	// Totals over the thread's finished turns.
-	Turns         int32   `protobuf:"varint,2,opt,name=turns,proto3" json:"turns,omitempty"`
-	CostUsd       float64 `protobuf:"fixed64,3,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
-	DurationMs    int64   `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Turns      int32   `protobuf:"varint,2,opt,name=turns,proto3" json:"turns,omitempty"`
+	CostUsd    float64 `protobuf:"fixed64,3,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	DurationMs int64   `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	// The agent's latest reply.
+	Reply         string `protobuf:"bytes,5,opt,name=reply,proto3" json:"reply,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9087,6 +9089,94 @@ func (x *RaceEntry) GetDurationMs() int64 {
 	return 0
 }
 
+func (x *RaceEntry) GetReply() string {
+	if x != nil {
+		return x.Reply
+	}
+	return ""
+}
+
+type RaceListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RaceListRequest) Reset() {
+	*x = RaceListRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RaceListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RaceListRequest) ProtoMessage() {}
+
+func (x *RaceListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RaceListRequest.ProtoReflect.Descriptor instead.
+func (*RaceListRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{145}
+}
+
+type RaceListResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Grouped by race_id, newest race first.
+	Threads       []*Thread `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RaceListResponse) Reset() {
+	*x = RaceListResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RaceListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RaceListResponse) ProtoMessage() {}
+
+func (x *RaceListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RaceListResponse.ProtoReflect.Descriptor instead.
+func (*RaceListResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{146}
+}
+
+func (x *RaceListResponse) GetThreads() []*Thread {
+	if x != nil {
+		return x.Threads
+	}
+	return nil
+}
+
 type RacePickRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
@@ -9096,7 +9186,7 @@ type RacePickRequest struct {
 
 func (x *RacePickRequest) Reset() {
 	*x = RacePickRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	mi := &file_banda_v1_banda_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9108,7 +9198,7 @@ func (x *RacePickRequest) String() string {
 func (*RacePickRequest) ProtoMessage() {}
 
 func (x *RacePickRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	mi := &file_banda_v1_banda_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9121,7 +9211,7 @@ func (x *RacePickRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RacePickRequest.ProtoReflect.Descriptor instead.
 func (*RacePickRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{145}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *RacePickRequest) GetThreadId() string {
@@ -9139,7 +9229,7 @@ type RacePickResponse struct {
 
 func (x *RacePickResponse) Reset() {
 	*x = RacePickResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	mi := &file_banda_v1_banda_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9151,7 +9241,7 @@ func (x *RacePickResponse) String() string {
 func (*RacePickResponse) ProtoMessage() {}
 
 func (x *RacePickResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	mi := &file_banda_v1_banda_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9164,7 +9254,7 @@ func (x *RacePickResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RacePickResponse.ProtoReflect.Descriptor instead.
 func (*RacePickResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{146}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{148}
 }
 
 type ForkPatchRequest struct {
@@ -9177,7 +9267,7 @@ type ForkPatchRequest struct {
 
 func (x *ForkPatchRequest) Reset() {
 	*x = ForkPatchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[147]
+	mi := &file_banda_v1_banda_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9189,7 +9279,7 @@ func (x *ForkPatchRequest) String() string {
 func (*ForkPatchRequest) ProtoMessage() {}
 
 func (x *ForkPatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[147]
+	mi := &file_banda_v1_banda_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9202,7 +9292,7 @@ func (x *ForkPatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkPatchRequest.ProtoReflect.Descriptor instead.
 func (*ForkPatchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{147}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *ForkPatchRequest) GetThreadId() string {
@@ -9231,7 +9321,7 @@ type ForkPatchResponse struct {
 
 func (x *ForkPatchResponse) Reset() {
 	*x = ForkPatchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[148]
+	mi := &file_banda_v1_banda_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9243,7 +9333,7 @@ func (x *ForkPatchResponse) String() string {
 func (*ForkPatchResponse) ProtoMessage() {}
 
 func (x *ForkPatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[148]
+	mi := &file_banda_v1_banda_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9256,7 +9346,7 @@ func (x *ForkPatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkPatchResponse.ProtoReflect.Descriptor instead.
 func (*ForkPatchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{148}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *ForkPatchResponse) GetPatch() string {
@@ -9292,7 +9382,7 @@ type SearchRequest struct {
 
 func (x *SearchRequest) Reset() {
 	*x = SearchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[149]
+	mi := &file_banda_v1_banda_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9304,7 +9394,7 @@ func (x *SearchRequest) String() string {
 func (*SearchRequest) ProtoMessage() {}
 
 func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[149]
+	mi := &file_banda_v1_banda_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9317,7 +9407,7 @@ func (x *SearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
 func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{149}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *SearchRequest) GetQuery() string {
@@ -9387,7 +9477,7 @@ type SearchResult struct {
 
 func (x *SearchResult) Reset() {
 	*x = SearchResult{}
-	mi := &file_banda_v1_banda_proto_msgTypes[150]
+	mi := &file_banda_v1_banda_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9399,7 +9489,7 @@ func (x *SearchResult) String() string {
 func (*SearchResult) ProtoMessage() {}
 
 func (x *SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[150]
+	mi := &file_banda_v1_banda_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9412,7 +9502,7 @@ func (x *SearchResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResult.ProtoReflect.Descriptor instead.
 func (*SearchResult) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{150}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *SearchResult) GetThreadId() string {
@@ -9480,7 +9570,7 @@ type SearchResponse struct {
 
 func (x *SearchResponse) Reset() {
 	*x = SearchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[151]
+	mi := &file_banda_v1_banda_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9492,7 +9582,7 @@ func (x *SearchResponse) String() string {
 func (*SearchResponse) ProtoMessage() {}
 
 func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[151]
+	mi := &file_banda_v1_banda_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9505,7 +9595,7 @@ func (x *SearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
 func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{151}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *SearchResponse) GetResults() []*SearchResult {
@@ -10047,13 +10137,17 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
 	"thread_ids\x18\x02 \x03(\tR\tthreadIds\"D\n" +
 	"\x13RaceCompareResponse\x12-\n" +
-	"\aentries\x18\x01 \x03(\v2\x13.banda.v1.RaceEntryR\aentries\"\x87\x01\n" +
+	"\aentries\x18\x01 \x03(\v2\x13.banda.v1.RaceEntryR\aentries\"\x9d\x01\n" +
 	"\tRaceEntry\x12(\n" +
 	"\x06thread\x18\x01 \x01(\v2\x10.banda.v1.ThreadR\x06thread\x12\x14\n" +
 	"\x05turns\x18\x02 \x01(\x05R\x05turns\x12\x19\n" +
 	"\bcost_usd\x18\x03 \x01(\x01R\acostUsd\x12\x1f\n" +
 	"\vduration_ms\x18\x04 \x01(\x03R\n" +
-	"durationMs\".\n" +
+	"durationMs\x12\x14\n" +
+	"\x05reply\x18\x05 \x01(\tR\x05reply\"\x11\n" +
+	"\x0fRaceListRequest\">\n" +
+	"\x10RaceListResponse\x12*\n" +
+	"\athreads\x18\x01 \x03(\v2\x10.banda.v1.ThreadR\athreads\".\n" +
 	"\x0fRacePickRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\x12\n" +
 	"\x10RacePickResponse\"E\n" +
@@ -10139,7 +10233,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x17SEARCH_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12SEARCH_KIND_PEOPLE\x10\x01\x12\x15\n" +
 	"\x11SEARCH_KIND_AGENT\x10\x02\x12\x14\n" +
-	"\x10SEARCH_KIND_CODE\x10\x032\xf9\x15\n" +
+	"\x10SEARCH_KIND_CODE\x10\x032\xbc\x16\n" +
 	"\rThreadService\x12M\n" +
 	"\fCreateThread\x12\x1d.banda.v1.CreateThreadRequest\x1a\x1e.banda.v1.CreateThreadResponse\x12J\n" +
 	"\vListThreads\x12\x1c.banda.v1.ListThreadsRequest\x1a\x1d.banda.v1.ListThreadsResponse\x12D\n" +
@@ -10179,6 +10273,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x04Fork\x12\x15.banda.v1.ForkRequest\x1a\x16.banda.v1.ForkResponse\x125\n" +
 	"\x04Race\x12\x15.banda.v1.RaceRequest\x1a\x16.banda.v1.RaceResponse\x12J\n" +
 	"\vRaceCompare\x12\x1c.banda.v1.RaceCompareRequest\x1a\x1d.banda.v1.RaceCompareResponse\x12A\n" +
+	"\bRaceList\x12\x19.banda.v1.RaceListRequest\x1a\x1a.banda.v1.RaceListResponse\x12A\n" +
 	"\bRacePick\x12\x19.banda.v1.RacePickRequest\x1a\x1a.banda.v1.RacePickResponse\x12;\n" +
 	"\x06Search\x12\x17.banda.v1.SearchRequest\x1a\x18.banda.v1.SearchResponse2\x84\x01\n" +
 	"\vUserService\x12/\n" +
@@ -10211,7 +10306,7 @@ func file_banda_v1_banda_proto_rawDescGZIP() []byte {
 }
 
 var file_banda_v1_banda_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
-var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 152)
+var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 154)
 var file_banda_v1_banda_proto_goTypes = []any{
 	(Status)(0),                         // 0: banda.v1.Status
 	(Mode)(0),                           // 1: banda.v1.Mode
@@ -10368,28 +10463,30 @@ var file_banda_v1_banda_proto_goTypes = []any{
 	(*RaceCompareRequest)(nil),          // 152: banda.v1.RaceCompareRequest
 	(*RaceCompareResponse)(nil),         // 153: banda.v1.RaceCompareResponse
 	(*RaceEntry)(nil),                   // 154: banda.v1.RaceEntry
-	(*RacePickRequest)(nil),             // 155: banda.v1.RacePickRequest
-	(*RacePickResponse)(nil),            // 156: banda.v1.RacePickResponse
-	(*ForkPatchRequest)(nil),            // 157: banda.v1.ForkPatchRequest
-	(*ForkPatchResponse)(nil),           // 158: banda.v1.ForkPatchResponse
-	(*SearchRequest)(nil),               // 159: banda.v1.SearchRequest
-	(*SearchResult)(nil),                // 160: banda.v1.SearchResult
-	(*SearchResponse)(nil),              // 161: banda.v1.SearchResponse
-	(*timestamppb.Timestamp)(nil),       // 162: google.protobuf.Timestamp
+	(*RaceListRequest)(nil),             // 155: banda.v1.RaceListRequest
+	(*RaceListResponse)(nil),            // 156: banda.v1.RaceListResponse
+	(*RacePickRequest)(nil),             // 157: banda.v1.RacePickRequest
+	(*RacePickResponse)(nil),            // 158: banda.v1.RacePickResponse
+	(*ForkPatchRequest)(nil),            // 159: banda.v1.ForkPatchRequest
+	(*ForkPatchResponse)(nil),           // 160: banda.v1.ForkPatchResponse
+	(*SearchRequest)(nil),               // 161: banda.v1.SearchRequest
+	(*SearchResult)(nil),                // 162: banda.v1.SearchResult
+	(*SearchResponse)(nil),              // 163: banda.v1.SearchResponse
+	(*timestamppb.Timestamp)(nil),       // 164: google.protobuf.Timestamp
 }
 var file_banda_v1_banda_proto_depIdxs = []int32{
 	0,   // 0: banda.v1.Thread.status:type_name -> banda.v1.Status
 	1,   // 1: banda.v1.Thread.mode:type_name -> banda.v1.Mode
-	162, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	162, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	162, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
+	164, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	164, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	164, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
 	107, // 5: banda.v1.Thread.activity:type_name -> banda.v1.TeamActivity
 	5,   // 6: banda.v1.Thread.auto_push:type_name -> banda.v1.AutoPushState
 	2,   // 7: banda.v1.Thread.permission_mode:type_name -> banda.v1.PermissionMode
 	12,  // 8: banda.v1.Thread.forked_from:type_name -> banda.v1.ForkOrigin
 	11,  // 9: banda.v1.Thread.overlaps:type_name -> banda.v1.Overlap
 	0,   // 10: banda.v1.Overlap.status:type_name -> banda.v1.Status
-	162, // 11: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
+	164, // 11: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
 	16,  // 12: banda.v1.Event.message:type_name -> banda.v1.Message
 	22,  // 13: banda.v1.Event.agent_text:type_name -> banda.v1.AgentText
 	23,  // 14: banda.v1.Event.agent_text_delta:type_name -> banda.v1.AgentTextDelta
@@ -10430,20 +10527,20 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	10,  // 49: banda.v1.SpawnThreadResponse.thread:type_name -> banda.v1.Thread
 	10,  // 50: banda.v1.LineageChildrenResponse.threads:type_name -> banda.v1.Thread
 	10,  // 51: banda.v1.ListMentionedResponse.threads:type_name -> banda.v1.Thread
-	162, // 52: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
+	164, // 52: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
 	5,   // 53: banda.v1.AutoPush.state:type_name -> banda.v1.AutoPushState
 	87,  // 54: banda.v1.PreviewWatchResponse.ports:type_name -> banda.v1.PreviewPort
 	13,  // 55: banda.v1.MeResponse.user:type_name -> banda.v1.User
 	13,  // 56: banda.v1.ListUsersResponse.users:type_name -> banda.v1.User
 	6,   // 57: banda.v1.HarnessAccount.auth_method:type_name -> banda.v1.AuthMethod
 	7,   // 58: banda.v1.HarnessAccount.login_state:type_name -> banda.v1.LoginState
-	162, // 59: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
-	162, // 60: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
+	164, // 59: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
+	164, // 60: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
 	94,  // 61: banda.v1.GetSettingsResponse.accounts:type_name -> banda.v1.HarnessAccount
 	95,  // 62: banda.v1.GetSettingsResponse.secrets:type_name -> banda.v1.SecretInfo
 	6,   // 63: banda.v1.SetAuthMethodRequest.auth_method:type_name -> banda.v1.AuthMethod
 	8,   // 64: banda.v1.OpenLoginTerminalRequest.action:type_name -> banda.v1.LoginAction
-	162, // 65: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
+	164, // 65: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
 	10,  // 66: banda.v1.TeamWatchResponse.threads:type_name -> banda.v1.Thread
 	10,  // 67: banda.v1.InboxWatchResponse.threads:type_name -> banda.v1.Thread
 	10,  // 68: banda.v1.InboxWatchResponse.mentioned:type_name -> banda.v1.Thread
@@ -10489,115 +10586,118 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	10,  // 108: banda.v1.RaceResponse.threads:type_name -> banda.v1.Thread
 	154, // 109: banda.v1.RaceCompareResponse.entries:type_name -> banda.v1.RaceEntry
 	10,  // 110: banda.v1.RaceEntry.thread:type_name -> banda.v1.Thread
-	9,   // 111: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
-	162, // 112: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
-	162, // 113: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
-	162, // 114: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
-	9,   // 115: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
-	160, // 116: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
-	37,  // 117: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
-	39,  // 118: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
-	41,  // 119: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
-	43,  // 120: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
-	45,  // 121: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
-	47,  // 122: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
-	50,  // 123: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
-	52,  // 124: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
-	54,  // 125: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
-	56,  // 126: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
-	58,  // 127: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
-	60,  // 128: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
-	62,  // 129: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
-	114, // 130: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
-	115, // 131: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
-	64,  // 132: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
-	66,  // 133: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
-	68,  // 134: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
-	70,  // 135: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
-	72,  // 136: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
-	75,  // 137: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
-	77,  // 138: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
-	79,  // 139: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
-	81,  // 140: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
-	83,  // 141: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
-	85,  // 142: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
-	88,  // 143: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
-	110, // 144: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
-	112, // 145: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
-	35,  // 146: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
-	108, // 147: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
-	119, // 148: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
-	121, // 149: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
-	148, // 150: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
-	150, // 151: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
-	152, // 152: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
-	155, // 153: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
-	159, // 154: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
-	90,  // 155: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
-	92,  // 156: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
-	96,  // 157: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
-	98,  // 158: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
-	100, // 159: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
-	102, // 160: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
-	104, // 161: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
-	105, // 162: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
-	106, // 163: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
-	125, // 164: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
-	157, // 165: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
-	38,  // 166: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
-	40,  // 167: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
-	42,  // 168: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
-	44,  // 169: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
-	46,  // 170: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
-	48,  // 171: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
-	51,  // 172: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
-	53,  // 173: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
-	55,  // 174: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
-	57,  // 175: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
-	59,  // 176: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
-	61,  // 177: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
-	63,  // 178: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
-	124, // 179: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
-	116, // 180: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
-	65,  // 181: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
-	67,  // 182: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
-	69,  // 183: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
-	71,  // 184: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
-	73,  // 185: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
-	76,  // 186: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
-	78,  // 187: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
-	80,  // 188: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	82,  // 189: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
-	84,  // 190: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
-	86,  // 191: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
-	89,  // 192: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
-	111, // 193: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
-	113, // 194: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
-	36,  // 195: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
-	109, // 196: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
-	120, // 197: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
-	122, // 198: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
-	149, // 199: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
-	151, // 200: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
-	153, // 201: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
-	156, // 202: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
-	161, // 203: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
-	91,  // 204: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
-	93,  // 205: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
-	97,  // 206: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
-	99,  // 207: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
-	101, // 208: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
-	103, // 209: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
-	76,  // 210: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
-	78,  // 211: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
-	80,  // 212: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	134, // 213: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
-	158, // 214: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
-	166, // [166:215] is the sub-list for method output_type
-	117, // [117:166] is the sub-list for method input_type
-	117, // [117:117] is the sub-list for extension type_name
-	117, // [117:117] is the sub-list for extension extendee
-	0,   // [0:117] is the sub-list for field type_name
+	10,  // 111: banda.v1.RaceListResponse.threads:type_name -> banda.v1.Thread
+	9,   // 112: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
+	164, // 113: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
+	164, // 114: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
+	164, // 115: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
+	9,   // 116: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
+	162, // 117: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
+	37,  // 118: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
+	39,  // 119: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
+	41,  // 120: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
+	43,  // 121: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
+	45,  // 122: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
+	47,  // 123: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
+	50,  // 124: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
+	52,  // 125: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
+	54,  // 126: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
+	56,  // 127: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
+	58,  // 128: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
+	60,  // 129: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
+	62,  // 130: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
+	114, // 131: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
+	115, // 132: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
+	64,  // 133: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
+	66,  // 134: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
+	68,  // 135: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
+	70,  // 136: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
+	72,  // 137: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
+	75,  // 138: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
+	77,  // 139: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
+	79,  // 140: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
+	81,  // 141: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
+	83,  // 142: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
+	85,  // 143: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
+	88,  // 144: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
+	110, // 145: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
+	112, // 146: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
+	35,  // 147: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
+	108, // 148: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
+	119, // 149: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
+	121, // 150: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
+	148, // 151: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
+	150, // 152: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
+	152, // 153: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
+	155, // 154: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
+	157, // 155: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
+	161, // 156: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
+	90,  // 157: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
+	92,  // 158: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
+	96,  // 159: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
+	98,  // 160: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
+	100, // 161: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
+	102, // 162: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
+	104, // 163: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
+	105, // 164: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
+	106, // 165: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
+	125, // 166: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
+	159, // 167: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
+	38,  // 168: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
+	40,  // 169: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
+	42,  // 170: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
+	44,  // 171: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
+	46,  // 172: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
+	48,  // 173: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
+	51,  // 174: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
+	53,  // 175: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
+	55,  // 176: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
+	57,  // 177: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
+	59,  // 178: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
+	61,  // 179: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
+	63,  // 180: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
+	124, // 181: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
+	116, // 182: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
+	65,  // 183: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
+	67,  // 184: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
+	69,  // 185: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
+	71,  // 186: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
+	73,  // 187: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
+	76,  // 188: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
+	78,  // 189: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
+	80,  // 190: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	82,  // 191: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
+	84,  // 192: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
+	86,  // 193: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
+	89,  // 194: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
+	111, // 195: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
+	113, // 196: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
+	36,  // 197: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
+	109, // 198: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
+	120, // 199: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
+	122, // 200: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
+	149, // 201: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
+	151, // 202: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
+	153, // 203: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
+	156, // 204: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
+	158, // 205: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
+	163, // 206: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
+	91,  // 207: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
+	93,  // 208: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
+	97,  // 209: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
+	99,  // 210: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
+	101, // 211: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
+	103, // 212: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
+	76,  // 213: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
+	78,  // 214: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
+	80,  // 215: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	134, // 216: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
+	160, // 217: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
+	168, // [168:218] is the sub-list for method output_type
+	118, // [118:168] is the sub-list for method input_type
+	118, // [118:118] is the sub-list for extension type_name
+	118, // [118:118] is the sub-list for extension extendee
+	0,   // [0:118] is the sub-list for field type_name
 }
 
 func init() { file_banda_v1_banda_proto_init() }
@@ -10664,7 +10764,7 @@ func file_banda_v1_banda_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_banda_v1_banda_proto_rawDesc), len(file_banda_v1_banda_proto_rawDesc)),
 			NumEnums:      10,
-			NumMessages:   152,
+			NumMessages:   154,
 			NumExtensions: 0,
 			NumServices:   4,
 		},
