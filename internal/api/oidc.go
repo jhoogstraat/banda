@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -27,9 +28,12 @@ const (
 	sessionTTL    = 7 * 24 * time.Hour
 )
 
-// OIDCConfig configures single sign-on. SessionSecret may be empty.
+// OIDCConfig configures single sign-on. SessionSecret may be empty. DexURL
+// (e.g. http://dex.banda.svc:5556) is a bundled Dex whose issuer is
+// $PUBLIC_URL/dex, as in dev behind Vite: the API proxies /dex/ to it for
+// browsers and reaches it directly itself.
 type OIDCConfig struct {
-	Issuer, ClientID, ClientSecret, PublicURL, SessionSecret string
+	Issuer, ClientID, ClientSecret, PublicURL, SessionSecret, DexURL string
 }
 
 // OIDC signs users in through any OIDC provider (authorization code flow
@@ -40,10 +44,23 @@ type OIDC struct {
 	verifier *oidc.IDTokenVerifier
 	signer
 	secure bool
+	client *http.Client // to the provider: discovery, keys, token exchange
+	dex    *url.URL
 }
 
 func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) {
-	p, err := oidc.NewProvider(ctx, c.Issuer)
+	client, dex := http.DefaultClient, (*url.URL)(nil)
+	if c.DexURL != "" {
+		issuer, err := url.Parse(c.Issuer)
+		if err == nil {
+			dex, err = url.Parse(c.DexURL)
+		}
+		if err != nil {
+			return nil, err
+		}
+		client = &http.Client{Transport: dexTransport(issuer, dex, http.DefaultTransport)}
+	}
+	p, err := oidc.NewProvider(oidc.ClientContext(ctx, client), c.Issuer)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +75,8 @@ func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) 
 		verifier: p.Verifier(&oidc.Config{ClientID: c.ClientID}),
 		signer:   secret,
 		secure:   strings.HasPrefix(c.PublicURL, "https://"),
+		client:   client,
+		dex:      dex,
 		oauth: oauth2.Config{
 			ClientID:     c.ClientID,
 			ClientSecret: c.ClientSecret,
@@ -68,12 +87,35 @@ func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) 
 	}, nil
 }
 
-// Mount adds the browser routes of the login flow.
+// Mount adds the browser routes of the login flow, and the bundled Dex's.
 func (o *OIDC) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/login", o.login)
 	mux.HandleFunc("GET /auth/callback", o.callback)
 	mux.HandleFunc("GET /auth/logout", o.logout)
+	if o.dex != nil {
+		mux.Handle("/dex/", httputil.NewSingleHostReverseProxy(o.dex))
+	}
 }
+
+// dexTransport sends the API's own requests for the issuer's origin (the
+// public URL, where browsers reach Dex through the proxy in Mount) straight
+// to Dex: an API behind an ingress needn't reach its own public address, and
+// discovery works before it listens. Paths stay, as Dex serves under its
+// issuer's path (/dex). Only provider requests use this client, so the
+// origin alone tells them apart.
+func dexTransport(issuer, dex *url.URL, next http.RoundTripper) http.RoundTripper {
+	return roundTripper(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Scheme == issuer.Scheme && r.URL.Host == issuer.Host {
+			r = r.Clone(r.Context())
+			r.URL.Scheme, r.URL.Host, r.Host = dex.Scheme, dex.Host, ""
+		}
+		return next.RoundTrip(r)
+	})
+}
+
+type roundTripper func(*http.Request) (*http.Response, error)
+
+func (f roundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
 	state, verifier := rand.Text(), oauth2.GenerateVerifier()
@@ -98,7 +140,7 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 		log.Printf("login: %v", err)
 		http.Error(w, "login failed", http.StatusUnauthorized)
 	}
-	tok, err := o.oauth.Exchange(r.Context(), q.Get("code"), oauth2.VerifierOption(flow.Get("verifier")))
+	tok, err := o.oauth.Exchange(context.WithValue(r.Context(), oauth2.HTTPClient, o.client), q.Get("code"), oauth2.VerifierOption(flow.Get("verifier")))
 	if err != nil {
 		fail(err)
 		return

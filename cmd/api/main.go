@@ -51,6 +51,7 @@ func main() {
 			ClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
 			PublicURL:     env("PUBLIC_URL", "http://localhost:5173"),
 			SessionSecret: os.Getenv("SESSION_SECRET"),
+			DexURL:        os.Getenv("DEX_URL"),
 		})
 		if err != nil {
 			log.Fatalf("oidc: %v", err)

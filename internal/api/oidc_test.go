@@ -1,6 +1,11 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -59,5 +64,46 @@ func TestSessionCookieShadowing(t *testing.T) {
 	o.secure = true
 	if got, _ := o.session("banda_session=" + mallory + "; __Host-banda_session=" + alice); got != "alice" {
 		t.Errorf("https session = %q, want alice", got)
+	}
+}
+
+// A bundled Dex (DEX_URL) has the issuer $PUBLIC_URL/dex: the API discovers it
+// without reaching the public URL, and browsers reach it through the API's proxy.
+func TestDexProxy(t *testing.T) {
+	const issuer = "http://banda.invalid/dex"
+	dex := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/dex/.well-known/openid-configuration":
+			json.NewEncoder(w).Encode(map[string]string{"issuer": issuer, "authorization_endpoint": issuer + "/auth",
+				"token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys"})
+		case "/dex/auth":
+			fmt.Fprint(w, "login form, q=", r.URL.RawQuery)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer dex.Close()
+
+	o, err := NewOIDC(t.Context(), nil, OIDCConfig{Issuer: issuer, ClientID: "banda", PublicURL: "http://banda.invalid", DexURL: dex.URL})
+	if err != nil {
+		t.Fatalf("discovery through DEX_URL: %v", err)
+	}
+	mux := http.NewServeMux()
+	o.Mount(mux)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest("GET", "http://banda.invalid/dex/auth?client_id=banda", nil))
+	if got := rec.Body.String(); rec.Code != 200 || got != "login form, q=client_id=banda" {
+		t.Fatalf("proxied /dex/auth: %d %q", rec.Code, got)
+	}
+
+	// Other hosts go where they point.
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "other") }))
+	defer other.Close()
+	res, err := o.client.Get(other.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := io.ReadAll(res.Body); string(b) != "other" {
+		t.Fatalf("other host: %q", b)
 	}
 }
