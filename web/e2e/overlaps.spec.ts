@@ -38,6 +38,7 @@ test('threads changing the same file see each other, in the API, chat, prompt, M
 	await page.getByRole('button', { name: /Overlaps with 1 thread/ }).click();
 	const overlaps = page.getByRole('region', { name: 'Overlaps' });
 	await expect(overlaps.getByRole('link', { name: /Bob’s part/ })).toHaveAttribute('href', `/t/${b.id}`);
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 	await page.getByRole('button', { name: /files? changed/ }).click();
 	await expect(page.getByRole('img', { name: 'Also changed in Bob’s part' }).first()).toBeVisible();
 	// The file link opens b's diff at that file.
