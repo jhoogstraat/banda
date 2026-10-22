@@ -117,6 +117,8 @@ test('the right pane: the files tab reads the checkout, the owner’s terminal r
 	const t = await alice.create({ prompt: 'start the preview' });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.turn(() => t.send('e2e: a file'));
+	// Before the page opens: a port that starts listening while it is open opens the pane by itself.
+	await t.waitForEvent((e) => e.kind.case === 'portOpened', 'portOpened');
 	const page = await open(alice, t);
 	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 
