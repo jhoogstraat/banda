@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { ModeWatcher } from 'mode-watcher';
 	import CommandPalette from '#lib/components/command-palette.svelte';
@@ -34,6 +35,7 @@
 </script>
 
 <svelte:head>
+	<link rel="icon" href={favicon} />
 	<title>{count ? `(${count}) ` : ''}Banda</title>
 </svelte:head>
 
