@@ -12,8 +12,9 @@ service ThreadService {
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
   rpc Interrupt(InterruptRequest) returns (InterruptResponse);
   rpc SetMode(SetModeRequest) returns (SetModeResponse);
-  // Changes the agent's model and effort (owner only). A running agent
-  // restarts with them once its turns have ended; a paused one starts with them.
+  // Changes the agent's model, effort and profile (owner only). A running
+  // agent restarts with them once its turns have ended; a paused one starts
+  // with them.
   rpc SetAgentSettings(SetAgentSettingsRequest) returns (SetAgentSettingsResponse);
   rpc Retry(RetryRequest) returns (RetryResponse);
   // Owner only: runs a teammate's turn request as their turn, or drops it.
@@ -99,8 +100,9 @@ service UserService {
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
-// SettingsService is the caller's own harness accounts and secrets.
-// Secret and API key values are write-only: no RPC ever returns them.
+// SettingsService is the caller's own harness accounts and secrets, and the
+// team's secrets. Secret and API key values are write-only: no RPC ever
+// returns them.
 service SettingsService {
   rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
   // Chooses how a harness signs in. Applies to environments started
@@ -110,6 +112,14 @@ service SettingsService {
   // an environment variable. Reserved names (harness credentials) are refused.
   rpc SetSecret(SetSecretRequest) returns (SetSecretResponse);
   rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
+  // The profile of the caller's new threads that don't name one.
+  rpc SetDefaultProfile(SetDefaultProfileRequest) returns (SetDefaultProfileResponse);
+  // Team secrets go to every environment of every user, before their own
+  // secrets, so a user's secret of the same name wins. Anyone signed in lists,
+  // sets, replaces and deletes them; the same names are refused.
+  rpc ListTeamSecrets(ListTeamSecretsRequest) returns (ListTeamSecretsResponse);
+  rpc SetTeamSecret(SetTeamSecretRequest) returns (SetTeamSecretResponse);
+  rpc DeleteTeamSecret(DeleteTeamSecretRequest) returns (DeleteTeamSecretResponse);
   // A terminal in the caller's login environment: a small pod that mounts
   // only the caller's harness config volume, started on demand. It runs the
   // harness's login or logout command. Output streams until it exits.
@@ -148,6 +158,7 @@ message Thread {
   string id = 1;
   string owner_id = 2;
   string title = 3;
+  // Empty: the thread has no repository, and so no branches and no diff.
   string repo_url = 4;
   string branch = 5;
   string model = 6;
@@ -189,6 +200,8 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // Who the agent works with, see AgentSettings.
+  string profile = 31;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -261,7 +274,8 @@ message Event {
     PresenceChanged presence_changed = 22;
     // Ephemeral (seq 0): the actor is typing in the composer.
     Typing typing = 23;
-    // The owner changed the model or effort; actor is the owner.
+    // The owner changed the model or effort (both set), the profile (set
+    // when it changed) or both; actor is the owner.
     AgentSettings agent_settings = 26;
     // Where the work lives changed, e.g. after an auto-push.
     AutoPush auto_push = 29;
@@ -439,6 +453,7 @@ enum SetupState {
 }
 
 message CreateThreadRequest {
+  // Empty: no repository (base_branch is ignored).
   string repo_url = 1;
   string base_branch = 2;
   string model = 3;
@@ -446,6 +461,8 @@ message CreateThreadRequest {
   string prompt = 5;
   // Unspecified: bypass.
   PermissionMode permission_mode = 6;
+  // Empty: the owner's default profile.
+  string profile = 7;
 }
 
 message CreateThreadResponse {
@@ -489,10 +506,13 @@ message SetModeRequest {
 
 message SetModeResponse {}
 
-// The agent's model and effort.
+// The agent's model, effort and profile.
 message AgentSettings {
   string model = 1;
   string effort = 2;
+  // Who the agent works with: "engineer" (Claude Code as it is), "spec",
+  // "devops" or "business". Its text is appended to the system prompt.
+  string profile = 3;
 }
 
 message SetAgentSettingsRequest {
@@ -500,6 +520,7 @@ message SetAgentSettingsRequest {
   // Empty keeps the current value.
   string model = 2;
   string effort = 3;
+  string profile = 4;
 }
 
 message SetAgentSettingsResponse {}
@@ -732,6 +753,8 @@ message HarnessAccount {
 message SecretInfo {
   string name = 1;
   google.protobuf.Timestamp updated_at = 2;
+  // Team secrets only: the user who set it last.
+  string updated_by = 3;
 }
 
 message GetSettingsRequest {}
@@ -739,6 +762,8 @@ message GetSettingsRequest {}
 message GetSettingsResponse {
   repeated HarnessAccount accounts = 1;
   repeated SecretInfo secrets = 2;
+  // The profile of new threads that don't name one.
+  string default_profile = 3;
 }
 
 message SetAuthMethodRequest {
@@ -763,6 +788,32 @@ message DeleteSecretRequest {
 }
 
 message DeleteSecretResponse {}
+
+message SetDefaultProfileRequest {
+  string profile = 1;
+}
+
+message SetDefaultProfileResponse {}
+
+message ListTeamSecretsRequest {}
+
+message ListTeamSecretsResponse {
+  repeated SecretInfo secrets = 1;
+}
+
+message SetTeamSecretRequest {
+  // An environment variable name: [A-Z_][A-Z0-9_]*.
+  string name = 1;
+  string value = 2;
+}
+
+message SetTeamSecretResponse {}
+
+message DeleteTeamSecretRequest {
+  string name = 1;
+}
+
+message DeleteTeamSecretResponse {}
 
 enum LoginAction {
   LOGIN_ACTION_UNSPECIFIED = 0;
@@ -1074,6 +1125,7 @@ message ForkResponse {
 }
 
 message RaceRequest {
+  // Empty: no repository, as for CreateThread.
   string repo_url = 1;
   string base_branch = 2;
   string prompt = 3;
@@ -1081,6 +1133,8 @@ message RaceRequest {
   repeated RaceTry tries = 4;
   // Every try's; unspecified: bypass.
   PermissionMode permission_mode = 5;
+  // Every try's; empty: the caller's default profile.
+  string profile = 6;
 }
 
 message RaceResponse {
@@ -1139,7 +1193,8 @@ message SearchRequest {
   string query = 1;
   // Filters; empty or unset means any.
   string actor = 2;
-  string repo_url = 3;
+  // Unset means any; empty, threads without a repository.
+  optional string repo_url = 3;
   SearchKind kind = 4;
   google.protobuf.Timestamp after = 5;
   google.protobuf.Timestamp before = 6;

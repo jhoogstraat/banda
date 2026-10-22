@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS secrets (
   PRIMARY KEY (user_id, name)
 );
 
+-- Names of the team's secrets, in every user's threads, and who set each
+-- last. The values live only in the Kubernetes Secret banda-env-team.
+CREATE TABLE IF NOT EXISTS team_secrets (
+  name       text PRIMARY KEY,
+  updated_by text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
 -- Runner tokens are kept as SHA-256 hashes only (pods read theirs from a
@@ -159,3 +167,11 @@ CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAG
   AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
 CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
+-- Who the agent works with (see AgentSettings.profile), and each user's
+-- profile for new threads that don't name one.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS profile text NOT NULL DEFAULT 'engineer';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_profile text NOT NULL DEFAULT 'engineer';
+-- A sub-thread whose reports (finished, failed) also start a turn of its
+-- parent's agent (create_thread's wake_parent), and when one last did.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS wake_parent boolean NOT NULL DEFAULT false;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS woke_parent_at timestamptz;

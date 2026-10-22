@@ -121,3 +121,21 @@ func TestSetupFork(t *testing.T) {
 		t.Fatalf("a patch that doesn't apply: %v %q", states, notices)
 	}
 }
+
+// Without a repository the agent gets an empty folder; only the login is checked.
+func TestPrepareWithoutRepo(t *testing.T) {
+	repoURL, apiKey, work = "", true, filepath.Join(t.TempDir(), "work")
+	t.Cleanup(func() { apiKey = false })
+	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-api-e2e")
+	var got []string
+	send := func(e *bandav1.Event) error { got = append(got, e.GetSetupStep().Id); return nil }
+	for i, want := range []string{"login", ""} { // a resume reports nothing skipped
+		got = nil
+		if err := prepare(context.Background(), send, nil, nil, nil); err != nil || strings.Join(got, " ") != want {
+			t.Fatalf("start %d: %v, steps %q", i, err, got)
+		}
+		if fi, err := os.Stat(work); err != nil || !fi.IsDir() {
+			t.Fatalf("no working folder: %v", err)
+		}
+	}
+}

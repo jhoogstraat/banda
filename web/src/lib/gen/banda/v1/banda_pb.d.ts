@@ -31,6 +31,8 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
   title: string;
 
   /**
+   * Empty: the thread has no repository, and so no branches and no diff.
+   *
    * @generated from field: string repo_url = 4;
    */
   repoUrl: string;
@@ -188,6 +190,13 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * Who the agent works with, see AgentSettings.
+   *
+   * @generated from field: string profile = 31;
+   */
+  profile: string;
 };
 
 /**
@@ -394,7 +403,8 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "typing";
   } | {
     /**
-     * The owner changed the model or effort; actor is the owner.
+     * The owner changed the model or effort (both set), the profile (set
+     * when it changed) or both; actor is the owner.
      *
      * @generated from field: banda.v1.AgentSettings agent_settings = 26;
      */
@@ -1033,6 +1043,8 @@ export declare const TypingResponseSchema: GenMessage<TypingResponse>;
  */
 export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadRequest"> & {
   /**
+   * Empty: no repository (base_branch is ignored).
+   *
    * @generated from field: string repo_url = 1;
    */
   repoUrl: string;
@@ -1063,6 +1075,13 @@ export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadReques
    * @generated from field: banda.v1.PermissionMode permission_mode = 6;
    */
   permissionMode: PermissionMode;
+
+  /**
+   * Empty: the owner's default profile.
+   *
+   * @generated from field: string profile = 7;
+   */
+  profile: string;
 };
 
 /**
@@ -1248,7 +1267,7 @@ export declare type SetModeResponse = Message$1<"banda.v1.SetModeResponse"> & {
 export declare const SetModeResponseSchema: GenMessage<SetModeResponse>;
 
 /**
- * The agent's model and effort.
+ * The agent's model, effort and profile.
  *
  * @generated from message banda.v1.AgentSettings
  */
@@ -1262,6 +1281,14 @@ export declare type AgentSettings = Message$1<"banda.v1.AgentSettings"> & {
    * @generated from field: string effort = 2;
    */
   effort: string;
+
+  /**
+   * Who the agent works with: "engineer" (Claude Code as it is), "spec",
+   * "devops" or "business". Its text is appended to the system prompt.
+   *
+   * @generated from field: string profile = 3;
+   */
+  profile: string;
 };
 
 /**
@@ -1290,6 +1317,11 @@ export declare type SetAgentSettingsRequest = Message$1<"banda.v1.SetAgentSettin
    * @generated from field: string effort = 3;
    */
   effort: string;
+
+  /**
+   * @generated from field: string profile = 4;
+   */
+  profile: string;
 };
 
 /**
@@ -2156,6 +2188,13 @@ export declare type SecretInfo = Message$1<"banda.v1.SecretInfo"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 2;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * Team secrets only: the user who set it last.
+   *
+   * @generated from field: string updated_by = 3;
+   */
+  updatedBy: string;
 };
 
 /**
@@ -2189,6 +2228,13 @@ export declare type GetSettingsResponse = Message$1<"banda.v1.GetSettingsRespons
    * @generated from field: repeated banda.v1.SecretInfo secrets = 2;
    */
   secrets: SecretInfo[];
+
+  /**
+   * The profile of new threads that don't name one.
+   *
+   * @generated from field: string default_profile = 3;
+   */
+  defaultProfile: string;
 };
 
 /**
@@ -2299,6 +2345,125 @@ export declare type DeleteSecretResponse = Message$1<"banda.v1.DeleteSecretRespo
  * Use `create(DeleteSecretResponseSchema)` to create a new message.
  */
 export declare const DeleteSecretResponseSchema: GenMessage<DeleteSecretResponse>;
+
+/**
+ * @generated from message banda.v1.SetDefaultProfileRequest
+ */
+export declare type SetDefaultProfileRequest = Message$1<"banda.v1.SetDefaultProfileRequest"> & {
+  /**
+   * @generated from field: string profile = 1;
+   */
+  profile: string;
+};
+
+/**
+ * Describes the message banda.v1.SetDefaultProfileRequest.
+ * Use `create(SetDefaultProfileRequestSchema)` to create a new message.
+ */
+export declare const SetDefaultProfileRequestSchema: GenMessage<SetDefaultProfileRequest>;
+
+/**
+ * @generated from message banda.v1.SetDefaultProfileResponse
+ */
+export declare type SetDefaultProfileResponse = Message$1<"banda.v1.SetDefaultProfileResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetDefaultProfileResponse.
+ * Use `create(SetDefaultProfileResponseSchema)` to create a new message.
+ */
+export declare const SetDefaultProfileResponseSchema: GenMessage<SetDefaultProfileResponse>;
+
+/**
+ * @generated from message banda.v1.ListTeamSecretsRequest
+ */
+export declare type ListTeamSecretsRequest = Message$1<"banda.v1.ListTeamSecretsRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.ListTeamSecretsRequest.
+ * Use `create(ListTeamSecretsRequestSchema)` to create a new message.
+ */
+export declare const ListTeamSecretsRequestSchema: GenMessage<ListTeamSecretsRequest>;
+
+/**
+ * @generated from message banda.v1.ListTeamSecretsResponse
+ */
+export declare type ListTeamSecretsResponse = Message$1<"banda.v1.ListTeamSecretsResponse"> & {
+  /**
+   * @generated from field: repeated banda.v1.SecretInfo secrets = 1;
+   */
+  secrets: SecretInfo[];
+};
+
+/**
+ * Describes the message banda.v1.ListTeamSecretsResponse.
+ * Use `create(ListTeamSecretsResponseSchema)` to create a new message.
+ */
+export declare const ListTeamSecretsResponseSchema: GenMessage<ListTeamSecretsResponse>;
+
+/**
+ * @generated from message banda.v1.SetTeamSecretRequest
+ */
+export declare type SetTeamSecretRequest = Message$1<"banda.v1.SetTeamSecretRequest"> & {
+  /**
+   * An environment variable name: [A-Z_][A-Z0-9_]*.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string value = 2;
+   */
+  value: string;
+};
+
+/**
+ * Describes the message banda.v1.SetTeamSecretRequest.
+ * Use `create(SetTeamSecretRequestSchema)` to create a new message.
+ */
+export declare const SetTeamSecretRequestSchema: GenMessage<SetTeamSecretRequest>;
+
+/**
+ * @generated from message banda.v1.SetTeamSecretResponse
+ */
+export declare type SetTeamSecretResponse = Message$1<"banda.v1.SetTeamSecretResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetTeamSecretResponse.
+ * Use `create(SetTeamSecretResponseSchema)` to create a new message.
+ */
+export declare const SetTeamSecretResponseSchema: GenMessage<SetTeamSecretResponse>;
+
+/**
+ * @generated from message banda.v1.DeleteTeamSecretRequest
+ */
+export declare type DeleteTeamSecretRequest = Message$1<"banda.v1.DeleteTeamSecretRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message banda.v1.DeleteTeamSecretRequest.
+ * Use `create(DeleteTeamSecretRequestSchema)` to create a new message.
+ */
+export declare const DeleteTeamSecretRequestSchema: GenMessage<DeleteTeamSecretRequest>;
+
+/**
+ * @generated from message banda.v1.DeleteTeamSecretResponse
+ */
+export declare type DeleteTeamSecretResponse = Message$1<"banda.v1.DeleteTeamSecretResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.DeleteTeamSecretResponse.
+ * Use `create(DeleteTeamSecretResponseSchema)` to create a new message.
+ */
+export declare const DeleteTeamSecretResponseSchema: GenMessage<DeleteTeamSecretResponse>;
 
 /**
  * @generated from message banda.v1.OpenLoginTerminalRequest
@@ -3516,6 +3681,8 @@ export declare const ForkResponseSchema: GenMessage<ForkResponse>;
  */
 export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
   /**
+   * Empty: no repository, as for CreateThread.
+   *
    * @generated from field: string repo_url = 1;
    */
   repoUrl: string;
@@ -3543,6 +3710,13 @@ export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
    * @generated from field: banda.v1.PermissionMode permission_mode = 5;
    */
   permissionMode: PermissionMode;
+
+  /**
+   * Every try's; empty: the caller's default profile.
+   *
+   * @generated from field: string profile = 6;
+   */
+  profile: string;
 };
 
 /**
@@ -3733,9 +3907,11 @@ export declare type SearchRequest = Message$1<"banda.v1.SearchRequest"> & {
   actor: string;
 
   /**
-   * @generated from field: string repo_url = 3;
+   * Unset means any; empty, threads without a repository.
+   *
+   * @generated from field: optional string repo_url = 3;
    */
-  repoUrl: string;
+  repoUrl?: string | undefined;
 
   /**
    * @generated from field: banda.v1.SearchKind kind = 4;
@@ -4254,8 +4430,9 @@ export declare const ThreadService: GenService<{
     output: typeof SetModeResponseSchema;
   },
   /**
-   * Changes the agent's model and effort (owner only). A running agent
-   * restarts with them once its turns have ended; a paused one starts with them.
+   * Changes the agent's model, effort and profile (owner only). A running
+   * agent restarts with them once its turns have ended; a paused one starts
+   * with them.
    *
    * @generated from rpc banda.v1.ThreadService.SetAgentSettings
    */
@@ -4609,8 +4786,9 @@ export declare const UserService: GenService<{
 }>;
 
 /**
- * SettingsService is the caller's own harness accounts and secrets.
- * Secret and API key values are write-only: no RPC ever returns them.
+ * SettingsService is the caller's own harness accounts and secrets, and the
+ * team's secrets. Secret and API key values are write-only: no RPC ever
+ * returns them.
  *
  * @generated from service banda.v1.SettingsService
  */
@@ -4652,6 +4830,44 @@ export declare const SettingsService: GenService<{
     methodKind: "unary";
     input: typeof DeleteSecretRequestSchema;
     output: typeof DeleteSecretResponseSchema;
+  },
+  /**
+   * The profile of the caller's new threads that don't name one.
+   *
+   * @generated from rpc banda.v1.SettingsService.SetDefaultProfile
+   */
+  setDefaultProfile: {
+    methodKind: "unary";
+    input: typeof SetDefaultProfileRequestSchema;
+    output: typeof SetDefaultProfileResponseSchema;
+  },
+  /**
+   * Team secrets go to every environment of every user, before their own
+   * secrets, so a user's secret of the same name wins. Anyone signed in lists,
+   * sets, replaces and deletes them; the same names are refused.
+   *
+   * @generated from rpc banda.v1.SettingsService.ListTeamSecrets
+   */
+  listTeamSecrets: {
+    methodKind: "unary";
+    input: typeof ListTeamSecretsRequestSchema;
+    output: typeof ListTeamSecretsResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.SettingsService.SetTeamSecret
+   */
+  setTeamSecret: {
+    methodKind: "unary";
+    input: typeof SetTeamSecretRequestSchema;
+    output: typeof SetTeamSecretResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.SettingsService.DeleteTeamSecret
+   */
+  deleteTeamSecret: {
+    methodKind: "unary";
+    input: typeof DeleteTeamSecretRequestSchema;
+    output: typeof DeleteTeamSecretResponseSchema;
   },
   /**
    * A terminal in the caller's login environment: a small pod that mounts

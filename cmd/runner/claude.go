@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -211,10 +212,20 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 		"type": "http", "url": os.Getenv("BANDA_API_URL") + "/mcp",
 		"headers": map[string]string{"Authorization": "Bearer " + os.Getenv("BANDA_RUNNER_TOKEN"), "X-Banda-Thread": threadID},
 	}}})
-	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", fmt.Sprintf(
-		"You are running inside Banda thread %s on git branch %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
+	where := "on git branch " + os.Getenv("BANDA_BRANCH")
+	if repoURL == "" {
+		where = "without a repository: your working directory started empty and lives only in this thread's environment"
+	}
+	prompt := fmt.Sprintf(
+		"You are running inside Banda thread %s %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
 			"The banda MCP server's tools, listed in its instructions, let you see and search the team's other threads, post into them and start sub-threads.",
-		threadID, os.Getenv("BANDA_BRANCH")))
+		threadID, where)
+	if p := profileText(s.profile); p != "" {
+		prompt += "\n\n" + p
+	}
+	// The CLI records the system prompt on a session's first request and resends that record on
+	// resume, so without snapshot off a switched profile would never reach the model.
+	args = append(args, "--mcp-config", string(mcpConfig), "--append-system-prompt", prompt, "--system-prompt-snapshot", "off")
 	sid := sessionID(threadID)
 	if hasTranscript(sid) {
 		args = append(args, "--resume", sid)
@@ -234,6 +245,28 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 		return nil, err
 	}
 	return &claudeProc{cmd: cmd, stdout: stdout, stdin: stdin}, cmd.Start()
+}
+
+//go:embed profiles
+var profiles embed.FS
+
+// profileText is the profile's text, appended to the system prompt: the
+// repo's .banda/profiles/<name>.md, else the built-in (the API sends only
+// their names). Read at every start, so an edit applies on the next restart;
+// through os.Root (see files), so a symlink can't pull the owner's Claude
+// login into the prompt.
+func profileText(name string) string {
+	text, err := profiles.ReadFile("profiles/" + name + ".md")
+	if err != nil {
+		return ""
+	}
+	if root, err := os.OpenRoot(work); err == nil {
+		if repo, err := root.ReadFile(".banda/profiles/" + name + ".md"); err == nil {
+			text = repo
+		}
+		root.Close()
+	}
+	return strings.TrimSpace(string(text))
 }
 
 // claudeCmd never kills claude outright: a kill during a token refresh logs

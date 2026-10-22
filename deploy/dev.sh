@@ -98,7 +98,7 @@ e2e() {
 	go build -o "$LOG/api" ./cmd/api & local api=$!
 	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!
 	pnpm -C web exec playwright install chromium >/dev/null & local chromium=$!
-	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
+	e2e_wipe
 	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
 	kc create ns "$ns" >/dev/null
 	kc -n "$ns" apply -f deploy/sandbox-policy.yaml >/dev/null
@@ -120,7 +120,7 @@ EOF
 	# The fixture repos at git://e2e-git/<name>.git; readonly refuses pushes.
 	kc -n "$ns" run e2e-git --image="$SANDBOX_IMAGE" --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
 		'cp -r /opt/e2e /tmp/git && cp -r /tmp/git/plain.git /tmp/git/readonly.git &&
-		for r in plain setup-fails setup-bg setup-hold; do git --git-dir=/tmp/git/$r.git config daemon.receivepack true; done &&
+		for r in plain setup-fails setup-bg setup-hold profiles; do git --git-dir=/tmp/git/$r.git config daemon.receivepack true; done &&
 		exec git daemon --reuseaddr --base-path=/tmp/git --export-all /tmp/git' >/dev/null
 	kc -n "$ns" rollout status deployment/dex --timeout=300s >/dev/null
 	start dex kubectl --context kind-banda -n "$ns" port-forward svc/dex "$dp:5556"; PIDS+=("$PID")
@@ -148,10 +148,15 @@ e2e_down() {
 	if [ -n "${E2E_KEEP:-}" ]; then
 		echo "kept namespace $ns and database $db"
 	else
-		kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null || true
+		e2e_wipe || true
 		pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" || true
 	fi
 	rm -f "$LOG/pid"
+}
+# The run's namespace and those of its tests' own APIs (startApi in web/e2e/fixtures.ts).
+e2e_wipe() {
+	kc delete ns "$ns" --ignore-not-found --timeout=300s >/dev/null
+	kc delete ns -l "banda.dev/e2e-run=$ns" --timeout=300s >/dev/null
 }
 pg() { kc -n banda exec postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 "$@"; }
 
@@ -159,7 +164,7 @@ pg() { kc -n banda exec postgres-0 -- psql -U banda -q -v ON_ERROR_STOP=1 "$@"; 
 # volumes go with them) older than CLEAN_HOURS whose thread wasn't touched in that time or is gone.
 clean() {
 	local h=${CLEAN_HOURS:-24} keep
-	keep=$(kc -n banda exec postgres-0 -- psql -U banda -tAc "select 't-' || id from threads where updated_at > now() - interval '$h hours'")
+	keep=$(kc -n banda exec postgres-0 -- psql -U banda -tAc "select 't-' || id from threads where updated_at > now() - interval '$h hours' or repo_url = ''")
 	kc -n banda get sandboxes -l banda.dev/thread -o json |
 		jq -r --argjson h "$h" '.items[] | select(.metadata.creationTimestamp | fromdate < now - $h * 3600) | .metadata.name' |
 		while read -r name; do

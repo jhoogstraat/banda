@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import CornerLeftUpIcon from '@lucide/svelte/icons/corner-left-up';
+	import FolderIcon from '@lucide/svelte/icons/folder';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -60,6 +61,11 @@
 		{:else if isSnoozed(thread)}
 			<BellOffIcon class="hidden size-3.5 shrink-0 text-muted-foreground @2xl:block" aria-label="Snoozed" />
 		{/if}
+		{#if !thread.repoUrl}
+			<span class="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground @2xl:flex" title="The agent works in a folder that lives only in this thread's environment: nothing is pushed.">
+				<FolderIcon class="size-3.5" />No repository
+			</span>
+		{/if}
 	{/if}
 	{#if thread?.parentId}
 		<a href="/t/{thread.parentId}" class="hidden max-w-48 min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground @3xl:flex" title="Spawned from {thread.parentTitle}">
@@ -101,7 +107,7 @@
 		{/if}
 		{#if pr}
 			<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
-		{:else if owner}
+		{:else if owner && thread?.repoUrl}
 			<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" keys={threadKeys.pane} variant={paneOpen ? 'secondary' : 'ghost'} onclick={() => (paneOpen = !paneOpen)} />

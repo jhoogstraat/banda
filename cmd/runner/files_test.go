@@ -49,3 +49,21 @@ func TestReadFile(t *testing.T) {
 		}
 	}
 }
+
+func TestListWithoutRepo(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "notes", ".hidden"), 0o755)
+	for _, p := range []string{"b.txt", "notes/a.md", "notes/.hidden/x"} {
+		os.WriteFile(filepath.Join(dir, p), []byte("x"), 0o600)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	repoURL = ""
+	got := &bandav1.FileResponse{}
+	if err := list(t.Context(), root, got); err != nil || strings.Join(got.Paths, " ") != "b.txt notes/.hidden/x notes/a.md" {
+		t.Errorf("got %q, %v", got.Paths, err)
+	}
+}

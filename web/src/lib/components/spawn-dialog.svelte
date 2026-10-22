@@ -35,8 +35,12 @@
 		<Dialog.Header>
 			<Dialog.Title>Spawn a sub-thread</Dialog.Title>
 			<Dialog.Description>
-				A new agent in its own sandbox. It starts from <code>{thread.branch}</code> if that was pushed, else from
-				<code>{thread.baseBranch}</code>, and reports back here when it finishes.
+				{#if thread.repoUrl}
+					A new agent in its own sandbox. It starts from <code>{thread.branch}</code> if that was pushed, else from
+					<code>{thread.baseBranch}</code>, and reports back here when it finishes.
+				{:else}
+					A new agent in its own sandbox, without a repository like this thread. It reports back here when it finishes.
+				{/if}
 				{#if threads.me?.id !== thread.ownerId}It is yours and runs on your Claude subscription.{/if}
 			</Dialog.Description>
 		</Dialog.Header>

@@ -2,6 +2,7 @@
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
+	import TeamSecrets from '#lib/components/team-secrets.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { ConnectError } from '@connectrpc/connect';
@@ -13,20 +14,22 @@
 		type HarnessAccount,
 		type SecretInfo
 	} from '#lib/gen/banda/v1/banda_pb.js';
+	import { profiles } from '#lib/profiles.js';
 	import { ago } from '#lib/utils.js';
 
 	let accounts = $state<HarnessAccount[]>([]);
 	let secrets = $state<SecretInfo[]>([]);
+	let defaultProfile = $state('');
 	let loaded = $state(false);
 	// An error and the section it belongs to.
 	let error = $state('');
-	let errorAt = $state<'accounts' | 'secrets'>('accounts');
+	let errorAt = $state<'accounts' | 'profile' | 'secrets'>('accounts');
 
 	const message = (e: unknown) => ConnectError.from(e).rawMessage;
 
 	async function load() {
 		try {
-			({ accounts, secrets } = await settingsApi.getSettings({}));
+			({ accounts, secrets, defaultProfile } = await settingsApi.getSettings({}));
 			loaded = true;
 			error = '';
 		} catch (e) {
@@ -83,6 +86,13 @@
 			keys[a.harness] = '';
 			delete chosen[a.harness];
 		}
+	}
+
+	// Shows the pick at once, and the saved one again if saving fails.
+	async function setProfile(name: string) {
+		const before = defaultProfile;
+		defaultProfile = name;
+		if (!(await act('profile', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
 	}
 
 	// Secrets: the add form, and the row being replaced.
@@ -196,6 +206,19 @@
 			</section>
 
 			<section>
+				{@render heading('profile', 'Agent profile', 'how the agent works with you in new threads; switch it per thread in the composer')}
+				<fieldset class="divide-y rounded-lg border">
+					<legend class="sr-only">Default profile</legend>
+					{#each profiles as p (p.name)}
+						<label class="flex items-start gap-3 px-4 py-3 text-sm">
+							<input type="radio" name="profile" class="mt-1 accent-primary" checked={p.name === defaultProfile} onchange={() => setProfile(p.name)} />
+							<span><span class="font-medium">{p.label}</span> <span class="block text-muted-foreground">{p.note}</span></span>
+						</label>
+					{/each}
+				</fieldset>
+			</section>
+
+			<section aria-label="Secrets & variables">
 				{@render heading('secrets', 'Secrets & variables', 'passed to all your threads as environment variables')}
 				<div class="divide-y rounded-lg border">
 					{#each secrets as s (s.name)}
@@ -233,6 +256,8 @@
 					</form>
 				</div>
 			</section>
+
+			<TeamSecrets />
 		</div>
 	</div>
 </div>

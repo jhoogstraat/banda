@@ -89,10 +89,12 @@ type (
 	}
 	createIn struct {
 		Prompt     string `json:"prompt" jsonschema:"the task for the new thread's agent"`
-		RepoURL    string `json:"repo_url,omitempty" jsonschema:"git repository to clone (default: this thread's)"`
+		RepoURL    string `json:"repo_url,omitempty" jsonschema:"git repository to clone (default: this thread's, none if it has none)"`
 		BaseBranch string `json:"base_branch,omitempty" jsonschema:"branch to start from (default: this thread's branch if it was pushed, else this thread's base branch)"`
 		Model      string `json:"model,omitempty" jsonschema:"model (default: this thread's)"`
 		Effort     string `json:"effort,omitempty" jsonschema:"effort (default: this thread's)"`
+		Profile    string `json:"profile,omitempty" jsonschema:"who the new agent works with: engineer, spec, devops or business (default: this thread's)"`
+		WakeParent bool   `json:"wake_parent,omitempty" jsonschema:"when the sub-thread finishes its turns or fails, also start a turn of yours to act on it (default false)"`
 	}
 	createOut struct {
 		ThreadID string `json:"thread_id"`
@@ -184,8 +186,12 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			}
 			names := s.names(ctx)
 			var b strings.Builder
-			fmt.Fprintf(&b, "Thread %s: %s\nOwner: %s (%s)\nStatus: %s, mode: %s\nRepo: %s, branch %s\nUpdated: %s\n\nTranscript:\n%s\n",
-				t.ID, t.Title, actorName(names, t.OwnerID), t.OwnerID, t.Status, t.Mode, t.RepoURL, t.Branch,
+			repo := "none"
+			if t.RepoURL != "" {
+				repo = t.RepoURL + ", branch " + t.Branch
+			}
+			fmt.Fprintf(&b, "Thread %s: %s\nOwner: %s (%s)\nStatus: %s, mode: %s, profile: %s\nRepo: %s\nUpdated: %s\n\nTranscript:\n%s\n",
+				t.ID, t.Title, actorName(names, t.OwnerID), t.OwnerID, t.Status, t.Mode, t.Profile, repo,
 				t.UpdatedAt.Format(time.RFC3339), transcript(names, events, limit))
 			if in.IncludeDiff {
 				d := t.Diff
@@ -232,13 +238,14 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return textResult("Message posted."), nil, nil
 		})
 
-	addTool(ts, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model and effort default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children. " +
+	addTool(ts, &mcp.Tool{Name: "create_thread", Description: "Start a sub-thread of this thread: a fresh coding agent in its own sandbox and branch that begins working on the prompt, owned by the same person as this thread. Use it to split work into parallel parts. Repository, model, effort and profile default to this thread's; it starts from this thread's branch if that was pushed (push first to hand over your commits), else from this thread's base branch. When it finishes a turn or fails, a line appears in this thread's chat; read details with read_thread and list sub-threads with list_children. " +
+		"With wake_parent such a report also starts a turn of yours: the first one always, a later one only if a person posted in either thread since. " +
 		fmt.Sprintf("Limits: sub-threads nest at most %d deep, and at most %d sub-threads started by agents run at once per owner (until they pause when idle); beyond them the call fails and you should do the work yourself.", s.MaxSubthreadDepth, s.MaxAgentThreads)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, createOut, error) {
 			if err := s.checkFanOut(ctx, caller); err != nil {
 				return nil, createOut{}, err
 			}
-			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort)
+			child, err := s.spawn(ctx, caller, caller.OwnerID, "agent", in.Prompt, in.RepoURL, in.BaseBranch, in.Model, in.Effort, in.Profile, in.WakeParent)
 			if err != nil {
 				return nil, createOut{}, err
 			}

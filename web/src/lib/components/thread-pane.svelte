@@ -44,6 +44,11 @@
 	let termOpened = $state(false);
 	let filesOpened = $state(false);
 	let browserOpened = $state(false);
+	// A thread without a repository has no diff: its files are its work.
+	const noRepo = $derived(!!thread && !thread.repoUrl);
+	$effect(() => {
+		if (noRepo && tab === 'diff') tab = 'files';
+	});
 	$effect(() => {
 		if (tab === 'terminal') termOpened = true;
 		if (tab === 'files') filesOpened = true;
@@ -54,7 +59,9 @@
 <SidePane bind:open>
 	<Tabs bind:value={tab} class="min-h-0 flex-1 gap-0">
 		<TabsList variant="line" class="group-data-horizontal/tabs:h-12 w-full shrink-0 justify-start border-b px-2">
-			<TabsTrigger value="diff">Diff{#if pending.length}<Badge variant="secondary" class="ml-1 h-4 px-1 text-[10px]">{pending.length}</Badge>{/if}</TabsTrigger>
+			{#if !noRepo}
+				<TabsTrigger value="diff">Diff{#if pending.length}<Badge variant="secondary" class="ml-1 h-4 px-1 text-[10px]">{pending.length}</Badge>{/if}</TabsTrigger>
+			{/if}
 			<TabsTrigger value="files">Files</TabsTrigger>
 			<TabsTrigger value="browser">Browser</TabsTrigger>
 			<TabsTrigger value="terminal">Terminal</TabsTrigger>
@@ -64,7 +71,7 @@
 			<DiffView diff={thread?.diff ?? ''} bind:pending bind:focus bind:ask {posted} {onsend} />
 		</TabsContent>
 		<TabsContent value="files" class="min-h-0 overflow-auto">
-			{#if filesOpened}<FileBrowser {threadId} diff={thread?.diff ?? ''} />{/if}
+			{#if filesOpened}<FileBrowser {threadId} version={noRepo ? String(thread?.status) : (thread?.diff ?? '')} />{/if}
 		</TabsContent>
 		{#if browserOpened}
 			<!-- Hidden rather than unmounted, so the framed app keeps its state. -->

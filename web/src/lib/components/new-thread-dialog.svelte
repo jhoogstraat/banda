@@ -3,7 +3,7 @@
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
 	import * as Command from '#lib/components/ui/command/index.js';
-	import { projectName, projects } from '#lib/threads.svelte.js';
+	import { noRepo, projectName, projects } from '#lib/threads.svelte.js';
 
 	let { open = $bindable(false) }: { open: boolean } = $props();
 
@@ -27,7 +27,7 @@
 				<Command.Item value={`${projectName(repo)} ${repo}`} onSelect={() => pick(repo)}>
 					<FolderGit2Icon />
 					<span class="truncate">{projectName(repo)}</span>
-					<span class="ml-auto truncate text-xs text-muted-foreground">{repo}</span>
+					{#if repo !== noRepo}<span class="ml-auto truncate text-xs text-muted-foreground">{repo}</span>{/if}
 				</Command.Item>
 			{/each}
 		</Command.Group>

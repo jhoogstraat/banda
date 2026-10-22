@@ -210,8 +210,12 @@ func (s *Service) reportDeleted(ctx context.Context) {
 }
 
 func (s *Service) Push(ctx context.Context, req *bandav1.PushRequest) (*bandav1.PushResponse, error) {
-	if _, err := s.owned(ctx, req.ThreadId); err != nil {
+	t, err := s.owned(ctx, req.ThreadId)
+	if err != nil {
 		return nil, err
+	}
+	if t.RepoURL == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "the thread has no repository to push to")
 	}
 	if !s.sendRunner(req.ThreadId, &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_Push{Push: &bandav1.Push{}}}) {
 		return nil, errNotRunning

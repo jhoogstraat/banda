@@ -61,6 +61,7 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 			BaseBranch:    src.BaseBranch,
 			Model:         or(try.Model, src.Model),
 			Effort:        or(try.Effort, src.Effort),
+			Profile:       src.Profile,
 			PendingPrompt: prompt,
 			Diff:          src.Diff, // also what the runner applies, see ForkPatch
 			ForkedFrom:    src.ID,
@@ -83,8 +84,8 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 }
 
 func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.RaceResponse, error) {
-	if req.RepoUrl == "" || strings.TrimSpace(req.Prompt) == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url and prompt are required")
+	if strings.TrimSpace(req.Prompt) == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
 	if err := checkRepoURL(req.RepoUrl); err != nil {
 		return nil, err
@@ -106,6 +107,7 @@ func (s *Service) Race(ctx context.Context, req *bandav1.RaceRequest) (*bandav1.
 			BaseBranch:     req.BaseBranch,
 			Model:          try.Model,
 			Effort:         try.Effort,
+			Profile:        req.Profile,
 			PendingPrompt:  req.Prompt,
 			RaceID:         race,
 			PermissionMode: mode,
@@ -235,8 +237,13 @@ func forkPrompt(names map[string]string, src store.Thread, turn int, events []*b
 		lines, cut = lines[1:], true
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "This thread is a fork of Banda thread %s (%q), made after its turn %d. Your branch already holds that thread's changes, committed on top of %s. Its conversation so far:\n\n",
-		src.ID, src.Title, turn, src.BaseBranch)
+	fmt.Fprintf(&b, "This thread is a fork of Banda thread %s (%q), made after its turn %d. ", src.ID, src.Title, turn)
+	if src.RepoURL == "" {
+		b.WriteString("Neither thread has a repository and that thread's files stayed in its environment: you start in an empty folder. ")
+	} else {
+		fmt.Fprintf(&b, "Your branch already holds that thread's changes, committed on top of %s. ", src.BaseBranch)
+	}
+	b.WriteString("Its conversation so far:\n\n")
 	if cut {
 		b.WriteString("(earlier messages left out)\n\n")
 	}
