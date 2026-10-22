@@ -49,10 +49,12 @@ type Thread struct {
 	PermissionMode string
 	Permissions    map[string]string // pending requests: id -> tool name
 	AllowedTools   []string
-	ForkedFrom     string // the source thread of a fork
-	ForkTurn       int    // turns the source had finished then
-	RaceID         string // shared by threads started together
-	ParentID       string // the thread this one was spawned from
+	ForkedFrom     string     // the source thread of a fork
+	ForkTurn       int        // turns the source had finished then
+	RaceID         string     // shared by threads started together
+	ParentID       string     // the thread this one was spawned from
+	WakeParent     bool       // its reports start a turn of the parent's agent
+	WokeParent     *time.Time // when it last did; see SetWokeParent
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -117,13 +119,13 @@ func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile`
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -150,10 +152,10 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id, profile)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id, profile, wake_parent)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID, t.Profile)
+		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID, t.Profile, t.WakeParent)
 	return err
 }
 
@@ -265,6 +267,21 @@ func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 		return "", nil
 	}
 	return text, err
+}
+
+// LastPost is when a person (not an agent) last posted a message or a turn
+// request in any of the threads, or nil.
+func (s *Store) LastPost(ctx context.Context, ids ...string) (*time.Time, error) {
+	var at *time.Time
+	err := s.db.QueryRow(ctx, `SELECT max((body->>'time')::timestamptz) FROM events WHERE thread_id = ANY($1)
+		AND kind IN ('message', 'turnRequest') AND body->>'actor' NOT LIKE 'agent:%'`, ids).Scan(&at)
+	return at, err
+}
+
+// SetWokeParent records that the sub-thread just started a turn of its parent's agent.
+func (s *Store) SetWokeParent(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET woke_parent_at = now() WHERE id = $1`, id)
+	return err
 }
 
 // Pushed reports whether the thread's branch was ever pushed to origin.

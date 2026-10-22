@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect/v2"
 
@@ -17,7 +18,7 @@ func (s *Service) SpawnThread(ctx context.Context, req *bandav1.SpawnThreadReque
 	if err != nil {
 		return nil, err
 	}
-	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort, "")
+	child, err := s.spawn(ctx, parent, user(ctx), user(ctx), req.Prompt, "", req.BaseBranch, req.Model, req.Effort, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,8 @@ func (s *Service) LineageChildren(ctx context.Context, req *bandav1.LineageChild
 // parent as actor. Repo, model, effort and profile default to the parent's. The base
 // defaults to the parent's branch once it was pushed (its commits are on
 // origin), else to the parent's base branch; for another repo, see start.
-func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, prompt, repo, base, model, effort, profile string) (store.Thread, error) {
+// With wake, its reports also wake the parent's agent (see wakeParent).
+func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, prompt, repo, base, model, effort, profile string, wake bool) (store.Thread, error) {
 	repo = or(repo, parent.RepoURL)
 	if base == "" && repo == parent.RepoURL {
 		base = parent.BaseBranch
@@ -56,7 +58,7 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor, 
 	}
 	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, ParentID: parent.ID, RepoURL: repo,
 		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort), Profile: or(profile, parent.Profile),
-		PermissionMode: parent.PermissionMode}, by, prompt) // an agent's sub-thread asks no less than it does
+		PermissionMode: parent.PermissionMode, WakeParent: wake}, by, prompt) // an agent's sub-thread asks no less than it does
 	if err != nil {
 		return child, err
 	}
@@ -104,7 +106,8 @@ func (s *Service) lineage(ctx context.Context, child store.Thread, actor string,
 }
 
 // reportToParent tells a sub-thread's parent when the sub-thread finished
-// its turns or failed. Called by broadcast, holding s.mu, for every batch of events.
+// its turns or failed, and wakes the parent's agent if the sub-thread asks
+// for it. Called by broadcast, holding s.mu, for every batch of events.
 func (s *Service) reportToParent(id string, events []*bandav1.Event) {
 	status, text := lineageStatus(events)
 	if status == bandav1.Status_STATUS_UNSPECIFIED {
@@ -138,7 +141,48 @@ func (s *Service) reportToParent(id string, events []*bandav1.Event) {
 			text = firstLine(last, maxLineage)
 		}
 		s.lineage(ctx, t, "system", status, text)
+		if t.WakeParent {
+			s.wakeParent(ctx, t, &bandav1.LineageUpdate{ThreadId: t.ID, Title: t.Title, Status: status, Text: text})
+		}
 	}()
+}
+
+// wakeParent starts a turn of the parent's agent about a report u of child,
+// as child's own agent posting with mention_agent would: no approval, a
+// paused parent wakes, a working one queues it, chat mode doesn't stop it.
+// A starting or errored parent isn't woken. mayWake is the loop guard.
+func (s *Service) wakeParent(ctx context.Context, child store.Thread, u *bandav1.LineageUpdate) {
+	posted, err := s.store.LastPost(ctx, child.ID, child.ParentID)
+	if err != nil {
+		slog.Error("last post", "thread", child.ID, "err", err)
+		return
+	}
+	if !mayWake(child.WokeParent, posted) {
+		return
+	}
+	_, err = s.SendMessage(WithUser(ctx, "agent:"+child.ID), &bandav1.SendMessageRequest{ThreadId: child.ParentID,
+		Message: &bandav1.Message{Text: wakeText(u), MentionsAgent: true}})
+	if err != nil {
+		slog.Warn("wake parent thread", "thread", child.ID, "parent", child.ParentID, "err", err)
+		return
+	}
+	if err := s.store.SetWokeParent(ctx, child.ID); err != nil {
+		slog.Error("record parent wake", "thread", child.ID, "err", err)
+	}
+}
+
+// mayWake is the loop guard, so that two agents don't keep each other busy
+// on the owner's subscription without a person: a sub-thread wakes its parent
+// the first time (woke is nil), then only once a person posted in either
+// thread (posted is the latest such post) since it last did.
+func mayWake(woke, posted *time.Time) bool {
+	return woke == nil || posted != nil && posted.After(*woke)
+}
+
+// wakeText is what a report asks of the parent's agent it wakes.
+func wakeText(u *bandav1.LineageUpdate) string {
+	return lineageLine(u) + "\nYou started this sub-thread with wake_parent. Read it with read_thread (thread_id " + u.ThreadId +
+		", include_diff for its changes) and carry on from its result."
 }
 
 // lineageStatus is what a batch of a thread's events means for its parent:
