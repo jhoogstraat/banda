@@ -31,7 +31,7 @@
 {#if brief}
 	<section aria-label="Brief" class="border-b px-4 py-3">
 		<h2 class="text-sm font-medium">
-			Since your last visit <span class="font-normal text-muted-foreground">{ago(brief.since, threads.now)} ago</span>
+			Since your last visit <span class="font-normal text-muted-foreground">{ago(brief.since, threads.now) === 'now' ? 'just now' : `${ago(brief.since, threads.now)} ago`}</span>
 		</h2>
 		{#if !sections.length}
 			<p class="mt-1 text-xs text-muted-foreground">Nothing new.</p>

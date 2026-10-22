@@ -210,3 +210,22 @@ test('settings: secrets are added, replaced and deleted, never shown; the accoun
 		await expect(page.getByRole('radio', { name: 'Subscription' })).toBeChecked();
 	});
 });
+
+test('a phone, dark and light: no page scrolls sideways, and a thread’s send button stays in reach', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e: on a phone' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const { defaultBrowserType: _, ...iphone } = devices['iPhone 13'];
+	for (const mode of ['dark', 'light']) {
+		const page = await alice.page(iphone);
+		await page.addInitScript((m) => localStorage.setItem('mode-watcher-mode', m), mode);
+		for (const path of ['/', '/team', `/u/${alice.id}`, '/decisions', '/search?q=hello', '/settings', '/compare', `/t/${t.id}`]) {
+			await page.goto(path);
+			await page.waitForTimeout(1000); // its data in (streams never let the network idle)
+			expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(mode === 'dark');
+			const [scroll, client] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+			expect(scroll, `${path} in ${mode} is ${scroll}px wide on a ${client}px phone`).toBeLessThanOrEqual(client);
+		}
+		await expect(page.getByRole('button', { name: 'Submit' })).toBeInViewport({ ratio: 1 });
+	}
+});

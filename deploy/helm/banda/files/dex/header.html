@@ -7,6 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{{ url .ReqPath "static/main.css" }}" rel="stylesheet">
     <link href="{{ url .ReqPath "theme/styles.css" }}" rel="stylesheet">
+    <script>
+      // The web app's theme (Settings, stored by mode-watcher): Dex is served on its origin at /dex, so it reads the same key.
+      var mode = localStorage.getItem('mode-watcher-mode') || 'dark';
+      if (mode === 'light' || (mode === 'system' && matchMedia('(prefers-color-scheme: light)').matches)) document.documentElement.classList.add('light');
+    </script>
   </head>
 
   <body class="theme-body">

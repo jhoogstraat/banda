@@ -17,5 +17,5 @@
 
 <span class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
 	<span class="size-2 shrink-0 rounded-full {dot}"></span>
-	{#if label}<span class="text-xs {waiting ? 'font-medium text-amber-500' : 'text-muted-foreground'}">{text}</span>{/if}
+	{#if label}<span class="text-xs {waiting ? 'font-medium text-amber-700 dark:text-amber-500' : 'text-muted-foreground'}">{text}</span>{/if}
 </span>

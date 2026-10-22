@@ -102,7 +102,7 @@
 	{#each shown as p (p)}
 		{@const dir = p.slice(0, p.lastIndexOf('/') + 1)}
 		<button
-			class="flex w-full px-3 py-1 text-left font-mono text-xs hover:bg-muted"
+			class="flex w-full px-3 py-1 text-left pointer-coarse:py-2.5 font-mono text-xs hover:bg-muted"
 			title={p}
 			onclick={() => {
 				file = undefined;

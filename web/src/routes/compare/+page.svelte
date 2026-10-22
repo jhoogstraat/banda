@@ -257,7 +257,7 @@
 										{#if f}<span class="text-green-600 dark:text-green-400">+{f.add}</span> <span class="text-red-600 dark:text-red-400">−{f.del}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
 									</span>
 								{/each}
-								<span class={d.kind === 'Same' ? 'text-muted-foreground' : 'font-medium text-amber-500'}>{d.kind}</span>
+								<span class={d.kind === 'Same' ? 'text-muted-foreground' : 'font-medium text-amber-700 dark:text-amber-500'}>{d.kind}</span>
 							</button>
 						{/each}
 					</div>

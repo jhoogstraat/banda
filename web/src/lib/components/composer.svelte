@@ -109,7 +109,8 @@
 				<MentionInput {placeholder} />
 			</PromptInput.Body>
 			<PromptInput.Toolbar>
-				<div class="flex items-center gap-1.5 pl-1">
+				<!-- The chips wrap on a phone, as on the new thread page, so the send button stays in reach. -->
+				<div class="flex min-w-0 flex-wrap items-center gap-1.5 pl-1">
 					<AttachButton />
 					{#if thread && owner}
 						<!-- A running agent switches model, effort and profile once its turns have ended, permissions at once. -->
@@ -158,7 +159,7 @@
 						</DropdownMenu.Root>
 					{/if}
 				</div>
-				<PromptInput.Submit />
+				<PromptInput.Submit class="shrink-0" />
 			</PromptInput.Toolbar>
 		</fieldset>
 	</PromptInput.Root>

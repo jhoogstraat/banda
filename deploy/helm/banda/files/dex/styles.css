@@ -1,5 +1,5 @@
-/* Banda's look for its bundled Dex: the dark tokens of web/src/routes/layout.css
- * and the layout of the web app's sign-in page (web/src/routes/signin). */
+/* Banda's look for its bundled Dex: the tokens of web/src/routes/layout.css and the layout of the web app's
+ * sign-in page (web/src/routes/signin). Dark, or light when header.html finds the app's theme is light. */
 
 @font-face {
   font-family: 'Inter Variable';
@@ -20,6 +20,8 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  --input-background: oklch(1 0 0 / 4.5%);
+  --primary-hover: oklch(0.922 0 0 / 80%);
   --radius: 0.625rem;
   /* What main.css reads for the home page. */
   --dex-fg: var(--foreground);
@@ -37,6 +39,22 @@
   min-height: 100dvh;
   place-items: center;
   -webkit-font-smoothing: antialiased;
+}
+
+.light .theme-body {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --input-background: transparent;
+  --primary-hover: oklch(0.205 0 0 / 90%);
+  color-scheme: light;
 }
 
 .dex-container {
@@ -100,7 +118,7 @@
 }
 
 .theme-form-input {
-  background-color: oklch(1 0 0 / 4.5%);
+  background-color: var(--input-background);
   border: 1px solid var(--input);
   border-radius: calc(var(--radius) * 0.8);
   color: var(--foreground);
@@ -110,6 +128,13 @@
   padding: 4px 10px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   width: 100%;
+}
+
+/* iOS zooms into inputs with text under 16px on focus (as in layout.css). */
+@media (pointer: coarse) {
+  .theme-form-input {
+    font-size: 16px;
+  }
 }
 
 .theme-form-input::placeholder {
@@ -147,11 +172,11 @@
 
 .theme-btn--primary:hover,
 .theme-btn--success:hover {
-  background-color: oklch(0.922 0 0 / 80%);
+  background-color: var(--primary-hover);
 }
 
 .theme-btn-provider {
-  background-color: oklch(1 0 0 / 4.5%);
+  background-color: var(--input-background);
   border: 1px solid var(--input);
   color: var(--foreground);
   width: 100%;

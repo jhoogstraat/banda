@@ -73,7 +73,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] Settings in sections: Claude Code, Git identity (commits as you, not "Banda"), defaults for new threads, notifications per kind, theme, shortcuts.
 - [x] Person pages (`/u/<id>`), names linking to them, and an account menu on your name.
 - [x] Banda's own sign-in and signed-out page (`OIDC_PROVIDER_NAME`); the bundled Dex in Banda's look; a favicon.
-- [ ] Try the light theme and the Dex pages on a phone.
+- [x] Try the light theme and the Dex pages on a phone: every page in dark and light on a desktop and a phone. The thread composer's send button was off a phone's screen, Dex stayed dark under the light theme, amber labels were faint on light; `pages.spec.ts` checks a phone scrolls no page sideways.
 - [ ] Flaky under load (1 of 2 full runs, never alone): `repoless.spec.ts` "a prompt resumes it with its files" listed only `hello1.txt` after the resumed turn. Find out whether the listing or the resumed volume is wrong.
 
 ## Later (not needed to run fully)

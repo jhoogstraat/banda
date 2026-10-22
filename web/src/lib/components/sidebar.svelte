@@ -74,7 +74,7 @@
 			{race ? `${raceTitle(t)} · ${race.children.length} tries` : t.title || t.repoUrl.split('/').pop() || t.id}
 		</span>
 		{#if wait && !byline}
-			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-500" title={wait}>{asking(asks(t))}</span>
+			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-700 dark:text-amber-500" title={wait}>{asking(asks(t))}</span>
 		{:else if t.pullRequest && !race}
 			<PullRequestChip pr={t.pullRequest} small />
 		{/if}

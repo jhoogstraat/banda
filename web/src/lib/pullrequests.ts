@@ -32,7 +32,7 @@ export const pullStates: Record<PullState, Look> = {
 
 export const checkStates: Record<ChecksState, Look> = {
 	[ChecksState.UNSPECIFIED]: { label: 'No checks', icon: CircleDashedIcon, class: 'text-muted-foreground' },
-	[ChecksState.PENDING]: { label: 'Running', icon: CircleDotIcon, class: 'text-amber-500' },
+	[ChecksState.PENDING]: { label: 'Running', icon: CircleDotIcon, class: 'text-amber-700 dark:text-amber-500' },
 	[ChecksState.PASSING]: { label: 'Passed', icon: CircleCheckIcon, class: 'text-emerald-600 dark:text-emerald-400' },
 	[ChecksState.FAILING]: { label: 'Failed', icon: CircleXIcon, class: 'text-destructive' },
 	[ChecksState.SKIPPED]: { label: 'Skipped', icon: CircleDashedIcon, class: 'text-muted-foreground' }
