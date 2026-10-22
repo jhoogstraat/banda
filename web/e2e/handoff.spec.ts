@@ -88,7 +88,8 @@ test('loop guard: a sub-thread wakes its parent again only once a person posted 
 test('a paused parent wakes for its sub-thread’s report', async ({ as }) => {
 	const parent = await as('alice').create();
 	await parent.waitForStatus(Status.AWAITING_INPUT);
-	const child = await spawn(parent, { prompt: 'e2e: build it e2e-hold:h', wake_parent: true });
+	// The directive on a line of its own: the title (the first line) is quoted in the woken prompt.
+	const child = await spawn(parent, { prompt: 'e2e: build it\ne2e-hold:h', wake_parent: true });
 	await child.waitForEvent((e) => e.kind.case === 'agentText' && e.kind.value.text === 'Holding h', 'the held turn', 120_000);
 	await parent.snooze();
 	await parent.waitForStatus(Status.SUSPENDED);
