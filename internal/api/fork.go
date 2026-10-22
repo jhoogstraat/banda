@@ -233,6 +233,21 @@ const maxTranscript = 40 << 10
 // conversation (people's messages and the agent's replies) and the new
 // instruction, or without one a request to sum up.
 func forkPrompt(names map[string]string, src store.Thread, turn int, events []*bandav1.Event, instruction string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "This thread is a fork of Banda thread %s (%q), made after its turn %d. Your branch already holds that thread's changes, committed on top of %s. Its conversation so far:\n\n",
+		src.ID, src.Title, turn, src.BaseBranch)
+	b.WriteString(conversation(names, events))
+	b.WriteString("\n\n---\n\n")
+	if instruction == "" {
+		instruction = "Sum up in a few lines where the work stands, then wait for instructions."
+	}
+	b.WriteString(instruction)
+	return b.String()
+}
+
+// conversation is a thread's people's messages and the agent's replies among
+// events, the latest maxTranscript of them, for a new session's first prompt.
+func conversation(names map[string]string, events []*bandav1.Event) string {
 	var lines []string
 	size := 0
 	for _, e := range events {
@@ -256,17 +271,9 @@ func forkPrompt(names map[string]string, src store.Thread, turn int, events []*b
 		size -= len(lines[0]) + 2
 		lines, cut = lines[1:], true
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "This thread is a fork of Banda thread %s (%q), made after its turn %d. Your branch already holds that thread's changes, committed on top of %s. Its conversation so far:\n\n",
-		src.ID, src.Title, turn, src.BaseBranch)
+	out := strings.Join(lines, "\n\n")
 	if cut {
-		b.WriteString("(earlier messages left out)\n\n")
+		out = "(earlier messages left out)\n\n" + out
 	}
-	b.WriteString(strings.Join(lines, "\n\n"))
-	b.WriteString("\n\n---\n\n")
-	if instruction == "" {
-		instruction = "Sum up in a few lines where the work stands, then wait for instructions."
-	}
-	b.WriteString(instruction)
-	return b.String()
+	return out
 }

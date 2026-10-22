@@ -174,3 +174,7 @@ CREATE TABLE IF NOT EXISTS overlap_notices (
   paths text[] NOT NULL,
   PRIMARY KEY (a, b)
 );
+-- The teammate the owner offered the thread to (see thread.Offer), and how
+-- many handoffs it has had: each starts a new Claude Code session.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoff_to text NOT NULL DEFAULT '';
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoffs int NOT NULL DEFAULT 0;

@@ -97,6 +97,11 @@ const [first, second] = asks.items;
 if (first.kind !== 'request' || first.resolved?.by !== 'ann' || first.resolved.note !== 'no' || first.text !== '@agent go')
 	throw new Error('a resolution should attach to its request');
 if (second.kind !== 'request' || second.resolved || asks.items.length !== 2) throw new Error('other requests should stay open');
+apply(asks, { seq: 10n, actor: 'ann', kind: { case: 'handoffOffered', value: { toUserId: 'bob', note: 'tests next' } } } as Event);
+apply(asks, { seq: 11n, actor: 'bob', kind: { case: 'handoffResolved', value: { offerSeq: 10n, accepted: true } } } as Event);
+const handoff = asks.items.at(-1);
+if (handoff?.kind !== 'handoff' || handoff.offer.toUserId !== 'bob' || handoff.resolved?.by !== 'bob' || !handoff.resolved.accepted || asks.items[2] !== handoff)
+	throw new Error('a handoff should be a card its resolution attaches to');
 
 const [f] = parseDiff('diff --git a/x.go b/x.go\n--- a/x.go\n+++ b/x.go\n@@ -3,4 +3,4 @@ func\n a\n-b\n-c\n+B\n d\n\\ No newline at end of file\n');
 if (f.path !== 'x.go' || f.add !== 1 || f.del !== 2 || f.lines.map((l) => `${l.old ?? ''}/${l.new ?? ''}`).join() !== '/,3/3,4/,5/,/4,6/5,/')
@@ -138,6 +143,8 @@ for (let t = 0; t < 4; t++) {
 	add({ case: 'turnEnded', value: { durationMs: 1n, costUsd: 0 } });
 	if (t === 1) add({ case: 'turnRequest', value: { message: { text: '@agent please', attachments: [{ id: 'notes', name: 'notes.md', mediaType: 'text/plain' }] } } }, { actor: 'bob' });
 	if (t === 2) add({ case: 'turnRequestResolved', value: { requestSeq: BigInt(history.findIndex((e) => e.kind.case === 'turnRequest') + 1), approved: true } }, { actor: 'dev' });
+	if (t === 1) add({ case: 'handoffOffered', value: { toUserId: 'bob', note: '' } }, { actor: 'dev' });
+	if (t === 2) add({ case: 'handoffResolved', value: { offerSeq: BigInt(history.findIndex((e) => e.kind.case === 'handoffOffered') + 1) } }, { actor: 'bob' });
 }
 const show = (c: Chat) => JSON.stringify({ items: c.items, plan: c.plan, planSeq: c.planSeq }, (_, v) => (typeof v === 'bigint' ? Number(v) : v));
 const whole = newChat();
@@ -160,7 +167,7 @@ for (let tail = 1; tail <= history.length; tail++) {
 		const first = paged.items[0];
 		if (first.kind !== 'message' || first.attachments[0]?.id !== 'shot0' || !paged.items.some((i) => i.kind === 'request' && i.attachments[0]?.id === 'notes'))
 			throw new Error('attachments in older pages should render');
-		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size || paged.orphans.answers.size) throw new Error('every orphan should find its call');
+		if (paged.orphans.results.size || paged.orphans.calls.size || paged.orphans.resolved.size || paged.orphans.handoffs.size || paged.orphans.answers.size) throw new Error('every orphan should find its call');
 	}
 }
 const tailOnly = newChat();

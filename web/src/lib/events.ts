@@ -6,6 +6,8 @@ import {
 	type Attachment,
 	type Event,
 	type ForkNote,
+	type HandoffOffered,
+	type HandoffResolved,
 	type LineageUpdate,
 	type Mode,
 	type Overlap,
@@ -49,13 +51,15 @@ export type Item = { key: number } & (
 	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
 	| { kind: 'push'; text: string; pushed: boolean; unavailable: boolean }
 	| { kind: 'fork'; actor: string; note: ForkNote }
+	// The owner (`actor`) offered the thread to a teammate; `resolved` once accepted, declined or cancelled (`by`).
+	| { kind: 'handoff'; seq: bigint; actor: string; offer: HandoffOffered; time?: Timestamp; resolved?: HandoffResolved & { by: string } }
 	| { kind: 'setup'; steps: SetupStep[] }
 );
 
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
-// subagent calls by parent id, turn request resolutions by request seq, permission answers and votes by request id,
+// subagent calls by parent id, turn request and handoff resolutions by their seq, permission answers and votes by request id,
 // and live permission cards whose call comes next, by call id. `planSeq` is the seq of the TodoWrite behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
@@ -70,6 +74,7 @@ export type Chat = {
 		results: Map<string, { result: ToolResult; seq: bigint; cut: boolean }>;
 		calls: Map<string, Tool[]>;
 		resolved: Map<bigint, TurnRequestResolved & { by: string }>;
+		handoffs: Map<bigint, HandoffResolved & { by: string }>;
 		answers: Map<string, PermissionResolved & { by: string }>;
 		votes: Map<string, Record<string, Record<string, string>>>;
 		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
@@ -85,7 +90,7 @@ export const newChat = (): Chat => ({
 	planSeq: 0n,
 	seq: 0n,
 	tools: new Map(),
-	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
+	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), handoffs: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
 	present: [],
 	typing: {}
 });
@@ -273,6 +278,16 @@ export function apply(chat: Chat, e: Event) {
 		case 'forkNote':
 			chat.items.push({ key, kind: 'fork', actor: e.actor, note: k.value });
 			break;
+		case 'handoffOffered':
+			chat.items.push({ key, kind: 'handoff', seq: e.seq, actor: e.actor, offer: k.value, time: e.time });
+			break;
+		case 'handoffResolved': {
+			const seq = k.value.offerSeq;
+			const offer = chat.items.find((i): i is Extract<Item, { kind: 'handoff' }> => i.kind === 'handoff' && i.seq === seq);
+			if (offer) offer.resolved = { ...k.value, by: e.actor };
+			else chat.orphans.handoffs.set(seq, { ...k.value, by: e.actor }); // its offer is in older history
+			break;
+		}
 	}
 }
 
@@ -300,6 +315,10 @@ export function prepend(chat: Chat, events: Event[]) {
 		if (item.kind === 'request' && chat.orphans.resolved.has(item.seq)) {
 			item.resolved = chat.orphans.resolved.get(item.seq);
 			chat.orphans.resolved.delete(item.seq);
+		}
+		if (item.kind === 'handoff' && chat.orphans.handoffs.has(item.seq)) {
+			item.resolved = chat.orphans.handoffs.get(item.seq);
+			chat.orphans.handoffs.delete(item.seq);
 		}
 		if (item.kind === 'permission' && chat.orphans.answers.has(item.req.id)) {
 			item.resolved = chat.orphans.answers.get(item.req.id);
@@ -331,6 +350,7 @@ export function prepend(chat: Chat, events: Event[]) {
 	}
 	// What waits in the older page waits for even older history.
 	for (const [seq, r] of old.orphans.resolved) chat.orphans.resolved.set(seq, r);
+	for (const [seq, r] of old.orphans.handoffs) chat.orphans.handoffs.set(seq, r);
 	for (const [id, r] of old.orphans.answers) chat.orphans.answers.set(id, r);
 	for (const [id, o] of old.orphans.results) chat.orphans.results.set(id, o);
 	for (const [id, kids] of old.orphans.calls) chat.orphans.calls.set(id, [...kids, ...(chat.orphans.calls.get(id) ?? [])]);

@@ -34,6 +34,9 @@ type State struct {
 	// runs on the owner's subscription, in a pod holding their credentials.
 	Requests int
 	Trusted  bool
+	// HandoffTo is the teammate the owner offered the thread to, until they
+	// accept or decline or the owner cancels.
+	HandoffTo string
 }
 
 // Effect is what the caller must do once the new state is persisted.
@@ -52,6 +55,9 @@ var (
 	ErrForbidden = errors.New("only the thread owner can do this")
 	ErrNotReady  = errors.New("the environment is not ready")
 	ErrNoRequest = errors.New("no turn request is waiting")
+	ErrNoHandoff = errors.New("no handoff is waiting")
+	ErrHandoff   = errors.New("hand the thread to a teammate, one at a time")
+	ErrBusy      = errors.New("the agent is working: accept once its turn has ended")
 )
 
 // CheckOwner returns ErrForbidden unless by owns the thread.
@@ -100,6 +106,17 @@ type SetMode struct {
 
 type Retry struct{ By string }
 
+// Offer offers the thread to a teammate. An idle agent first writes them a
+// briefing, as the owner's last turn.
+type Offer struct{ By, To string }
+
+// Accept makes the recipient of an offer the owner: the environment restarts
+// with their login and secrets. Withdraw ends an offer: the recipient
+// declines it or the owner cancels it.
+type Accept struct{ By string }
+
+type Withdraw struct{ By string }
+
 // EnvReady: the runner connected. Pending is true if a prompt is waiting
 // to be delivered (the initial prompt of a new thread).
 type EnvReady struct{ Pending bool }
@@ -126,6 +143,9 @@ func (Trust) action()     {}
 func (Interrupt) action() {}
 func (SetMode) action()   {}
 func (Retry) action()     {}
+func (Offer) action()     {}
+func (Accept) action()    {}
+func (Withdraw) action()  {}
 func (EnvReady) action()  {}
 func (TurnEnded) action() {}
 func (EnvLost) action()   {}
@@ -207,6 +227,44 @@ func Apply(s State, a Action) (State, Effect, error) {
 		}
 		s.Status = Starting
 		return s, Provision, nil
+
+	case Offer:
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
+		}
+		if a.To == "" || a.To == s.OwnerID || s.HandoffTo != "" {
+			return s, None, ErrHandoff
+		}
+		s.HandoffTo = a.To
+		if s.Status == AwaitingInput { // the briefing
+			return startTurn(s)
+		}
+		return s, None, nil
+
+	case Accept:
+		if s.HandoffTo == "" {
+			return s, None, ErrNoHandoff
+		}
+		if a.By != s.HandoffTo {
+			return s, None, ErrForbidden
+		}
+		if s.Status == Working {
+			return s, None, ErrBusy
+		}
+		// Trust was the old owner's, for their subscription.
+		s.OwnerID, s.HandoffTo, s.Trusted = a.By, "", false
+		s.Status, s.Turns = Starting, 0
+		return s, Provision, nil
+
+	case Withdraw:
+		if s.HandoffTo == "" {
+			return s, None, ErrNoHandoff
+		}
+		if a.By != s.HandoffTo && a.By != s.OwnerID {
+			return s, None, ErrForbidden
+		}
+		s.HandoffTo = ""
+		return s, None, nil
 
 	case EnvReady:
 		// A fresh claude runs no turn, so this also ends a turn lost with a

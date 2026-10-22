@@ -89,7 +89,7 @@ export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = 
 	}
 	const mentioned = new Set(prev.mentioned.map((t) => t.id));
 	for (const t of next.mentioned) {
-		if (!mentioned.has(t.id)) push(t, `You were mentioned in ${name(t.ownerId)}'s thread`);
+		if (!mentioned.has(t.id)) push(t, t.handoffTo ? `${name(t.ownerId)} hands you a thread` : `You were mentioned in ${name(t.ownerId)}'s thread`);
 	}
 	if (next.loginNeeded && !prev.loginNeeded)
 		out.push({ href: '/settings', title: 'Log in to Claude', body: 'Your agents can’t run until you log in again.' });
