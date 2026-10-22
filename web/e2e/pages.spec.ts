@@ -121,19 +121,19 @@ test('team board: bob watches alice’s thread start, work and wait for her, liv
 	await expect(column(page, alice).getByText('1 working · 1')).toBeVisible(); // starting counts
 	await expect(card).toContainText('Agent: ', { timeout: 90_000 });
 	await t.release('board');
-	await expect(card).toContainText(`Waiting for ${alice.id}`);
+	await expect(card).toContainText(`Ready for ${alice.id}`);
 	await card.click();
 	await expect(page).toHaveURL(`/t/${t.id}`);
 });
 
-test('the sidebar’s inbox: my thread waiting for me under Needs input; a teammate’s mention under Mentioned, counted in the tab title until read', async ({ as }) => {
+test('the sidebar’s inbox: my finished thread under Ready; a teammate’s mention under Mentioned, counted in the tab title until read', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const [mine, bobs] = [await alice.create({ prompt: 'e2e: mine' }), await bob.create({ prompt: 'e2e: bob’s' })];
 	await Promise.all([mine.waitForStatus(Status.AWAITING_INPUT), bobs.waitForStatus(Status.AWAITING_INPUT)]);
 	await alice.users.me({});
 	const page = await alice.page();
 	await page.goto('/settings'); // a page that marks nothing read
-	await expect(page.getByRole('region', { name: 'Needs input' }).getByRole('link', { name: /e2e: mine/ })).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Ready' }).getByRole('link', { name: /e2e: mine/ })).toBeVisible();
 
 	await bobs.send(`@${alice.id} have a look`, { mentionedUserIds: [alice.id] });
 	const mention = page.getByRole('region', { name: 'Mentioned' }).getByRole('link', { name: /e2e: bob’s/ });

@@ -162,7 +162,8 @@
 		{@render reviewCards(item.review)}
 		{#if noting && owner && !item.resolved}
 			<!-- svelte-ignore a11y_autofocus -->
-			<Input bind:value={note} autofocus placeholder="Why not? Sent with the decline." class="h-8 text-xs" aria-label="Decline note" />
+			<Input bind:value={note} autofocus placeholder="Why not? Sent with the decline." class="h-8 text-xs" aria-label="Decline note"
+				onkeydown={(e) => e.key === 'Enter' && act(api.declineTurn({ threadId, requestSeq: item.seq, note }))} />
 		{/if}
 	</div>
 {:else if item.kind === 'permission'}

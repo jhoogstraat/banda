@@ -164,6 +164,11 @@ func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav
 	}
 	_, err := s.apply(ctx, req.ThreadId, thread.Trust{By: user(ctx), Trusted: req.Trusted},
 		&bandav1.Event{Actor: user(ctx), Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
+	s.mu.Lock()
+	for w := range s.inbox { // its pending permission requests become teammates' decisions, or stop being theirs
+		w.wake()
+	}
+	s.mu.Unlock()
 	return &bandav1.TrustResponse{}, err
 }
 

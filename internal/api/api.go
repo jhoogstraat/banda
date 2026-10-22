@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -257,6 +259,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		Activity:           t.Activity,
 		PermissionMode:     permissionModeToProto[t.PermissionMode],
 		PermissionPending:  len(t.Permissions) > 0,
+		PermissionTools:    slices.Sorted(maps.Values(t.Permissions)),
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
 	}
