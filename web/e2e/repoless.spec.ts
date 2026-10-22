@@ -89,7 +89,7 @@ test('browser: a thread started with “No repository” shows its files, no dif
 
 	await test.step('the sidebar’s project filter files it under “No repository”, apart from a thread with one', async () => {
 		await (await alice.create({ repoUrl: repo(), prompt: 'e2e: with a repository' })).waitForStatus(Status.AWAITING_INPUT);
-		const sidebar = page.getByRole('region', { name: 'Ready' }); // finished threads
+		const sidebar = page.getByRole('region', { name: 'Ready' });
 		await expect(sidebar.getByRole('link', { name: /e2e: with a repository/ })).toBeVisible();
 		await page.getByRole('button', { name: 'Filter by project' }).click();
 		await page.getByRole('menuitemradio', { name: 'No repository' }).click();
