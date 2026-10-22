@@ -100,8 +100,9 @@ service UserService {
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
-// SettingsService is the caller's own harness accounts and secrets.
-// Secret and API key values are write-only: no RPC ever returns them.
+// SettingsService is the caller's own harness accounts and secrets, and the
+// team's secrets. Secret and API key values are write-only: no RPC ever
+// returns them.
 service SettingsService {
   rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
   // Chooses how a harness signs in. Applies to environments started
@@ -113,6 +114,12 @@ service SettingsService {
   rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
   // The profile of the caller's new threads that don't name one.
   rpc SetDefaultProfile(SetDefaultProfileRequest) returns (SetDefaultProfileResponse);
+  // Team secrets go to every environment of every user, before their own
+  // secrets, so a user's secret of the same name wins. Anyone signed in lists,
+  // sets, replaces and deletes them; the same names are refused.
+  rpc ListTeamSecrets(ListTeamSecretsRequest) returns (ListTeamSecretsResponse);
+  rpc SetTeamSecret(SetTeamSecretRequest) returns (SetTeamSecretResponse);
+  rpc DeleteTeamSecret(DeleteTeamSecretRequest) returns (DeleteTeamSecretResponse);
   // A terminal in the caller's login environment: a small pod that mounts
   // only the caller's harness config volume, started on demand. It runs the
   // harness's login or logout command. Output streams until it exits.
@@ -738,6 +745,8 @@ message HarnessAccount {
 message SecretInfo {
   string name = 1;
   google.protobuf.Timestamp updated_at = 2;
+  // Team secrets only: the user who set it last.
+  string updated_by = 3;
 }
 
 message GetSettingsRequest {}
@@ -777,6 +786,26 @@ message SetDefaultProfileRequest {
 }
 
 message SetDefaultProfileResponse {}
+
+message ListTeamSecretsRequest {}
+
+message ListTeamSecretsResponse {
+  repeated SecretInfo secrets = 1;
+}
+
+message SetTeamSecretRequest {
+  // An environment variable name: [A-Z_][A-Z0-9_]*.
+  string name = 1;
+  string value = 2;
+}
+
+message SetTeamSecretResponse {}
+
+message DeleteTeamSecretRequest {
+  string name = 1;
+}
+
+message DeleteTeamSecretResponse {}
 
 enum LoginAction {
   LOGIN_ACTION_UNSPECIFIED = 0;

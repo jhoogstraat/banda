@@ -133,6 +133,15 @@ const (
 	// SettingsServiceSetDefaultProfileProcedure is the procedure name of the SettingsService's
 	// SetDefaultProfile RPC.
 	SettingsServiceSetDefaultProfileProcedure = "/banda.v1.SettingsService/SetDefaultProfile"
+	// SettingsServiceListTeamSecretsProcedure is the procedure name of the SettingsService's
+	// ListTeamSecrets RPC.
+	SettingsServiceListTeamSecretsProcedure = "/banda.v1.SettingsService/ListTeamSecrets"
+	// SettingsServiceSetTeamSecretProcedure is the procedure name of the SettingsService's
+	// SetTeamSecret RPC.
+	SettingsServiceSetTeamSecretProcedure = "/banda.v1.SettingsService/SetTeamSecret"
+	// SettingsServiceDeleteTeamSecretProcedure is the procedure name of the SettingsService's
+	// DeleteTeamSecret RPC.
+	SettingsServiceDeleteTeamSecretProcedure = "/banda.v1.SettingsService/DeleteTeamSecret"
 	// SettingsServiceOpenLoginTerminalProcedure is the procedure name of the SettingsService's
 	// OpenLoginTerminal RPC.
 	SettingsServiceOpenLoginTerminalProcedure = "/banda.v1.SettingsService/OpenLoginTerminal"
@@ -1870,6 +1879,27 @@ var (
 			Procedure:  SettingsServiceSetDefaultProfileProcedure,
 		}
 	})
+	settingsServiceListTeamSecretsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("ListTeamSecrets"),
+			Procedure:  SettingsServiceListTeamSecretsProcedure,
+		}
+	})
+	settingsServiceSetTeamSecretSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetTeamSecret"),
+			Procedure:  SettingsServiceSetTeamSecretProcedure,
+		}
+	})
+	settingsServiceDeleteTeamSecretSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("DeleteTeamSecret"),
+			Procedure:  SettingsServiceDeleteTeamSecretProcedure,
+		}
+	})
 	settingsServiceOpenLoginTerminalSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeServer,
@@ -1905,6 +1935,12 @@ type SettingsServiceClient interface {
 	DeleteSecret(context.Context, *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error)
 	// The profile of the caller's new threads that don't name one.
 	SetDefaultProfile(context.Context, *v1.SetDefaultProfileRequest) (*v1.SetDefaultProfileResponse, error)
+	// Team secrets go to every environment of every user, before their own
+	// secrets, so a user's secret of the same name wins. Anyone signed in lists,
+	// sets, replaces and deletes them; the same names are refused.
+	ListTeamSecrets(context.Context, *v1.ListTeamSecretsRequest) (*v1.ListTeamSecretsResponse, error)
+	SetTeamSecret(context.Context, *v1.SetTeamSecretRequest) (*v1.SetTeamSecretResponse, error)
+	DeleteTeamSecret(context.Context, *v1.DeleteTeamSecretRequest) (*v1.DeleteTeamSecretResponse, error)
 	// A terminal in the caller's login environment: a small pod that mounts
 	// only the caller's harness config volume, started on demand. It runs the
 	// harness's login or logout command. Output streams until it exits.
@@ -1952,6 +1988,12 @@ type SettingsServiceHandler interface {
 	DeleteSecret(context.Context, *v1.DeleteSecretRequest) (*v1.DeleteSecretResponse, error)
 	// The profile of the caller's new threads that don't name one.
 	SetDefaultProfile(context.Context, *v1.SetDefaultProfileRequest) (*v1.SetDefaultProfileResponse, error)
+	// Team secrets go to every environment of every user, before their own
+	// secrets, so a user's secret of the same name wins. Anyone signed in lists,
+	// sets, replaces and deletes them; the same names are refused.
+	ListTeamSecrets(context.Context, *v1.ListTeamSecretsRequest) (*v1.ListTeamSecretsResponse, error)
+	SetTeamSecret(context.Context, *v1.SetTeamSecretRequest) (*v1.SetTeamSecretResponse, error)
+	DeleteTeamSecret(context.Context, *v1.DeleteTeamSecretRequest) (*v1.DeleteTeamSecretResponse, error)
 	// A terminal in the caller's login environment: a small pod that mounts
 	// only the caller's harness config volume, started on demand. It runs the
 	// harness's login or logout command. Output streams until it exits.
@@ -1970,6 +2012,9 @@ func RegisterSettingsServiceHandler(server *connect.Server, svc SettingsServiceH
 		connect.Method{Spec: settingsServiceSetSecretSpec(), Handler: adapter.setSecret},
 		connect.Method{Spec: settingsServiceDeleteSecretSpec(), Handler: adapter.deleteSecret},
 		connect.Method{Spec: settingsServiceSetDefaultProfileSpec(), Handler: adapter.setDefaultProfile},
+		connect.Method{Spec: settingsServiceListTeamSecretsSpec(), Handler: adapter.listTeamSecrets},
+		connect.Method{Spec: settingsServiceSetTeamSecretSpec(), Handler: adapter.setTeamSecret},
+		connect.Method{Spec: settingsServiceDeleteTeamSecretSpec(), Handler: adapter.deleteTeamSecret},
 		connect.Method{Spec: settingsServiceOpenLoginTerminalSpec(), Handler: adapter.openLoginTerminal},
 		connect.Method{Spec: settingsServiceWriteLoginTerminalSpec(), Handler: adapter.writeLoginTerminal},
 		connect.Method{Spec: settingsServiceResizeLoginTerminalSpec(), Handler: adapter.resizeLoginTerminal},
@@ -2013,6 +2058,18 @@ func (UnimplementedSettingsServiceHandler) DeleteSecret(context.Context, *v1.Del
 
 func (UnimplementedSettingsServiceHandler) SetDefaultProfile(context.Context, *v1.SetDefaultProfileRequest) (*v1.SetDefaultProfileResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetDefaultProfile is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) ListTeamSecrets(context.Context, *v1.ListTeamSecretsRequest) (*v1.ListTeamSecretsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.ListTeamSecrets is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetTeamSecret(context.Context, *v1.SetTeamSecretRequest) (*v1.SetTeamSecretResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetTeamSecret is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) DeleteTeamSecret(context.Context, *v1.DeleteTeamSecretRequest) (*v1.DeleteTeamSecretResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.DeleteTeamSecret is not implemented")
 }
 
 func (UnimplementedSettingsServiceHandler) OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest, SettingsServiceOpenLoginTerminalServerStream) error {
@@ -2066,6 +2123,30 @@ func (c *settingsServiceClient) DeleteSecret(ctx context.Context, req *v1.Delete
 func (c *settingsServiceClient) SetDefaultProfile(ctx context.Context, req *v1.SetDefaultProfileRequest) (*v1.SetDefaultProfileResponse, error) {
 	var res v1.SetDefaultProfileResponse
 	if err := c.client.CallUnary(ctx, settingsServiceSetDefaultProfileSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) ListTeamSecrets(ctx context.Context, req *v1.ListTeamSecretsRequest) (*v1.ListTeamSecretsResponse, error) {
+	var res v1.ListTeamSecretsResponse
+	if err := c.client.CallUnary(ctx, settingsServiceListTeamSecretsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetTeamSecret(ctx context.Context, req *v1.SetTeamSecretRequest) (*v1.SetTeamSecretResponse, error) {
+	var res v1.SetTeamSecretResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetTeamSecretSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) DeleteTeamSecret(ctx context.Context, req *v1.DeleteTeamSecretRequest) (*v1.DeleteTeamSecretResponse, error) {
+	var res v1.DeleteTeamSecretResponse
+	if err := c.client.CallUnary(ctx, settingsServiceDeleteTeamSecretSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2151,6 +2232,42 @@ func (h settingsServiceHandler) setDefaultProfile(ctx context.Context, _ connect
 		return err
 	}
 	res, err := h.svc.SetDefaultProfile(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) listTeamSecrets(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListTeamSecretsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListTeamSecrets(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setTeamSecret(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetTeamSecretRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetTeamSecret(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) deleteTeamSecret(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteTeamSecretRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteTeamSecret(ctx, &req)
 	if err != nil {
 		return err
 	}

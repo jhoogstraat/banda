@@ -120,20 +120,16 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	s.previewChanged(t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)
-	var secrets []store.Secret
+	var secrets []string
 	if err == nil {
-		secrets, err = s.store.Secrets(ctx, t.OwnerID)
+		secrets, err = s.store.SecretNames(ctx, t.OwnerID)
 	}
 	var token string // a new one for every pod: an old pod's can't connect any more
 	if err == nil {
 		token, err = s.store.NewRunnerToken(ctx, t.ID)
 	}
 	if err == nil {
-		var names []string
-		for _, sec := range secrets {
-			names = append(names, sec.Name)
-		}
-		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, names)
+		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets)
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
