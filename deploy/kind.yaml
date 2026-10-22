@@ -15,11 +15,3 @@ kubeadmConfigPatches:
   - |
     kind: KubeletConfiguration
     podPidsLimit: 4096
-  # A dev cluster: etcd skips fsync, so API writes don't wait on slow disks (CI runners').
-  - |
-    kind: ClusterConfiguration
-    etcd:
-      local:
-        extraArgs:
-          - name: unsafe-no-fsync
-            value: "true"

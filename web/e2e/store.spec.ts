@@ -19,9 +19,13 @@ test('with a one-connection pool, approving a teammate’s turn does not deadloc
 // B11: posts, approvals and forks loaded every event since the last delivery (or all of them), tool outputs included.
 test('a 20k-event thread: posting, resolving turn requests and forking stay fast', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
-	const { stdout } = await promisify(execFile)('../deploy/long-thread.sh', ['20000'], { env: { ...process.env, DB, OWNER: alice.id } });
-	const t = alice.thread(stdout.trim());
-	await t.get(); // connected
+	const seed = async (events: number) => {
+		const { stdout } = await promisify(execFile)('../deploy/long-thread.sh', [String(events)], { env: { ...process.env, DB, OWNER: alice.id } });
+		const t = alice.thread(stdout.trim());
+		await t.get(); // connected
+		return t;
+	};
+	const [t, short] = [await seed(20000), await seed(25)];
 	// The fastest of three, so a busy machine doesn't fail it; they took 140-200 ms each.
 	const fastest = async (call: (i: number) => Promise<unknown>) => {
 		const ms: number[] = [];
@@ -38,7 +42,9 @@ test('a 20k-event thread: posting, resolving turn requests and forking stay fast
 	const resolve = await fastest((i) =>
 		(i < 2 ? alice.threads.declineTurn : alice.threads.approveTurn)({ threadId: t.id, requestSeq: requests[i] })
 	);
-	const fork = await fastest(() => alice.threads.fork({ threadId: t.id }));
+	// A fork also starts a thread and its sandbox, which takes over 100 ms on a slow machine (Actions)
+	// whatever the source's length: only what the 20k events add counts.
+	const fork = (await fastest(() => alice.threads.fork({ threadId: t.id }))) - (await fastest(() => alice.threads.fork({ threadId: short.id })));
 	expect(Math.max(post, resolve, fork), `ms: ${JSON.stringify({ post, resolve, fork })}`).toBeLessThan(50);
 });
 

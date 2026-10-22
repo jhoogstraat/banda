@@ -5,7 +5,7 @@ Read [AGENTS.md](../AGENTS.md) for the layout and [VISION.md](../VISION.md) befo
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev): `mise install` provides go, node, pnpm, buf, kind, kubectl, helm, podman, jq and actionlint.
-- Podman with the default machine (`podman machine init`, at least 8 CPUs and 16 GiB to share it with other projects). `mise.toml` points `podman` and `kind` at its root connection. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`; with Docker Desktop also `HOST_IP` (the host's address as pods see it) for the sandbox policies and `mise run e2e`. On Linux with Docker, `KIND_EXPERIMENTAL_PROVIDER=docker` and `CONTAINER=docker` suffice: the host is the gateway of kind's network (CI runs it that way).
+- Podman with the default machine (`podman machine init`, at least 8 CPUs and 16 GiB to share it with other projects). `mise.toml` points `podman` and `kind` at its root connection. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`; with Docker Desktop also `HOST_IP` (the host's address as pods see it) for the sandbox policies and `mise run e2e`. On Linux with Docker, `KIND_EXPERIMENTAL_PROVIDER=docker` and `CONTAINER=docker` suffice: the host is the gateway of kind's network, the kind node's default route (CI runs the e2e suite that way, `.github/workflows/ci.yml`).
 
 ## Dev loop
 
