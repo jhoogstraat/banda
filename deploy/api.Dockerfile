@@ -1,5 +1,6 @@
 # The control plane: Go API serving the static web build.
-FROM node:26-slim AS web
+# The web build and Go cross-compiling run natively: multi-arch builds emulate nothing.
+FROM --platform=$BUILDPLATFORM node:26-slim AS web
 RUN npm install -g pnpm@12
 WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml web/.npmrc ./
@@ -7,14 +8,15 @@ RUN pnpm install --frozen-lockfile
 COPY web ./
 RUN pnpm build
 
-FROM golang:1.27.2 AS api
+FROM --platform=$BUILDPLATFORM golang:1.27.2 AS api
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd cmd
 COPY internal internal
 COPY gen gen
-RUN CGO_ENABLED=0 go build -o /api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /api ./cmd/api
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=api /api /api
