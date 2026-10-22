@@ -103,6 +103,7 @@ test('B9: a CLI crash mid-turn tells the chat its turn and the prompt queued beh
 	await t.waitForStatus(Status.AWAITING_INPUT, 180_000);
 	expect(await notices(t)).toMatch(/turn was lost, and 1 prompt queued behind it/);
 	expect((await t.of('turnEnded')).map((e) => e.isError)).toEqual([false, true]);
+	expect((await t.of('statusChanged')).find((e) => e.status === Status.ERRORED)?.reason).toMatch(/^Lost the environment: its runner disconnected/);
 	await t.turn(() => t.send('after the crash'));
 	expect(await t.reply()).toContain('Created hello');
 });

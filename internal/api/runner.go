@@ -92,7 +92,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		if mine && !login {
 			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 			_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
-				return envLost(t, 0), nil
+				return envLost(t, 0, reasonDisconnected), nil
 			})
 			if err != nil {
 				slog.Error("store lost environment", "thread", id, "err", err)
@@ -147,6 +147,10 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if e.GetPermissionResolved() != nil {
 				e.Actor = "system" // the agent withdrew it
 			}
+			if e.GetPermissionModeChanged() != nil {
+				s.agentMode(bg, id, e)
+				continue
+			}
 			if e.GetPermissionRequested() != nil || e.GetPermissionResolved() != nil {
 				s.permissionEvent(bg, id, e)
 				if e.GetPermissionRequested() != nil { // asking keeps a parked thread's turn open
@@ -188,6 +192,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if err := s.store.SetLogin(bg, owner, k.LoginStatus.Harness, k.LoginStatus.LoggedIn); err != nil {
 				slog.Error("store login status", "user", owner, "err", err)
 			}
+			s.pokeInbox(owner) // a login needed is in their inbox
 		case *bandav1.ConnectRequest_Pushed:
 			s.mu.Lock()
 			if ch := s.pushes[id]; ch != nil {
@@ -215,17 +220,23 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
 			// The runner sends it after every turn: only a change makes viewers fetch it again.
-			_, events, err := s.store.Update(bg, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+			_, events, err := s.store.Update(bg, id, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 				if t.Diff == k.Diff.Diff {
 					return nil, errUnchanged
 				}
 				t.Diff = k.Diff.Diff
+				if err := tx.SetPaths(bg, id, store.DiffPaths(t.Diff)); err != nil {
+					return nil, err
+				}
 				return []*bandav1.Event{{Actor: "system", Kind: &bandav1.Event_DiffChanged{DiffChanged: &bandav1.DiffChanged{}}}}, nil
 			})
 			if err != nil && err != errUnchanged {
 				slog.Error("store diff", "thread", id, "err", err)
 			}
 			s.broadcast(id, events)
+			if events != nil {
+				s.noticeOverlaps(bg, id)
+			}
 		}
 	}
 }
@@ -302,14 +313,27 @@ func lostTurns(st thread.State, kept int) []*bandav1.Event {
 	}
 }
 
-// envLost applies EnvLost to t (kept: see lostTurns) and returns the events to store.
-func envLost(t *store.Thread, kept int) []*bandav1.Event {
+// envLost applies EnvLost to t (kept: see lostTurns) and returns the events to
+// store; reason says why on the status change.
+func envLost(t *store.Thread, kept int, reason string) []*bandav1.Event {
 	events := lostTurns(t.State, kept)
 	next, _, _ := thread.Apply(t.State, thread.EnvLost{})
-	events = append(events, stateEvents(t.State, next)...)
+	for _, e := range stateEvents(t.State, next) {
+		if sc := e.GetStatusChanged(); sc != nil {
+			sc.Reason = reason
+		}
+		events = append(events, e)
+	}
 	t.State = next
 	return events
 }
+
+// Why an environment was lost, on its status change and the team board.
+const (
+	reasonDisconnected = "Lost the environment: its runner disconnected (the pod crashed, restarted or was deleted)"
+	reasonUnreachable  = "Lost the environment: its runner was gone when a prompt was sent"
+	reasonProvision    = "Couldn't create the environment"
+)
 
 // sendRunner reports false if no runner is connected for the thread, or it
 // stops taking commands.

@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,6 +53,7 @@ type Thread struct {
 	ForkTurn       int    // turns the source had finished then
 	RaceID         string // shared by threads started together
 	ParentID       string // the thread this one was spawned from
+	Handoffs       int    // accepted handoffs; each starts a new Claude Code session
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -116,13 +118,13 @@ func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id, env_pushed`
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed, handoff_to, handoffs`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.HandoffTo, &t.Handoffs}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -204,6 +206,30 @@ func (s *Store) Compared(ctx context.Context, raceID string, ids []string, viewe
 	return threads, err
 }
 
+// Races returns the threads of the latest n races, everyone's, newest race
+// first and in order of creation within one.
+func (s *Store) Races(ctx context.Context, viewerID string, n int) ([]Thread, error) {
+	threads, err := s.listWithView(ctx, `t.race_id IN (SELECT race_id FROM threads WHERE race_id <> ''
+		GROUP BY race_id ORDER BY max(created_at) DESC LIMIT $2)`, viewerID, n)
+	started := map[string]time.Time{}
+	for _, t := range threads {
+		if s, ok := started[t.RaceID]; !ok || t.CreatedAt.Before(s) {
+			started[t.RaceID] = t.CreatedAt
+		}
+	}
+	sort.SliceStable(threads, func(i, j int) bool {
+		a, b := threads[i], threads[j]
+		if a.RaceID != b.RaceID {
+			if sa, sb := started[a.RaceID], started[b.RaceID]; !sa.Equal(sb) {
+				return sa.After(sb)
+			}
+			return a.RaceID < b.RaceID
+		}
+		return a.CreatedAt.Before(b.CreatedAt)
+	})
+	return threads, err
+}
+
 // TurnTotals sums the finished turns of each thread: count, cost, duration.
 type TurnTotals struct {
 	Turns      int
@@ -275,10 +301,29 @@ func (s *Store) Pushed(ctx context.Context, id string) (bool, error) {
 }
 
 // ListMentioned returns other users' threads in which the viewer has an
-// unanswered mention.
+// unanswered mention, or that are offered to them.
 func (s *Store) ListMentioned(ctx context.Context, viewerID string) ([]Thread, error) {
-	return s.listWithView(ctx, `t.owner_id <> $1 AND EXISTS (SELECT 1 FROM mentions m
-		WHERE m.thread_id = t.id AND m.user_id = $1 AND m.answered_at IS NULL)`, viewerID)
+	return s.listWithView(ctx, `t.owner_id <> $1 AND (t.handoff_to = $1 OR EXISTS (SELECT 1 FROM mentions m
+		WHERE m.thread_id = t.id AND m.user_id = $1 AND m.answered_at IS NULL))`, viewerID)
+}
+
+// Threads returns the given threads with viewerID's view, without diffs.
+func (s *Store) Threads(ctx context.Context, ids []string, viewerID string) ([]Thread, error) {
+	return s.listWithView(ctx, `t.id = ANY($2)`, viewerID, ids)
+}
+
+// Decisions returns the pending requests viewerID can answer, oldest first:
+// permission requests in their threads or in threads that trust teammates
+// (plans only in their own), and turn requests in their threads.
+func (s *Store) Decisions(ctx context.Context, viewerID string) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT e.body FROM threads t JOIN events e ON e.thread_id = t.id
+		WHERE ((t.permissions <> '{}' AND (t.owner_id = $1 OR t.trusted)) OR (t.requests > 0 AND t.owner_id = $1))
+		AND e.kind IN ('permissionRequested', 'turnRequest') AND CASE e.kind
+		WHEN 'permissionRequested' THEN t.permissions ? (e.body->'permissionRequested'->>'id')
+			AND (t.owner_id = $1 OR e.body->'permissionRequested'->>'toolName' <> 'ExitPlanMode')
+		ELSE t.owner_id = $1 AND NOT EXISTS (SELECT 1 FROM events r WHERE r.thread_id = t.id AND r.kind = 'turnRequestResolved'
+			AND r.body->'turnRequestResolved'->>'requestSeq' = e.seq::text) END
+		ORDER BY (e.body->>'time')::timestamptz, e.seq`, viewerID)
 }
 
 // listWithView lists threads matching where, without diffs (they are large);
@@ -362,9 +407,10 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
 		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18,
-		summary=coalesce($19, summary), finished_at=CASE WHEN $20 THEN now() ELSE finished_at END, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		owner_id=$19, handoff_to=$20, handoffs=$21, summary=coalesce($22, summary), finished_at=CASE WHEN $23 THEN now() ELSE finished_at END,
+		updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, summary, finished).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, summary, finished).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

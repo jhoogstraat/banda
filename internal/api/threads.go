@@ -127,7 +127,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
-		s.apply(context.WithoutCancel(ctx), t.ID, thread.EnvLost{})
+		s.applyBecause(context.WithoutCancel(ctx), t.ID, thread.EnvLost{}, reasonProvision)
 	}
 }
 
@@ -148,7 +148,13 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &bandav1.GetThreadResponse{Thread: toProto(t)}, nil
+	overlaps, err := s.overlaps(ctx, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	p := toProto(t)
+	p.Overlaps = overlaps[t.ID]
+	return &bandav1.GetThreadResponse{Thread: p}, nil
 }
 
 func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav1.TrustResponse, error) {
@@ -158,6 +164,11 @@ func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav
 	}
 	_, err := s.apply(ctx, req.ThreadId, thread.Trust{By: user(ctx), Trusted: req.Trusted},
 		&bandav1.Event{Actor: user(ctx), Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
+	s.mu.Lock()
+	for w := range s.inbox { // its pending permission requests become teammates' decisions, or stop being theirs
+		w.wake()
+	}
+	s.mu.Unlock()
 	return &bandav1.TrustResponse{}, err
 }
 

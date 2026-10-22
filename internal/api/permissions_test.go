@@ -56,3 +56,43 @@ func TestResolvePermission(t *testing.T) {
 		t.Errorf("plan approval: %v %v %q %v", res, cmd, th.PermissionMode, err)
 	}
 }
+
+func TestAnswerQuestionsRulesAndEdits(t *testing.T) {
+	const (
+		allow  = bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW
+		always = bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW_ALWAYS
+		deny   = bandav1.PermissionDecision_PERMISSION_DECISION_DENY
+	)
+	th := &store.Thread{Permissions: map[string]string{"q": askUserQuestion, "b": "Bash", "w": "Write", "e": "Bash"}}
+	th.OwnerID, th.Trusted = "ann", true
+	answers := map[string]string{"Which?": "A"}
+	for _, r := range []*bandav1.PermissionAnswerRequest{
+		{RequestId: "q", Decision: allow},                     // no answers
+		{RequestId: "q", Decision: always, Answers: answers}, // a question is never always allowed
+		{RequestId: "b", Decision: always, Rule: "Bash(npm test && rm:*)"},
+		{RequestId: "b", Decision: always, Rule: "Edit(src/**)"},
+		{RequestId: "w", Decision: always, Rule: "Edit(../x/**)"},
+		{RequestId: "w", Decision: always, Rule: "Edit(/etc/**)"},
+		{RequestId: "b", Decision: allow, UpdatedInputJson: `"ls"`},
+		{RequestId: "b", Decision: deny, UpdatedInputJson: `{"command":"ls"}`},
+	} {
+		if _, _, err := answerPermission(th, "ann", r); err == nil {
+			t.Errorf("accepted %v", r)
+		}
+	}
+	if _, _, err := answerPermission(th, "bob", &bandav1.PermissionAnswerRequest{RequestId: "b", Decision: allow, UpdatedInputJson: `{"command":"ls"}`}); !errors.Is(err, thread.ErrForbidden) {
+		t.Errorf("a teammate changed the command: %v", err)
+	}
+	res, cmd, err := answerPermission(th, "bob", &bandav1.PermissionAnswerRequest{RequestId: "q", Decision: allow, Answers: answers})
+	if err != nil || res.Answers["Which?"] != "A" || cmd.Answers["Which?"] != "A" {
+		t.Errorf("answer: %v %v %v", res, cmd, err)
+	}
+	res, cmd, err = answerPermission(th, "ann", &bandav1.PermissionAnswerRequest{RequestId: "b", Decision: always, Rule: "Bash(npm test:*)"})
+	if err != nil || res.Rule != "Bash(npm test:*)" || !slices.Equal(cmd.AllowedTools, []string{"Bash(npm test:*)"}) {
+		t.Errorf("rule: %v %v %v", res, cmd, err)
+	}
+	res, cmd, err = answerPermission(th, "ann", &bandav1.PermissionAnswerRequest{RequestId: "w", Decision: always, Rule: "Edit(src/lib/**)", UpdatedInputJson: `{"file_path":"src/lib/a"}`})
+	if err != nil || res.UpdatedInputJson == "" || cmd.UpdatedInputJson != `{"file_path":"src/lib/a"}` || !slices.Equal(th.AllowedTools, []string{"Bash(npm test:*)", "Edit(src/lib/**)"}) {
+		t.Errorf("edited: %v %v %v", res, cmd, err)
+	}
+}

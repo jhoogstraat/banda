@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"strings"
 	"time"
@@ -263,6 +264,9 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_EFFORT":                 t.Effort,
 		"BANDA_AUTH_METHOD":            authMethod,
 		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
+	}
+	if t.Handoffs > 0 { // a new owner's session: the old one's transcript is on the old owner's volume
+		env["BANDA_SESSION_KEY"] = fmt.Sprintf("/handoff-%d", t.Handoffs)
 	}
 	vars := []corev1.EnvVar{tokenEnv(name)}
 	for k, v := range env {

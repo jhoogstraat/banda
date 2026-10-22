@@ -44,9 +44,46 @@ func (s *Service) InboxWatch(ctx context.Context, _ *bandav1.InboxWatchRequest, 
 		if err != nil {
 			return nil, nil, err
 		}
-		return &bandav1.InboxWatchResponse{Threads: mine.Threads, Mentioned: mentioned.Threads},
-			append(mine.Threads, mentioned.Threads...), nil
+		res := &bandav1.InboxWatchResponse{Threads: mine.Threads, Mentioned: mentioned.Threads}
+		if res.Decisions, err = s.decisions(ctx); err != nil {
+			return nil, nil, err
+		}
+		st, err := s.store.Settings(ctx, user(ctx), "claude")
+		if err != nil {
+			return nil, nil, err
+		}
+		res.LoginNeeded = st.AuthMethod == "subscription" && st.LoginState == "logged_out"
+		watched := append(mine.Threads, mentioned.Threads...)
+		for _, d := range res.Decisions {
+			watched = append(watched, d.Thread)
+		}
+		return res, watched, nil
 	}, stream.Send)
+}
+
+// decisions are the requests the caller can answer, with their threads.
+func (s *Service) decisions(ctx context.Context) ([]*bandav1.Decision, error) {
+	events, err := s.store.Decisions(ctx, user(ctx))
+	if err != nil || len(events) == 0 {
+		return nil, err
+	}
+	var ids []string
+	for _, e := range events {
+		ids = append(ids, e.ThreadId)
+	}
+	threads, err := s.store.Threads(ctx, ids, user(ctx))
+	if err != nil {
+		return nil, err
+	}
+	byID := map[string]*bandav1.Thread{}
+	for _, t := range threads {
+		byID[t.ID] = toProto(t)
+	}
+	var out []*bandav1.Decision
+	for _, e := range events {
+		out = append(out, &bandav1.Decision{Thread: byID[e.ThreadId], Request: e})
+	}
+	return out, nil
 }
 
 // TeamWatch sends everyone's recent threads with their presence whenever a
@@ -59,10 +96,19 @@ func (s *Service) TeamWatch(ctx context.Context, _ *bandav1.TeamWatchRequest, st
 		if err != nil {
 			return nil, nil, err
 		}
+		var ids []string
+		for _, t := range threads {
+			ids = append(ids, t.ID)
+		}
+		overlaps, err := s.overlaps(ctx, ids...)
+		if err != nil {
+			return nil, nil, err
+		}
 		res := &bandav1.TeamWatchResponse{}
 		s.mu.Lock()
 		for _, t := range threads {
 			p := toProto(t)
+			p.Overlaps = overlaps[t.ID]
 			p.PresentUserIds = slices.Sorted(maps.Keys(s.present[t.ID]))
 			res.Threads = append(res.Threads, p)
 		}
@@ -132,8 +178,11 @@ func (s *Service) inboxChanged(id string, events []*bandav1.Event) {
 	if len(events) == 0 || events[0].Seq == 0 { // ephemeral deltas change no sidebar
 		return
 	}
+	asks := slices.ContainsFunc(events, func(e *bandav1.Event) bool { // may be a decision of anyone's
+		return e.GetPermissionRequested() != nil || e.GetTurnRequest() != nil
+	})
 	for w := range s.inbox {
-		if w.team || w.ids[id] || events[0].Seq == 1 {
+		if w.team || w.ids[id] || events[0].Seq == 1 || asks {
 			w.wake()
 		}
 	}

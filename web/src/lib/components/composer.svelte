@@ -1,7 +1,9 @@
 <script lang="ts">
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
@@ -11,10 +13,11 @@
 	import Plan from '#lib/components/plan.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import type { Chat } from '#lib/events.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { permissionLabel, permissionModes } from '#lib/permissions.js';
+	import { permissionLabel, permissionModes, ruleLabel } from '#lib/permissions.js';
 
 	// The bottom of a thread: who is producing something, the error, banners, the plan and the prompt box.
 	// typing: the names of the others typing. send throws to keep the prompt; typed reports typing.
@@ -49,7 +52,7 @@
 	<!-- Who is producing something right now: the agent while it works, then people typing. Always takes its line, so the composer doesn't jump. -->
 	<div class="flex h-6 items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
 		{#if thread?.permissionPending}
-			<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for permission</span>
+			<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
 		{:else if thread?.status === Status.WORKING}
 			<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 		{/if}
@@ -87,6 +90,30 @@
 						<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><ShieldIcon /> {permissionLabel(thread.permissionMode)}</Badge>
+					{/if}
+					{#if thread?.allowedTools.length}
+						<!-- What the agent does without asking in this thread; whoever answers its requests can take it back. -->
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<PromptInput.Button {...props} size="sm" aria-label="Allowed: {thread!.allowedTools.length}"><ShieldCheckIcon /> Allowed · {thread!.allowedTools.length}</PromptInput.Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="start" class="w-64">
+								<DropdownMenu.Label>Runs without asking</DropdownMenu.Label>
+								{#each thread.allowedTools as rule (rule)}
+									<DropdownMenu.Item
+										disabled={!owner && !thread.trusted}
+										onSelect={() => act(api.permissionRevoke({ threadId: thread!.id, rule }))}
+										aria-label="Stop allowing {ruleLabel(rule)}"
+										class="font-mono text-xs"
+									>
+										<span class="min-w-0 flex-1 truncate">{ruleLabel(rule)}</span>
+										{#if owner || thread.trusted}<XIcon class="text-muted-foreground" />{/if}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					{/if}
 				</div>
 				<PromptInput.Submit />

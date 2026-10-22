@@ -4,6 +4,7 @@
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -15,7 +16,7 @@
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { userName } from '#lib/threads.svelte.js';
+	import { userName, waiting } from '#lib/threads.svelte.js';
 
 	// here: the others with the thread open. interrupt, toggleMode and push are the command palette's too.
 	let {
@@ -29,6 +30,7 @@
 		push,
 		forkOpen = $bindable(),
 		spawnOpen = $bindable(),
+		handoffOpen = $bindable(),
 		paneOpen = $bindable()
 	}: {
 		thread?: Thread;
@@ -41,6 +43,7 @@
 		push: () => void;
 		forkOpen: boolean;
 		spawnOpen: boolean;
+		handoffOpen: boolean;
 		paneOpen?: boolean;
 	} = $props();
 
@@ -49,7 +52,7 @@
 
 <PageHeader>
 	<h1 class="min-w-0 truncate text-sm font-medium">{thread?.title || 'Untitled thread'}</h1>
-	{#if thread}<StatusDot status={thread.status} label />{/if}
+	{#if thread}<StatusDot status={thread.status} label waiting={waiting(thread)} />{/if}
 	{#if thread?.parentId}
 		<a href="/t/{thread.parentId}" class="flex min-w-0 shrink items-center gap-1 text-xs text-muted-foreground hover:text-foreground" title="Spawned from {thread.parentTitle}">
 			<CornerLeftUpIcon class="size-3.5 shrink-0" /><span class="truncate">from {thread.parentTitle || 'its parent'}</span>
@@ -94,6 +97,7 @@
 			/>
 			<IconButton icon={GitForkIcon} label="Fork: try another way from here" onclick={() => (forkOpen = true)} />
 			<IconButton icon={GitBranchPlusIcon} label="Spawn a sub-thread" onclick={() => (spawnOpen = true)} />
+			{#if owner && !thread.handoffTo}<IconButton icon={HandshakeIcon} label="Hand off to a teammate" onclick={() => (handoffOpen = true)} />{/if}
 			<ThreadActions {thread} {act} />
 		{/if}
 		{#if pr}

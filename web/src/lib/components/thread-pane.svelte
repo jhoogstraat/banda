@@ -58,7 +58,7 @@
 			<IconButton icon={XIcon} label="Close the pane" class="ml-auto" onclick={() => (open = false)} />
 		</TabsList>
 		<TabsContent value="diff" class="flex min-h-0 flex-col">
-			<DiffView diff={thread?.diff ?? ''} bind:pending bind:focus bind:ask {posted} {onsend} />
+			<DiffView diff={thread?.diff ?? ''} overlaps={thread?.overlaps ?? []} bind:pending bind:focus bind:ask {posted} {onsend} />
 		</TabsContent>
 		<TabsContent value="files" class="min-h-0 overflow-auto">
 			{#if filesOpened}<FileBrowser {threadId} diff={thread?.diff ?? ''} />{/if}

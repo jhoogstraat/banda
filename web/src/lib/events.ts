@@ -6,8 +6,11 @@ import {
 	type Attachment,
 	type Event,
 	type ForkNote,
+	type HandoffOffered,
+	type HandoffResolved,
 	type LineageUpdate,
 	type Mode,
+	type Overlap,
 	type PermissionMode,
 	type PermissionRequested,
 	type PermissionResolved,
@@ -34,22 +37,29 @@ export type Item = { key: number } & (
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
 	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
-	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
+	// `votes` are teammates' latest votes on a question (AskUserQuestion), by user.
+	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string }; votes: Record<string, Record<string, string>> }
 	| { kind: 'turn'; turn: TurnEnded }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
+	// The thread now changes files another one changes too.
+	| { kind: 'overlap'; overlap: Overlap }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
-	| { kind: 'push'; text: string; pushed: boolean }
+	| { kind: 'revoked'; actor: string; rule: string }
+	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
+	| { kind: 'push'; text: string; pushed: boolean; unavailable: boolean }
 	| { kind: 'fork'; actor: string; note: ForkNote }
+	// The owner (`actor`) offered the thread to a teammate; `resolved` once accepted, declined or cancelled (`by`).
+	| { kind: 'handoff'; seq: bigint; actor: string; offer: HandoffOffered; time?: Timestamp; resolved?: HandoffResolved & { by: string } }
 	| { kind: 'setup'; steps: SetupStep[] }
 );
 
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
-// subagent calls by parent id, turn request resolutions by request seq, permission answers by request id,
+// subagent calls by parent id, turn request and handoff resolutions by their seq, permission answers and votes by request id,
 // and live permission cards whose call comes next, by call id. `planSeq` is the seq of the TodoWrite behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
@@ -64,7 +74,9 @@ export type Chat = {
 		results: Map<string, { result: ToolResult; seq: bigint; cut: boolean }>;
 		calls: Map<string, Tool[]>;
 		resolved: Map<bigint, TurnRequestResolved & { by: string }>;
+		handoffs: Map<bigint, HandoffResolved & { by: string }>;
 		answers: Map<string, PermissionResolved & { by: string }>;
+		votes: Map<string, Record<string, Record<string, string>>>;
 		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
 	};
 	present: string[];
@@ -78,7 +90,7 @@ export const newChat = (): Chat => ({
 	planSeq: 0n,
 	seq: 0n,
 	tools: new Map(),
-	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map(), cards: new Map() },
+	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), handoffs: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
 	present: [],
 	typing: {}
 });
@@ -144,6 +156,9 @@ export function apply(chat: Chat, e: Event) {
 		case 'lineageUpdate':
 			chat.items.push({ key, kind: 'lineage', actor: e.actor, update: k.value });
 			break;
+		case 'overlap':
+			chat.items.push({ key, kind: 'overlap', overlap: k.value });
+			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];
 			chat.items.push({ key, kind: 'request', seq: e.seq, actor: e.actor, text: k.value.message?.text ?? '', review: k.value.message?.review ?? [], attachments: k.value.message?.attachments ?? [], time: e.time });
@@ -199,7 +214,7 @@ export function apply(chat: Chat, e: Event) {
 			const r = k.value;
 			const call = { id: r.toolCallId, name: r.toolName, inputJson: r.inputJson } as ToolCall;
 			const tool = chat.tools.get(r.toolCallId);
-			chat.items.push({ key, kind: 'permission', req: r, tool: tool ?? { kind: 'tool', call, children: [], seq: 0n } });
+			chat.items.push({ key, kind: 'permission', req: r, tool: tool ?? { kind: 'tool', call, children: [], seq: 0n }, votes: {} });
 			// The CLI may ask before it streams the call: the card points at it once it arrives.
 			if (!tool) chat.orphans.cards.set(r.toolCallId, chat.items.at(-1) as Extract<Item, { kind: 'permission' }>);
 			break;
@@ -211,6 +226,18 @@ export function apply(chat: Chat, e: Event) {
 			else chat.orphans.answers.set(id, { ...k.value, by: e.actor }); // its request is in older history
 			break;
 		}
+		case 'permissionVoted': {
+			const { id, answers } = k.value;
+			const req = chat.items.findLast((i): i is Extract<Item, { kind: 'permission' }> => i.kind === 'permission' && i.req.id === id);
+			const votes = req?.votes ?? chat.orphans.votes.get(id) ?? {};
+			if (Object.keys(answers).length) votes[e.actor] = answers;
+			else delete votes[e.actor];
+			if (!req) chat.orphans.votes.set(id, votes);
+			break;
+		}
+		case 'permissionRevoked':
+			chat.items.push({ key, kind: 'revoked', actor: e.actor, rule: k.value.rule });
+			break;
 		case 'turnEnded':
 			chat.streaming = '';
 			chat.items.push({ key, kind: 'turn', turn: k.value });
@@ -233,9 +260,12 @@ export function apply(chat: Chat, e: Event) {
 		case 'typing':
 			chat.typing[e.actor] = Date.now();
 			break;
-		case 'autoPush':
-			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === AutoPushState.PUSHED });
+		case 'autoPush': {
+			const unavailable = k.value.state === AutoPushState.UNAVAILABLE;
+			if (unavailable && chat.items.some((i) => i.kind === 'push' && i.unavailable)) break;
+			chat.items.push({ key, kind: 'push', text: k.value.detail, pushed: k.value.state === AutoPushState.PUSHED, unavailable });
 			break;
+		}
 		case 'modeChanged':
 			chat.items.push({ key, kind: 'mode', mode: k.value.mode });
 			break;
@@ -248,6 +278,16 @@ export function apply(chat: Chat, e: Event) {
 		case 'forkNote':
 			chat.items.push({ key, kind: 'fork', actor: e.actor, note: k.value });
 			break;
+		case 'handoffOffered':
+			chat.items.push({ key, kind: 'handoff', seq: e.seq, actor: e.actor, offer: k.value, time: e.time });
+			break;
+		case 'handoffResolved': {
+			const seq = k.value.offerSeq;
+			const offer = chat.items.find((i): i is Extract<Item, { kind: 'handoff' }> => i.kind === 'handoff' && i.seq === seq);
+			if (offer) offer.resolved = { ...k.value, by: e.actor };
+			else chat.orphans.handoffs.set(seq, { ...k.value, by: e.actor }); // its offer is in older history
+			break;
+		}
 	}
 }
 
@@ -276,9 +316,17 @@ export function prepend(chat: Chat, events: Event[]) {
 			item.resolved = chat.orphans.resolved.get(item.seq);
 			chat.orphans.resolved.delete(item.seq);
 		}
+		if (item.kind === 'handoff' && chat.orphans.handoffs.has(item.seq)) {
+			item.resolved = chat.orphans.handoffs.get(item.seq);
+			chat.orphans.handoffs.delete(item.seq);
+		}
 		if (item.kind === 'permission' && chat.orphans.answers.has(item.req.id)) {
 			item.resolved = chat.orphans.answers.get(item.req.id);
 			chat.orphans.answers.delete(item.req.id);
+		}
+		if (item.kind === 'permission' && chat.orphans.votes.has(item.req.id)) {
+			item.votes = { ...item.votes, ...chat.orphans.votes.get(item.req.id) };
+			chat.orphans.votes.delete(item.req.id);
 		}
 	}
 	// A permission card made before its call was loaded points at the call now.
@@ -302,6 +350,7 @@ export function prepend(chat: Chat, events: Event[]) {
 	}
 	// What waits in the older page waits for even older history.
 	for (const [seq, r] of old.orphans.resolved) chat.orphans.resolved.set(seq, r);
+	for (const [seq, r] of old.orphans.handoffs) chat.orphans.handoffs.set(seq, r);
 	for (const [id, r] of old.orphans.answers) chat.orphans.answers.set(id, r);
 	for (const [id, o] of old.orphans.results) chat.orphans.results.set(id, o);
 	for (const [id, kids] of old.orphans.calls) chat.orphans.calls.set(id, [...kids, ...(chat.orphans.calls.get(id) ?? [])]);

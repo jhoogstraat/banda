@@ -85,19 +85,41 @@ service ThreadService {
   // Sets which tool calls the agent must ask for (owner only). Applies to the
   // running agent at once.
   rpc PermissionSetMode(PermissionSetModeRequest) returns (PermissionSetModeResponse);
+  // Votes for answers to the agent's pending question (AskUserQuestion):
+  // anyone, shown on the card for whoever answers. A new vote replaces the
+  // caller's last one.
+  rpc PermissionVote(PermissionVoteRequest) returns (PermissionVoteResponse);
+  // Removes a tool or rule from the thread's "always allow" list: the owner,
+  // or anyone in a trusted thread.
+  rpc PermissionRevoke(PermissionRevokeRequest) returns (PermissionRevokeResponse);
   // Starts threads (one per try) from another thread's current changes and
   // conversation, owned by the caller. Anyone who can see a thread can fork it.
   rpc Fork(ForkRequest) returns (ForkResponse);
   // Starts sibling threads with the same prompt, one per try.
   rpc Race(RaceRequest) returns (RaceResponse);
-  // Status, cost, time and diff of threads, side by side.
+  // Status, cost, time, latest reply and diff of threads, side by side.
+  // NotFound when there are none.
   rpc RaceCompare(RaceCompareRequest) returns (RaceCompareResponse);
+  // Everyone's most recent races, newest first: the threads of each, without
+  // diffs.
+  rpc RaceList(RaceListRequest) returns (RaceListResponse);
   // Keeps one thread of a race (owner only): settles its siblings for the
   // caller and notes the pick in each.
   rpc RacePick(RacePickRequest) returns (RacePickResponse);
   // Full-text search over every thread's messages, review comments, agent
   // text and tool calls, best matches first.
   rpc Search(SearchRequest) returns (SearchResponse);
+  // Offers the thread to a teammate (owner only). If the agent is idle, it
+  // first writes a briefing for them, as the owner's last turn. The next
+  // turns run on the recipient's subscription once they accept.
+  rpc HandoffOffer(HandoffOfferRequest) returns (HandoffOfferResponse);
+  // Takes the offered thread (the recipient only): its environment restarts
+  // with the recipient's Claude login and secrets, in a new Claude Code
+  // session that gets the conversation so far. Refused while the agent works.
+  rpc HandoffAccept(HandoffAcceptRequest) returns (HandoffAcceptResponse);
+  // Withdraws the pending offer: declined by the recipient, or cancelled by
+  // the owner.
+  rpc HandoffDecline(HandoffDeclineRequest) returns (HandoffDeclineResponse);
 }
 
 service UserService {
@@ -195,6 +217,29 @@ message Thread {
   string parent_title = 27;
   // A GitHub pull request for the branch, once it is pushed.
   string pull_request_url = 30;
+  // Other recent, unsettled threads on the same repository and base branch
+  // whose diffs change some of the same files. Set by GetThread and TeamWatch.
+  repeated Overlap overlaps = 31;
+  // The tools the pending permission requests are for, sorted ("ExitPlanMode"
+  // for a plan).
+  repeated string permission_tools = 32;
+  // Tools and rules the agent uses without asking, e.g. "Bash" or
+  // "Bash(npm test:*)" (see PermissionAnswerRequest.rule).
+  repeated string allowed_tools = 33;
+  // The teammate the owner offered the thread to, until they accept or
+  // decline (see HandoffOffer).
+  string handoff_to = 34;
+}
+
+// Another thread that changes some of the same files (see Thread.overlaps).
+message Overlap {
+  string thread_id = 1;
+  string title = 2;
+  string owner_id = 3;
+  // Not set in an Event.
+  Status status = 4;
+  // The files both diffs change, sorted.
+  repeated string paths = 5;
 }
 
 // Which tool calls the agent asks for, mapped to Claude Code's
@@ -276,8 +321,20 @@ message Event {
     // Links another thread: a fork of this one, or the pick of a race.
     ForkNote fork_note = 33;
     LineageUpdate lineage_update = 32;
-    // The owner changed the permission mode; actor is the owner.
+    // The permission mode changed: by the owner, or by the agent entering
+    // plan mode itself (EnterPlanMode; actor "agent").
     PermissionModeChanged permission_mode_changed = 34;
+    // The thread now changes files that another one changes too, or more of
+    // them than it was told before.
+    Overlap overlap = 35;
+    PermissionVoted permission_voted = 36;
+    // Someone removed an "always allow" tool or rule.
+    PermissionRevoked permission_revoked = 37;
+    // The owner offered the thread to a teammate; actor is the owner.
+    HandoffOffered handoff_offered = 38;
+    // The offer at offer_seq was accepted or declined (actor: the recipient)
+    // or cancelled (actor: the owner).
+    HandoffResolved handoff_resolved = 39;
   }
 }
 
@@ -531,6 +588,27 @@ message TrustRequest {
 }
 
 message TrustResponse {}
+
+message HandoffOfferRequest {
+  string thread_id = 1;
+  string to_user_id = 2;
+  // Optional, for the recipient and the briefing.
+  string note = 3;
+}
+
+message HandoffOfferResponse {}
+
+message HandoffAcceptRequest {
+  string thread_id = 1;
+}
+
+message HandoffAcceptResponse {}
+
+message HandoffDeclineRequest {
+  string thread_id = 1;
+}
+
+message HandoffDeclineResponse {}
 
 message SpawnThreadRequest {
   string parent_id = 1;
@@ -842,6 +920,21 @@ message InboxWatchResponse {
   // As ListThreads and ListMentioned return them.
   repeated Thread threads = 1;
   repeated Thread mentioned = 2;
+  // What the caller can decide now, oldest first.
+  repeated Decision decisions = 3;
+  // The caller signs in to Claude with their subscription and an environment
+  // reported them logged out.
+  bool login_needed = 4;
+}
+
+// A pending permission request the caller may answer (their thread, or a
+// thread that trusts teammates; plans only the owner), or a teammate's turn
+// request in the caller's thread.
+message Decision {
+  // Without its diff.
+  Thread thread = 1;
+  // The PermissionRequested or TurnRequest event.
+  Event request = 2;
 }
 
 message InboxMarkReadRequest {
@@ -892,6 +985,12 @@ message PermissionResolved {
   string message = 3;
   // A plan approval switched the thread to this mode.
   PermissionMode mode = 4;
+  // The input the tool ran with, if the answer changed it (redacted).
+  string updated_input_json = 5;
+  // The answers to a question (AskUserQuestion): question text -> answer.
+  map<string, string> answers = 6;
+  // What ALLOW_ALWAYS allowed: the tool, or a narrower rule.
+  string rule = 7;
 }
 
 message PermissionAnswerRequest {
@@ -903,9 +1002,47 @@ message PermissionAnswerRequest {
   string message = 4;
   // Required to approve a plan: the mode to work in afterwards.
   PermissionMode mode = 5;
+  // Required to answer a question (AskUserQuestion) with ALLOW: question
+  // text -> the chosen option's label, several joined by ", ", or free text.
+  map<string, string> answers = 6;
+  // Optional, owner only, for ALLOW and ALLOW_ALWAYS: the tool input to run
+  // instead, as a JSON object.
+  string updated_input_json = 7;
+  // Optional, for ALLOW_ALWAYS: a narrower rule than the whole tool, in
+  // Claude Code's syntax: "Bash(<command prefix>:*)" for Bash, or
+  // "Edit(<directory>/**)" for the edit tools (Edit, Write, MultiEdit,
+  // NotebookEdit), the directory relative to the checkout.
+  string rule = 8;
 }
 
 message PermissionAnswerResponse {}
+
+message PermissionVoteRequest {
+  string thread_id = 1;
+  string request_id = 2;
+  // As PermissionAnswerRequest.answers. Empty withdraws the vote.
+  map<string, string> answers = 3;
+}
+
+message PermissionVoteResponse {}
+
+// The actor's vote on a pending question; replaces their previous one.
+message PermissionVoted {
+  string id = 1;
+  map<string, string> answers = 2;
+}
+
+message PermissionRevokeRequest {
+  string thread_id = 1;
+  // A tool or rule from Thread.allowed_tools.
+  string rule = 2;
+}
+
+message PermissionRevokeResponse {}
+
+message PermissionRevoked {
+  string rule = 1;
+}
 
 message PermissionSetModeRequest {
   string thread_id = 1;
@@ -916,6 +1053,18 @@ message PermissionSetModeResponse {}
 
 message PermissionModeChanged {
   PermissionMode mode = 1;
+}
+
+message HandoffOffered {
+  string to_user_id = 1;
+  string note = 2;
+  // Why the agent writes no briefing (its environment isn't idle), or empty.
+  string no_briefing = 3;
+}
+
+message HandoffResolved {
+  int64 offer_seq = 1;
+  bool accepted = 2;
 }
 
 message WatchThreadResponse {
@@ -1016,8 +1165,13 @@ message PermissionCommand {
   string message = 3;
   // The mode to run in from now on. Unset with an answer: keep it.
   PermissionMode mode = 4;
-  // Tools the runner allows without asking.
+  // Tools and rules the runner allows without asking.
   repeated string allowed_tools = 5;
+  // With an allow: the answers to a question (AskUserQuestion), which the
+  // runner adds to its input.
+  map<string, string> answers = 6;
+  // With an allow: the input to run instead.
+  string updated_input_json = 7;
 }
 
 message Prompt {
@@ -1134,6 +1288,15 @@ message RaceEntry {
   int32 turns = 2;
   double cost_usd = 3;
   int64 duration_ms = 4;
+  // The agent's latest reply.
+  string reply = 5;
+}
+
+message RaceListRequest {}
+
+message RaceListResponse {
+  // Grouped by race_id, newest race first.
+  repeated Thread threads = 1;
 }
 
 message RacePickRequest {

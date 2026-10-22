@@ -188,6 +188,38 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * Other recent, unsettled threads on the same repository and base branch
+   * whose diffs change some of the same files. Set by GetThread and TeamWatch.
+   *
+   * @generated from field: repeated banda.v1.Overlap overlaps = 31;
+   */
+  overlaps: Overlap[];
+
+  /**
+   * The tools the pending permission requests are for, sorted ("ExitPlanMode"
+   * for a plan).
+   *
+   * @generated from field: repeated string permission_tools = 32;
+   */
+  permissionTools: string[];
+
+  /**
+   * Tools and rules the agent uses without asking, e.g. "Bash" or
+   * "Bash(npm test:*)" (see PermissionAnswerRequest.rule).
+   *
+   * @generated from field: repeated string allowed_tools = 33;
+   */
+  allowedTools: string[];
+
+  /**
+   * The teammate the owner offered the thread to, until they accept or
+   * decline (see HandoffOffer).
+   *
+   * @generated from field: string handoff_to = 34;
+   */
+  handoffTo: string;
 };
 
 /**
@@ -195,6 +227,48 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
  * Use `create(ThreadSchema)` to create a new message.
  */
 export declare const ThreadSchema: GenMessage<Thread>;
+
+/**
+ * Another thread that changes some of the same files (see Thread.overlaps).
+ *
+ * @generated from message banda.v1.Overlap
+ */
+export declare type Overlap = Message$1<"banda.v1.Overlap"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string owner_id = 3;
+   */
+  ownerId: string;
+
+  /**
+   * Not set in an Event.
+   *
+   * @generated from field: banda.v1.Status status = 4;
+   */
+  status: Status;
+
+  /**
+   * The files both diffs change, sorted.
+   *
+   * @generated from field: repeated string paths = 5;
+   */
+  paths: string[];
+};
+
+/**
+ * Describes the message banda.v1.Overlap.
+ * Use `create(OverlapSchema)` to create a new message.
+ */
+export declare const OverlapSchema: GenMessage<Overlap>;
 
 /**
  * @generated from message banda.v1.ForkOrigin
@@ -436,12 +510,53 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "lineageUpdate";
   } | {
     /**
-     * The owner changed the permission mode; actor is the owner.
+     * The permission mode changed: by the owner, or by the agent entering
+     * plan mode itself (EnterPlanMode; actor "agent").
      *
      * @generated from field: banda.v1.PermissionModeChanged permission_mode_changed = 34;
      */
     value: PermissionModeChanged;
     case: "permissionModeChanged";
+  } | {
+    /**
+     * The thread now changes files that another one changes too, or more of
+     * them than it was told before.
+     *
+     * @generated from field: banda.v1.Overlap overlap = 35;
+     */
+    value: Overlap;
+    case: "overlap";
+  } | {
+    /**
+     * @generated from field: banda.v1.PermissionVoted permission_voted = 36;
+     */
+    value: PermissionVoted;
+    case: "permissionVoted";
+  } | {
+    /**
+     * Someone removed an "always allow" tool or rule.
+     *
+     * @generated from field: banda.v1.PermissionRevoked permission_revoked = 37;
+     */
+    value: PermissionRevoked;
+    case: "permissionRevoked";
+  } | {
+    /**
+     * The owner offered the thread to a teammate; actor is the owner.
+     *
+     * @generated from field: banda.v1.HandoffOffered handoff_offered = 38;
+     */
+    value: HandoffOffered;
+    case: "handoffOffered";
+  } | {
+    /**
+     * The offer at offer_seq was accepted or declined (actor: the recipient)
+     * or cancelled (actor: the owner).
+     *
+     * @generated from field: banda.v1.HandoffResolved handoff_resolved = 39;
+     */
+    value: HandoffResolved;
+    case: "handoffResolved";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1425,6 +1540,102 @@ export declare type TrustResponse = Message$1<"banda.v1.TrustResponse"> & {
  * Use `create(TrustResponseSchema)` to create a new message.
  */
 export declare const TrustResponseSchema: GenMessage<TrustResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffOfferRequest
+ */
+export declare type HandoffOfferRequest = Message$1<"banda.v1.HandoffOfferRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string to_user_id = 2;
+   */
+  toUserId: string;
+
+  /**
+   * Optional, for the recipient and the briefing.
+   *
+   * @generated from field: string note = 3;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffOfferRequest.
+ * Use `create(HandoffOfferRequestSchema)` to create a new message.
+ */
+export declare const HandoffOfferRequestSchema: GenMessage<HandoffOfferRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffOfferResponse
+ */
+export declare type HandoffOfferResponse = Message$1<"banda.v1.HandoffOfferResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffOfferResponse.
+ * Use `create(HandoffOfferResponseSchema)` to create a new message.
+ */
+export declare const HandoffOfferResponseSchema: GenMessage<HandoffOfferResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffAcceptRequest
+ */
+export declare type HandoffAcceptRequest = Message$1<"banda.v1.HandoffAcceptRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffAcceptRequest.
+ * Use `create(HandoffAcceptRequestSchema)` to create a new message.
+ */
+export declare const HandoffAcceptRequestSchema: GenMessage<HandoffAcceptRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffAcceptResponse
+ */
+export declare type HandoffAcceptResponse = Message$1<"banda.v1.HandoffAcceptResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffAcceptResponse.
+ * Use `create(HandoffAcceptResponseSchema)` to create a new message.
+ */
+export declare const HandoffAcceptResponseSchema: GenMessage<HandoffAcceptResponse>;
+
+/**
+ * @generated from message banda.v1.HandoffDeclineRequest
+ */
+export declare type HandoffDeclineRequest = Message$1<"banda.v1.HandoffDeclineRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffDeclineRequest.
+ * Use `create(HandoffDeclineRequestSchema)` to create a new message.
+ */
+export declare const HandoffDeclineRequestSchema: GenMessage<HandoffDeclineRequest>;
+
+/**
+ * @generated from message banda.v1.HandoffDeclineResponse
+ */
+export declare type HandoffDeclineResponse = Message$1<"banda.v1.HandoffDeclineResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.HandoffDeclineResponse.
+ * Use `create(HandoffDeclineResponseSchema)` to create a new message.
+ */
+export declare const HandoffDeclineResponseSchema: GenMessage<HandoffDeclineResponse>;
 
 /**
  * @generated from message banda.v1.SpawnThreadRequest
@@ -2579,6 +2790,21 @@ export declare type InboxWatchResponse = Message$1<"banda.v1.InboxWatchResponse"
    * @generated from field: repeated banda.v1.Thread mentioned = 2;
    */
   mentioned: Thread[];
+
+  /**
+   * What the caller can decide now, oldest first.
+   *
+   * @generated from field: repeated banda.v1.Decision decisions = 3;
+   */
+  decisions: Decision[];
+
+  /**
+   * The caller signs in to Claude with their subscription and an environment
+   * reported them logged out.
+   *
+   * @generated from field: bool login_needed = 4;
+   */
+  loginNeeded: boolean;
 };
 
 /**
@@ -2586,6 +2812,35 @@ export declare type InboxWatchResponse = Message$1<"banda.v1.InboxWatchResponse"
  * Use `create(InboxWatchResponseSchema)` to create a new message.
  */
 export declare const InboxWatchResponseSchema: GenMessage<InboxWatchResponse>;
+
+/**
+ * A pending permission request the caller may answer (their thread, or a
+ * thread that trusts teammates; plans only the owner), or a teammate's turn
+ * request in the caller's thread.
+ *
+ * @generated from message banda.v1.Decision
+ */
+export declare type Decision = Message$1<"banda.v1.Decision"> & {
+  /**
+   * Without its diff.
+   *
+   * @generated from field: banda.v1.Thread thread = 1;
+   */
+  thread?: Thread | undefined;
+
+  /**
+   * The PermissionRequested or TurnRequest event.
+   *
+   * @generated from field: banda.v1.Event request = 2;
+   */
+  request?: Event | undefined;
+};
+
+/**
+ * Describes the message banda.v1.Decision.
+ * Use `create(DecisionSchema)` to create a new message.
+ */
+export declare const DecisionSchema: GenMessage<Decision>;
 
 /**
  * @generated from message banda.v1.InboxMarkReadRequest
@@ -2769,6 +3024,27 @@ export declare type PermissionResolved = Message$1<"banda.v1.PermissionResolved"
    * @generated from field: banda.v1.PermissionMode mode = 4;
    */
   mode: PermissionMode;
+
+  /**
+   * The input the tool ran with, if the answer changed it (redacted).
+   *
+   * @generated from field: string updated_input_json = 5;
+   */
+  updatedInputJson: string;
+
+  /**
+   * The answers to a question (AskUserQuestion): question text -> answer.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * What ALLOW_ALWAYS allowed: the tool, or a narrower rule.
+   *
+   * @generated from field: string rule = 7;
+   */
+  rule: string;
 };
 
 /**
@@ -2811,6 +3087,32 @@ export declare type PermissionAnswerRequest = Message$1<"banda.v1.PermissionAnsw
    * @generated from field: banda.v1.PermissionMode mode = 5;
    */
   mode: PermissionMode;
+
+  /**
+   * Required to answer a question (AskUserQuestion) with ALLOW: question
+   * text -> the chosen option's label, several joined by ", ", or free text.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * Optional, owner only, for ALLOW and ALLOW_ALWAYS: the tool input to run
+   * instead, as a JSON object.
+   *
+   * @generated from field: string updated_input_json = 7;
+   */
+  updatedInputJson: string;
+
+  /**
+   * Optional, for ALLOW_ALWAYS: a narrower rule than the whole tool, in
+   * Claude Code's syntax: "Bash(<command prefix>:*)" for Bash, or
+   * "Edit(<directory>/**)" for the edit tools (Edit, Write, MultiEdit,
+   * NotebookEdit), the directory relative to the checkout.
+   *
+   * @generated from field: string rule = 8;
+   */
+  rule: string;
 };
 
 /**
@@ -2830,6 +3132,120 @@ export declare type PermissionAnswerResponse = Message$1<"banda.v1.PermissionAns
  * Use `create(PermissionAnswerResponseSchema)` to create a new message.
  */
 export declare const PermissionAnswerResponseSchema: GenMessage<PermissionAnswerResponse>;
+
+/**
+ * @generated from message banda.v1.PermissionVoteRequest
+ */
+export declare type PermissionVoteRequest = Message$1<"banda.v1.PermissionVoteRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
+  /**
+   * As PermissionAnswerRequest.answers. Empty withdraws the vote.
+   *
+   * @generated from field: map<string, string> answers = 3;
+   */
+  answers: { [key: string]: string };
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoteRequest.
+ * Use `create(PermissionVoteRequestSchema)` to create a new message.
+ */
+export declare const PermissionVoteRequestSchema: GenMessage<PermissionVoteRequest>;
+
+/**
+ * @generated from message banda.v1.PermissionVoteResponse
+ */
+export declare type PermissionVoteResponse = Message$1<"banda.v1.PermissionVoteResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoteResponse.
+ * Use `create(PermissionVoteResponseSchema)` to create a new message.
+ */
+export declare const PermissionVoteResponseSchema: GenMessage<PermissionVoteResponse>;
+
+/**
+ * The actor's vote on a pending question; replaces their previous one.
+ *
+ * @generated from message banda.v1.PermissionVoted
+ */
+export declare type PermissionVoted = Message$1<"banda.v1.PermissionVoted"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: map<string, string> answers = 2;
+   */
+  answers: { [key: string]: string };
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoted.
+ * Use `create(PermissionVotedSchema)` to create a new message.
+ */
+export declare const PermissionVotedSchema: GenMessage<PermissionVoted>;
+
+/**
+ * @generated from message banda.v1.PermissionRevokeRequest
+ */
+export declare type PermissionRevokeRequest = Message$1<"banda.v1.PermissionRevokeRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * A tool or rule from Thread.allowed_tools.
+   *
+   * @generated from field: string rule = 2;
+   */
+  rule: string;
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevokeRequest.
+ * Use `create(PermissionRevokeRequestSchema)` to create a new message.
+ */
+export declare const PermissionRevokeRequestSchema: GenMessage<PermissionRevokeRequest>;
+
+/**
+ * @generated from message banda.v1.PermissionRevokeResponse
+ */
+export declare type PermissionRevokeResponse = Message$1<"banda.v1.PermissionRevokeResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevokeResponse.
+ * Use `create(PermissionRevokeResponseSchema)` to create a new message.
+ */
+export declare const PermissionRevokeResponseSchema: GenMessage<PermissionRevokeResponse>;
+
+/**
+ * @generated from message banda.v1.PermissionRevoked
+ */
+export declare type PermissionRevoked = Message$1<"banda.v1.PermissionRevoked"> & {
+  /**
+   * @generated from field: string rule = 1;
+   */
+  rule: string;
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevoked.
+ * Use `create(PermissionRevokedSchema)` to create a new message.
+ */
+export declare const PermissionRevokedSchema: GenMessage<PermissionRevoked>;
 
 /**
  * @generated from message banda.v1.PermissionSetModeRequest
@@ -2879,6 +3295,55 @@ export declare type PermissionModeChanged = Message$1<"banda.v1.PermissionModeCh
  * Use `create(PermissionModeChangedSchema)` to create a new message.
  */
 export declare const PermissionModeChangedSchema: GenMessage<PermissionModeChanged>;
+
+/**
+ * @generated from message banda.v1.HandoffOffered
+ */
+export declare type HandoffOffered = Message$1<"banda.v1.HandoffOffered"> & {
+  /**
+   * @generated from field: string to_user_id = 1;
+   */
+  toUserId: string;
+
+  /**
+   * @generated from field: string note = 2;
+   */
+  note: string;
+
+  /**
+   * Why the agent writes no briefing (its environment isn't idle), or empty.
+   *
+   * @generated from field: string no_briefing = 3;
+   */
+  noBriefing: string;
+};
+
+/**
+ * Describes the message banda.v1.HandoffOffered.
+ * Use `create(HandoffOfferedSchema)` to create a new message.
+ */
+export declare const HandoffOfferedSchema: GenMessage<HandoffOffered>;
+
+/**
+ * @generated from message banda.v1.HandoffResolved
+ */
+export declare type HandoffResolved = Message$1<"banda.v1.HandoffResolved"> & {
+  /**
+   * @generated from field: int64 offer_seq = 1;
+   */
+  offerSeq: bigint;
+
+  /**
+   * @generated from field: bool accepted = 2;
+   */
+  accepted: boolean;
+};
+
+/**
+ * Describes the message banda.v1.HandoffResolved.
+ * Use `create(HandoffResolvedSchema)` to create a new message.
+ */
+export declare const HandoffResolvedSchema: GenMessage<HandoffResolved>;
 
 /**
  * @generated from message banda.v1.WatchThreadResponse
@@ -3290,11 +3755,26 @@ export declare type PermissionCommand = Message$1<"banda.v1.PermissionCommand"> 
   mode: PermissionMode;
 
   /**
-   * Tools the runner allows without asking.
+   * Tools and rules the runner allows without asking.
    *
    * @generated from field: repeated string allowed_tools = 5;
    */
   allowedTools: string[];
+
+  /**
+   * With an allow: the answers to a question (AskUserQuestion), which the
+   * runner adds to its input.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * With an allow: the input to run instead.
+   *
+   * @generated from field: string updated_input_json = 7;
+   */
+  updatedInputJson: string;
 };
 
 /**
@@ -3742,6 +4222,13 @@ export declare type RaceEntry = Message$1<"banda.v1.RaceEntry"> & {
    * @generated from field: int64 duration_ms = 4;
    */
   durationMs: bigint;
+
+  /**
+   * The agent's latest reply.
+   *
+   * @generated from field: string reply = 5;
+   */
+  reply: string;
 };
 
 /**
@@ -3749,6 +4236,36 @@ export declare type RaceEntry = Message$1<"banda.v1.RaceEntry"> & {
  * Use `create(RaceEntrySchema)` to create a new message.
  */
 export declare const RaceEntrySchema: GenMessage<RaceEntry>;
+
+/**
+ * @generated from message banda.v1.RaceListRequest
+ */
+export declare type RaceListRequest = Message$1<"banda.v1.RaceListRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.RaceListRequest.
+ * Use `create(RaceListRequestSchema)` to create a new message.
+ */
+export declare const RaceListRequestSchema: GenMessage<RaceListRequest>;
+
+/**
+ * @generated from message banda.v1.RaceListResponse
+ */
+export declare type RaceListResponse = Message$1<"banda.v1.RaceListResponse"> & {
+  /**
+   * Grouped by race_id, newest race first.
+   *
+   * @generated from field: repeated banda.v1.Thread threads = 1;
+   */
+  threads: Thread[];
+};
+
+/**
+ * Describes the message banda.v1.RaceListResponse.
+ * Use `create(RaceListResponseSchema)` to create a new message.
+ */
+export declare const RaceListResponseSchema: GenMessage<RaceListResponse>;
 
 /**
  * @generated from message banda.v1.RacePickRequest
@@ -4665,6 +5182,29 @@ export declare const ThreadService: GenService<{
     output: typeof PermissionSetModeResponseSchema;
   },
   /**
+   * Votes for answers to the agent's pending question (AskUserQuestion):
+   * anyone, shown on the card for whoever answers. A new vote replaces the
+   * caller's last one.
+   *
+   * @generated from rpc banda.v1.ThreadService.PermissionVote
+   */
+  permissionVote: {
+    methodKind: "unary";
+    input: typeof PermissionVoteRequestSchema;
+    output: typeof PermissionVoteResponseSchema;
+  },
+  /**
+   * Removes a tool or rule from the thread's "always allow" list: the owner,
+   * or anyone in a trusted thread.
+   *
+   * @generated from rpc banda.v1.ThreadService.PermissionRevoke
+   */
+  permissionRevoke: {
+    methodKind: "unary";
+    input: typeof PermissionRevokeRequestSchema;
+    output: typeof PermissionRevokeResponseSchema;
+  },
+  /**
    * Starts threads (one per try) from another thread's current changes and
    * conversation, owned by the caller. Anyone who can see a thread can fork it.
    *
@@ -4686,7 +5226,8 @@ export declare const ThreadService: GenService<{
     output: typeof RaceResponseSchema;
   },
   /**
-   * Status, cost, time and diff of threads, side by side.
+   * Status, cost, time, latest reply and diff of threads, side by side.
+   * NotFound when there are none.
    *
    * @generated from rpc banda.v1.ThreadService.RaceCompare
    */
@@ -4694,6 +5235,17 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof RaceCompareRequestSchema;
     output: typeof RaceCompareResponseSchema;
+  },
+  /**
+   * Everyone's most recent races, newest first: the threads of each, without
+   * diffs.
+   *
+   * @generated from rpc banda.v1.ThreadService.RaceList
+   */
+  raceList: {
+    methodKind: "unary";
+    input: typeof RaceListRequestSchema;
+    output: typeof RaceListResponseSchema;
   },
   /**
    * Keeps one thread of a race (owner only): settles its siblings for the
@@ -4716,6 +5268,41 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof SearchRequestSchema;
     output: typeof SearchResponseSchema;
+  },
+  /**
+   * Offers the thread to a teammate (owner only). If the agent is idle, it
+   * first writes a briefing for them, as the owner's last turn. The next
+   * turns run on the recipient's subscription once they accept.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffOffer
+   */
+  handoffOffer: {
+    methodKind: "unary";
+    input: typeof HandoffOfferRequestSchema;
+    output: typeof HandoffOfferResponseSchema;
+  },
+  /**
+   * Takes the offered thread (the recipient only): its environment restarts
+   * with the recipient's Claude login and secrets, in a new Claude Code
+   * session that gets the conversation so far. Refused while the agent works.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffAccept
+   */
+  handoffAccept: {
+    methodKind: "unary";
+    input: typeof HandoffAcceptRequestSchema;
+    output: typeof HandoffAcceptResponseSchema;
+  },
+  /**
+   * Withdraws the pending offer: declined by the recipient, or cancelled by
+   * the owner.
+   *
+   * @generated from rpc banda.v1.ThreadService.HandoffDecline
+   */
+  handoffDecline: {
+    methodKind: "unary";
+    input: typeof HandoffDeclineRequestSchema;
+    output: typeof HandoffDeclineResponseSchema;
   },
 }>;
 
