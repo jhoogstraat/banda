@@ -176,6 +176,11 @@ func limits(cpu, memory, disk resource.Quantity) corev1.ResourceRequirements {
 // current pod template (settings may have changed) and deletes the pod so
 // the controller recreates it from that, on the same volumes. A scheduled
 // deletion is cancelled: the environment is in use again.
+//
+// Only the pod from before the patch is deleted. A suspended Sandbox has
+// none, and the one the controller creates on the patch already runs the new
+// template: deleting it could kill a runner that just took the thread's
+// prompt, losing the turn.
 func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 	sandboxes := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace)
 	created, err := sandboxes.Create(ctx, sb, metav1.CreateOptions{})
@@ -183,6 +188,13 @@ func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 		return c.ownToken(ctx, created)
 	}
 	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	pods := c.kube.CoreV1().Pods(c.cfg.Namespace)
+	old, err := pods.Get(ctx, sb.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		old = nil
+	} else if err != nil {
 		return err
 	}
 	patch, err := json.Marshal(map[string]any{"spec": map[string]any{"operatingMode": "Running", "podTemplate": sb.Spec.PodTemplate,
@@ -194,11 +206,11 @@ func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 	if err == nil {
 		err = c.ownToken(ctx, patched) // Secrets from before ownership was set
 	}
-	if err != nil {
+	if err != nil || old == nil || old.DeletionTimestamp != nil { // a pod on its way out is replaced from the new template
 		return err
 	}
-	err = c.kube.CoreV1().Pods(c.cfg.Namespace).Delete(ctx, sb.Name, metav1.DeleteOptions{})
-	if apierrors.IsNotFound(err) {
+	err = pods.Delete(ctx, sb.Name, metav1.DeleteOptions{Preconditions: metav1.NewUIDPreconditions(string(old.UID))})
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) { // gone, or already replaced
 		return nil
 	}
 	return err

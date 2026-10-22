@@ -1,11 +1,21 @@
 package sandbox
 
 import (
+	"context"
 	"encoding/json"
 	"net/netip"
 	"slices"
 	"strings"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
+	sbfake "sigs.k8s.io/agent-sandbox/clients/k8s/clientset/versioned/fake"
 
 	"github.com/jhoogstraat/banda/internal/store"
 )
@@ -105,5 +115,42 @@ func TestEgressPolicy(t *testing.T) {
 		`"egress":[{"to":[{"ipBlock":{"cidr":"10.20.0.0/16"}},{"ipBlock":{"cidr":"192.0.2.7/32"}}]}],"policyTypes":["Egress"]}}`
 	if string(b) != want {
 		t.Errorf("got  %s\nwant %s", b, want)
+	}
+}
+
+// Resuming a suspended Sandbox must not delete the pod the controller creates
+// for it: its runner may already have taken the thread's prompt. A pod from
+// before is replaced.
+func TestStartKeepsTheNewPod(t *testing.T) {
+	for _, running := range []bool{false, true} {
+		ctx := context.Background()
+		sb := (&Client{}).sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "subscription", nil, store.GitIdentity{})
+		sb.Namespace = "ns"
+		sbx := sbfake.NewSimpleClientset()
+		sbx.AgentsV1beta1().Sandboxes("ns").Create(ctx, sb.DeepCopy(), metav1.CreateOptions{}) // suspended or running, it exists
+		pod := func(uid string) *corev1.Pod {
+			return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "t-1", Namespace: "ns", UID: k8stypes.UID(uid)}}
+		}
+		objs := []runtime.Object{&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "t-1-token", Namespace: "ns"}}}
+		if running {
+			objs = append(objs, pod("old"))
+		}
+		kube := kubefake.NewClientset(objs...)
+		// The controller: a Running Sandbox without a pod gets one.
+		sbx.PrependReactor("patch", "sandboxes", func(k8stesting.Action) (bool, runtime.Object, error) {
+			kube.CoreV1().Pods("ns").Create(ctx, pod("new"), metav1.CreateOptions{})
+			return false, nil, nil
+		})
+		c := &Client{cfg: Config{Namespace: "ns"}, sbx: sbx, kube: kube}
+		if err := c.start(ctx, sb); err != nil {
+			t.Fatal(err)
+		}
+		got, err := kube.CoreV1().Pods("ns").Get(ctx, "t-1", metav1.GetOptions{})
+		if running && !apierrors.IsNotFound(err) {
+			t.Errorf("the running pod was kept: %v", got.UID)
+		}
+		if !running && (err != nil || got.UID != "new") {
+			t.Errorf("the controller's new pod was deleted: %v", err)
+		}
 	}
 }
