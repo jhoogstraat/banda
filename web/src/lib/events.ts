@@ -16,6 +16,7 @@ import {
 	type PermissionResolved,
 	type PreviewPort,
 	type PullRequestChanged,
+	type RepoAdded,
 	type ReviewComment,
 	type SetupStep,
 	type ToolCall,
@@ -54,6 +55,8 @@ export type Item = { key: number } & (
 	// A port started listening in the environment.
 	| { kind: 'port'; port: PreviewPort }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
+	// The owner (`actor`) gave the thread a repository.
+	| { kind: 'repo'; actor: string; repo: RepoAdded }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
 	| { kind: 'revoked'; actor: string; rule: string }
 	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
@@ -291,6 +294,9 @@ export function apply(chat: Chat, e: Event) {
 		}
 		case 'agentSettings':
 			chat.items.push({ key, kind: 'settings', actor: e.actor, settings: k.value });
+			break;
+		case 'repoAdded':
+			chat.items.push({ key, kind: 'repo', actor: e.actor, repo: k.value });
 			break;
 		case 'permissionModeChanged':
 			chat.items.push({ key, kind: 'permissionMode', actor: e.actor, mode: k.value.mode });

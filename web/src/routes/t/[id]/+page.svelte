@@ -13,6 +13,7 @@
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitPullRequestIcon from '@lucide/svelte/icons/git-pull-request';
+	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
 	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
@@ -33,6 +34,7 @@
 	import Composer from '#lib/components/composer.svelte';
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import HandoffDialog from '#lib/components/handoff-dialog.svelte';
+	import RepoDialog from '#lib/components/repo-dialog.svelte';
 	import LoadState from '#lib/components/load-state.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import Overlaps from '#lib/components/overlaps.svelte';
@@ -78,6 +80,7 @@
 	let forkOpen = $state(false);
 	let spawnOpen = $state(false);
 	let handoffOpen = $state(false);
+	let repoOpen = $state(false);
 	let prOpen = $state(false);
 	// Bumped when the thread hears its pull request changed, so the Pull request tab reloads it.
 	let prVersion = $state(0);
@@ -217,7 +220,7 @@
 						refresh();
 					}
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved', 'repoAdded'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -330,6 +333,7 @@
 		else if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
+		if (owner && !t.repoUrl) c.push({ label: 'Add a repository', icon: FolderGit2Icon, run: () => (repoOpen = true) });
 		if (owner) {
 			if (!pr && t.repoUrl) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
@@ -387,7 +391,7 @@
 		<PageHeader />
 		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
-		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:paneOpen={diffOpen} />
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:repoOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
 		<Overlaps overlaps={thread?.overlaps ?? []} />
 
@@ -446,4 +450,5 @@
 {#if thread}<ForkDialog bind:open={forkOpen} {thread} />{/if}
 {#if thread}<SpawnDialog bind:open={spawnOpen} {thread} />{/if}
 {#if thread}<HandoffDialog bind:open={handoffOpen} {thread} />{/if}
+{#if thread}<RepoDialog bind:open={repoOpen} {thread} />{/if}
 {#if thread}<PullRequestDialog bind:open={prOpen} {thread} summary={lastReply} ondone={refresh} />{/if}

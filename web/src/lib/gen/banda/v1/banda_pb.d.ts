@@ -609,6 +609,14 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: PullRequestChanged;
     case: "pullRequestChanged";
+  } | {
+    /**
+     * The owner (actor) gave the thread without a repository one.
+     *
+     * @generated from field: banda.v1.RepoAdded repo_added = 42;
+     */
+    value: RepoAdded;
+    case: "repoAdded";
   } | { case: undefined; value?: undefined };
 };
 
@@ -5648,6 +5656,67 @@ export declare type SetThreadDefaultsResponse = Message$1<"banda.v1.SetThreadDef
 export declare const SetThreadDefaultsResponseSchema: GenMessage<SetThreadDefaultsResponse>;
 
 /**
+ * @generated from message banda.v1.RepoAdded
+ */
+export declare type RepoAdded = Message$1<"banda.v1.RepoAdded"> & {
+  /**
+   * @generated from field: string repo_url = 1;
+   */
+  repoUrl: string;
+
+  /**
+   * @generated from field: string base_branch = 2;
+   */
+  baseBranch: string;
+};
+
+/**
+ * Describes the message banda.v1.RepoAdded.
+ * Use `create(RepoAddedSchema)` to create a new message.
+ */
+export declare const RepoAddedSchema: GenMessage<RepoAdded>;
+
+/**
+ * @generated from message banda.v1.AddRepositoryRequest
+ */
+export declare type AddRepositoryRequest = Message$1<"banda.v1.AddRepositoryRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string repo_url = 2;
+   */
+  repoUrl: string;
+
+  /**
+   * Empty is main.
+   *
+   * @generated from field: string base_branch = 3;
+   */
+  baseBranch: string;
+};
+
+/**
+ * Describes the message banda.v1.AddRepositoryRequest.
+ * Use `create(AddRepositoryRequestSchema)` to create a new message.
+ */
+export declare const AddRepositoryRequestSchema: GenMessage<AddRepositoryRequest>;
+
+/**
+ * @generated from message banda.v1.AddRepositoryResponse
+ */
+export declare type AddRepositoryResponse = Message$1<"banda.v1.AddRepositoryResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.AddRepositoryResponse.
+ * Use `create(AddRepositoryResponseSchema)` to create a new message.
+ */
+export declare const AddRepositoryResponseSchema: GenMessage<AddRepositoryResponse>;
+
+/**
  * @generated from enum banda.v1.Status
  */
 export enum Status {
@@ -6733,6 +6802,18 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof PullRequestResolveRequestSchema;
     output: typeof PullRequestResolveResponseSchema;
+  },
+  /**
+   * Gives a thread without a repository one (owner only, not while the agent
+   * works): the environment restarts with the folder as a checkout of the
+   * thread branch, its files kept as uncommitted changes.
+   *
+   * @generated from rpc banda.v1.ThreadService.AddRepository
+   */
+  addRepository: {
+    methodKind: "unary";
+    input: typeof AddRepositoryRequestSchema;
+    output: typeof AddRepositoryResponseSchema;
   },
 }>;
 

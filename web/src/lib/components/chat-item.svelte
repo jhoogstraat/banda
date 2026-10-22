@@ -42,7 +42,7 @@
 	import { tone, where, type Comment } from '#lib/diff.js';
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { threads, userName } from '#lib/threads.svelte.js';
+	import { projectName, threads, userName } from '#lib/threads.svelte.js';
 	import { changeText, checkStates, pullStates } from '#lib/pullrequests.js';
 
 	let {
@@ -325,6 +325,8 @@
 	{@const s = item.settings}
 	<!-- The event has the model and effort if they changed, the profile if it did. -->
 	{@render divider(`${userName(item.actor)} switched to ${[s.model && `${s.model} · ${s.effort}`, s.profile && profileLabel(s.profile)].filter(Boolean).join(' · ')}`)}
+{:else if item.kind === 'repo'}
+	{@render divider(`${userName(item.actor)} added ${projectName(item.repo.repoUrl)} · ${item.repo.baseBranch}`)}
 {:else if item.kind === 'permissionMode'}
 	{@render divider(`${item.actor === 'agent' ? 'The agent' : userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
 {:else if item.kind === 'revoked'}

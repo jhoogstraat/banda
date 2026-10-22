@@ -46,6 +46,9 @@ apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'agentSettings', value: { m
 const switched = chat.items.at(-1);
 if (switched?.kind !== 'settings' || switched.actor !== 'alice' || switched.settings.model !== 'm')
 	throw new Error('agentSettings should become a divider naming who switched');
+apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'repoAdded', value: { repoUrl: 'https://x/y.git', baseBranch: 'main' } } } as Event);
+const added = chat.items.at(-1);
+if (added?.kind !== 'repo' || added.actor !== 'alice' || added.repo.repoUrl !== 'https://x/y.git') throw new Error('repoAdded should become a divider naming who added it');
 
 apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));
 apply(chat, ev({ case: 'diffChanged', value: {} }));

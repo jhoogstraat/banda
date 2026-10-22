@@ -53,17 +53,20 @@ func TestReadFile(t *testing.T) {
 func TestListWithoutRepo(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "notes", ".hidden"), 0o755)
-	for _, p := range []string{"b.txt", "notes/a.md", "notes/.hidden/x"} {
-		os.WriteFile(filepath.Join(dir, p), []byte("x"), 0o600)
+	os.MkdirAll(filepath.Join(dir, "node_modules", "x"), 0o755)
+	for p, c := range map[string]string{"b.txt": "x", "notes/a.md": "x", "notes/.hidden/x": "x", "notes/.gitignore": "*.log\n", "notes/run.log": "x",
+		".gitignore": "node_modules/\n", "node_modules/x/index.js": "x", "run.log": "x"} {
+		os.WriteFile(filepath.Join(dir, p), []byte(c), 0o600)
 	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer root.Close()
-	repoURL = ""
+	work = dir
 	got := &bandav1.FileResponse{}
-	if err := list(t.Context(), root, got); err != nil || strings.Join(got.Paths, " ") != "b.txt notes/.hidden/x notes/a.md" {
+	// git's ignore rules, without a repository: .gitignore files apply to their folder
+	if err := list(t.Context(), root, got); err != nil || strings.Join(got.Paths, " ") != ".gitignore b.txt notes/.gitignore notes/.hidden/x notes/a.md run.log" {
 		t.Errorf("got %q, %v", got.Paths, err)
 	}
 }

@@ -162,6 +162,13 @@ func (s *Store) Create(ctx context.Context, t Thread) error {
 	return err
 }
 
+// SetRepository gives a thread without a repository one; Update doesn't
+// write these columns.
+func (s *Store) SetRepository(ctx context.Context, t Thread) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET repo_url=$2, base_branch=$3, branch=$4 WHERE id=$1`, t.ID, t.RepoURL, t.BaseBranch, t.Branch)
+	return err
+}
+
 func (s *Store) Get(ctx context.Context, id string) (Thread, error) {
 	return scan(s.db.QueryRow(ctx, `SELECT `+cols+` FROM threads WHERE id = $1`, id))
 }

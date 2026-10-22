@@ -1,5 +1,6 @@
 // Threads without a repository: the agent works in an empty folder that lives only in the thread's volume.
-import { expect, kube, refused, repo, sql, Status, test, type Thread } from './fixtures.ts';
+import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { expect, kube, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 const files = async (t: Thread) => (await t.user.threads.listFiles({ threadId: t.id })).paths;
 
@@ -96,5 +97,42 @@ test('browser: a thread started with “No repository” shows its files, no dif
 		await expect(page.getByRole('button', { name: 'Project: No repository' })).toBeVisible();
 		await expect(sidebar.getByRole('link', { name: /e2e: notes for the launch/ })).toBeVisible();
 		await expect(page.getByRole('link', { name: /e2e: with a repository/ })).toHaveCount(0);
+	});
+});
+
+test('the owner adds a repository: the files the agent wrote stay, as changes in the diff on its new branch; then it pushes and settles like any thread', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create({ repoUrl: '', prompt: 'e2e: write a file' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.turn(() => t.send('e2e-file:README e2e: mine')); // the repository has a README too
+	expect(await refused(bob.threads.addRepository({ threadId: t.id, repoUrl: repo() }))).toContain('only the thread owner');
+	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: 'ext::sh -c touch% /tmp/pwned' }))).toContain('must be an https');
+
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await page.getByRole('menuitem', { name: 'Add a repository' }).click();
+	await page.getByLabel('Repository URL').fill(repo());
+	await page.getByRole('button', { name: 'Add repository' }).click();
+	await expect(page.getByText(/added e2e-git\/plain · main/)).toBeVisible();
+	const info = await t.waitFor('to be ready on its repository', (i) => i.repoUrl === repo() && i.status === Status.AWAITING_INPUT);
+	expect([info.branch, info.baseBranch]).toEqual([`banda/${t.id}`, 'main']);
+	expect((await t.of('repoAdded')).map((r) => [r.repoUrl, r.baseBranch])).toEqual([[repo(), 'main']]);
+	expect((await t.events()).find((e) => e.kind.case === 'repoAdded')?.actor).toBe(alice.id);
+	expect((await t.of('notice')).map((n) => n.text).join('\n')).toContain('The files that were already in the folder are kept');
+	const diff = (await t.waitFor('to report its diff', (i) => i.diff !== '')).diff;
+	expect(diff).toContain('+++ b/hello1.txt');
+	expect(diff).toMatch(/--- a\/README\n\+\+\+ b\/README\n[^]*-Hello World!/);
+	expect(await t.terminal('git status --porcelain; git branch --show-current')).toMatch(/M README[^]*\?\? hello1\.txt[^]*banda\//);
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
+	await expect(page.getByRole('tab', { name: 'Diff' })).toBeVisible();
+	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: repo() }))).toContain('already has a repository');
+
+	await test.step('a turn that commits pushes everything to origin; settling then finds it all there', async () => {
+		await t.turn(() => t.send('e2e: commit it all'));
+		await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 30_000);
+		expect(await t.origin(`show --stat --format=%s banda/${t.id}`)).toMatch(/hello 2[^]*README[^]*hello1\.txt[^]*hello2\.txt/);
+		await alice.threads.settle({ threadId: t.id, settled: true });
+		await until(async () => (await sql(`SELECT env_pushed FROM threads WHERE id = '${t.id}'`)) === 't', () => 'env_pushed is still false');
 	});
 });

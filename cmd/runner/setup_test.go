@@ -139,3 +139,50 @@ func TestPrepareWithoutRepo(t *testing.T) {
 		}
 	}
 }
+
+// A folder that already holds files becomes the checkout without losing one.
+func TestCheckoutKeepsFiles(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	origin := t.TempDir()
+	git := func(dir string, args ...string) string {
+		out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	files := func(dir string, m map[string]string) {
+		for p, c := range m {
+			os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
+			os.WriteFile(filepath.Join(dir, p), []byte(c), 0o644)
+		}
+	}
+	git(origin, "init", "-q", "-b", "main")
+	files(origin, map[string]string{"a.txt": "a\n", "b.txt": "b\n", "d/x": "x\n", ".gitignore": "node_modules/\n"})
+	git(origin, "add", "-A")
+	git(origin, "commit", "-qm", "base")
+	work = filepath.Join(t.TempDir(), "work")
+	files(work, map[string]string{"a.txt": "mine\n", "new.txt": "new\n", "node_modules/j": "j\n", "d": "a file\n"})
+	t.Setenv("BANDA_REPO_URL", origin)
+	t.Setenv("BANDA_BASE_BRANCH", "main")
+	t.Setenv("BANDA_BRANCH", "banda/t1")
+
+	kept, err := checkout(context.Background())
+	if err != nil || kept == "" {
+		t.Fatalf("checkout: %q, %v", kept, err)
+	}
+	for p, want := range map[string]string{"a.txt": "mine\n", "new.txt": "new\n", "node_modules/j": "j\n", "d": "a file\n", "b.txt": "b\n"} {
+		if b, _ := os.ReadFile(filepath.Join(work, p)); string(b) != want {
+			t.Errorf("%s: %q, want %q", p, b, want)
+		}
+	}
+	if got := git(work, "status", "--porcelain"); got != "M a.txt\n D d/x\n?? d\n?? new.txt" {
+		t.Errorf("status:\n%s", got)
+	}
+	if git(work, "branch", "--show-current") != "banda/t1" || git(work, "rev-parse", "HEAD") != git(origin, "rev-parse", "HEAD") {
+		t.Error("not on the thread branch at the base")
+	}
+	if kept, err := checkout(context.Background()); err != nil || kept != "" { // a resume
+		t.Errorf("resume: %q, %v", kept, err)
+	}
+}

@@ -175,6 +175,11 @@ func run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+	if repoURL != "" { // the diff as it is now: a folder that just got its repository shows its files as changes
+		if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: redact(diff(ctx))}}}); err != nil {
+			return err
+		}
+	}
 	// Every way out of here stops claude gracefully and waits for it: a kill
 	// in the middle of a token refresh would log the user out everywhere.
 	var claude *claudeProc

@@ -162,6 +162,9 @@ const (
 	// ThreadServicePullRequestResolveProcedure is the procedure name of the ThreadService's
 	// PullRequestResolve RPC.
 	ThreadServicePullRequestResolveProcedure = "/banda.v1.ThreadService/PullRequestResolve"
+	// ThreadServiceAddRepositoryProcedure is the procedure name of the ThreadService's AddRepository
+	// RPC.
+	ThreadServiceAddRepositoryProcedure = "/banda.v1.ThreadService/AddRepository"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -596,6 +599,13 @@ var (
 			Procedure:  ThreadServicePullRequestResolveProcedure,
 		}
 	})
+	threadServiceAddRepositorySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("AddRepository"),
+			Procedure:  ThreadServiceAddRepositoryProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -741,6 +751,10 @@ type ThreadServiceClient interface {
 	// Resolves or reopens a review thread, with the caller's own token
 	// (refused without one).
 	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
+	// Gives a thread without a repository one (owner only, not while the agent
+	// works): the environment restarts with the folder as a checkout of the
+	// thread branch, its files kept as uncommitted changes.
+	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -995,6 +1009,10 @@ type ThreadServiceHandler interface {
 	// Resolves or reopens a review thread, with the caller's own token
 	// (refused without one).
 	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
+	// Gives a thread without a repository one (owner only, not while the agent
+	// works): the environment restarts with the folder as a checkout of the
+	// thread branch, its files kept as uncommitted changes.
+	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -1057,6 +1075,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceListForgeReposSpec(), Handler: adapter.listForgeRepos},
 		connect.Method{Spec: threadServicePullRequestChoicesSpec(), Handler: adapter.pullRequestChoices},
 		connect.Method{Spec: threadServicePullRequestResolveSpec(), Handler: adapter.pullRequestResolve},
+		connect.Method{Spec: threadServiceAddRepositorySpec(), Handler: adapter.addRepository},
 	)
 }
 
@@ -1359,6 +1378,10 @@ func (UnimplementedThreadServiceHandler) PullRequestChoices(context.Context, *v1
 
 func (UnimplementedThreadServiceHandler) PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestResolve is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.AddRepository is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1800,6 +1823,14 @@ func (c *threadServiceClient) PullRequestChoices(ctx context.Context, req *v1.Pu
 func (c *threadServiceClient) PullRequestResolve(ctx context.Context, req *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error) {
 	var res v1.PullRequestResolveResponse
 	if err := c.client.CallUnary(ctx, threadServicePullRequestResolveSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) AddRepository(ctx context.Context, req *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error) {
+	var res v1.AddRepositoryResponse
+	if err := c.client.CallUnary(ctx, threadServiceAddRepositorySpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2441,6 +2472,18 @@ func (h threadServiceHandler) pullRequestResolve(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.PullRequestResolve(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) addRepository(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AddRepositoryRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AddRepository(ctx, &req)
 	if err != nil {
 		return err
 	}

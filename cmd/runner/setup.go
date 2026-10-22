@@ -48,8 +48,12 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 	s := setup{send: send, fresh: err != nil}
 	title := "Check out " + os.Getenv("BANDA_BRANCH")
 	if s.fresh {
-		err = s.run("checkout", title, func() (string, error) { return "", checkout(ctx) })
-	} else if err = checkout(ctx); err != nil { // quick on a resume, so only reported if it fails
+		var kept string
+		err = s.run("checkout", title, func() (string, error) { kept, err = checkout(ctx); return kept, err })
+		if err == nil && kept != "" {
+			notice(kept)
+		}
+	} else if _, err = checkout(ctx); err != nil { // quick on a resume, so only reported if it fails
 		s.report("checkout", title, bandav1.SetupState_SETUP_STATE_FAILED, err.Error())
 	}
 	if err != nil {
@@ -201,8 +205,10 @@ func runGroup(ctx context.Context, command string) (string, error) {
 }
 
 // checkout clones the repo onto the thread branch the first time; the home
-// volume keeps it across restarts.
-func checkout(ctx context.Context) error {
+// volume keeps it across restarts. A folder that already holds files (the
+// thread had no repository until now) becomes the checkout instead, and the
+// result says so.
+func checkout(ctx context.Context) (string, error) {
 	git := func(args ...string) error {
 		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
 			return fmt.Errorf("git %s: %w: %s", args[0], err, out)
@@ -220,12 +226,21 @@ func checkout(ctx context.Context) error {
 		steps = append(steps, []string{"config", "--global", "credential.https://" + u.Host + ".helper",
 			`!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
 	}
-	if _, err := os.Stat(filepath.Join(work, ".git")); err != nil {
-		steps = append(steps, []string{"clone", "--branch=" + os.Getenv("BANDA_BASE_BRANCH"), "--", os.Getenv("BANDA_REPO_URL"), work})
-	}
 	for _, args := range steps {
 		if err := git(args...); err != nil {
-			return err
+			return "", err
+		}
+	}
+	kept := ""
+	if _, err := os.Stat(filepath.Join(work, ".git")); err != nil {
+		if entries, _ := os.ReadDir(work); len(entries) > 0 {
+			if err := adopt(git); err != nil {
+				return "", err
+			}
+			kept = fmt.Sprintf("The files that were already in the folder are kept: they are uncommitted changes on %s, on top of %s.",
+				os.Getenv("BANDA_BRANCH"), os.Getenv("BANDA_BASE_BRANCH"))
+		} else if err := git("clone", "--branch="+os.Getenv("BANDA_BASE_BRANCH"), "--", os.Getenv("BANDA_REPO_URL"), work); err != nil {
+			return "", err
 		}
 	}
 	// Also covers a previous start that died right after cloning. A fresh
@@ -234,11 +249,46 @@ func checkout(ctx context.Context) error {
 	branch := os.Getenv("BANDA_BRANCH")
 	switch {
 	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch) == nil:
-		return nil
+		return kept, nil
 	case git("-C", work, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+branch) == nil:
-		return git("-C", work, "switch", branch)
+		return kept, git("-C", work, "switch", branch)
 	}
-	return git("-C", work, "switch", "-c", branch)
+	return kept, git("-C", work, "switch", "-c", branch)
+}
+
+// adopt makes the folder a checkout of the thread branch, based on the base
+// branch, without touching a file in it (never lose work): what differs from
+// the base shows as uncommitted changes, and only the base's files missing
+// from the folder are written. The repository is built beside the folder and
+// moved in last, so a start that dies halfway begins again.
+func adopt(git func(...string) error) error {
+	dir, base := filepath.Join(os.Getenv("HOME"), ".banda", "adopt.git"), os.Getenv("BANDA_BASE_BRANCH")
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if err := git("init", "-q", "--bare", "--initial-branch="+os.Getenv("BANDA_BRANCH"), dir); err != nil {
+		return err
+	}
+	in := func(args ...string) error {
+		return git(append([]string{"-C", work, "--git-dir=" + dir, "--work-tree=" + work}, args...)...)
+	}
+	for _, args := range [][]string{
+		{"remote", "add", "origin", os.Getenv("BANDA_REPO_URL")},
+		{"fetch", "-q", "origin", "+refs/heads/" + base + ":refs/remotes/origin/" + base},
+		{"reset", "-q", "refs/remotes/origin/" + base}, // the branch and the index, not the files
+	} {
+		if err := in(args...); err != nil {
+			return err
+		}
+	}
+	// Without --force it never overwrites a file, and fails for those it
+	// skipped (one is there already, or the base has a folder where the
+	// folder has a file): those are the folder's changes.
+	in("checkout-index", "--all", "--quiet")
+	if err := in("config", "core.bare", "false"); err != nil {
+		return err
+	}
+	return os.Rename(dir, filepath.Join(work, ".git"))
 }
 
 // waitForLogin waits for a subscription login, reported as the login step

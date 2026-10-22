@@ -148,6 +148,10 @@ service ThreadService {
   // Resolves or reopens a review thread, with the caller's own token
   // (refused without one).
   rpc PullRequestResolve(PullRequestResolveRequest) returns (PullRequestResolveResponse);
+  // Gives a thread without a repository one (owner only, not while the agent
+  // works): the environment restarts with the folder as a checkout of the
+  // thread branch, its files kept as uncommitted changes.
+  rpc AddRepository(AddRepositoryRequest) returns (AddRepositoryResponse);
 }
 
 service UserService {
@@ -396,6 +400,8 @@ message Event {
     // failed or passed, a review, merged, closed). Ephemeral (seq 0, change
     // empty) for any other change, so open pages refetch it.
     PullRequestChanged pull_request_changed = 41;
+    // The owner (actor) gave the thread without a repository one.
+    RepoAdded repo_added = 42;
   }
 }
 
@@ -1745,3 +1751,17 @@ message SetThreadDefaultsRequest {
 }
 
 message SetThreadDefaultsResponse {}
+
+message RepoAdded {
+  string repo_url = 1;
+  string base_branch = 2;
+}
+
+message AddRepositoryRequest {
+  string thread_id = 1;
+  string repo_url = 2;
+  // Empty is main.
+  string base_branch = 3;
+}
+
+message AddRepositoryResponse {}

@@ -67,3 +67,16 @@ test('browser: the new-thread composer takes attachments like the thread compose
 	expect((await t.of('agentText')).map((a) => a.text)).toContain('Received 1 image blocks (image/png) and 0 text files');
 	await expect(page.getByRole('img', { name: 'dot.png' })).toBeVisible();
 });
+
+test('the Files tab of a thread without a repository applies the .gitignore files in its folder, as git would', async ({ as }) => {
+	const t = await as('alice').create({ repoUrl: '', prompt: 'e2e: write a file' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.terminal("mkdir -p node_modules/x notes && echo x > node_modules/x/index.js && echo 'node_modules/' > .gitignore && echo '*.log' > notes/.gitignore && echo x > notes/run.log && echo x > notes/a.md && echo x > run.log && echo done");
+	expect((await t.user.threads.listFiles({ threadId: t.id })).paths).toEqual(['.gitignore', 'hello1.txt', 'notes/.gitignore', 'notes/a.md', 'run.log']);
+	const page = await t.user.page();
+	await page.goto(`/t/${t.id}`);
+	await page.getByRole('button', { name: 'Toggle right pane' }).click();
+	const pane = page.getByRole('tabpanel', { name: 'Files' });
+	await expect(pane.getByRole('button', { name: 'hello1.txt', exact: true })).toBeVisible();
+	await expect(pane.getByRole('button', { name: 'node_modules', exact: true })).toHaveCount(0);
+});

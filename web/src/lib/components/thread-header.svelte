@@ -38,6 +38,7 @@
 		forkOpen = $bindable(),
 		spawnOpen = $bindable(),
 		handoffOpen = $bindable(),
+		repoOpen = $bindable(),
 		paneOpen = $bindable()
 	}: {
 		thread?: Thread;
@@ -55,6 +56,7 @@
 		forkOpen: boolean;
 		spawnOpen: boolean;
 		handoffOpen: boolean;
+		repoOpen: boolean;
 		paneOpen?: boolean;
 	} = $props();
 
@@ -71,7 +73,11 @@
 		{:else if isSnoozed(thread)}
 			<BellOffIcon class="hidden size-3.5 shrink-0 text-muted-foreground @2xl:block" aria-label="Snoozed" />
 		{/if}
-		{#if !thread.repoUrl}
+		{#if !thread.repoUrl && owner}
+			<button class="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground @2xl:flex" title="The agent works in a folder that lives only in this thread's environment: nothing is pushed. Click to add a repository." onclick={() => (repoOpen = true)}>
+				<FolderIcon class="size-3.5" />No repository
+			</button>
+		{:else if !thread.repoUrl}
 			<span class="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground @2xl:flex" title="The agent works in a folder that lives only in this thread's environment: nothing is pushed.">
 				<FolderIcon class="size-3.5" />No repository
 			</span>
@@ -131,7 +137,7 @@
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" keys={threadKeys.pane} variant={paneOpen ? 'secondary' : 'ghost'} onclick={() => (paneOpen = !paneOpen)} />
 		{#if thread}
-			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} />
+			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} onrepo={() => (repoOpen = true)} />
 		{/if}
 	</div>
 </PageHeader>

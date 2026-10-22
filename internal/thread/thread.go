@@ -57,7 +57,7 @@ var (
 	ErrNoRequest = errors.New("no turn request is waiting")
 	ErrNoHandoff = errors.New("no handoff is waiting")
 	ErrHandoff   = errors.New("hand the thread to a teammate, one at a time")
-	ErrBusy      = errors.New("the agent is working: accept once its turn has ended")
+	ErrBusy      = errors.New("the agent is working: try again once its turn has ended")
 )
 
 // CheckOwner returns ErrForbidden unless by owns the thread.
@@ -136,6 +136,10 @@ type Suspend struct{}
 // Wake resumes a suspended environment without a prompt, e.g. to open a terminal.
 type Wake struct{ By string }
 
+// AddRepo: the owner gave the thread a repository. The environment restarts
+// to check it out, so never mid-turn.
+type AddRepo struct{ By string }
+
 func (Send) action()      {}
 func (Approve) action()   {}
 func (Decline) action()   {}
@@ -151,6 +155,7 @@ func (TurnEnded) action() {}
 func (EnvLost) action()   {}
 func (Suspend) action()   {}
 func (Wake) action()      {}
+func (AddRepo) action()   {}
 
 func Apply(s State, a Action) (State, Effect, error) {
 	switch a := a.(type) {
@@ -301,6 +306,16 @@ func Apply(s State, a Action) (State, Effect, error) {
 		}
 		s.Status = Suspended
 		return s, SuspendEnv, nil
+
+	case AddRepo:
+		if err := s.CheckOwner(a.By); err != nil {
+			return s, None, err
+		}
+		if s.Status == Working {
+			return s, None, ErrBusy
+		}
+		s.Status, s.Turns = Starting, 0
+		return s, Provision, nil
 
 	case Wake:
 		if err := s.CheckOwner(a.By); err != nil {

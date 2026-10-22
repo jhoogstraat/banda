@@ -28,6 +28,7 @@
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import HandshakeIcon from '@lucide/svelte/icons/handshake';
@@ -50,7 +51,8 @@
 		retry,
 		onfork,
 		onspawn,
-		onhandoff
+		onhandoff,
+		onrepo
 	}: {
 		thread: Thread;
 		owner: boolean;
@@ -60,6 +62,7 @@
 		onfork: () => void;
 		onspawn: () => void;
 		onhandoff: () => void;
+		onrepo: () => void;
 	} = $props();
 
 	const when = (d: Date) => d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
@@ -84,6 +87,7 @@
 		<Menu.Item onclick={onfork}><GitForkIcon /> Fork: try another way<Menu.Shortcut>{threadKeys.fork}</Menu.Shortcut></Menu.Item>
 		<Menu.Item onclick={onspawn}><GitBranchPlusIcon /> Spawn a sub-thread<Menu.Shortcut>{threadKeys.spawn}</Menu.Shortcut></Menu.Item>
 		{#if owner && !thread.handoffTo}<Menu.Item onclick={onhandoff}><HandshakeIcon /> Hand off to a teammate</Menu.Item>{/if}
+		{#if owner && !thread.repoUrl}<Menu.Item onclick={onrepo}><FolderGit2Icon /> Add a repository</Menu.Item>{/if}
 		<Menu.Separator />
 		<Menu.Sub>
 			<Menu.SubTrigger><BellOffIcon /> {snoozed ? `Snoozed until ${when(until!)}` : 'Snooze'}</Menu.SubTrigger>

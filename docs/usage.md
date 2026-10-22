@@ -37,7 +37,9 @@ Settings has a section each, linked from its side nav (`/settings#claude`, `#git
 
 ## Work without a repository
 
-For work without code, pick **No repository** in the composer's repository chip. The agent starts in an empty folder in the thread's environment; the Files tab and the terminal work on it, but there is no diff, push or pull request. The folder lives only in that environment, so settling the thread never deletes it. A fork gets the conversation but not the files, and sub-threads have no repository either.
+For work without code, pick **No repository** in the composer's repository chip. The agent starts in an empty folder in the thread's environment; the Files tab and the terminal work on it, but there is no diff, push or pull request. The folder lives only in that environment, so settling the thread never deletes it. A fork gets the conversation but not the files, and sub-threads have no repository either. The Files tab follows the `.gitignore` files in the folder, as git would.
+
+The owner can add a repository later (**Add a repository** in the thread's **…** menu, or click **No repository** in the header), between turns. The environment restarts with the folder as a checkout of the thread's own branch: the files already there are kept as uncommitted changes on top of the base branch (the diff shows them; where the base has the same file, the folder's version stays), and from then on it is a thread like any other.
 
 ## Preparing a repo
 
