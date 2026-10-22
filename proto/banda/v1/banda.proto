@@ -121,6 +121,24 @@ service ThreadService {
   // Withdraws the pending offer: declined by the recipient, or cancelled by
   // the owner.
   rpc HandoffDecline(HandoffDeclineRequest) returns (HandoffDeclineResponse);
+
+  // The thread's pull request (GitLab: merge request) as last fetched from
+  // its forge with the owner's token, for everyone; refresh fetches it now.
+  rpc PullRequestGet(PullRequestGetRequest) returns (PullRequestGetResponse);
+  // Opens a pull request for the thread's pushed branch against its base
+  // (owner only, with the owner's token).
+  rpc PullRequestCreate(PullRequestCreateRequest) returns (PullRequestCreateResponse);
+  // Links an existing pull request: by number, or the open one whose head is
+  // the thread's branch (owner only).
+  rpc PullRequestLink(PullRequestLinkRequest) returns (PullRequestLinkResponse);
+  // Edits the title or description, marks it draft or ready, requests
+  // reviewers (owner only).
+  rpc PullRequestUpdate(PullRequestUpdateRequest) returns (PullRequestUpdateResponse);
+  // Merges it (owner only).
+  rpc PullRequestMerge(PullRequestMergeRequest) returns (PullRequestMergeResponse);
+  // Comments on it, or replies to a review comment, with the caller's own
+  // token (refused without one).
+  rpc PullRequestComment(PullRequestCommentRequest) returns (PullRequestCommentResponse);
 }
 
 service UserService {
@@ -242,6 +260,14 @@ message Thread {
   // The teammate the owner offered the thread to, until they accept or
   // decline (see HandoffOffer).
   string handoff_to = 35;
+  // The linked pull request (GitLab: merge request), as last fetched.
+  PullRequestSummary pull_request = 36;
+  // The forge of the repository: "github", "gitlab", or empty when Banda
+  // doesn't know it (see FORGE_HOSTS).
+  string forge = 37;
+  // The owner has a token for the forge, so Banda can open and manage the
+  // pull request. Set by GetThread only.
+  bool forge_ready = 38;
 }
 
 // Another thread that changes some of the same files (see Thread.overlaps).
@@ -352,6 +378,10 @@ message Event {
     // A port started listening in the environment (see PreviewWatch); the
     // ports already listening when a runner connects aren't announced.
     PreviewPort port_opened = 40;
+    // The pull request was opened or linked, or changed notably (checks
+    // failed or passed, a review, merged, closed). Ephemeral (seq 0, change
+    // empty) for any other change, so open pages refetch it.
+    PullRequestChanged pull_request_changed = 41;
   }
 }
 
@@ -1419,4 +1449,196 @@ message SearchResult {
 
 message SearchResponse {
   repeated SearchResult results = 1;
+}
+
+enum PullState {
+  PULL_STATE_UNSPECIFIED = 0;
+  PULL_STATE_OPEN = 1;
+  PULL_STATE_DRAFT = 2;
+  PULL_STATE_MERGED = 3;
+  PULL_STATE_CLOSED = 4;
+}
+
+// A rollup of checks (GitLab: pipeline jobs), or the state of one check.
+enum ChecksState {
+  // None reported.
+  CHECKS_STATE_UNSPECIFIED = 0;
+  CHECKS_STATE_PENDING = 1;
+  CHECKS_STATE_PASSING = 2;
+  CHECKS_STATE_FAILING = 3;
+  // One check skipped, neutral or cancelled: neither passing nor failing.
+  CHECKS_STATE_SKIPPED = 4;
+}
+
+enum ReviewState {
+  // No review, none requested.
+  REVIEW_STATE_UNSPECIFIED = 0;
+  // Reviewers are requested and nobody approved or asked for changes yet.
+  REVIEW_STATE_REQUESTED = 1;
+  REVIEW_STATE_APPROVED = 2;
+  REVIEW_STATE_CHANGES_REQUESTED = 3;
+  REVIEW_STATE_COMMENTED = 4;
+}
+
+enum Mergeable {
+  // Not known: the forge is still computing it, or it is merged or closed.
+  MERGEABLE_UNSPECIFIED = 0;
+  MERGEABLE_CLEAN = 1;
+  MERGEABLE_CONFLICTS = 2;
+  // No conflicts, but the forge's rules block it (checks, reviews, draft).
+  MERGEABLE_BLOCKED = 3;
+}
+
+// What lists, the header and the chat show of a pull request.
+message PullRequestSummary {
+  // "github" or "gitlab".
+  string forge = 1;
+  int32 number = 2;
+  string url = 3;
+  string title = 4;
+  PullState state = 5;
+  ChecksState checks = 6;
+  ReviewState review = 7;
+  Mergeable mergeable = 8;
+}
+
+message PullRequestCheck {
+  string name = 1;
+  ChecksState state = 2;
+  // The forge's word for it, e.g. "success", "failure", "in_progress".
+  string status = 3;
+  string url = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+
+message PullRequestReviewer {
+  string login = 1;
+  // REQUESTED until they review.
+  ReviewState state = 2;
+}
+
+// A comment on the pull request, a review (its verdict and summary), or a
+// review comment on a line (path set). Oldest first.
+message PullRequestComment {
+  string id = 1;
+  string author = 2;
+  string body = 3;
+  google.protobuf.Timestamp created_at = 4;
+  string url = 5;
+  // Review comments: the file, the line in the head (0: the file or an
+  // outdated line), the diff around it, and the first comment of the thread
+  // it replies in.
+  string path = 6;
+  int32 line = 7;
+  string diff_hunk = 8;
+  string reply_to = 9;
+  // A review: its verdict.
+  ReviewState review = 10;
+}
+
+message PullRequest {
+  PullRequestSummary summary = 1;
+  string body = 2;
+  string author = 3;
+  string head_branch = 4;
+  string base_branch = 5;
+  repeated string labels = 6;
+  repeated PullRequestReviewer reviewers = 7;
+  repeated PullRequestCheck checks = 8;
+  repeated PullRequestComment comments = 9;
+  // How it may be merged: "merge", "squash", "rebase".
+  repeated string merge_methods = 10;
+  // Why it can't be merged, when it is blocked.
+  string merge_detail = 11;
+  int32 additions = 12;
+  int32 deletions = 13;
+  int32 changed_files = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp merged_at = 16;
+  string merged_by = 17;
+  // When Banda last fetched it, and why the latest refresh failed if it did.
+  google.protobuf.Timestamp fetched_at = 18;
+  string error = 19;
+  string head_sha = 20;
+  // The forge's GraphQL id (drafts are toggled there); GitLab: empty.
+  string node_id = 21;
+}
+
+// See Event.pull_request_changed. The actor is who opened or linked it, or
+// "system" for what the forge reported.
+message PullRequestChanged {
+  PullRequestSummary pull_request = 1;
+  // "opened", "linked", "ready", "draft", "checks_failed", "checks_passed",
+  // "approved", "changes_requested", "merged", "closed", "reopened"; empty
+  // in an ephemeral refresh.
+  string change = 2;
+}
+
+message PullRequestGetRequest {
+  string thread_id = 1;
+  // Fetch it from the forge now instead of returning the last snapshot.
+  bool refresh = 2;
+}
+
+message PullRequestGetResponse {
+  // Unset when none is linked.
+  PullRequest pull_request = 1;
+  // The caller has a token for the forge, so they may comment.
+  bool can_comment = 2;
+}
+
+message PullRequestCreateRequest {
+  string thread_id = 1;
+  string title = 2;
+  string body = 3;
+  bool draft = 4;
+}
+
+message PullRequestCreateResponse {
+  PullRequest pull_request = 1;
+}
+
+message PullRequestLinkRequest {
+  string thread_id = 1;
+  // 0: the open one whose head is the thread's branch.
+  int32 number = 2;
+}
+
+message PullRequestLinkResponse {
+  PullRequest pull_request = 1;
+}
+
+message PullRequestUpdateRequest {
+  string thread_id = 1;
+  optional string title = 2;
+  optional string body = 3;
+  optional bool draft = 4;
+  // Logins (GitLab: usernames) to ask for a review.
+  repeated string add_reviewers = 5;
+}
+
+message PullRequestUpdateResponse {
+  PullRequest pull_request = 1;
+}
+
+message PullRequestMergeRequest {
+  string thread_id = 1;
+  // One of PullRequest.merge_methods.
+  string method = 2;
+}
+
+message PullRequestMergeResponse {
+  PullRequest pull_request = 1;
+}
+
+message PullRequestCommentRequest {
+  string thread_id = 1;
+  string body = 2;
+  // Reply in the thread of this review comment (PullRequestComment.id).
+  string reply_to = 3;
+}
+
+message PullRequestCommentResponse {
+  PullRequest pull_request = 1;
 }

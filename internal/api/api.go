@@ -74,6 +74,8 @@ type Service struct {
 	// deliveries holds a mutex per thread, see lockDelivery.
 	deliveries sync.Map
 
+	tokens forgeTokens
+
 	// Preview configures the preview origin (preview.go). Set before serving.
 	Preview      PreviewConfig
 	previewKey   signer
@@ -94,6 +96,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 		reports:   map[string]chan struct{}{},
+		tokens:    forgeTokens{m: map[string]cachedToken{}, backoff: map[string]time.Time{}},
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
 		LoginIdle:          10 * time.Minute,
@@ -268,6 +271,10 @@ func toProto(t store.Thread) *bandav1.Thread {
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
 		HandoffTo:          t.HandoffTo,
+		PullRequest:        t.PullRequest,
+	}
+	if r, ok := Forges.Repo(t.RepoURL); ok {
+		p.Forge = r.Kind
 	}
 	if t.ForkedFrom != "" {
 		p.ForkedFrom = &bandav1.ForkOrigin{ThreadId: t.ForkedFrom, Turn: int32(t.ForkTurn)}

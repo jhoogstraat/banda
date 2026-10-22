@@ -16,6 +16,7 @@ import (
 
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
 	"github.com/jhoogstraat/banda/internal/api"
+	"github.com/jhoogstraat/banda/internal/forge"
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 )
@@ -96,6 +97,17 @@ func main() {
 		log.Fatalf("TEST_SUSPEND_PAUSE: %v", err)
 	}
 	go svc.SuspendIdle(ctx, idle, every)
+	hosts, err := forge.ParseHosts(os.Getenv("FORGE_HOSTS"))
+	if err != nil {
+		log.Fatalf("FORGE_HOSTS: %v", err)
+	}
+	// TEST_FORGE_URL: tests only, a fake forge API in place of every forge's.
+	api.Forges = forge.Config{Hosts: hosts, TestURL: os.Getenv("TEST_FORGE_URL")}
+	poll, err := time.ParseDuration(env("PULL_REQUEST_POLL", "30s"))
+	if err != nil {
+		log.Fatalf("PULL_REQUEST_POLL: %v", err)
+	}
+	go svc.PollPullRequests(ctx, poll)
 	svc.Preview = api.PreviewConfig{Addr: env("PREVIEW_ADDR", ":8788"), URL: os.Getenv("PREVIEW_URL")}
 	go func() {
 		preview := &http.Server{Addr: svc.Preview.Addr, Handler: svc.PreviewHandler(), ReadHeaderTimeout: 10 * time.Second}

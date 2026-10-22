@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -116,7 +117,69 @@ type (
 	searchOut struct {
 		Results []searchHit `json:"results"`
 	}
+	prIn struct {
+		ThreadID string `json:"thread_id,omitempty" jsonschema:"thread whose pull request to read (default: this thread)"`
+		Refresh  bool   `json:"refresh,omitempty" jsonschema:"fetch it from the forge now instead of Banda's latest copy"`
+	}
+	prCommentIn struct {
+		Body    string `json:"body" jsonschema:"the comment, in markdown"`
+		ReplyTo string `json:"reply_to,omitempty" jsonschema:"id of a review comment to reply to in its thread"`
+	}
 )
+
+// pullRequestText renders a pull request for agents.
+func pullRequestText(pr *bandav1.PullRequest) string {
+	s := pr.Summary
+	word := func(e fmt.Stringer, prefix string) string {
+		return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(e.String(), prefix)), "_", " ")
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Pull request #%d %q (%s): %s\n%s wants to merge %s into %s.\nState: %s; checks: %s; review: %s; mergeable: %s",
+		s.Number, s.Title, s.Forge, s.Url, pr.Author, pr.HeadBranch, pr.BaseBranch, word(s.State, "PULL_STATE_"),
+		word(s.Checks, "CHECKS_STATE_"), word(s.Review, "REVIEW_STATE_"), word(s.Mergeable, "MERGEABLE_"))
+	if pr.MergeDetail != "" {
+		b.WriteString(" (" + pr.MergeDetail + ")")
+	}
+	if pr.Error != "" {
+		fmt.Fprintf(&b, "\nThe latest refresh failed (%s); this is as of %s.", pr.Error, pr.FetchedAt.AsTime().Format(time.RFC3339))
+	}
+	if len(pr.Labels) > 0 {
+		b.WriteString("\nLabels: " + strings.Join(pr.Labels, ", "))
+	}
+	checks := slices.Clone(pr.Checks)
+	slices.SortStableFunc(checks, func(a, c *bandav1.PullRequestCheck) int {
+		failing := func(c *bandav1.PullRequestCheck) bool { return c.State == bandav1.ChecksState_CHECKS_STATE_FAILING }
+		return cmp.Compare(b2i(!failing(a)), b2i(!failing(c)))
+	})
+	if len(checks) > 0 {
+		b.WriteString("\n\nChecks:")
+		for _, c := range checks {
+			fmt.Fprintf(&b, "\n- %s: %s %s", c.Name, c.Status, c.Url)
+		}
+	}
+	if len(pr.Reviewers) > 0 {
+		b.WriteString("\n\nReviewers:")
+		for _, r := range pr.Reviewers {
+			fmt.Fprintf(&b, "\n- %s: %s", r.Login, word(r.State, "REVIEW_STATE_"))
+		}
+	}
+	fmt.Fprintf(&b, "\n\nDescription:\n%s\n\nConversation (oldest first):", cmp.Or(pr.Body, "(none)"))
+	for _, c := range pr.Comments {
+		fmt.Fprintf(&b, "\n\n[%s] %s", c.Id, c.Author)
+		switch {
+		case c.Review != bandav1.ReviewState_REVIEW_STATE_UNSPECIFIED:
+			b.WriteString(" reviewed: " + word(c.Review, "REVIEW_STATE_"))
+		case c.Path != "" && c.ReplyTo != "":
+			fmt.Fprintf(&b, " replied on %s:%d (to %s)", c.Path, c.Line, c.ReplyTo)
+		case c.Path != "":
+			fmt.Fprintf(&b, " commented on %s:%d", c.Path, c.Line)
+		}
+		if c.Body != "" {
+			b.WriteString(":\n" + c.Body)
+		}
+	}
+	return b.String()
+}
 
 func textResult(s string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}
@@ -263,6 +326,26 @@ func (s *Service) mcpServer(caller store.Thread) *mcp.Server {
 			return nil, createOut{child.ID}, nil
 		})
 
+	addTool(ts, &mcp.Tool{Name: "read_pull_request", Description: "Read a thread's pull request (GitLab: merge request), this thread's by default: its state, checks with their status and links (failing first), reviewers and their verdicts, mergeability, description and the conversation, review comments with their file and line. Use it to act on failing checks and review comments. Banda refreshes it from the forge every few minutes; refresh fetches it now."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in prIn) (*mcp.CallToolResult, any, error) {
+			res, err := s.PullRequestGet(WithUser(ctx, caller.OwnerID), &bandav1.PullRequestGetRequest{ThreadId: or(in.ThreadID, caller.ID), Refresh: in.Refresh})
+			if err != nil {
+				return nil, nil, err
+			}
+			if res.PullRequest == nil {
+				return textResult("This thread has no pull request."), nil, nil
+			}
+			return textResult(pullRequestText(res.PullRequest)), nil, nil
+		})
+
+	addTool(ts, &mcp.Tool{Name: "comment_pull_request", Description: "Comment on this thread's own pull request, or reply to one of its review comments (reply_to: the comment's id from read_pull_request). It is posted with the thread owner's forge token, so it appears as theirs: say that you are their agent."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in prCommentIn) (*mcp.CallToolResult, any, error) {
+			if _, err := s.PullRequestComment(WithUser(ctx, caller.OwnerID), &bandav1.PullRequestCommentRequest{ThreadId: caller.ID, Body: in.Body, ReplyTo: in.ReplyTo}); err != nil {
+				return nil, nil, err
+			}
+			return textResult("Comment posted."), nil, nil
+		})
+
 	srv := mcp.NewServer(&mcp.Implementation{Name: "banda", Version: "1"}, &mcp.ServerOptions{SchemaCache: mcpSchemas,
 		Instructions: "Banda's tools (" + strings.Join(ts.names, ", ") + ") let you see the team's other threads, search them, " +
 			"post into them and start sub-threads of this one."})
@@ -284,6 +367,8 @@ func transcript(names map[string]string, events []*bandav1.Event, limit int) str
 			lines = append(lines, lineageLine(k.LineageUpdate))
 		case *bandav1.Event_Overlap:
 			lines = append(lines, overlapLine(names, k.Overlap))
+		case *bandav1.Event_PullRequestChanged:
+			lines = append(lines, pullRequestLine(k.PullRequestChanged))
 		case *bandav1.Event_TurnRequest:
 			lines = append(lines, actorName(names, e.Actor)+" (asks the agent, needs the owner's approval): "+messageText(k.TurnRequest.GetMessage())+attached(k.TurnRequest.GetMessage()))
 		case *bandav1.Event_TurnRequestResolved:
@@ -328,4 +413,11 @@ func (s *Service) threadInfos(ctx context.Context, threads []store.Thread) listO
 			string(t.Status), string(t.Mode), t.RepoURL, t.Branch, t.UpdatedAt, t.ParentID})
 	}
 	return out
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

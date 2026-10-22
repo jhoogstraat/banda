@@ -234,6 +234,25 @@ func (c *Client) SetTeamSecret(ctx context.Context, name string, value []byte) e
 	return c.patchSecret(ctx, teamSecret, "team-secret", map[string][]byte{name: value})
 }
 
+// Env is the value the owner's thread pods get for the environment variable
+// name, with their precedence: banda-git < the team's < the owner's. Empty if
+// none sets it. Needs get on Secrets.
+func (c *Client) Env(ctx context.Context, owner, name string) (string, error) {
+	var value string
+	for _, s := range []string{"banda-git", teamSecret, envSecret(owner)} {
+		sec, err := c.kube.CoreV1().Secrets(c.cfg.Namespace).Get(ctx, s, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return "", err
+		}
+		if v, ok := sec.Data[name]; ok {
+			value = string(v)
+		}
+	}
+	return value, nil
+}
+
 func (c *Client) SetAPIKey(ctx context.Context, owner, key string) error {
 	return c.patchSecret(ctx, authSecret(owner), "user-secret", map[string][]byte{"ANTHROPIC_API_KEY": []byte(key)})
 }

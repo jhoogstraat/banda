@@ -67,6 +67,7 @@ type Thread struct {
 	// Only set by the lists.
 	Activity    *bandav1.TeamActivity
 	ParentTitle string
+	PullRequest *bandav1.PullRequestSummary
 }
 
 // Store is the pool, or inside Update the transaction (see Update).
@@ -349,7 +350,8 @@ func (s *Store) Decisions(ctx context.Context, viewerID string) ([]*bandav1.Even
 func (s *Store) listWithView(ctx context.Context, where, viewerID string, args ...any) ([]Thread, error) {
 	rows, err := s.db.Query(ctx, `SELECT `+listCols+`,
 		v.snoozed_until, v.settled_at IS NOT NULL, t.last_seq > coalesce(v.seen_seq, 0), t.activity,
-		coalesce((SELECT p.title FROM threads p WHERE p.id = t.parent_id), '')
+		coalesce((SELECT p.title FROM threads p WHERE p.id = t.parent_id), ''),
+		(SELECT pr.data->'summary' FROM pull_requests pr WHERE pr.thread_id = t.id)
 		FROM threads t LEFT JOIN thread_views v ON v.thread_id = t.id AND v.user_id = $1
 		WHERE `+where+` ORDER BY t.updated_at DESC`, append([]any{viewerID}, args...)...)
 	if err != nil {
@@ -359,13 +361,19 @@ func (s *Store) listWithView(ctx context.Context, where, viewerID string, args .
 	var out []Thread
 	for rows.Next() {
 		var t Thread
-		var activity []byte
-		if err := rows.Scan(append(fields(&t), &t.SnoozedUntil, &t.Settled, &t.Unread, &activity, &t.ParentTitle)...); err != nil {
+		var activity, pr []byte
+		if err := rows.Scan(append(fields(&t), &t.SnoozedUntil, &t.Settled, &t.Unread, &activity, &t.ParentTitle, &pr)...); err != nil {
 			return nil, err
 		}
 		if activity != nil {
 			t.Activity = new(bandav1.TeamActivity)
 			if err := protojson.Unmarshal(activity, t.Activity); err != nil {
+				return nil, err
+			}
+		}
+		if pr != nil {
+			t.PullRequest = new(bandav1.PullRequestSummary)
+			if err := protojson.Unmarshal(pr, t.PullRequest); err != nil {
 				return nil, err
 			}
 		}

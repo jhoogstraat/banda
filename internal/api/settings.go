@@ -113,6 +113,7 @@ func (s *Service) SetSecret(ctx context.Context, req *bandav1.SetSecretRequest) 
 	if err := s.store.PutSecret(ctx, user(ctx), req.Name); err != nil {
 		return nil, err
 	}
+	defer s.tokensChanged(user(ctx))
 	return &bandav1.SetSecretResponse{}, s.sandboxes.SetSecret(ctx, user(ctx), req.Name, []byte(req.Value))
 }
 
@@ -120,6 +121,7 @@ func (s *Service) DeleteSecret(ctx context.Context, req *bandav1.DeleteSecretReq
 	if !secretName.MatchString(req.Name) { // reserved names are fine: none exist
 		return nil, connect.NewError(connect.CodeInvalidArgument, "invalid secret name")
 	}
+	defer s.tokensChanged(user(ctx))
 	// The value first, so environments keep redacting it until it is gone.
 	if err := s.sandboxes.SetSecret(ctx, user(ctx), req.Name, nil); err != nil {
 		return nil, err
@@ -158,6 +160,7 @@ func (s *Service) SetTeamSecret(ctx context.Context, req *bandav1.SetTeamSecretR
 	if err := s.store.PutTeamSecret(ctx, req.Name, user(ctx)); err != nil {
 		return nil, err
 	}
+	defer s.tokensChanged("")
 	return &bandav1.SetTeamSecretResponse{}, s.sandboxes.SetTeamSecret(ctx, req.Name, []byte(req.Value))
 }
 
@@ -165,6 +168,7 @@ func (s *Service) DeleteTeamSecret(ctx context.Context, req *bandav1.DeleteTeamS
 	if !secretName.MatchString(req.Name) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "invalid secret name")
 	}
+	defer s.tokensChanged("")
 	if err := s.sandboxes.SetTeamSecret(ctx, req.Name, nil); err != nil {
 		return nil, err
 	}
