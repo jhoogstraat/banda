@@ -73,7 +73,9 @@ test.describe('egress allowlist', () => {
 	});
 
 	test('Postgres, Dex, the API’s other ports, other sandboxes and the Kubernetes API stay closed when an allowed range covers them', async ({ as, startApi }) => {
-		const api = await startApi({ SANDBOX_EGRESS_ALLOW: '10.0.0.0/8' }, { namespace: true }); // kind's pods, services and node
+		const node = await kube('get', 'nodes', '-o', 'jsonpath={.items[0].status.addresses[0].address}');
+		// kind's pods, services and node (in 10/8 on Podman, on kind's Docker network otherwise).
+		const api = await startApi({ SANDBOX_EGRESS_ALLOW: `10.0.0.0/8,${node}/32` }, { namespace: true });
 		const ns = api.namespace;
 		// The API in the cluster (the chart's banda-api) as the network sees it: the runner port and the preview's.
 		await kubeIn(ns, 'run', 'banda-api', `--image=${process.env.SANDBOX_IMAGE}`, '--image-pull-policy=Never', '--labels=app=banda-api',
@@ -87,7 +89,6 @@ test.describe('egress allowlist', () => {
 		await expect.poll(() => kexec('banda-api', 'curl -s -o /dev/null -o /dev/null -w %{http_code} localhost:8787 localhost:8788', ns).catch(() => ''), { timeout: 30_000 }).toBe('200200');
 		const ip = (pod: string) => kubeIn(ns, 'get', 'pod', pod, '-o', 'jsonpath={.status.podIP}');
 		const [apiIP, bIP] = [await ip('banda-api'), await ip(b.pod)];
-		const node = await kube('get', 'nodes', '-o', 'jsonpath={.items[0].status.addresses[0].address}');
 
 		// The range opens what the base policy refuses: the in-cluster API's pod, the Kubernetes API.
 		expect(await reaches(a.pod, apiIP, 8787, ns)).toBe(true);
