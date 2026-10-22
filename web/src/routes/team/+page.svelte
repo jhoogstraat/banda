@@ -146,7 +146,7 @@
 						</button>
 					</h2>
 					{#if unfolded}
-						{@render list(p.id, p.id === me ? 'Needs you' : `Needs ${userName(p.id)}`, p.needs)}
+						{@render list(p.id, p.id === me ? 'Needs you' : 'Needs them', p.needs)}
 						{@render list(p.id, 'Working', p.working)}
 						{@render list(p.id, 'Done recently', p.done, 3)}
 						{#if p.older.length}

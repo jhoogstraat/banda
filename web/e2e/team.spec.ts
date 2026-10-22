@@ -1,7 +1,7 @@
 // The team board at scale (each person's threads by what matters, quiet people hidden, the phone list) and the
 // morning brief at its top. The board's live updates are in pages.spec.ts.
 import { devices, type Page } from '@playwright/test';
-import { expect, sql, Status, test, type User } from './fixtures.ts';
+import { expect, sql, Status, test, until, type User } from './fixtures.ts';
 
 /** A person on the team board. */
 const person = (page: Page, user: User | 'You') =>
@@ -26,14 +26,20 @@ test('team board: alice’s threads grouped by what needs her, paused ones folde
 	await Promise.all([waiting, done, older].map((t) => t.waitForStatus(Status.AWAITING_INPUT)));
 	await Promise.all([done, older].map((t) => t.snooze()));
 	await Promise.all([done, older].map((t) => t.waitForStatus(Status.SUSPENDED)));
-	await sql(`UPDATE threads SET activity = NULL, updated_at = now() - interval '3 days' WHERE id = '${older.id}'`);
+	// Paused 3 days ago; again if the suspend's last events (the push report) land after it.
+	await older.podGone();
+	await until(async () => {
+		await sql(`UPDATE threads SET activity = NULL, updated_at = now() - interval '3 days' WHERE id = '${older.id}'`);
+		await new Promise((r) => setTimeout(r, 3000));
+		return (await sql(`SELECT updated_at < now() - interval '1 day' FROM threads WHERE id = '${older.id}'`)) === 't';
+	}, () => 'the thread kept changing');
 
 	const page = await bob.page();
 	await page.goto('/team');
 	await expect(page.getByRole('heading', { level: 2 }).filter({ has: page.getByRole('button') }).first()).toContainText('You');
 	const col = person(page, alice);
 	const group = (name: string) => col.getByRole('region', { name });
-	await expect(group(`Needs ${alice.id}`).getByRole('link', { name: /waits for alice/ })).toBeVisible();
+	await expect(group('Needs them').getByRole('link', { name: /waits for alice/ })).toBeVisible();
 	await expect(group('Working').getByRole('link', { name: /e2e-hold:grouped/ })).toBeVisible();
 	await expect(group('Done recently').getByRole('link', { name: /done today/ })).toBeVisible();
 	await expect(col.getByRole('link', { name: /done last week/ })).toBeHidden();

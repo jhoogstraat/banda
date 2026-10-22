@@ -43,7 +43,7 @@ test('team board: bob watches alice’s thread start, work and wait for her, liv
 	await alice.users.me({}); // known to the team before bob looks
 	const page = await bob.page();
 	await page.goto('/team');
-	await expect(page.getByRole('heading', { name: 'You' })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 2, name: /^\S+ You\b/ })).toBeVisible(); // avatar initials, then me
 	const t = await alice.create({ prompt: 'e2e-hold:board' });
 	const card = column(page, alice).getByRole('link', { name: /e2e-hold:board/ });
 	await expect(card).toBeVisible();
