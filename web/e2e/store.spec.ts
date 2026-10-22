@@ -42,9 +42,13 @@ test('a 20k-event thread: posting, resolving turn requests and forking stay fast
 	const resolve = await fastest((i) =>
 		(i < 2 ? alice.threads.declineTurn : alice.threads.approveTurn)({ threadId: t.id, requestSeq: requests[i] })
 	);
-	// A fork also starts a thread and its sandbox, which takes over 100 ms on a slow machine (Actions)
-	// whatever the source's length: only what the 20k events add counts.
-	const fork = (await fastest(() => alice.threads.fork({ threadId: t.id }))) - (await fastest(() => alice.threads.fork({ threadId: short.id })));
+	// A fork also starts a thread and its sandbox, slower on a busy machine (Actions) whatever the source's
+	// length: only what the 20k events add counts. That start took 800 ms from the third fork in a row
+	// while client-go held the API to 5 Kubernetes requests a second.
+	const long = await fastest(() => alice.threads.fork({ threadId: t.id }));
+	const base = await fastest(() => alice.threads.fork({ threadId: short.id }));
+	expect(base, 'a fork of a one-turn thread').toBeLessThan(300);
+	const fork = long - base;
 	expect(Math.max(post, resolve, fork), `ms: ${JSON.stringify({ post, resolve, fork })}`).toBeLessThan(50);
 });
 

@@ -99,6 +99,9 @@ func New(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	// client-go's default of 5 requests a second (burst 10) held a thread's start, four requests, for up
+	// to a second once a few threads started together. The API server's own fairness limits stay.
+	rc.QPS, rc.Burst = 50, 100
 	sbx, err := versioned.NewForConfig(rc)
 	if err != nil {
 		return nil, err
