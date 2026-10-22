@@ -361,7 +361,7 @@ test('a thread that can’t push tells only its owner, compactly, with a link to
 	await expect(bobPage.getByText(/GIT_TOKEN/)).toHaveCount(0);
 	await add.click();
 	await expect(page).toHaveURL(/\/settings\?secret=GIT_TOKEN#secrets$/);
-	await expect(page.getByRole('textbox', { name: 'Name' })).toHaveValue('GIT_TOKEN');
+	await expect(page.getByRole('region', { name: 'Secrets & variables' }).getByRole('textbox', { name: 'Name' })).toHaveValue('GIT_TOKEN');
 });
 
 test('phone: the sidebar is a drawer that lists the thread and closes once one is opened', async ({ as }) => {
