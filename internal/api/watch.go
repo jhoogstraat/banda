@@ -5,6 +5,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -66,10 +67,16 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 		}
 		return stream.Send(&bandav1.WatchThreadResponse{Event: slim(e)})
 	}
+	tick := time.NewTicker(s.Keepalive)
+	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-tick.C:
+			if err := stream.Send(&bandav1.WatchThreadResponse{}); err != nil {
+				return err
+			}
 		case e := <-ch:
 			if err := deliver(e); err != nil {
 				return err

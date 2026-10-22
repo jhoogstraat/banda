@@ -58,7 +58,7 @@ func (s *Service) InboxWatch(ctx context.Context, _ *bandav1.InboxWatchRequest, 
 			watched = append(watched, d.Thread)
 		}
 		return res, watched, nil
-	}, stream.Send)
+	}, stream.Send, &bandav1.InboxWatchResponse{Keepalive: true})
 }
 
 // decisions are the requests the caller can answer, with their threads.
@@ -114,14 +114,14 @@ func (s *Service) TeamWatch(ctx context.Context, _ *bandav1.TeamWatchRequest, st
 		}
 		s.mu.Unlock()
 		return res, nil, nil
-	}, stream.Send)
+	}, stream.Send, &bandav1.TeamWatchResponse{Keepalive: true})
 }
 
 // follow registers w, then sends snapshot() at once and again each time w is
-// woken, at most every delay and only if it changed. Snapshot's threads
-// become w.ids.
+// woken, at most every delay and only if it changed, and keepalive while
+// nothing does. Snapshot's threads become w.ids.
 func follow[T proto.Message](ctx context.Context, s *Service, w *inboxWatcher, delay time.Duration,
-	snapshot func() (T, []*bandav1.Thread, error), send func(T) error) error {
+	snapshot func() (T, []*bandav1.Thread, error), send func(T) error, keepalive T) error {
 	s.mu.Lock()
 	s.inbox[w] = struct{}{}
 	s.mu.Unlock()
@@ -131,6 +131,8 @@ func follow[T proto.Message](ctx context.Context, s *Service, w *inboxWatcher, d
 		s.mu.Unlock()
 	}()
 
+	tick := time.NewTicker(s.Keepalive)
+	defer tick.Stop()
 	var last proto.Message
 	for {
 		res, threads, err := snapshot()
@@ -150,10 +152,18 @@ func follow[T proto.Message](ctx context.Context, s *Service, w *inboxWatcher, d
 			}
 			last = res
 		}
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-w.poke:
+	quiet:
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-tick.C:
+				if err := send(keepalive); err != nil {
+					return err
+				}
+			case <-w.poke:
+				break quiet
+			}
 		}
 		select {
 		case <-ctx.Done():

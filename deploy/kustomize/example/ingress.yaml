@@ -1,12 +1,14 @@
 # Banda and its preview origin on sibling hosts, with a certificate covering
-# both (here from cert-manager). Thread streams are long-lived: raise the
-# controller's read timeouts if it cuts them.
+# both (here from cert-manager). Thread streams are long-lived: the API sends a
+# keepalive every 25 s, and a long read timeout saves reconnects (ingress-nginx).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: banda-api
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   tls:
     - secretName: banda-tls

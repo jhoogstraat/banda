@@ -5,6 +5,8 @@ package banda.v1;
 import "google/protobuf/timestamp.proto";
 
 // ThreadService is the API the web client talks to.
+// Its server streams, and SettingsService's, send a keepalive every 25 s so
+// proxies with read timeouts don't cut a quiet stream; clients skip them.
 service ThreadService {
   rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
@@ -782,6 +784,7 @@ message OpenTerminalRequest {
 }
 
 message OpenTerminalResponse {
+  // Empty and not exited: a keepalive.
   bytes data = 1;
   bool exited = 2;
 }
@@ -834,6 +837,8 @@ message PreviewWatchResponse {
   // A runner is connected; without one there are no ports.
   bool running = 1;
   repeated PreviewPort ports = 2;
+  // Nothing else is set: skip it.
+  bool keepalive = 3;
 }
 
 message PreviewPort {
@@ -999,6 +1004,8 @@ message TeamWatchResponse {
   // Threads updated in the last 7 days, not settled by their owners, most
   // recently updated first. Without diffs.
   repeated Thread threads = 1;
+  // Nothing else is set: skip it.
+  bool keepalive = 2;
 }
 
 message BriefRequest {}
@@ -1045,6 +1052,8 @@ message InboxWatchResponse {
   // The caller signs in to Claude with their subscription and an environment
   // reported them logged out.
   bool login_needed = 4;
+  // Nothing else is set: skip it.
+  bool keepalive = 5;
 }
 
 // A pending permission request the caller may answer (their thread, or a
@@ -1188,6 +1197,7 @@ message HandoffResolved {
 }
 
 message WatchThreadResponse {
+  // Unset: a keepalive.
   Event event = 1;
 }
 

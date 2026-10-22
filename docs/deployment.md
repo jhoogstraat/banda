@@ -95,4 +95,12 @@ Also in [todo.md](../todo.md).
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
 - **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists.
 - **Sizes:** each thread's pod may take 4 CPU, 8 GiB and 10 GiB scratch, plus a 10 GiB volume, by default; the chart's `sandboxes` values change them ([configuration](configuration.md)). Plan nodes for the number of threads running at once, not threads in total (suspended threads cost only disk).
-- **Ingress:** thread streams are long-lived; some controllers cut them at their default read timeout (60 s for ingress-nginx). Raise it through `ingress.annotations`.
+- **Ingress:** thread streams are long-lived; controllers cut a stream quiet for their read timeout (60 s for ingress-nginx). The API sends a keepalive on every stream every 25 s, so any timeout above that works; a long one saves reconnects. For ingress-nginx, in `ingress.annotations`:
+
+  ```yaml
+  nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  ```
+
+  Other controllers have their own (Traefik's `respondingTimeouts` on the entry point, a cloud load balancer's idle timeout): keep them above 25 s.
+- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job or ServiceMonitor at it. Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume). Logs go to stdout.

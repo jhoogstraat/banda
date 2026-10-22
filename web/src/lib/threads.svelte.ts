@@ -59,6 +59,7 @@ export async function watchInbox(signal: AbortSignal) {
 	while (!signal.aborted) {
 		try {
 			for await (const res of api.inboxWatch({}, { signal })) {
+				if (res.keepalive) continue;
 				if (prev) alerts(prev, res, userName).forEach(notify);
 				prev = res;
 				Object.assign(threads, { list: res.threads, mentioned: res.mentioned, decisions: res.decisions, loginNeeded: res.loginNeeded });
@@ -147,7 +148,7 @@ export const sidebarOrder = () => [threads.mentioned.filter(matches), ...Object.
 export async function watchTeam(signal: AbortSignal, on: (threads?: Thread[]) => void) {
 	while (!signal.aborted) {
 		try {
-			for await (const res of api.teamWatch({}, { signal })) on(res.threads);
+			for await (const res of api.teamWatch({}, { signal })) if (!res.keepalive) on(res.threads);
 		} catch {
 			if (signal.aborted) return;
 		}

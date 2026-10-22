@@ -79,6 +79,8 @@ func (s *Service) PreviewWatch(ctx context.Context, req *bandav1.PreviewWatchReq
 		}
 		s.do(ctx, id, effect)
 	}
+	tick := time.NewTicker(s.Keepalive)
+	defer tick.Stop()
 	var last *bandav1.PreviewWatchResponse
 	for {
 		res := &bandav1.PreviewWatchResponse{}
@@ -101,6 +103,10 @@ func (s *Service) PreviewWatch(ctx context.Context, req *bandav1.PreviewWatchReq
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-tick.C: // then the ports again, sent only if they changed
+			if err := stream.Send(&bandav1.PreviewWatchResponse{Keepalive: true}); err != nil {
+				return err
+			}
 		case <-changed:
 		}
 	}

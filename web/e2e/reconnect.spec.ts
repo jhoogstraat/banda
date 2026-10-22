@@ -2,7 +2,7 @@
 // the team board reconnect and end up showing what a fresh load shows. setOffline only stops new requests, so the
 // test's own API restarts to break the open streams while the page is offline.
 import type { Page } from '@playwright/test';
-import { expect, Status, test, type User } from './fixtures.ts';
+import { expect, listen, Status, test, type User } from './fixtures.ts';
 
 /** The chat as the page shows it: each item's key and text. */
 const chat = (page: Page) =>
@@ -66,4 +66,34 @@ test('the sidebar’s inbox and the team board catch up after losing the API', a
 	await expect(page.getByText('reconnecting…')).toBeHidden();
 	await expect(board.getByRole('link', { name: /e2e: the second/ })).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Mentioned' }).getByRole('link', { name: /e2e: the first/ })).toBeVisible();
+});
+
+// Ingress controllers cut a stream that says nothing for their read timeout (60 s for ingress-nginx): every server
+// stream sends a keepalive (every 25 s; here every second) that the clients skip.
+test('quiet streams get keepalives, and the pages ignore them', async ({ as, startApi }) => {
+	const api = await startApi({ TEST_KEEPALIVE_EVERY: '1s' });
+	const alice = as('alice', api);
+	const t = await alice.create({ prompt: 'e2e: quiet' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const keepalive = async <T>(name: string, open: (signal: AbortSignal) => AsyncIterable<T>, ok: (m: T) => boolean) => {
+		const l = listen(open);
+		await l.until(ok, `a keepalive on ${name}`, 10_000);
+		l.stop();
+	};
+	await Promise.all([
+		keepalive('WatchThread', (signal) => alice.threads.watchThread({ threadId: t.id }, { signal }), (m) => !m.event),
+		keepalive('InboxWatch', (signal) => alice.threads.inboxWatch({}, { signal }), (m) => m.keepalive),
+		keepalive('TeamWatch', (signal) => alice.threads.teamWatch({}, { signal }), (m) => m.keepalive),
+		keepalive('PreviewWatch', (signal) => alice.threads.previewWatch({ threadId: t.id }, { signal }), (m) => m.keepalive),
+		keepalive('OpenTerminal', (signal) => alice.threads.openTerminal({ threadId: t.id, cols: 80, rows: 24, command: 'sleep 60' }, { signal }),
+			(m) => !m.data.length && !m.exited)
+	]);
+
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	await page.waitForTimeout(3000);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible();
+	await expect(page.getByRole('link', { name: /e2e: quiet/ }).first()).toBeVisible();
+	await expect(page.getByText(/offline|reconnecting/i)).toHaveCount(0);
 });

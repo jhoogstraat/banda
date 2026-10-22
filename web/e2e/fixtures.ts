@@ -255,7 +255,8 @@ export class Thread {
 		void (async () => {
 			try {
 				for await (const r of this.user.threads.watchThread({ threadId: this.id }, { signal })) {
-					this.seen.push(r.event!);
+					if (!r.event) continue; // a keepalive
+					this.seen.push(r.event);
 					this.woken.splice(0).forEach((w) => w());
 				}
 			} catch {
@@ -402,7 +403,7 @@ export const png = Buffer.from(
 	'base64'
 );
 
-const freePort = () =>
+export const freePort = () =>
 	new Promise<number>((resolve) => {
 		const s = createServer().listen(0, () => {
 			const { port } = s.address() as { port: number };

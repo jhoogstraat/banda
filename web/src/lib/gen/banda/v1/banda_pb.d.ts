@@ -2059,6 +2059,8 @@ export declare const OpenTerminalRequestSchema: GenMessage<OpenTerminalRequest>;
  */
 export declare type OpenTerminalResponse = Message$1<"banda.v1.OpenTerminalResponse"> & {
   /**
+   * Empty and not exited: a keepalive.
+   *
    * @generated from field: bytes data = 1;
    */
   data: Uint8Array;
@@ -2274,6 +2276,13 @@ export declare type PreviewWatchResponse = Message$1<"banda.v1.PreviewWatchRespo
    * @generated from field: repeated banda.v1.PreviewPort ports = 2;
    */
   ports: PreviewPort[];
+
+  /**
+   * Nothing else is set: skip it.
+   *
+   * @generated from field: bool keepalive = 3;
+   */
+  keepalive: boolean;
 };
 
 /**
@@ -2883,6 +2892,13 @@ export declare type TeamWatchResponse = Message$1<"banda.v1.TeamWatchResponse"> 
    * @generated from field: repeated banda.v1.Thread threads = 1;
    */
   threads: Thread[];
+
+  /**
+   * Nothing else is set: skip it.
+   *
+   * @generated from field: bool keepalive = 2;
+   */
+  keepalive: boolean;
 };
 
 /**
@@ -3064,6 +3080,13 @@ export declare type InboxWatchResponse = Message$1<"banda.v1.InboxWatchResponse"
    * @generated from field: bool login_needed = 4;
    */
   loginNeeded: boolean;
+
+  /**
+   * Nothing else is set: skip it.
+   *
+   * @generated from field: bool keepalive = 5;
+   */
+  keepalive: boolean;
 };
 
 /**
@@ -3609,6 +3632,8 @@ export declare const HandoffResolvedSchema: GenMessage<HandoffResolved>;
  */
 export declare type WatchThreadResponse = Message$1<"banda.v1.WatchThreadResponse"> & {
   /**
+   * Unset: a keepalive.
+   *
    * @generated from field: banda.v1.Event event = 1;
    */
   event?: Event | undefined;
@@ -6252,6 +6277,8 @@ export declare const MergeableSchema: GenEnum<Mergeable>;
 
 /**
  * ThreadService is the API the web client talks to.
+ * Its server streams, and SettingsService's, send a keepalive every 25 s so
+ * proxies with read timeouts don't cut a quiet stream; clients skip them.
  *
  * @generated from service banda.v1.ThreadService
  */

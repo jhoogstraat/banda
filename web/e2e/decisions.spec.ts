@@ -9,9 +9,10 @@ const asked = (r: InboxWatchResponse) =>
 /** The user's inbox stream; latest() waits until its newest snapshot is as wanted. */
 function inbox(u: User) {
 	const l = listen((signal) => u.threads.inboxWatch({}, { signal }));
+	const last = () => l.got.filter((r) => !r.keepalive).at(-1);
 	const latest = (want: string, timeout = 30_000) =>
-		until(async () => (l.got.length && asked(l.got.at(-1)!) === want) || undefined, () => `${u.id}'s decisions "${want}", got "${l.got.length && asked(l.got.at(-1)!)}"`, timeout);
-	return { ...l, latest };
+		until(async () => (last() && asked(last()!) === want) || undefined, () => `${u.id}'s decisions "${want}", got "${last() && asked(last()!)}"`, timeout);
+	return { ...l, last, latest };
 }
 
 test('the inbox lists what I can decide: my agent’s permission requests and plans, teammates’ turn requests; trusted teammates get the permission requests, never the plan', async ({ as, startApi }) => {
@@ -26,7 +27,7 @@ test('the inbox lists what I can decide: my agent’s permission requests and pl
 	await t.send('e2e-ask please');
 	await mine.latest('Bash');
 	expect((await t.get()).permissionTools).toEqual(['Bash']);
-	const d = mine.got.at(-1)!.decisions[0];
+	const d = mine.last()!.decisions[0];
 	expect([d.thread?.id, d.thread?.title]).toEqual([t.id, (await t.get()).title]);
 	await theirs.latest('');
 
@@ -41,7 +42,7 @@ test('the inbox lists what I can decide: my agent’s permission requests and pl
 	await t.send('e2e-plan please');
 	await mine.latest('ExitPlanMode');
 	await new Promise((r) => setTimeout(r, 1000));
-	expect(asked(theirs.got.at(-1)!)).toBe(''); // a plan only the owner approves
+	expect(asked(theirs.last()!)).toBe(''); // a plan only the owner approves
 	await alice.threads.permissionAnswer({ threadId: t.id, requestId: (await t.of('permissionRequested')).at(-1)!.id, decision: PermissionDecision.DENY });
 	await mine.latest('');
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -50,7 +51,7 @@ test('the inbox lists what I can decide: my agent’s permission requests and pl
 	await t.as(bob).send('@agent e2e: from bob', { mentionsAgent: true });
 	await mine.latest('turn');
 	await theirs.latest('');
-	const seq = mine.got.at(-1)!.decisions[0].request!.seq;
+	const seq = mine.last()!.decisions[0].request!.seq;
 	await alice.threads.declineTurn({ threadId: t.id, requestSeq: seq });
 	await mine.latest('');
 	mine.stop();

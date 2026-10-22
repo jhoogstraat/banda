@@ -14,7 +14,7 @@ metadata:
 rules:
   - apiGroups: [agents.x-k8s.io]
     resources: [sandboxes]
-    verbs: [get, create, patch]
+    verbs: [get, list, create, patch] # list: /metrics counts them
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, delete]
@@ -23,7 +23,7 @@ rules:
     verbs: [create]
   - apiGroups: [""]
     resources: [secrets] # users' banda-env-* and banda-auth-*, the team's banda-env-team, banda-git, runner tokens (<sandbox>-token, owned by their Sandbox)
-    verbs: [get, create, patch]
+    verbs: [get, list, create, patch, delete] # list, delete: the start-up sweep of token Secrets from before they had an owner
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies] # sandboxes-allow, from SANDBOX_EGRESS_ALLOW
     verbs: [create, patch, delete]
@@ -68,6 +68,9 @@ spec:
           ports:
             - {name: api, containerPort: 8787}
             - {name: preview, containerPort: 8788} # the Browser tab's origin
+            {{- with .Values.api.metricsPort }}
+            - {name: metrics, containerPort: {{ . }}} # /metrics, for a Prometheus in the cluster; no ingress routes it
+            {{- end }}
           env:
             {{- if .Values.postgres.enabled }}
             - name: POSTGRES_PASSWORD
@@ -78,6 +81,9 @@ spec:
             - {name: SANDBOX_IMAGE, value: {{ include "banda.image" (dict "image" .Values.image.sandbox "root" .) | quote }}}
             - {name: RUNNER_API_URL, value: "http://banda-api.{{ .Release.Namespace }}.svc:8787"}
             - {name: PUBLIC_URL, value: {{ include "banda.publicUrl" . | quote }}}
+            {{- with .Values.api.metricsPort }}
+            - {name: METRICS_ADDR, value: ":{{ . }}"}
+            {{- end }}
             {{- with include "banda.previewUrl" . }}
             - {name: PREVIEW_URL, value: {{ . | quote }}}
             {{- end }}
@@ -132,4 +138,7 @@ spec:
   ports:
     - {name: api, port: 8787, targetPort: api}
     - {name: preview, port: 8788, targetPort: preview}
+    {{- with .Values.api.metricsPort }}
+    - {name: metrics, port: {{ . }}, targetPort: metrics}
+    {{- end }}
 {{- end }}

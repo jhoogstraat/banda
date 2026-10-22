@@ -61,7 +61,7 @@ test('a watcher that falls behind catches up from the store: the same events as 
 	const t = await alice.create({ prompt: 'e2e-noop' });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const watch = listen((signal) => alice.threads.watchThread({ threadId: t.id }, { signal }));
-	const seen = () => watch.got.map((r) => r.event!);
+	const seen = () => watch.got.flatMap((r) => r.event ?? []);
 	await t.turn(() => t.send('e2e-deltas:2000 go'));
 	const stored = (await t.events()).map((e) => e.seq);
 	await watch.until(() => seen().at(-1)?.seq === stored.at(-1), 'the last stored event');

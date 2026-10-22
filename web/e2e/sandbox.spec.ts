@@ -34,7 +34,7 @@ test('files are listed; paths outside the checkout are refused', async ({ as }) 
 	await refused(t.user.threads.readFile({ threadId: t.id, path: '../.claude/.credentials.json' }));
 });
 
-const ports = (u: User, threadId: string, wake = false) => collect((signal) => u.threads.previewWatch({ threadId, wake }, { signal }));
+const ports = (u: User, threadId: string, wake = false) => collect((signal) => u.threads.previewWatch({ threadId, wake }, { signal })).then((r) => r.filter((p) => !p.keepalive));
 
 test('the preview lists the dev server the agent started, to teammates too, and serves it only with the cookie from PreviewOpen', async ({ as }) => {
 	const bob = as('bob');

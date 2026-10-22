@@ -348,6 +348,22 @@ func (s *Store) LastPost(ctx context.Context, ids ...string) (*time.Time, error)
 	return at, err
 }
 
+// StatusCounts is how many threads have each status.
+func (s *Store) StatusCounts(ctx context.Context) (map[string]int, error) {
+	rows, err := s.db.Query(ctx, `SELECT status, count(*) FROM threads GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]int{}
+	var status string
+	var n int
+	_, err = pgx.ForEachRow(rows, []any{&status, &n}, func() error {
+		counts[status] = n
+		return nil
+	})
+	return counts, err
+}
+
 // SetWokeParent records that the sub-thread just started a turn of its parent's agent.
 func (s *Store) SetWokeParent(ctx context.Context, id string) error {
 	_, err := s.db.Exec(ctx, `UPDATE threads SET woke_parent_at = now() WHERE id = $1`, id)

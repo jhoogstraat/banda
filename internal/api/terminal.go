@@ -57,10 +57,16 @@ func (s *Service) terminal(ctx context.Context, key string, open *bandav1.Termin
 		return errNotRunning
 	}
 
+	tick := time.NewTicker(s.Keepalive)
+	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-tick.C:
+			if err := send(&bandav1.OpenTerminalResponse{}); err != nil {
+				return err
+			}
 		case o, ok := <-ch:
 			if !ok {
 				return nil

@@ -5364,9 +5364,10 @@ func (x *OpenTerminalRequest) GetCommand() string {
 }
 
 type OpenTerminalResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Exited        bool                   `protobuf:"varint,2,opt,name=exited,proto3" json:"exited,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty and not exited: a keepalive.
+	Data          []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Exited        bool   `protobuf:"varint,2,opt,name=exited,proto3" json:"exited,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5866,8 +5867,10 @@ func (x *PreviewWatchRequest) GetWake() bool {
 type PreviewWatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A runner is connected; without one there are no ports.
-	Running       bool           `protobuf:"varint,1,opt,name=running,proto3" json:"running,omitempty"`
-	Ports         []*PreviewPort `protobuf:"bytes,2,rep,name=ports,proto3" json:"ports,omitempty"`
+	Running bool           `protobuf:"varint,1,opt,name=running,proto3" json:"running,omitempty"`
+	Ports   []*PreviewPort `protobuf:"bytes,2,rep,name=ports,proto3" json:"ports,omitempty"`
+	// Nothing else is set: skip it.
+	Keepalive     bool `protobuf:"varint,3,opt,name=keepalive,proto3" json:"keepalive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5914,6 +5917,13 @@ func (x *PreviewWatchResponse) GetPorts() []*PreviewPort {
 		return x.Ports
 	}
 	return nil
+}
+
+func (x *PreviewWatchResponse) GetKeepalive() bool {
+	if x != nil {
+		return x.Keepalive
+	}
+	return false
 }
 
 type PreviewPort struct {
@@ -7372,7 +7382,9 @@ type TeamWatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Threads updated in the last 7 days, not settled by their owners, most
 	// recently updated first. Without diffs.
-	Threads       []*Thread `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
+	Threads []*Thread `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
+	// Nothing else is set: skip it.
+	Keepalive     bool `protobuf:"varint,2,opt,name=keepalive,proto3" json:"keepalive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7412,6 +7424,13 @@ func (x *TeamWatchResponse) GetThreads() []*Thread {
 		return x.Threads
 	}
 	return nil
+}
+
+func (x *TeamWatchResponse) GetKeepalive() bool {
+	if x != nil {
+		return x.Keepalive
+	}
+	return false
 }
 
 type BriefRequest struct {
@@ -7743,7 +7762,9 @@ type InboxWatchResponse struct {
 	Decisions []*Decision `protobuf:"bytes,3,rep,name=decisions,proto3" json:"decisions,omitempty"`
 	// The caller signs in to Claude with their subscription and an environment
 	// reported them logged out.
-	LoginNeeded   bool `protobuf:"varint,4,opt,name=login_needed,json=loginNeeded,proto3" json:"login_needed,omitempty"`
+	LoginNeeded bool `protobuf:"varint,4,opt,name=login_needed,json=loginNeeded,proto3" json:"login_needed,omitempty"`
+	// Nothing else is set: skip it.
+	Keepalive     bool `protobuf:"varint,5,opt,name=keepalive,proto3" json:"keepalive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7802,6 +7823,13 @@ func (x *InboxWatchResponse) GetDecisions() []*Decision {
 func (x *InboxWatchResponse) GetLoginNeeded() bool {
 	if x != nil {
 		return x.LoginNeeded
+	}
+	return false
+}
+
+func (x *InboxWatchResponse) GetKeepalive() bool {
+	if x != nil {
+		return x.Keepalive
 	}
 	return false
 }
@@ -8974,8 +9002,9 @@ func (x *HandoffResolved) GetAccepted() bool {
 }
 
 type WatchThreadResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Event         *Event                 `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset: a keepalive.
+	Event         *Event `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -14031,10 +14060,11 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"F\n" +
 	"\x13PreviewWatchRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
-	"\x04wake\x18\x02 \x01(\bR\x04wake\"]\n" +
+	"\x04wake\x18\x02 \x01(\bR\x04wake\"{\n" +
 	"\x14PreviewWatchResponse\x12\x18\n" +
 	"\arunning\x18\x01 \x01(\bR\arunning\x12+\n" +
-	"\x05ports\x18\x02 \x03(\v2\x15.banda.v1.PreviewPortR\x05ports\";\n" +
+	"\x05ports\x18\x02 \x03(\v2\x15.banda.v1.PreviewPortR\x05ports\x12\x1c\n" +
+	"\tkeepalive\x18\x03 \x01(\bR\tkeepalive\";\n" +
 	"\vPreviewPort\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x18\n" +
 	"\aprocess\x18\x02 \x01(\tR\aprocess\"Y\n" +
@@ -14116,9 +14146,10 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x05actor\x18\x01 \x01(\tR\x05actor\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12.\n" +
 	"\x04time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x04time\"\x12\n" +
-	"\x10TeamWatchRequest\"?\n" +
+	"\x10TeamWatchRequest\"]\n" +
 	"\x11TeamWatchResponse\x12*\n" +
-	"\athreads\x18\x01 \x03(\v2\x10.banda.v1.ThreadR\athreads\"\x0e\n" +
+	"\athreads\x18\x01 \x03(\v2\x10.banda.v1.ThreadR\athreads\x12\x1c\n" +
+	"\tkeepalive\x18\x02 \x01(\bR\tkeepalive\"\x0e\n" +
 	"\fBriefRequest\"\xb1\x02\n" +
 	"\rBriefResponse\x120\n" +
 	"\x05since\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\x120\n" +
@@ -14136,12 +14167,13 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x10BriefSeenRequest\x120\n" +
 	"\x05until\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"\x13\n" +
 	"\x11BriefSeenResponse\"\x13\n" +
-	"\x11InboxWatchRequest\"\xc5\x01\n" +
+	"\x11InboxWatchRequest\"\xe3\x01\n" +
 	"\x12InboxWatchResponse\x12*\n" +
 	"\athreads\x18\x01 \x03(\v2\x10.banda.v1.ThreadR\athreads\x12.\n" +
 	"\tmentioned\x18\x02 \x03(\v2\x10.banda.v1.ThreadR\tmentioned\x120\n" +
 	"\tdecisions\x18\x03 \x03(\v2\x12.banda.v1.DecisionR\tdecisions\x12!\n" +
-	"\flogin_needed\x18\x04 \x01(\bR\vloginNeeded\"_\n" +
+	"\flogin_needed\x18\x04 \x01(\bR\vloginNeeded\x12\x1c\n" +
+	"\tkeepalive\x18\x05 \x01(\bR\tkeepalive\"_\n" +
 	"\bDecision\x12(\n" +
 	"\x06thread\x18\x01 \x01(\v2\x10.banda.v1.ThreadR\x06thread\x12)\n" +
 	"\arequest\x18\x02 \x01(\v2\x0f.banda.v1.EventR\arequest\"3\n" +

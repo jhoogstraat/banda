@@ -10,7 +10,7 @@ test('long threads: a tail replays the last events with the plan from before it 
 
 	const tail = listen((signal) => alice.threads.watchThread({ threadId, tail: 200 }, { signal }));
 	// Stored events only: the stream also says who is here (seq 0).
-	const stored = () => tail.got.map((r) => r.event!).filter((e) => e.seq > 0n);
+	const stored = () => tail.got.flatMap((r) => r.event ?? []).filter((e) => e.seq > 0n);
 	await tail.until(() => stored().filter((e) => !e.context).length >= 200, 'the tail');
 	tail.stop();
 	const events = stored();

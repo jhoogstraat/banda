@@ -228,6 +228,69 @@ func (c *Client) ownToken(ctx context.Context, sb *sbv1.Sandbox) error {
 	return err
 }
 
+// SweepTokens deletes the runner-token Secrets left behind by Sandboxes
+// deleted before start made each Sandbox own its Secret: no owner, no
+// Sandbox of that name, and unwritten for 10 minutes. The age spares a
+// Secret whose Sandbox another API (the e2e's run side by side) is creating
+// right now, between putToken and ownToken; the resourceVersion one written
+// since the list.
+func (c *Client) SweepTokens(ctx context.Context) (int, error) {
+	secrets := c.kube.CoreV1().Secrets(c.cfg.Namespace)
+	list, err := secrets.List(ctx, metav1.ListOptions{LabelSelector: "banda.dev/runner-token=true"})
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, sec := range list.Items {
+		name, ok := strings.CutSuffix(sec.Name, "-token")
+		if !ok || len(sec.OwnerReferences) > 0 || time.Since(lastWrite(sec.ObjectMeta)) < 10*time.Minute {
+			continue
+		}
+		_, err := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace).Get(ctx, name, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			if err != nil {
+				return n, err
+			}
+			continue // start owns it on the next resume
+		}
+		err = secrets.Delete(ctx, sec.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &sec.ResourceVersion}})
+		if err == nil {
+			n++
+		} else if !apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {
+			return n, err
+		}
+	}
+	return n, nil
+}
+
+// lastWrite is when an object was created or last changed by anyone.
+func lastWrite(m metav1.ObjectMeta) time.Time {
+	t := m.CreationTimestamp.Time
+	for _, f := range m.ManagedFields {
+		if f.Time != nil && f.Time.After(t) {
+			t = f.Time.Time
+		}
+	}
+	return t
+}
+
+// Count is how many Sandboxes, threads' and login environments', are
+// running and suspended.
+func (c *Client) Count(ctx context.Context) (running, suspended int, err error) {
+	list, err := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "banda.dev/sandbox"})
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, sb := range list.Items {
+		if sb.Spec.OperatingMode == sbv1.SandboxOperatingModeSuspended {
+			suspended++
+		} else {
+			running++
+		}
+	}
+	return running, suspended, nil
+}
+
 // ParseCIDRs parses a comma-separated list of CIDRs (SANDBOX_EGRESS_ALLOW).
 // NetworkPolicies can't name hosts, so a host is an address with /32.
 func ParseCIDRs(s string) ([]netip.Prefix, error) {

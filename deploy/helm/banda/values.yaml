@@ -37,6 +37,10 @@ api:
     requests: {cpu: 100m, memory: 256Mi}
   # Trusts the X-Banda-User header instead of signing in: local experiments only.
   devAuth: false
+  # Prometheus metrics at :<metricsPort>/metrics (METRICS_ADDR), on the banda-api
+  # Service's port "metrics" for a scraper in the cluster; never on the ingress,
+  # unreachable from sandboxes. null turns it off.
+  metricsPort: 9090
 
 oidc:
   # Your provider's issuer. Empty with dex.enabled: <publicUrl>/dex.
@@ -67,6 +71,11 @@ sandboxes:
 ingress:
   enabled: false
   className: ""
+  # Thread streams stay open for hours. The API sends a keepalive on each every
+  # 25 s, so a read timeout above that keeps them, but a longer one saves
+  # reconnects, e.g. for ingress-nginx:
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
   annotations: {}
   host: "" # banda.example.com
   previewHost: "" # preview.banda.example.com: a sibling of host, for the preview's SameSite cookie

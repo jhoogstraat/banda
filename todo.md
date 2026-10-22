@@ -45,7 +45,8 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] Postgres: generated password in a Secret, no NodePort outside kind, or your own database.
 - [ ] Postgres for real: a non-superuser role for the API, backups (or CloudNativePG / a managed database).
 - [x] Ingress with TLS for `banda.<domain>` and `preview.banda.<domain>` in the chart (`ingress.*`); `PUBLIC_URL`, `PREVIEW_URL` follow.
-- [ ] Ingress on a real cluster: check the controller keeps thread streams open (read timeouts).
+- [x] Streams survive proxies: every server stream sends a keepalive every 25 s; the chart's `ingress.annotations` comment and the Kustomize example set ingress-nginx's timeouts.
+- [ ] Ingress on a real cluster: confirm a quiet thread page stays connected for minutes behind the team's controller.
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [x] Versioned schema migrations: `internal/store/migrations/NNNN_*.sql`, each once, under an advisory lock (docs/development.md).
 - [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", is the start; it needs a run on a real cluster.
@@ -64,9 +65,10 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Multi-node volumes: the per-user Claude volume and thread volumes are RWO. Pin a user's pods to one node, or use RWX storage.
 - [x] Sandbox sizes as settings (`SANDBOX_CPU`, `SANDBOX_MEMORY`, … and the chart's `sandboxes:`).
 - [ ] Size nodes for concurrent threads.
-- [x] Clean up what lingers: token Secrets are owned by their Sandbox; pushed environments idle for `DELETE_IDLE_AFTER` (30 days) are deleted like settled ones. Token Secrets from before this change go only with a one-off `kubectl delete`.
+- [x] Clean up what lingers: token Secrets are owned by their Sandbox; pushed environments idle for `DELETE_IDLE_AFTER` (30 days) are deleted like settled ones. Token Secrets from before this change go in a sweep at API start (drop it once every install has started once).
 - [ ] `SANDBOX_EGRESS_ALLOW` for the private networks agents need (git host, staging); a read-only kubeconfig as a team secret for DevOps.
-- [ ] Monitoring: API logs and errors, sandbox count, disk use of PVCs.
+- [x] Monitoring: `/metrics` on `METRICS_ADDR` (threads by status, sandboxes, runners, internal errors, uptime); logs on stdout. PVC disk use comes from the kubelet's `kubelet_volume_stats_*`, not Banda.
+- [ ] Monitoring on the team cluster: a scrape config (or ServiceMonitor) and alerts on internal errors and full volumes.
 
 ## Built 2026-10-22 (needs real use)
 

@@ -47,6 +47,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("SANDBOX_EGRESS_ALLOW: %v", err)
 	}
+	// Before serving: with one replica (and Recreate) no other API creates
+	// sandboxes now; the sweep's own age check covers the e2e's side by side.
+	// ponytail: one-off for Secrets from before start set their owner; drop once no install has them.
+	if n, err := sb.SweepTokens(ctx); err != nil {
+		log.Printf("sweep token Secrets: %v", err) // e.g. a Role without list/delete: they just linger
+	} else if n > 0 {
+		log.Printf("deleted %d token Secrets of deleted sandboxes", n)
+	}
+	started := time.Now()
 
 	auth, httpUser := api.DevAuth(), api.DevUser
 	var sso *api.OIDC
@@ -106,6 +115,12 @@ func main() {
 	if svc.SuspendPause, err = time.ParseDuration(env("TEST_SUSPEND_PAUSE", "0s")); err != nil {
 		log.Fatalf("TEST_SUSPEND_PAUSE: %v", err)
 	}
+	// Tests only: how often server streams send a keepalive (default 25s).
+	if v := os.Getenv("TEST_KEEPALIVE_EVERY"); v != "" {
+		if svc.Keepalive, err = time.ParseDuration(v); err != nil || svc.Keepalive <= 0 {
+			log.Fatalf("TEST_KEEPALIVE_EVERY: %q is not a positive duration", v)
+		}
+	}
 	go svc.SuspendIdle(ctx, idle, every)
 	hosts, err := forge.ParseHosts(os.Getenv("FORGE_HOSTS"))
 	if err != nil {
@@ -124,6 +139,15 @@ func main() {
 		log.Printf("preview on %s", preview.Addr)
 		log.Printf("preview disabled: %v", preview.ListenAndServe()) // e.g. the port is taken: the rest still works
 	}()
+	if addr := os.Getenv("METRICS_ADDR"); addr != "" {
+		go func() {
+			mux := http.NewServeMux()
+			mux.Handle("/metrics", svc.MetricsHandler(started))
+			metrics := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+			log.Printf("metrics on %s", addr)
+			log.Printf("metrics disabled: %v", metrics.ListenAndServe())
+		}()
+	}
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
 	if sso != nil {

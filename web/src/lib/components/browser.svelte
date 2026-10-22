@@ -37,6 +37,7 @@
 			while (!signal.aborted) {
 				try {
 					for await (const res of api.previewWatch({ threadId, wake }, { signal })) {
+						if (res.keepalive) continue;
 						[running, ports, error] = [res.running, res.ports, ''];
 						if (!ports.some((p) => p.port === port)) port = pick(ports);
 						if (running) wake = false; // woken: don't wake it again on a reconnect

@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log/slog"
+	"sync/atomic"
 
 	"connectrpc.com/connect/v2"
 
@@ -47,6 +48,9 @@ func Errors() connect.ServerInterceptor {
 	}
 }
 
+// internalErrors counts the errors clients saw as CodeInternal (/metrics).
+var internalErrors atomic.Int64
+
 // codes are the errors clients may see, with their code.
 var codes = map[error]connect.Code{
 	store.ErrNotFound:     connect.CodeNotFound,
@@ -76,6 +80,7 @@ func publicError(ctx context.Context, op string, err error) error {
 			return connect.NewError(code, known.Error())
 		}
 	}
+	internalErrors.Add(1)
 	slog.Error("internal error", "op", op, "user", user(ctx), "err", err)
 	return connect.NewError(connect.CodeInternal, "internal error")
 }

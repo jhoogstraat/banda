@@ -1,6 +1,6 @@
 // A thread's environment over time: push, suspend and resume, settle, delete and recreate.
 import { AutoPushState, PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { exists, expect, kexec, kube, png, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
+import { exists, expect, freePort, kexec, kube, png, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 test('push reports its result as a notice', async ({ as }) => {
 	const t = await as('alice').create();
@@ -244,4 +244,22 @@ test('an unsettled environment unused for DELETE_IDLE_AFTER with all its work on
 		expect(await sandbox(dirty.id, 'shutdownTime')).toBe('');
 		expect(await sql(`select env_delete_at is null from threads where id = '${dirty.id}'`, api.db)).toBe('t');
 	});
+});
+
+// Monitoring: METRICS_ADDR serves Prometheus' text format on a port of its own; the API port has no /metrics.
+test('the metrics port reports threads by status, sandboxes and connected runners', async ({ as, startApi }) => {
+	const port = await freePort();
+	const api = await startApi({ METRICS_ADDR: `:${port}` }); // a database of its own: its threads only
+	const t = await as('alice', api).create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const res = await fetch(`http://localhost:${port}/metrics`);
+	expect(res.headers.get('content-type')).toContain('text/plain; version=0.0.4');
+	const text = await res.text();
+	expect(text).toContain('banda_threads{status="awaiting_input"} 1\n');
+	expect(text).toContain('banda_threads{status="working"} 0\n');
+	expect(text).toMatch(/^banda_sandboxes\{mode="running"\} [1-9]\d*$/m); // the run's namespace: other tests' too
+	expect(text).toContain('banda_runners_connected 1\n');
+	expect(text).toMatch(/^banda_internal_errors_total \d+$/m);
+	expect(text).toMatch(/^banda_uptime_seconds \d+$/m);
+	expect(await (await fetch(`${api.url}/metrics`)).text()).not.toContain('banda_threads');
 });

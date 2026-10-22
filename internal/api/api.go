@@ -47,6 +47,10 @@ type Service struct {
 	// WatchBuffer is how many events a WatchThread stream may lag behind
 	// before it catches up from the store.
 	WatchBuffer int
+	// Keepalive is how often a server stream sends a keepalive, which clients
+	// skip: ingress controllers cut streams quiet for longer than their read
+	// timeout (60 s for ingress-nginx).
+	Keepalive time.Duration
 
 	mu sync.Mutex
 	// watchers holds each WatchThread's channel and its behind signal (see watch).
@@ -108,6 +112,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		MaxAgentThreads:    8,
 		OverlapWindow:      7 * 24 * time.Hour,
 		WatchBuffer:        256,
+		Keepalive:          25 * time.Second,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}
