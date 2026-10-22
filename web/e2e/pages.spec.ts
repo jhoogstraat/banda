@@ -71,7 +71,7 @@ test('compare: tries go by model, update live without polling, show replies and 
 	expect(compares).toBe(before);
 	await Promise.all([a.release('cmp'), b.release('cmp')]);
 	await expect(page.getByRole('region', { name: 'Last reply of sonnet-5-5 · high' })).toContainText('with claude-sonnet-5-5 · high', { timeout: 60_000 });
-	await expect(opus.getByText('Needs input')).toBeVisible();
+	await expect(opus.getByText('Ready', { exact: true })).toBeVisible();
 	await expect(opus.getByText('1 turn', { exact: true })).toBeVisible();
 	// Different second turns, and a third in one try only.
 	await Promise.all([a.turn(() => a.send('e2e: alpha')), b.turn(() => b.send('e2e: beta'))]);

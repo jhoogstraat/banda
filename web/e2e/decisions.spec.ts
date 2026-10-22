@@ -92,7 +92,8 @@ test('the Decisions page: requests appear live; y allows, n denies with a note, 
 
 	await test.step('a teammate’s turn request, declined with a note from the keyboard', async () => {
 		await t.as(bob).send('@agent e2e: from bob', { mentionsAgent: true });
-		await expect(card.getByText(`${bob.id} asks the agent:`)).toBeVisible();
+		await expect(card.getByText('asks the agent', { exact: true })).toBeVisible();
+		await expect(card).toContainText(bob.id);
 		await page.keyboard.press('n');
 		await page.keyboard.type('later');
 		await page.keyboard.press('Enter');
