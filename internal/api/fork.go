@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 
@@ -33,15 +34,13 @@ func (s *Service) Fork(ctx context.Context, req *bandav1.ForkRequest) (*bandav1.
 	if err != nil {
 		return nil, err
 	}
-	events, err := s.store.EventsOf(ctx, src.ID, 0, "message", "agentText", "turnEnded") // what forkPrompt and the turn count use
+	turn, err := s.store.Count(ctx, src.ID, "turnEnded")
 	if err != nil {
 		return nil, err
 	}
-	turn := 0
-	for _, e := range events {
-		if e.GetTurnEnded() != nil {
-			turn++
-		}
+	events, err := s.transcript(ctx, src.ID)
+	if err != nil {
+		return nil, err
 	}
 	by, instruction := user(ctx), strings.TrimSpace(req.Prompt)
 	prompt := forkPrompt(s.names(ctx), src, turn, events, instruction)
@@ -253,6 +252,32 @@ func forkPrompt(names map[string]string, src store.Thread, turn int, events []*b
 	}
 	b.WriteString(instruction)
 	return b.String()
+}
+
+// transcript is the thread's latest messages and replies, enough of them for conversation: pages
+// from the newest back, as a long thread's are thousands.
+func (s *Service) transcript(ctx context.Context, id string) ([]*bandav1.Event, error) {
+	const page = 200
+	var events []*bandav1.Event
+	for before, size := int64(math.MaxInt64), 0; size <= maxTranscript; {
+		got, err := s.store.LatestOf(ctx, id, before, page, "message", "agentText")
+		if err != nil || len(got) == 0 {
+			return events, err
+		}
+		events = append(got, events...)
+		for _, e := range got {
+			text := e.GetAgentText().GetText()
+			if m := e.GetMessage(); m != nil {
+				text = messageText(m)
+			}
+			size += min(len(text), maxTranscript/4) + 2 // no more than its line in conversation
+		}
+		if len(got) < page {
+			break
+		}
+		before = got[0].Seq
+	}
+	return events, nil
 }
 
 // conversation is a thread's people's messages and the agent's replies among

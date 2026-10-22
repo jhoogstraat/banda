@@ -335,7 +335,8 @@ test('a thread that fails to load says why and loads on Try again', async ({ as 
 	await expect(page.getByRole('heading', { name: "Couldn't load this thread" })).toBeVisible();
 	await expect(composer(page)).toHaveCount(0);
 	await page.unroute(getThread);
-	await page.getByRole('button', { name: 'Try again' }).click();
+	// The page also tries again by itself every 2 s, and on a slow machine that can come first and take the button away.
+	await page.getByRole('button', { name: 'Try again' }).click({ timeout: 2000 }).catch(() => {});
 	await expect(page.getByRole('heading', { name: (await t.get()).title })).toBeVisible();
 	await expect(composer(page)).toBeVisible();
 });

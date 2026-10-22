@@ -42,14 +42,17 @@ test('a 20k-event thread: posting, resolving turn requests and forking stay fast
 	const resolve = await fastest((i) =>
 		(i < 2 ? alice.threads.declineTurn : alice.threads.approveTurn)({ threadId: t.id, requestSeq: requests[i] })
 	);
-	// A fork also starts a thread and its sandbox, slower on a busy machine (Actions) whatever the source's
-	// length: only what the 20k events add counts. That start took 800 ms from the third fork in a row
-	// while client-go held the API to 5 Kubernetes requests a second.
+	// A fork also starts a thread and its sandbox whatever the source's length: only what the 20k events
+	// add counts. That start took 800 ms from the third fork in a row while client-go held the API to 5
+	// Kubernetes requests a second.
 	const long = await fastest(() => alice.threads.fork({ threadId: t.id }));
 	const base = await fastest(() => alice.threads.fork({ threadId: short.id }));
 	expect(base, 'a fork of a one-turn thread').toBeLessThan(300);
 	const fork = long - base;
-	expect(Math.max(post, resolve, fork), `ms: ${JSON.stringify({ post, resolve, fork })}`).toBeLessThan(50);
+	// Against loading all 20k events, so a slower machine (Actions) is measured by its own speed: loading
+	// them all is what each of these did (half a load), now a few ms of 300.
+	const load = await fastest(() => t.events());
+	expect(Math.max(post, resolve, fork) / load, `ms: ${JSON.stringify({ post, resolve, fork, load })}`).toBeLessThan(0.15);
 });
 
 // B14: the runner reports the diff after every turn, and each report was a diffChanged that made every viewer fetch it.
