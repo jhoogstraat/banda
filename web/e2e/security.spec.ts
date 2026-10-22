@@ -84,7 +84,7 @@ test.describe('egress allowlist', () => {
 		await b.waitForStatus(Status.AWAITING_INPUT);
 		await b.turn(() => b.send('start the preview'));
 		await expect.poll(() => kexec(b.pod, 'curl -s localhost:5173/', ns), { timeout: 30_000 }).toContain('e2e-preview-page');
-		await expect.poll(() => kexec('banda-api', 'curl -s -o /dev/null -w %{http_code} localhost:8787 localhost:8788', ns).catch(() => ''), { timeout: 30_000 }).toBe('200200');
+		await expect.poll(() => kexec('banda-api', 'curl -s -o /dev/null -o /dev/null -w %{http_code} localhost:8787 localhost:8788', ns).catch(() => ''), { timeout: 30_000 }).toBe('200200');
 		const ip = (pod: string) => kubeIn(ns, 'get', 'pod', pod, '-o', 'jsonpath={.status.podIP}');
 		const [apiIP, bIP] = [await ip('banda-api'), await ip(b.pod)];
 		const node = await kube('get', 'nodes', '-o', 'jsonpath={.items[0].status.addresses[0].address}');
