@@ -1,11 +1,13 @@
-FROM golang:1.27.2 AS build
+# Go cross-compiles: multi-arch builds only emulate the image stages.
+FROM --platform=$BUILDPLATFORM golang:1.27.2 AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd cmd
 COPY internal internal
 COPY gen gen
-RUN CGO_ENABLED=0 go build -o /runner ./cmd/runner
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /runner ./cmd/runner
 
 FROM debian:trixie-slim AS sandbox
 ARG CLAUDE_VERSION=2.1.301

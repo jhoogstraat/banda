@@ -1,0 +1,48 @@
+# A real cluster, by patching the base: released images, an ingress with TLS
+# on banda.example.com and preview.banda.example.com, your OIDC provider, your
+# pod network. Copy it, replace the example values, then:
+#   kubectl kustomize --enable-helm deploy/kustomize/example | kubectl apply -f -
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: banda
+resources:
+  - ../base
+  - ingress.yaml
+images:
+  - {name: ghcr.io/jhoogstraat/banda-api, newTag: 1.0.0}
+# The settings Secret the base expects. Keep the real values out of git (a
+# sealed or external secret, or a file you don't commit). Its name stays
+# fixed: Kustomize doesn't rename references in what a chart inflated, so
+# restart banda-api after changing it.
+generatorOptions: {disableNameSuffixHash: true}
+secretGenerator:
+  - name: banda-api
+    literals:
+      - OIDC_ISSUER=https://login.example.com
+      - OIDC_CLIENT_ID=banda
+      - OIDC_CLIENT_SECRET=change-me
+      - SESSION_SECRET=change-me-to-48-random-characters
+      - POSTGRES_PASSWORD=change-me-url-safe
+patches:
+  - target: {kind: Deployment, name: banda-api}
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: banda-api}
+      spec:
+        template:
+          spec:
+            containers:
+              - name: api
+                env:
+                  - {name: PUBLIC_URL, value: https://banda.example.com}
+                  - {name: PREVIEW_URL, value: https://preview.banda.example.com}
+                  # Not an image field, so images: above doesn't reach it.
+                  - {name: SANDBOX_IMAGE, value: ghcr.io/jhoogstraat/banda-sandbox:1.0.0}
+  # The ingress policies tell sandboxes from browsers by the pod network: your cluster's instead of kind's.
+  - target: {kind: NetworkPolicy, name: banda-api}
+    patch: |
+      - {op: replace, path: /spec/ingress/1/from/1/ipBlock/except/0, value: 10.42.0.0/16}
+  - target: {kind: NetworkPolicy, name: postgres}
+    patch: |
+      - {op: replace, path: /spec/ingress/0/from/1/ipBlock/except/0, value: 10.42.0.0/16}

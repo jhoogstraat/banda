@@ -1,0 +1,32 @@
+{{- if and .Values.api.enabled .Values.ingress.enabled }}
+# Banda on ingress.host (with /dex for a bundled Dex), the preview on ingress.previewHost.
+# Thread streams are long-lived: raise the controller's read timeouts if it cuts them.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tlsSecret }}
+  tls:
+    - secretName: {{ . }}
+      hosts: [{{ $.Values.ingress.host | quote }}{{ with $.Values.ingress.previewHost }}, {{ . | quote }}{{ end }}]
+  {{- end }}
+  rules:
+    - host: {{ required "ingress.host is required" .Values.ingress.host | quote }}
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: banda-api, port: {name: api}}}}
+    {{- with .Values.ingress.previewHost }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: banda-api, port: {name: preview}}}}
+    {{- end }}
+{{- end }}

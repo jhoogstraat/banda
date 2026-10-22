@@ -1,0 +1,22 @@
+# Banda and its preview origin on sibling hosts, with a certificate covering
+# both (here from cert-manager). Thread streams are long-lived: raise the
+# controller's read timeouts if it cuts them.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banda-api
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+    - secretName: banda-tls
+      hosts: [banda.example.com, preview.banda.example.com]
+  rules:
+    - host: banda.example.com
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: banda-api, port: {name: api}}}}
+    - host: preview.banda.example.com
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: banda-api, port: {name: preview}}}}

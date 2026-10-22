@@ -1,0 +1,80 @@
+{{- if .Values.postgres.enabled }}
+# ponytail: one superuser "banda", no backups. A non-superuser role for the API
+# and backups (or CloudNativePG, a managed database) before data matters.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - containerPort: 5432
+          env:
+            - {name: POSTGRES_USER, value: banda}
+            # Only read when the volume is new. ponytail: a password set in values (dev) stays in the pod
+            # spec, as kind clusters made before the chart have it, so adopting them doesn't restart Postgres
+            # under other checkouts' e2e runs; a generated one only in the Secret.
+            {{- if .Values.postgres.password }}
+            - {name: POSTGRES_PASSWORD, value: {{ .Values.postgres.password | quote }}}
+            {{- else }}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_PASSWORD}}
+            {{- end }}
+            - {name: POSTGRES_DB, value: banda}
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, 127.0.0.1, -U, banda]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  type: {{ ternary "NodePort" "ClusterIP" (not (empty .Values.postgres.nodePort)) }}
+  selector: {app: postgres}
+  ports:
+    - port: 5432
+      {{- with .Values.postgres.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+---
+# Only the API reaches Postgres: in the cluster, or from outside it through
+# the NodePort (dev). No other pod does, not even through the NodePort.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app: postgres}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: banda-api}}
+        - ipBlock: {cidr: 0.0.0.0/0, except: [{{ .Values.podCIDR }}]}
+      ports:
+        - port: 5432
+{{- end }}

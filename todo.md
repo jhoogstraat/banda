@@ -6,7 +6,7 @@ What is left before Banda runs fully, ordered by when it's needed. Measured agai
 
 Feature work for v1 is essentially complete and covered by the e2e suite with the fake agent: threads, sandboxes and their lifecycle, multiplayer (mentions, chat mode, turn requests, trust, handoffs), permissions, diff review, forks and races, sub-threads and the MCP server, profiles, search, the team board, decisions, preview, files and terminal, auto-push, sandbox isolation.
 
-What isn't proven is **real use**: no real Claude Code turn has run through Banda yet, and it has never run anywhere but in kind with the API on the Mac.
+What isn't proven is **real use**: no real Claude Code turn has run through Banda yet, and it has never run anywhere but in kind.
 
 | Vision goal | State |
 |---|---|
@@ -15,7 +15,7 @@ What isn't proven is **real use**: no real Claude Code turn has run through Band
 | 3. Never loses work, no manual cleanup | Built (auto-push, settled deletion); `mise run clean` is still dev-only |
 | 4. Team habits: mentions, reviews, forks, handoffs | Built |
 | 5. A non-engineer gets work done | Profiles built; untried with a person |
-| 6. One person installs it from one page | Not yet: dev setup only |
+| 6. One person installs it from one page | Helm chart, Kustomize and release manifests (README, Install); never installed outside kind |
 
 ## Phase 1: run it for real on this Mac (Podman + kind)
 
@@ -33,23 +33,26 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] A second person on the LAN (bob) posts, mentions, requests a turn, forks; a handoff to bob with bob's own Claude login.
 - [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR.
 - [ ] Use it for a week; write down what's annoying.
-- [ ] Run the API in the cluster instead of on the Mac (`mise run deploy`). Blocked by sign-in: Dex is only reachable through Vite's `/dex` proxy (see below).
+- [x] Run the API in the cluster instead of on the Mac (`mise run deploy`): signs in with Dex at `/dex` through the API.
 
 ## Phase 2: deployable
 
-- [ ] Sign-in in the cluster: give Dex an issuer that both browsers and the API pod reach (Ingress, or the API proxying `/dex`), or use a real OIDC provider.
-- [ ] Kustomize: `deploy/base` plus `overlays/kind` and `overlays/team`; mise tasks apply the kind overlay (docs/deployment.md).
-- [ ] CI: `mise run test`, `pnpm -C web check`, the `.check.ts` scripts and `mise run e2e`; build and push both images with version tags.
-- [ ] Postgres for real: generated password in a Secret, non-superuser role for the API, no NodePort, backups (or CloudNativePG / a managed database).
-- [ ] Ingress with TLS for `banda.<domain>` and `preview.banda.<domain>`; set `PUBLIC_URL`, `PREVIEW_URL`.
-- [ ] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
+- [x] Sign-in in the cluster: the API serves the bundled Dex at `$PUBLIC_URL/dex` (`DEX_URL`); real OIDC providers as before.
+- [x] Packaging: the Helm chart `deploy/helm/banda` as the one source, Kustomize base and overlays (`kind`, `example`) on top; the mise tasks and the e2e world install it (docs/deployment.md).
+- [x] CI: Go vet and tests, `pnpm -C web check`, the `.check.ts` scripts, the generated code, the chart and both images on every pull request; releases push multi-arch images, the chart (OCI) and `banda.yaml` on a `v*` tag.
+- [ ] CI e2e on kind with Docker: written (`deploy/dev.sh` derives the host from kind's network), not yet green on Actions; drop its `continue-on-error` once it is.
+- [x] Postgres: generated password in a Secret, no NodePort outside kind, or your own database.
+- [ ] Postgres for real: a non-superuser role for the API, backups (or CloudNativePG / a managed database).
+- [x] Ingress with TLS for `banda.<domain>` and `preview.banda.<domain>` in the chart (`ingress.*`); `PUBLIC_URL`, `PREVIEW_URL` follow.
+- [ ] Ingress on a real cluster: check the controller keeps thread streams open (read timeouts).
+- [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [ ] Versioned schema migrations before the first column change (`internal/store/store.go`).
-- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6).
+- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). README's Install section is the start; it needs a run on a real cluster.
 - [ ] Decide on Claude: confirm the persistent login volume and teammate turns with Anthropic (PLAN.md, open question 3) before more than the core team uses it.
 
 ## Phase 3: the team cluster
 
-- [ ] A cluster dedicated to Banda, separate from production, with a CNI that enforces NetworkPolicy (Calico, Cilium); replace kind's pod CIDR `10.244.0.0/16` in the ingress policies.
+- [ ] A cluster dedicated to Banda, separate from production, with a CNI that enforces NetworkPolicy (Calico, Cilium); its pod network in the chart's `podCIDR`.
 - [ ] Multi-node volumes: the per-user Claude volume and thread volumes are RWO. Pin a user's pods to one node, or use RWX storage.
 - [ ] Sandbox sizes as settings instead of fixed 4 CPU / 8 GiB (`internal/sandbox/sandbox.go`); size nodes for concurrent threads.
 - [ ] Clean up what lingers: per-thread token Secrets outlive deleted Sandboxes; sandboxes of threads never settled stay forever outside dev (`mise run clean` is dev-only).

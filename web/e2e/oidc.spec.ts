@@ -1,4 +1,4 @@
-// Sign-in through the run's own Dex (deploy/dex.yaml's users) against the run's OIDC API.
+// Sign-in through the run's own Dex (the kind values' users), served by the run's OIDC API at /dex.
 import type { Browser, Page } from '@playwright/test';
 import { expect, OIDC_API, test } from './fixtures.ts';
 

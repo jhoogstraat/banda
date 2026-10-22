@@ -1,0 +1,14 @@
+# Banda in kind with Dex, as `mise run deploy` installs it:
+#   kubectl kustomize --enable-helm deploy/kustomize/kind | kubectl --context kind-banda apply -f -
+# Its own chart inflation, not the base's: Kustomize can't change the values
+# of a chart a base inflates, only patch what comes out.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: banda
+helmGlobals:
+  chartHome: ../../helm
+helmCharts:
+  - name: banda
+    releaseName: banda
+    namespace: banda
+    valuesFile: values.yaml

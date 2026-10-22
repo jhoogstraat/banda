@@ -1,0 +1,80 @@
+# Banda in one namespace: the API, its sandboxes, and optionally Postgres and Dex.
+# Needs the agent-sandbox controller (see README, "Install") and a CNI that
+# enforces NetworkPolicy. Every API setting is in the README.
+
+# Where browsers reach Banda. Empty: https://<ingress.host> (http without
+# ingress.tlsSecret), or http://localhost:8787 without an ingress (port-forward).
+# Dex's issuer and the OIDC redirect URI derive from it.
+publicUrl: ""
+# The Browser tab's origin (PREVIEW_URL). Empty: <scheme>://<ingress.previewHost>,
+# or without one the host browsers reach Banda on, port 8788.
+previewUrl: ""
+# The cluster's pod network. Ingress policies tell sandboxes (pods) from
+# browsers (ingress controllers, port-forwards, NodePorts) by it. kind's default.
+podCIDR: 10.244.0.0/16
+
+image:
+  api:
+    repository: ghcr.io/jhoogstraat/banda-api
+    tag: "" # default: the chart's appVersion
+    pullPolicy: IfNotPresent
+  sandbox:
+    repository: ghcr.io/jhoogstraat/banda-sandbox
+    tag: ""
+
+api:
+  enabled: true
+  # Settings from a Secret of your own instead of the one this chart makes
+  # (banda-api). It needs SESSION_SECRET, OIDC_CLIENT_SECRET (with OIDC or
+  # Dex), POSTGRES_PASSWORD (with the bundled Postgres) or DATABASE_URL
+  # (without it), and can hold any other setting.
+  existingSecret: ""
+  # Plain settings, e.g. {IDLE_SUSPEND_AFTER: 1h, MAX_AGENT_THREADS: "4"}.
+  env: {}
+  # Secret settings for the Secret this chart makes, e.g. {DATABASE_URL: ...}.
+  secretEnv: {}
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+  # Trusts the X-Banda-User header instead of signing in: local experiments only.
+  devAuth: false
+
+oidc:
+  # Your provider's issuer. Empty with dex.enabled: <publicUrl>/dex.
+  issuer: ""
+  clientId: banda
+  # Empty: generated on install and kept on upgrades (for Dex), else required.
+  clientSecret: ""
+
+# Signs session cookies. Empty: generated on install and kept on upgrades.
+sessionSecret: ""
+
+# SANDBOX_EGRESS_ALLOW: comma-separated CIDRs sandboxes may reach besides the internet.
+egressAllow: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: "" # banda.example.com
+  previewHost: "" # preview.banda.example.com: a sibling of host, for the preview's SameSite cookie
+  # A TLS Secret covering both hosts (e.g. from cert-manager). Banda wants https outside a trusted LAN.
+  tlsSecret: ""
+
+postgres:
+  # false: point DATABASE_URL at your own database (api.secretEnv or api.existingSecret).
+  enabled: true
+  image: postgres:18
+  storage: 5Gi
+  # Empty: generated on install and kept on upgrades. Must be URL-safe.
+  password: ""
+  # Dev only: a NodePort for an API outside the cluster.
+  nodePort: null
+
+# Dex, a small OIDC provider with static users, for demos and dev. The API
+# serves it at <publicUrl>/dex (DEX_URL), so it needs no host of its own.
+dex:
+  enabled: false
+  image: ghcr.io/dexidp/dex:v2.46.0
+  nodePort: null
+  # email, username, userID and hash (bcrypt: htpasswd -nbBC 10 "" <password> | cut -d: -f2).
+  users: []

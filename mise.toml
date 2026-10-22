@@ -7,6 +7,8 @@ kind = "latest"
 kubectl = "latest"
 podman = "6"
 jq = "latest"
+helm = "4"
+actionlint = "latest"
 # Code generators for `mise run gen`, local so parallel checkouts don't hit buf's remote plugin rate limit.
 "go:google.golang.org/protobuf/cmd/protoc-gen-go" = "1.36.12"
 "go:connectrpc.com/connect/v2/cmd/protoc-gen-connect-go" = "2.0.1"
@@ -56,18 +58,13 @@ kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-s
 # Each volume takes a helper pod; 4 workers (the default) can't keep up with parallel e2e runs.
 kubectl --context kind-banda -n local-path-storage get deploy local-path-provisioner -o jsonpath='{.spec.template.spec.containers[0].command}' | grep -q worker-threads ||
   kubectl --context kind-banda -n local-path-storage patch deploy local-path-provisioner --type json -p '[{"op":"add","path":"/spec/template/spec/containers/0/command/-","value":"--worker-threads=16"}]'
-kubectl --context kind-banda apply -f deploy/postgres.yaml
-kubectl --context kind-banda rollout status statefulset/postgres -n banda --timeout=300s
 mise run dex
 """
 
 [tasks.dex]
-description = "Apply Dex with its issuer on PUBLIC_HOST (browsers reach it through the web server at /dex)"
-run = """
-sed "s|localhost:5173|${PUBLIC_HOST:-localhost}:5173|" deploy/dex.yaml | kubectl --context kind-banda apply -f -
-kubectl --context kind-banda rollout restart deployment/dex -n banda
-kubectl --context kind-banda rollout status deployment/dex -n banda --timeout=300s
-"""
+description = "Install the chart in kind without the API: Postgres, the sandbox policies and Dex with its issuer on PUBLIC_HOST (browsers reach it through the web server at /dex)"
+run = 'deploy/dev.sh chart --set api.enabled=false --set publicUrl=http://${PUBLIC_HOST:-localhost}:5173'
+
 
 [tasks.image]
 description = "Build the sandbox image and load it into kind (after changing cmd/runner or deploy/sandbox.Dockerfile)"
@@ -104,11 +101,25 @@ description = "Run the Vite dev server on :5173"
 run = '''exec pnpm -C web dev $([ "${PUBLIC_HOST:-localhost}" = localhost ] || echo --host)'''
 
 [tasks.deploy]
-description = "Build the API image (with the web build), load it into kind and apply deploy/banda.yaml"
+description = "Build the API image (with the web build), load it into kind and install the chart with the API, signing in with Dex at PUBLIC_URL/dex (default http://localhost:8787)"
 run = """
 ${CONTAINER:-podman} build -f deploy/api.Dockerfile -t localhost/banda-api:dev .
 ${CONTAINER:-podman} save localhost/banda-api:dev -o /tmp/banda-api.tar
 kind load image-archive /tmp/banda-api.tar --name banda
-kubectl --context kind-banda apply -f deploy/banda.yaml
+deploy/dev.sh chart --set api.enabled=true --set publicUrl=${PUBLIC_URL:-http://localhost:8787}
 kubectl --context kind-banda rollout restart -n banda deployment/banda-api
+kubectl --context kind-banda rollout status -n banda deployment/banda-api --timeout=300s
+# Both would sweep and drive the same threads; mise run up removes this one again.
+! lsof -tiTCP:8787 -sTCP:LISTEN >/dev/null || echo 'An API runs on this machine too (mise run api): stop it, one API per database.' >&2
+echo 'kubectl --context kind-banda -n banda port-forward svc/banda-api 8787 8788, then open http://localhost:8787'
+"""
+
+[tasks.chart-check]
+description = "Lint the Helm chart and render it with every values file and Kustomize overlay"
+run = """
+set -e
+helm lint deploy/helm/banda
+helm lint deploy/helm/banda -f deploy/kustomize/kind/values.yaml
+helm template banda deploy/helm/banda -n banda --set dex.enabled=true,ingress.enabled=true,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=tls >/dev/null
+for k in base kind example; do kubectl kustomize --enable-helm deploy/kustomize/$k >/dev/null; done
 """

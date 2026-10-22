@@ -175,7 +175,7 @@ func ParseCIDRs(s string) ([]netip.Prefix, error) {
 }
 
 // AllowEgress lets the namespace's sandboxes reach cidrs (production, say) on
-// top of deploy/sandbox-policy.yaml, with a NetworkPolicy of its own;
+// top of the chart's policies.yaml, with a NetworkPolicy of its own;
 // policies add up, so the base stays as it is. None removes it. Banda's own
 // pods keep sandboxes out with ingress policies even when a range covers them.
 func (c *Client) AllowEgress(ctx context.Context, cidrs []netip.Prefix) error {
@@ -357,7 +357,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 	}
 	uid := int64(1000)
 	grace := int64(90)                                                                   // the runner stops claude gracefully; killing it mid token refresh logs the user out
-	labels := map[string]string{"banda.dev/thread": t.ID, "banda.dev/sandbox": "thread"} // see deploy/sandbox-policy.yaml
+	labels := map[string]string{"banda.dev/thread": t.ID, "banda.dev/sandbox": "thread"} // see deploy/helm/banda/templates/policies.yaml
 	no := false                                                                          // runners never call the Kubernetes API
 
 	return &sbv1.Sandbox{

@@ -25,10 +25,35 @@ until_ok() {
 }
 listening() { lsof -tiTCP:"$1" -sTCP:LISTEN; }
 
+C=${CONTAINER:-podman}
+
 # Podman on macOS runs one VM at a time, so Banda shares the default machine with other projects.
 machine() {
+	[ "$C" = podman ] && [ "$(uname)" = Darwin ] || return 0
 	[ "$(podman machine inspect podman-machine-default --format '{{.State}}')" = running ] ||
 		podman machine start podman-machine-default
+}
+
+# chart [<helm args>]: the chart (deploy/helm/banda) in kind's namespace banda with the kind values.
+# Values set before (api.enabled, publicUrl) stay unless given again. --take-ownership and
+# --force-conflicts adopt what kubectl applied before the chart existed.
+chart() {
+	helm --kube-context kind-banda upgrade --install banda deploy/helm/banda -n banda --create-namespace --take-ownership --force-conflicts \
+		--reset-then-reuse-values -f deploy/kustomize/kind/values.yaml --wait --timeout 5m "$@"
+}
+
+# policies <namespace>: the sandbox policies of the chart, for a namespace with sandboxes but no release.
+policies() {
+	helm template banda deploy/helm/banda -n "$1" --show-only templates/policies.yaml | kc -n "$1" apply -f - >/dev/null
+}
+
+# The host as sandboxes see it, for an API running here: Podman's host.containers.internal, or with
+# Docker on Linux the gateway of kind's network. HOST_IP overrides it (Docker Desktop).
+host_ip() {
+	if [ -n "${HOST_IP:-}" ]; then echo "$HOST_IP"
+	elif [ "$C" = podman ]; then echo 192.168.127.254
+	else docker network inspect kind | jq -r '[.[0].IPAM.Config[].Gateway | select(contains("."))][0]'
+	fi
 }
 
 cluster() {
@@ -36,21 +61,20 @@ cluster() {
 		mise run cluster
 		mise run image
 	else
-		podman start banda-control-plane >/dev/null
+		$C start banda-control-plane >/dev/null
 		for _ in $(seq 60); do kc get nodes >/dev/null 2>&1 && break; sleep 2; done
 		kc -n agent-sandbox-system rollout status deployment/agent-sandbox-controller --timeout=300s
+		# Clusters made before the chart (`mise run up` upgrades it; parallel e2e runs mustn't race on it).
+		helm --kube-context kind-banda status banda -n banda >/dev/null 2>&1 || chart --set api.enabled=false >/dev/null
 		kc -n banda rollout status statefulset/postgres --timeout=300s
 		kc -n banda rollout status deployment/dex --timeout=300s
 	fi
-	# Again on every start, so clusters made before a policy get it.
-	kc apply -f deploy/postgres.yaml >/dev/null
-	kc -n banda apply -f deploy/sandbox-policy.yaml >/dev/null
 	host_api banda 8700 8999 # mise run api, and other checkouts' on ports of their own
 }
 
 # host_api <namespace> <port> [<end port>]: lets the namespace's sandboxes reach an API on this machine,
-# at host.containers.internal (Podman's address for it), on that port only: Postgres, the kind API server
-# and everything else on the host stay out of reach (deploy/sandbox-policy.yaml).
+# at host_ip, on that port only: Postgres, the kind API server and everything else on the host stay out
+# of reach (the chart's policies).
 host_api() {
 	kc -n "$1" apply -f - >/dev/null <<EOF
 apiVersion: networking.k8s.io/v1
@@ -59,7 +83,7 @@ metadata: {name: host-api-$2}
 spec:
   podSelector: {matchExpressions: [{key: banda.dev/sandbox, operator: Exists}]}
   policyTypes: [Egress]
-  egress: [{to: [{ipBlock: {cidr: 192.168.127.254/32}}], ports: [{port: $2${3:+, endPort: $3}}]}]
+  egress: [{to: [{ipBlock: {cidr: $(host_ip)/32}}], ports: [{port: $2${3:+, endPort: $3}}]}]
 EOF
 }
 
@@ -101,7 +125,6 @@ e2e() {
 	e2e_wipe
 	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
 	kc create ns "$ns" >/dev/null
-	kc -n "$ns" apply -f deploy/sandbox-policy.yaml >/dev/null
 	kc -n "$ns" apply -f - >/dev/null <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -114,8 +137,9 @@ EOF
 	local p pp op opp dp
 	read -r p pp op opp dp < <(node -e 'const n = require("net"); Promise.all([1, 2, 3, 4, 5].map(() => new Promise((r) => { const s = n.createServer().listen(0, () => r(s)); })))
 		.then((ss) => { console.log(ss.map((s) => s.address().port).join(" ")); ss.forEach((s) => s.close()); })')
-	sed -e "s|namespace: banda|namespace: $ns|" -e "s|issuer: http://localhost:5173|issuer: http://localhost:$dp|" -e "s|localhost:5173/auth|localhost:$op/auth|" \
-		-e 's/type: NodePort/type: ClusterIP/' -e '/nodePort:/d' deploy/dex.yaml | kc apply -f - >/dev/null
+	# The chart's sandbox policies and Dex, which the OIDC API serves at /dex as it would in a cluster.
+	helm template banda deploy/helm/banda -n "$ns" -f deploy/kustomize/kind/values.yaml --set api.enabled=false,postgres.enabled=false \
+		--set dex.nodePort=null,publicUrl=http://localhost:$op | kc -n "$ns" apply -f - >/dev/null
 	wait $image || { tail -30 "$LOG/image.log"; exit 1; }
 	# The fixture repos at git://e2e-git/<name>.git; readonly refuses pushes.
 	kc -n "$ns" run e2e-git --image="$SANDBOX_IMAGE" --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
@@ -131,11 +155,12 @@ EOF
 	# Every thread on the plain repo writes hello1.txt: overlaps would tie all tests together. Their test turns them on.
 	export OVERLAP_WINDOW=0
 	host_api "$ns" "$p"; host_api "$ns" "$op"
-	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://host.containers.internal:$p start api "$LOG/api"; PIDS+=("$PID")
+	export E2E_HOST; E2E_HOST=$(host_ip)
+	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://$E2E_HOST:$p start api "$LOG/api"; PIDS+=("$PID")
 	local api_pid=$PID
 	# It shares the database but leaves sweeps to the main API, whose watchers see what they change.
-	IDLE_SWEEP_EVERY=24h OIDC_ISSUER=http://localhost:$dp/dex OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret PUBLIC_URL=http://localhost:$op \
-		ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://host.containers.internal:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
+	IDLE_SWEEP_EVERY=24h OIDC_ISSUER=http://localhost:$op/dex DEX_URL=http://localhost:$dp OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret \
+		PUBLIC_URL=http://localhost:$op ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://$E2E_HOST:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
 	until_ok oidc-api listening "$op"
 	PID=$api_pid until_ok api listening "$p"
 	kc -n "$ns" wait --for=condition=Ready pod/e2e-git --timeout=120s >/dev/null
@@ -179,6 +204,8 @@ up) machine; cluster; servers ;;
 e2e) shift; machine; cluster; e2e "$@" ;;
 clean) clean ;;
 host-api) shift; host_api "$@" ;; # the e2e harness, for an API of a test's own
-down) free 8787; free 8788; free 5173; podman stop banda-control-plane ;;
-*) echo "usage: $0 up|e2e|clean|down" >&2; exit 2 ;;
+policies) shift; policies "$1" ;; # the e2e harness, for a namespace of a test's own
+chart) shift; chart "$@" ;; # mise run dex, deploy
+down) free 8787; free 8788; free 5173; $C stop banda-control-plane ;;
+*) echo "usage: $0 up|e2e|clean|down|chart" >&2; exit 2 ;;
 esac

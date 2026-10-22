@@ -7,11 +7,11 @@
 # policy of its own: see host_api in deploy/dev.sh. Private networks
 # (production, a git host) are opened by SANDBOX_EGRESS_ALLOW: the API applies
 # the policy sandboxes-allow (internal/sandbox).
-# Apply it to every namespace with sandboxes: kubectl apply -n <ns> -f deploy/sandbox-policy.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: sandboxes
+  labels: {{- include "banda.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchExpressions: [{key: banda.dev/sandbox, operator: Exists}]
@@ -19,7 +19,7 @@ spec:
   egress:
     - to: [{namespaceSelector: {}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
       ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
-    - to: [{podSelector: {matchLabels: {app: banda-api}}}] # deploy/banda.yaml
+    - to: [{podSelector: {matchLabels: {app: banda-api}}}]
       ports: [{port: 8787}]
     - to:
         - ipBlock:
@@ -28,12 +28,13 @@ spec:
             # the LAN, cloud metadata.
             except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 127.0.0.0/8]
 ---
-# The API in the cluster (deploy/banda.yaml) takes sandboxes only on its runner
-# port, also when an allowed range covers its pod: anyone else on any port.
+# The API takes sandboxes only on its runner port, also when an allowed range
+# covers its pod: anyone else on any port.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
 spec:
   podSelector: {matchLabels: {app: banda-api}}
   policyTypes: [Ingress]
@@ -42,4 +43,4 @@ spec:
     - from:
         - namespaceSelector: {}
           podSelector: {matchExpressions: [{key: banda.dev/sandbox, operator: DoesNotExist}]}
-        - ipBlock: {cidr: 0.0.0.0/0, except: [10.244.0.0/16]} # kind's pod network
+        - ipBlock: {cidr: 0.0.0.0/0, except: [{{ .Values.podCIDR }}]}

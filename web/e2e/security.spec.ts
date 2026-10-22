@@ -2,7 +2,7 @@
 // browser-facing defences of open risk 6 (F8). Sandboxes run untrusted code: a malicious repo or a
 // prompt-injected agent. Probes run in the pods, as that code would.
 import { LoginAction } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { API, expect, kexec, kube, kubeIn, NAMESPACE, refused, repo, sql, Status, test, userHash, type Thread, type User } from './fixtures.ts';
+import { API, expect, HOST, kexec, kube, kubeIn, NAMESPACE, refused, repo, sql, Status, test, userHash, type Thread, type User } from './fixtures.ts';
 
 /** Whether a TCP connection from the pod (in the run's namespace, or ns) to host:port opens within 3 s. */
 const reaches = async (pod: string, host: string, port: number, ns?: string) =>
@@ -41,9 +41,9 @@ test.describe('network', () => {
 		const closed = {
 			'Postgres': ['postgres.banda.svc.cluster.local', 5432],
 			'Postgres through its NodePort': [node, 30432],
-			'Postgres through the host': ['host.containers.internal', 5432],
+			'Postgres through the host': [HOST, 5432],
 			'the Kubernetes API': ['kubernetes.default.svc', 443],
-			'the Kubernetes API through the host': ['host.containers.internal', Number(kubeAPI)],
+			'the Kubernetes API through the host': [HOST, Number(kubeAPI)],
 			'the kubelet': [node, 10250],
 			'Dex': ['dex', 5556],
 			'another thread’s dev server': [bIP, 5173]
@@ -75,7 +75,7 @@ test.describe('egress allowlist', () => {
 	test('Postgres, Dex, the API’s other ports, other sandboxes and the Kubernetes API stay closed when an allowed range covers them', async ({ as, startApi }) => {
 		const api = await startApi({ SANDBOX_EGRESS_ALLOW: '10.0.0.0/8' }, { namespace: true }); // kind's pods, services and node
 		const ns = api.namespace;
-		// The API in the cluster (deploy/banda.yaml) as the network sees it: the runner port and the preview's.
+		// The API in the cluster (the chart's banda-api) as the network sees it: the runner port and the preview's.
 		await kubeIn(ns, 'run', 'banda-api', `--image=${process.env.SANDBOX_IMAGE}`, '--image-pull-policy=Never', '--labels=app=banda-api',
 			'--command', '--', 'sh', '-c', 'python3 -m http.server 8788 & exec python3 -m http.server 8787');
 		const alice = as('alice', api);
