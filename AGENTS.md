@@ -5,7 +5,7 @@ A web app where a team builds software together with coding agents. Each thread 
 - [VISION.md](VISION.md): why Banda exists and the principles for deciding anything not settled yet. Read it before a design choice.
 - [PLAN.md](PLAN.md): the decisions made and what is built.
 - [todo.md](todo.md): what is left before Banda runs fully, by phase.
-- [README.md](README.md): settings and how to run it; [docs/deployment.md](docs/deployment.md): deployment options.
+- [README.md](README.md): what Banda is and the quick start; `docs/`: [usage](docs/usage.md), [configuration](docs/configuration.md) (every setting), [deployment](docs/deployment.md) (Helm, Kustomize, releases), [development](docs/development.md) (dev loop, tests).
 
 ## Layout
 

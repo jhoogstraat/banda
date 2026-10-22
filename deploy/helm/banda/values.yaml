@@ -1,6 +1,6 @@
 # Banda in one namespace: the API, its sandboxes, and optionally Postgres and Dex.
-# Needs the agent-sandbox controller (see README, "Install") and a CNI that
-# enforces NetworkPolicy. Every API setting is in the README.
+# Needs the agent-sandbox controller (docs/deployment.md, "Install") and a CNI that
+# enforces NetworkPolicy. Every API setting is in docs/configuration.md.
 
 # Where browsers reach Banda. Empty: https://<ingress.host> (http without
 # ingress.tlsSecret), or http://localhost:8787 without an ingress (port-forward).

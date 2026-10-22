@@ -4,7 +4,7 @@ What is left before Banda runs fully, ordered by when it's needed. Measured agai
 
 ## Where we are
 
-Feature work for v1 is essentially complete and covered by the e2e suite with the fake agent: threads, sandboxes and their lifecycle, multiplayer (mentions, chat mode, turn requests, trust, handoffs), permissions, diff review, forks and races, sub-threads and the MCP server, profiles, search, the team board, decisions, preview, files and terminal, auto-push, sandbox isolation.
+Feature work for v1 is essentially complete and covered by the e2e suite with the fake agent: threads, sandboxes and their lifecycle, multiplayer (mentions, chat mode, turn requests, trust, handoffs), permissions, diff review, forks and races, sub-threads and the MCP server, profiles, search, the team board, decisions, preview, files and terminal, auto-push, sandbox isolation, and GitHub/GitLab pull requests through their APIs (against a fake forge). Packaging (Helm, Kustomize, release manifest), CI and releases exist.
 
 What isn't proven is **real use**: no real Claude Code turn has run through Banda yet, and it has never run anywhere but in kind.
 
@@ -15,7 +15,7 @@ What isn't proven is **real use**: no real Claude Code turn has run through Band
 | 3. Never loses work, no manual cleanup | Built (auto-push, settled deletion); `mise run clean` is still dev-only |
 | 4. Team habits: mentions, reviews, forks, handoffs | Built |
 | 5. A non-engineer gets work done | Profiles built; untried with a person |
-| 6. One person installs it from one page | Helm chart, Kustomize and release manifests (README, Install); never installed outside kind |
+| 6. One person installs it from one page | Helm chart, Kustomize and release manifests (docs/deployment.md); never installed outside kind |
 
 ## Phase 1: run it for real on this Mac (Podman + kind)
 
@@ -24,7 +24,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] `mise run up`, sign in as alice, create a thread on a real repo.
 - [ ] Log in to Claude Code with your own subscription (Settings or the thread's terminal); check the login survives a suspend and resume, and is shared by a second thread.
 - [ ] Add a `GIT_TOKEN` secret; check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
-- [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in README's table are enough and no more.
+- [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in docs/usage.md are enough and no more.
 - [ ] Verify against the real CLI what is only sourced from docs (PLAN.md, "Verified only partly" and "Not yet"):
   - [ ] a real turn streams correctly (tool calls, thinking, subagents, the TodoWrite plan);
   - [ ] `queued_turn_count` when a prompt is folded into a running turn;
@@ -48,8 +48,15 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Ingress on a real cluster: check the controller keeps thread streams open (read timeouts).
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [ ] Versioned schema migrations before the first column change (`internal/store/store.go`).
-- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). README's Install section is the start; it needs a run on a real cluster.
+- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", is the start; it needs a run on a real cluster.
 - [ ] Decide on Claude: confirm the persistent login volume and teammate turns with Anthropic (PLAN.md, open question 3) before more than the core team uses it.
+
+## Open-source launch
+
+- [x] MIT license, SECURITY.md, CONTRIBUTING.md, a README with the quick start and install options.
+- [ ] Create `github.com/jhoogstraat/banda`, push `main`; enable private vulnerability reporting (SECURITY.md points to it).
+- [ ] Tag `v0.1.0`; after the first release, make the GHCR packages `banda-api`, `banda-sandbox` and `charts/banda` public (GHCR creates them private), then check `helm install` from the README works on a fresh cluster.
+- [ ] Confirm with Anthropic first (PLAN.md, open question 3).
 
 ## Phase 3: the team cluster
 
