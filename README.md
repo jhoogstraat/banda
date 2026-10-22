@@ -6,8 +6,8 @@ A web app where a team builds software together with coding agents. Each thread 
 
 ## Prerequisites
 
-- [mise](https://mise.jdx.dev): `mise install` provides go, node, pnpm, buf, kind, kubectl, podman and jq.
-- Podman with the default machine (`podman machine init`, at least 8 CPUs and 16 GiB to share it with other projects). `mise.toml` points `podman` and `kind` at its root connection. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`.
+- [mise](https://mise.jdx.dev): `mise install` provides go, node, pnpm, buf, kind, kubectl, helm, podman, jq and actionlint.
+- Podman with the default machine (`podman machine init`, at least 8 CPUs and 16 GiB to share it with other projects). `mise.toml` points `podman` and `kind` at its root connection. For Docker (OrbStack, Docker Desktop), set `KIND_EXPERIMENTAL_PROVIDER=docker`, `CONTAINER=docker` and `RUNNER_API_URL=http://host.docker.internal:8787` under `[env]` in a `mise.local.toml`; with Docker Desktop also `HOST_IP` (the host's address as pods see it) for the sandbox policies and `mise run e2e`. On Linux with Docker, `KIND_EXPERIMENTAL_PROVIDER=docker` and `CONTAINER=docker` suffice: the host is the gateway of kind's network (CI runs it that way).
 
 ## Dev loop
 
@@ -50,7 +50,7 @@ Before the agent starts, a thread installs the tools from the repo's `mise.toml`
 
 ## Sign in
 
-The cluster runs [Dex](https://dexidp.io), a local OIDC provider, reached through the web server at `/dex`. Sign in as `alice`, `bob` or `carol` (`@example.com`) with the password `password`. `DEV_AUTH=1 mise run api` skips sign-in and trusts the `X-Banda-User` header instead (default user `dev`).
+The cluster runs [Dex](https://dexidp.io), a local OIDC provider, reached through the web server at `/dex` (in the cluster, through the API: see Install). Sign in as `alice`, `bob` or `carol` (`@example.com`) with the password `password`. `DEV_AUTH=1 mise run api` skips sign-in and trusts the `X-Banda-User` header instead (default user `dev`).
 
 To use another OIDC provider, set these before `mise run api` (or when running `cmd/api`) and register `$PUBLIC_URL/auth/callback` as its redirect URI:
 
@@ -61,7 +61,7 @@ To use another OIDC provider, set these before `mise run api` (or when running `
 | `PUBLIC_URL` | Origin the browser uses, default `http://localhost:5173`. |
 | `SESSION_SECRET` | Signs the session cookie. If empty, a random one is used and sessions end when the API restarts. |
 
-Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`, checked every `IDLE_SWEEP_EVERY`, default `1m`), `LOGIN_IDLE_AFTER` (default `10m`: login environments without a terminal), `DELETE_SETTLED_AFTER` (default `168h`: settled environments whose work is pushed), `MAX_SUBTHREAD_DEPTH` (default `3`) and `MAX_AGENT_THREADS` (default `8`: agents' sub-threads, see PLAN.md), `OVERLAP_WINDOW` (default `168h`: how recently two threads must have changed for shared files to count as an overlap; `0` turns overlaps off), `SANDBOX_EGRESS_ALLOW` (comma-separated CIDRs sandboxes may reach besides the internet, such as production; see Sandbox isolation), `TEST_SUSPEND_PAUSE` (tests only: holds every suspend between the thread's status and its pod), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build), `WATCH_BUFFER` (default `256`: events a thread stream may lag behind before it catches up from the database; small for tests).
+Without `OIDC_ISSUER` the API only starts with `DEV_AUTH=1`. Other API settings: `DATABASE_URL`, `SANDBOX_NAMESPACE`, `SANDBOX_IMAGE`, `RUNNER_API_URL`, `IDLE_SUSPEND_AFTER` (default `30m`, checked every `IDLE_SWEEP_EVERY`, default `1m`), `LOGIN_IDLE_AFTER` (default `10m`: login environments without a terminal), `DELETE_SETTLED_AFTER` (default `168h`: settled environments whose work is pushed), `MAX_SUBTHREAD_DEPTH` (default `3`) and `MAX_AGENT_THREADS` (default `8`: agents' sub-threads, see PLAN.md), `OVERLAP_WINDOW` (default `168h`: how recently two threads must have changed for shared files to count as an overlap; `0` turns overlaps off), `SANDBOX_EGRESS_ALLOW` (comma-separated CIDRs sandboxes may reach besides the internet, such as production; see Sandbox isolation), `DEX_URL` (a bundled Dex, e.g. `http://dex.banda.svc:5556`, whose issuer is `$PUBLIC_URL/dex`: the API serves it at `/dex/` and reaches it there directly; the chart sets it), `TEST_SUSPEND_PAUSE` (tests only: holds every suspend between the thread's status and its pod), `ADDR` (default `:8787`), `WEB_DIR` (serve a web build), `WATCH_BUFFER` (default `256`: events a thread stream may lag behind before it catches up from the database; small for tests).
 
 The Browser tab shows apps running in a thread's environment from a second origin: `PREVIEW_ADDR` (default `:8788`) is where the API serves it, `PREVIEW_URL` the URL browsers use for it, by default the host they reach Banda on with that port. Keep it on the same site as Banda (another port, or a sibling subdomain such as `preview.banda.example.com`): the preview signs in with a SameSite cookie. Previewed apps run code from the sandboxes on that site; outside a trusted LAN serve Banda over https (its cookies are then `__Host-`) with the preview on a sibling subdomain.
 
@@ -71,14 +71,43 @@ The Browser tab shows apps running in a thread's environment from a second origi
 - `mise run e2e`: the end-to-end suite in `web/e2e` ([Playwright](https://playwright.dev)): API tests with typed Connect clients and browser tests with one context per user, Dex sign-in included. It runs a fake agent that needs no Claude login (`deploy/fake-claude`, whose directives hold, crash or echo a turn, or ask before a call), and maps `https://github.com/e2e/<repo>.git` to its git server for GitHub-only UI (the pull request link). Every run gets a world of its own, derived from the checkout path, so checkouts run it side by side: namespace `banda-e2e-<run>` (sandboxes, volumes, a git server with the fixture repos, Dex), database `banda_e2e_<run>`, the image `localhost/banda-sandbox:fake-<run>` and APIs on free ports; it is deleted afterwards (`E2E_KEEP=1` keeps it). Arguments go to Playwright: `mise run e2e -- e2e/fork.spec.ts`, `mise run e2e -- -g "race"`. `E2E_WORKERS` (default 4) sets the parallelism. Failures leave a trace, the threads' last events and the API log (`/tmp/banda-e2e-<run>/`): `pnpm -C web exec playwright show-report`.
 - `deploy/long-thread.sh [N]` seeds a suspended thread with N events (default 20000) straight into Postgres and prints its id, to try or measure long threads without running an agent.
 
-## Run the API in the cluster
+## Install
 
-`mise run deploy` builds the API image (with the web build), loads it into kind and applies `deploy/banda.yaml`. Settings come from the optional Secret `banda-api` (the variables above). Run either `mise run api` or `mise run deploy`, not both. Reach it with `kubectl -n banda port-forward svc/banda-api 8787 8788`.
+Banda needs a Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and the [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller, which is cluster-wide and not part of the chart:
+
+```sh
+kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+```
+
+Everything else is the Helm chart `deploy/helm/banda`, released to `oci://ghcr.io/jhoogstraat/charts/banda` with images `ghcr.io/jhoogstraat/banda-api` and `banda-sandbox` (amd64 and arm64) of the same version. Its [values](deploy/helm/banda/values.yaml) are the settings above: `publicUrl`, `ingress.*` (Banda and the preview on sibling hosts, with TLS), `oidc.*` or `dex.*`, `postgres.*` (bundled, or `postgres.enabled=false` and your own `DATABASE_URL`), `podCIDR` (your pod network, for the ingress policies), `egressAllow`, and `api.env` for the rest.
+
+```sh
+helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-namespace \
+  --set ingress.enabled=true,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=banda-tls \
+  --set oidc.issuer=https://login.example.com,oidc.clientSecret=... --set podCIDR=10.42.0.0/16
+```
+
+Register `$PUBLIC_URL/auth/callback` with your provider. To try it without one, `--set dex.enabled=true` with `dex.users` (see `deploy/kustomize/kind/values.yaml`): the API serves Dex at `$PUBLIC_URL/dex`, so it needs no host of its own (docs/deployment.md, "Sign-in with the bundled Dex"). The session secret, Postgres password and Dex client secret are generated on install and kept on upgrades.
+
+Without Helm: every release has `banda.yaml`, the chart rendered as the Kustomize base renders it, and `deploy/kustomize/base` inflates the chart for Kustomize (`kubectl kustomize --enable-helm`, which runs `helm`); `deploy/kustomize/example` patches it for a real cluster. Neither can keep generated secrets, so both read their settings from a Secret you create first:
+
+```sh
+kubectl create namespace banda
+kubectl -n banda create secret generic banda-api --from-literal=SESSION_SECRET=$(openssl rand -hex 32) \
+  --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) --from-literal=OIDC_ISSUER=... --from-literal=OIDC_CLIENT_ID=... --from-literal=OIDC_CLIENT_SECRET=...
+kubectl -n banda apply -f https://github.com/jhoogstraat/banda/releases/download/v1.0.0/banda.yaml
+```
+
+The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` to `http://localhost:8787` (a port-forward) and `SANDBOX_IMAGE` to the release's, so patch the first for an ingress, as the example overlay does, and add the Ingress.
+
+### In kind
+
+`mise run deploy` builds the API image (with the web build), loads it into kind and installs the chart with the API and Dex (`deploy/kustomize/kind/values.yaml`, also `kubectl kustomize --enable-helm deploy/kustomize/kind`). Reach it with `kubectl --context kind-banda -n banda port-forward svc/banda-api 8787 8788` and sign in at `http://localhost:8787` as alice. Run either `mise run api` or `mise run deploy`, not both: they share the database and the sandboxes. `mise run up` removes the in-cluster API again and points Dex back at the web server. `mise run chart-check` lints the chart and renders it with every values file and overlay.
 
 ## Sandbox isolation
 
-Sandboxes run the repo's code and the agent, so NetworkPolicies let them reach only DNS, the internet and the API (`deploy/sandbox-policy.yaml`), and Postgres and Dex take connections only from the API and from outside the cluster (`deploy/postgres.yaml`, `deploy/dex.yaml`); `mise run up` and `mise run e2e` apply them on every start. An API on this machine (`mise run api`) must listen on a port in 8700–8999 for sandboxes in `banda` to reach it.
+Sandboxes run the repo's code and the agent, so NetworkPolicies let them reach only DNS, the internet and the API (`deploy/helm/banda/templates/policies.yaml`), and Postgres and Dex take connections only from the API and from outside the cluster (their templates); the chart installs them, in dev through `mise run up`. An API on this machine (`mise run api`) must listen on a port in 8700–8999 for sandboxes in `banda` to reach it.
 
 Private networks, such as production or a private git host, are closed too until `SANDBOX_EGRESS_ALLOW` lists them: comma-separated CIDRs (`10.20.0.0/16,10.30.1.5/32`; NetworkPolicies can't name hosts). The API applies them when it starts, as the NetworkPolicy `sandboxes-allow` in `SANDBOX_NAMESPACE` (set it in the Secret `banda-api` in the cluster); empty removes it, and a bad CIDR stops the API with an error. Postgres, Dex and the API in the cluster (except on its runner port) still refuse sandboxes inside an allowed range, and the Kubernetes API and kubelets refuse them without a token. Everything else in the range is open, so allow only what agents need: a range over the cluster's own networks opens its other pods and NodePorts, and in dev one over `host.containers.internal` (192.168.127.254) the host's ports, Postgres's among them. For a production Kubernetes cluster, keep it separate from Banda's: put a kubeconfig for it in a secret and allow its API server's address if that is private. Don't give sandboxes a service account in Banda's cluster.
 
-For a shared deployment run the API in the cluster, remove Postgres's NodePort, give Postgres a generated password and the API a non-superuser role, never set `DEV_AUTH`, use a CNI that enforces NetworkPolicy, and put your cluster's pod network where the ingress policies name kind's (`10.244.0.0/16`). See PLAN.md, open risk 9.
+For a shared deployment install the chart (see Install): no NodePorts, a generated Postgres password, never `api.devAuth`, a CNI that enforces NetworkPolicy, and your cluster's pod network in `podCIDR` instead of kind's (`10.244.0.0/16`). The API still connects as Postgres's superuser. See PLAN.md, open risk 9.
