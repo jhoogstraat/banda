@@ -1,6 +1,6 @@
 # Banda
 
-A web app where a team builds software together with coding agents. Each thread is one owner, one Claude Code agent and one isolated Kubernetes sandbox with the repo checked out on its own branch. Teammates can browse each other's threads, post into them and mention each other. See [PLAN.md](PLAN.md) for the architecture, decisions and status.
+A web app where a team builds software together with coding agents. Each thread is one owner, one Claude Code agent and one isolated Kubernetes sandbox with the repo checked out on its own branch. Teammates can browse each other's threads, post into them and mention each other. See [VISION.md](VISION.md) for why, [PLAN.md](PLAN.md) for the architecture, decisions and status, [todo.md](todo.md) for what's left and [docs/deployment.md](docs/deployment.md) for deployment options.
 
 ![A thread with the diff pane](docs/screenshots/thread.png)
 

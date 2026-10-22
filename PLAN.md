@@ -2,9 +2,7 @@
 
 ## Vision
 
-Banda is a web app where a team builds software together with coding agents. Each piece of work is a **thread**: one owner, one coding agent (model, effort, profile), and one isolated Kubernetes environment with the repo checked out on its own branch. Teammates can browse each other's threads, post into them, and discuss right inside the chat.
-
-**Audience:** an internal tool for my team. It may be open-sourced later, but it will never be sold.
+Banda is a web app where a team builds software together with coding agents. Each piece of work is a **thread**: one owner, one coding agent (model, effort, profile), and one isolated Kubernetes environment with the repo checked out on its own branch. Teammates can browse each other's threads, post into them, and discuss right inside the chat. The why, the audience and the principles for deciding are in [VISION.md](VISION.md); what's left is in [todo.md](todo.md).
 
 ## Non-goals (for now)
 
