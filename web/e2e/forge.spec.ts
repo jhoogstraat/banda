@@ -143,6 +143,26 @@ test('a self-hosted GitLab (FORGE_HOSTS): link the open merge request of the bra
 	await expect(page.getByRole('button', { name: 'MR !1 · Merged' })).toBeVisible();
 });
 
+test('the new-thread composer lists my repositories from the forge, filtered as I type', async ({ as, startApi, forge }) => {
+	const api = await startApi({ TEST_FORGE_URL: forge.url });
+	const alice = as('alice', api);
+	forge.tokens = { 'alice-token': 'alice' };
+	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'alice-token' });
+	const page = await alice.page();
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Choose repository' }).click();
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/profiles' })).toBeVisible();
+	await page.getByLabel('Repository URL').fill('pla');
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/profiles' })).toBeHidden();
+	await page.getByRole('menuitemradio', { name: 'e2e/plain' }).click();
+	await page.getByPlaceholder('Describe the task.').fill('e2e: from my repositories');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/t\/[a-z0-9]+$/);
+	const t = alice.thread(page.url().split('/').pop()!);
+	expect((await t.get()).repoUrl).toBe(repoUrl);
+	await expect(page.getByText('Created hello1.txt')).toBeVisible({ timeout: 90_000 }); // cloned through the URL picked
+});
+
 test('without a token for the forge, the header keeps the link to its compare page', async ({ as }) => {
 	const alice = as('alice'); // the run's API: no forge calls happen here
 	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'e2e' });

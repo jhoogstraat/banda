@@ -11,12 +11,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/google/go-github/v93/github"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
@@ -117,6 +121,43 @@ func (c Config) Open(r Repo, token string) (Forge, error) {
 		return newGitHub(r, base, token)
 	}
 	return newGitLab(r, base, token)
+}
+
+// Known lists every host Banda knows the forge of.
+func (c Config) Known() map[string]string {
+	hosts := map[string]string{"github.com": GitHub, "gitlab.com": GitLab}
+	maps.Copy(hosts, c.Hosts)
+	return hosts
+}
+
+// Repos lists the token's user's 100 most recently pushed repositories on the host.
+func (c Config) Repos(ctx context.Context, kind, host, token string) ([]*bandav1.ForgeRepo, error) {
+	r := Repo{Kind: kind, Host: host}
+	f, err := c.Open(r, token)
+	if err != nil {
+		return nil, err
+	}
+	var out []*bandav1.ForgeRepo
+	switch f := f.(type) {
+	case *gitHub:
+		repos, _, err := f.c.Repositories.ListByAuthenticatedUser(ctx, &github.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: github.ListOptions{PerPage: 100}})
+		if err != nil {
+			return nil, ghError(err)
+		}
+		for _, p := range repos {
+			out = append(out, &bandav1.ForgeRepo{Url: "https://" + host + "/" + p.GetFullName() + ".git", Name: p.GetFullName(), Description: p.GetDescription(), Forge: kind})
+		}
+	case *gitLab:
+		projects, _, err := f.c.Projects.ListProjects(&gitlab.ListProjectsOptions{Membership: gitlab.Ptr(true), OrderBy: gitlab.Ptr("last_activity_at"),
+			ListOptions: gitlab.ListOptions{PerPage: 100}}, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, glError(err)
+		}
+		for _, p := range projects {
+			out = append(out, &bandav1.ForgeRepo{Url: "https://" + host + "/" + p.PathWithNamespace + ".git", Name: p.PathWithNamespace, Description: p.Description, Forge: kind})
+		}
+	}
+	return out, nil
 }
 
 // Error is a forge's answer that clients may see; anything else is internal.

@@ -6,6 +6,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { api } from '#lib/api.js';
+	import type { ForgeRepo } from '#lib/gen/banda/v1/banda_pb.js';
 	import { noRepo, projectName, projects } from '#lib/threads.svelte.js';
 
 	// The composer chip for the repository (or noRepo) and base branch of a new thread.
@@ -14,6 +16,17 @@
 	let open = $state(false);
 	let custom = $state('');
 	const known = $derived([...new Set([repoUrl, ...projects()].filter((url) => url && url !== noRepo))]);
+	// The caller's repositories on the forges they have a token for, loaded when the menu first opens; the URL field filters them.
+	let mine = $state<ForgeRepo[]>([]);
+	let asked = false;
+	$effect(() => {
+		if (!open || asked) return;
+		asked = true;
+		api.listForgeRepos({}).then((r) => (mine = r.repos)).catch(() => {}); // without them the field still takes a URL
+	});
+	const matches = $derived(
+		mine.filter((r) => !known.includes(r.url) && r.name.toLowerCase().includes(custom.trim().toLowerCase())).slice(0, 8)
+	);
 	const Icon = $derived(repoUrl === noRepo ? FolderIcon : FolderGit2Icon);
 
 	function useCustom(e: SubmitEvent) {
@@ -45,10 +58,16 @@
 			{#each known as url (url)}
 				<DropdownMenu.RadioItem value={url} title={url}><span class="truncate">{projectName(url)}</span></DropdownMenu.RadioItem>
 			{/each}
+			{#if matches.length}
+				<DropdownMenu.Label class="text-xs font-normal text-muted-foreground">Your repositories</DropdownMenu.Label>
+				{#each matches as r (r.url)}
+					<DropdownMenu.RadioItem value={r.url} title={r.description || r.url}><span class="truncate">{r.name}</span></DropdownMenu.RadioItem>
+				{/each}
+			{/if}
 			<DropdownMenu.RadioItem value={noRepo} title="For work without code: the agent starts in an empty folder">No repository</DropdownMenu.RadioItem>
 		</DropdownMenu.RadioGroup>
 		<form class="flex gap-1 p-1" onsubmit={useCustom}>
-			<Input bind:value={custom} onkeydown={keepKeys} placeholder="https://github.com/org/repo.git" aria-label="Repository URL" class="h-7 min-w-0 text-xs" />
+			<Input bind:value={custom} onkeydown={keepKeys} placeholder="Search yours, or a URL" aria-label="Repository URL" class="h-7 min-w-0 text-xs" />
 			<Button type="submit" size="sm" disabled={!custom.trim()}>Use</Button>
 		</form>
 		{#if repoUrl !== noRepo}

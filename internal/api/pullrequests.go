@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -404,6 +406,41 @@ func (s *Service) PullRequestComment(ctx context.Context, req *bandav1.PullReque
 	}
 	pr, _ = s.refresh(ctx, t, pr, "system") // a failure is in pr.Error; the comment is posted
 	return &bandav1.PullRequestCommentResponse{PullRequest: pr}, nil
+}
+
+// ListForgeRepos asks every known forge the caller has a token for, at once;
+// one that fails or takes over 10 s is left out (the URL field still works).
+// ponytail: the 100 most recently pushed per forge, filtered in the browser; search on the forge if that isn't enough.
+func (s *Service) ListForgeRepos(ctx context.Context, _ *bandav1.ListForgeReposRequest) (*bandav1.ListForgeReposResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	found := map[string][]*bandav1.ForgeRepo{}
+	for host, kind := range Forges.Known() {
+		token, err := s.forgeToken(ctx, user(ctx), kind)
+		if err != nil {
+			return nil, err
+		}
+		if token == "" {
+			continue
+		}
+		wg.Go(func() {
+			repos, err := Forges.Repos(ctx, kind, host, token)
+			if err != nil {
+				slog.Info("list forge repos", "host", host, "user", user(ctx), "err", err)
+			}
+			mu.Lock()
+			found[host] = repos
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	res := &bandav1.ListForgeReposResponse{}
+	for _, host := range slices.Sorted(maps.Keys(found)) {
+		res.Repos = append(res.Repos, found[host]...)
+	}
+	return res, nil
 }
 
 // PollPullRequests refreshes linked pull requests from their forges: those

@@ -107,6 +107,8 @@ export class FakeForge {
 			p.draft = String(body.query).includes('convertPullRequestToDraft');
 			return send(res, 200, { data: {} });
 		}
+		if (method === 'GET' && path === '/api/v3/user/repos')
+			return send(res, 200, [{ full_name: 'e2e/plain', description: 'The fixture repository' }, { full_name: 'e2e/profiles' }]);
 		const m = path.match(/^\/api\/v3\/repos\/e2e\/(\w+)(\/.*)?$/);
 		if (!m) return send(res, 404, { message: 'Not Found' });
 		const [, repo, rest = ''] = m;
@@ -173,6 +175,7 @@ export class FakeForge {
 			const name = url.searchParams.get('username');
 			return send(res, 200, name ? [{ id: this.idOf(name), username: name }] : []);
 		}
+		if (method === 'GET' && path === '/api/v4/projects') return send(res, 200, []); // github.com's repositories are the ones listed
 		const m = path.match(/^\/api\/v4\/projects\/e2e\/(\w+)(\/.*)$/);
 		if (!m) return send(res, 404, { message: '404 Not Found' });
 		const [, repo, rest] = m;

@@ -153,6 +153,9 @@ const (
 	// ThreadServicePullRequestCommentProcedure is the procedure name of the ThreadService's
 	// PullRequestComment RPC.
 	ThreadServicePullRequestCommentProcedure = "/banda.v1.ThreadService/PullRequestComment"
+	// ThreadServiceListForgeReposProcedure is the procedure name of the ThreadService's ListForgeRepos
+	// RPC.
+	ThreadServiceListForgeReposProcedure = "/banda.v1.ThreadService/ListForgeRepos"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -560,6 +563,13 @@ var (
 			Procedure:  ThreadServicePullRequestCommentProcedure,
 		}
 	})
+	threadServiceListForgeReposSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ListForgeRepos"),
+			Procedure:  ThreadServiceListForgeReposProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -696,6 +706,9 @@ type ThreadServiceClient interface {
 	// Comments on it, or replies to a review comment, with the caller's own
 	// token (refused without one).
 	PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error)
+	// The caller's repositories on the forges they have a token for, for the
+	// new-thread composer.
+	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -941,6 +954,9 @@ type ThreadServiceHandler interface {
 	// Comments on it, or replies to a review comment, with the caller's own
 	// token (refused without one).
 	PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error)
+	// The caller's repositories on the forges they have a token for, for the
+	// new-thread composer.
+	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -1000,6 +1016,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServicePullRequestUpdateSpec(), Handler: adapter.pullRequestUpdate},
 		connect.Method{Spec: threadServicePullRequestMergeSpec(), Handler: adapter.pullRequestMerge},
 		connect.Method{Spec: threadServicePullRequestCommentSpec(), Handler: adapter.pullRequestComment},
+		connect.Method{Spec: threadServiceListForgeReposSpec(), Handler: adapter.listForgeRepos},
 	)
 }
 
@@ -1290,6 +1307,10 @@ func (UnimplementedThreadServiceHandler) PullRequestMerge(context.Context, *v1.P
 
 func (UnimplementedThreadServiceHandler) PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestComment is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ListForgeRepos is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1707,6 +1728,14 @@ func (c *threadServiceClient) PullRequestMerge(ctx context.Context, req *v1.Pull
 func (c *threadServiceClient) PullRequestComment(ctx context.Context, req *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error) {
 	var res v1.PullRequestCommentResponse
 	if err := c.client.CallUnary(ctx, threadServicePullRequestCommentSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ListForgeRepos(ctx context.Context, req *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
+	var res v1.ListForgeReposResponse
+	if err := c.client.CallUnary(ctx, threadServiceListForgeReposSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2312,6 +2341,18 @@ func (h threadServiceHandler) pullRequestComment(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.PullRequestComment(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) listForgeRepos(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListForgeReposRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListForgeRepos(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -5309,6 +5309,74 @@ export declare type PullRequestCommentResponse = Message$1<"banda.v1.PullRequest
 export declare const PullRequestCommentResponseSchema: GenMessage<PullRequestCommentResponse>;
 
 /**
+ * @generated from message banda.v1.ListForgeReposRequest
+ */
+export declare type ListForgeReposRequest = Message$1<"banda.v1.ListForgeReposRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.ListForgeReposRequest.
+ * Use `create(ListForgeReposRequestSchema)` to create a new message.
+ */
+export declare const ListForgeReposRequestSchema: GenMessage<ListForgeReposRequest>;
+
+/**
+ * @generated from message banda.v1.ListForgeReposResponse
+ */
+export declare type ListForgeReposResponse = Message$1<"banda.v1.ListForgeReposResponse"> & {
+  /**
+   * The caller's most recently pushed repositories on each forge they have a
+   * token for, newest first; a forge that fails is left out.
+   *
+   * @generated from field: repeated banda.v1.ForgeRepo repos = 1;
+   */
+  repos: ForgeRepo[];
+};
+
+/**
+ * Describes the message banda.v1.ListForgeReposResponse.
+ * Use `create(ListForgeReposResponseSchema)` to create a new message.
+ */
+export declare const ListForgeReposResponseSchema: GenMessage<ListForgeReposResponse>;
+
+/**
+ * @generated from message banda.v1.ForgeRepo
+ */
+export declare type ForgeRepo = Message$1<"banda.v1.ForgeRepo"> & {
+  /**
+   * The https URL to clone.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * owner/name, or GitLab's group/name.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * "github" or "gitlab".
+   *
+   * @generated from field: string forge = 4;
+   */
+  forge: string;
+};
+
+/**
+ * Describes the message banda.v1.ForgeRepo.
+ * Use `create(ForgeRepoSchema)` to create a new message.
+ */
+export declare const ForgeRepoSchema: GenMessage<ForgeRepo>;
+
+/**
  * @generated from enum banda.v1.Status
  */
 export enum Status {
@@ -6361,6 +6429,17 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof PullRequestCommentRequestSchema;
     output: typeof PullRequestCommentResponseSchema;
+  },
+  /**
+   * The caller's repositories on the forges they have a token for, for the
+   * new-thread composer.
+   *
+   * @generated from rpc banda.v1.ThreadService.ListForgeRepos
+   */
+  listForgeRepos: {
+    methodKind: "unary";
+    input: typeof ListForgeReposRequestSchema;
+    output: typeof ListForgeReposResponseSchema;
   },
 }>;
 

@@ -139,6 +139,9 @@ service ThreadService {
   // Comments on it, or replies to a review comment, with the caller's own
   // token (refused without one).
   rpc PullRequestComment(PullRequestCommentRequest) returns (PullRequestCommentResponse);
+  // The caller's repositories on the forges they have a token for, for the
+  // new-thread composer.
+  rpc ListForgeRepos(ListForgeReposRequest) returns (ListForgeReposResponse);
 }
 
 service UserService {
@@ -1641,4 +1644,22 @@ message PullRequestCommentRequest {
 
 message PullRequestCommentResponse {
   PullRequest pull_request = 1;
+}
+
+message ListForgeReposRequest {}
+
+message ListForgeReposResponse {
+  // The caller's most recently pushed repositories on each forge they have a
+  // token for, newest first; a forge that fails is left out.
+  repeated ForgeRepo repos = 1;
+}
+
+message ForgeRepo {
+  // The https URL to clone.
+  string url = 1;
+  // owner/name, or GitLab's group/name.
+  string name = 2;
+  string description = 3;
+  // "github" or "gitlab".
+  string forge = 4;
 }

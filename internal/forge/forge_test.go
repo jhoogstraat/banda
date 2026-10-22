@@ -308,4 +308,20 @@ func TestGitLab(t *testing.T) {
 	}
 }
 
+func TestRepos(t *testing.T) {
+	_, base := newFake(t, map[string]any{
+		"GET /api/v3/user/repos": []any{map[string]any{"full_name": "o/r", "description": "d"}},
+		"GET /api/v4/projects":   []any{map[string]any{"path_with_namespace": "g/sub/p"}},
+	})
+	c := Config{TestURL: base}
+	gh, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok")
+	if err != nil || len(gh) != 1 || gh[0].Url != "https://ghe.corp/o/r.git" || gh[0].Description != "d" {
+		t.Errorf("GitHub repos %v, %v", gh, err)
+	}
+	gl, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok")
+	if err != nil || len(gl) != 1 || gl[0].Url != "https://gitlab.com/g/sub/p.git" || gl[0].Forge != GitLab {
+		t.Errorf("GitLab repos %v, %v", gl, err)
+	}
+}
+
 func ptr[T any](v T) *T { return &v }
