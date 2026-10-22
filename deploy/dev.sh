@@ -120,7 +120,7 @@ EOF
 	# The fixture repos at git://e2e-git/<name>.git; readonly refuses pushes.
 	kc -n "$ns" run e2e-git --image="$SANDBOX_IMAGE" --image-pull-policy=Never --port=9418 --expose --command -- sh -c \
 		'cp -r /opt/e2e /tmp/git && cp -r /tmp/git/plain.git /tmp/git/readonly.git &&
-		for r in plain setup-fails setup-bg setup-hold; do git --git-dir=/tmp/git/$r.git config daemon.receivepack true; done &&
+		for r in plain setup-fails setup-bg setup-hold profiles; do git --git-dir=/tmp/git/$r.git config daemon.receivepack true; done &&
 		exec git daemon --reuseaddr --base-path=/tmp/git --export-all /tmp/git' >/dev/null
 	kc -n "$ns" rollout status deployment/dex --timeout=300s >/dev/null
 	start dex kubectl --context kind-banda -n "$ns" port-forward svc/dex "$dp:5556"; PIDS+=("$PID")

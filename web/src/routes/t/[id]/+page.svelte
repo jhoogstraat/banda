@@ -239,7 +239,7 @@
 		}
 	}
 
-	function setAgent(change: { model?: string; effort?: string }) {
+	function setAgent(change: { model?: string; effort?: string; profile?: string }) {
 		Object.assign(thread!, change); // the chip shows the choice right away
 		act(api.setAgentSettings({ threadId: id, ...change }));
 	}

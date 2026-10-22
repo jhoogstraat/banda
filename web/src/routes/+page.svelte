@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
+	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import SplitIcon from '@lucide/svelte/icons/split';
@@ -17,6 +18,7 @@
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { AuthMethod, LoginState, PermissionMode } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes } from '#lib/permissions.js';
+	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
 	import { projects, threads } from '#lib/threads.svelte.js';
 
 	// A new thread is an empty chat: the first message creates it. The last choices are remembered
@@ -27,6 +29,8 @@
 	let model = $state(saved('model', models[0]));
 	let effort = $state(saved('effort', 'high'));
 	let permissions = $state(saved('permissions', permissionLabel(PermissionMode.BYPASS)));
+	// Not remembered: it starts at the default profile from Settings ('' until loaded: the API uses that default).
+	let profile = $state('');
 	// Not remembered: every try runs (and bills) its own agent.
 	let tries = $state(tryOptions[0]);
 	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
@@ -45,7 +49,8 @@
 	const checkAccount = () =>
 		settingsApi
 			.getSettings({})
-			.then(({ accounts }) => {
+			.then(({ accounts, defaultProfile }) => {
+				profile ||= defaultProfile;
 				const a = accounts.find((a) => a.harness === 'claude');
 				if (!a) connect = '';
 				else if (a.authMethod === AuthMethod.API_KEY) connect = a.apiKeySet ? '' : 'key';
@@ -71,10 +76,10 @@
 			const race = raceTries(tries, model, effort);
 			const permissionMode = permissionModes[permissions] ?? PermissionMode.BYPASS;
 			if (race.length > 1) {
-				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race, permissionMode });
+				const { threads } = await api.race({ repoUrl, baseBranch, prompt: text, tries: race, permissionMode, profile });
 				await goto(`/compare?race=${threads[0].raceId}`);
 			} else {
-				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text, permissionMode });
+				const { thread } = await api.createThread({ repoUrl, baseBranch, model, effort, prompt: text, permissionMode, profile });
 				await goto(`/t/${thread!.id}`);
 			}
 		} catch (err) {
@@ -121,6 +126,7 @@
 						<RepoPicker bind:repoUrl bind:baseBranch />
 						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
 						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
+						<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
 						<OptionMenu label="Permissions" icon={ShieldIcon} bind:value={permissions} options={Object.keys(permissionModes)} />
 						<OptionMenu label="Try N ways" icon={SplitIcon} bind:value={tries} options={tryOptions} />
 					</PromptInput.Tools>

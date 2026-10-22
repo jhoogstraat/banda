@@ -188,6 +188,13 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * Who the agent works with, see AgentSettings.
+   *
+   * @generated from field: string profile = 31;
+   */
+  profile: string;
 };
 
 /**
@@ -394,7 +401,8 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "typing";
   } | {
     /**
-     * The owner changed the model or effort; actor is the owner.
+     * The owner changed the model or effort (both set), the profile (set
+     * when it changed) or both; actor is the owner.
      *
      * @generated from field: banda.v1.AgentSettings agent_settings = 26;
      */
@@ -1043,6 +1051,13 @@ export declare type CreateThreadRequest = Message$1<"banda.v1.CreateThreadReques
    * @generated from field: banda.v1.PermissionMode permission_mode = 6;
    */
   permissionMode: PermissionMode;
+
+  /**
+   * Empty: the owner's default profile.
+   *
+   * @generated from field: string profile = 7;
+   */
+  profile: string;
 };
 
 /**
@@ -1228,7 +1243,7 @@ export declare type SetModeResponse = Message$1<"banda.v1.SetModeResponse"> & {
 export declare const SetModeResponseSchema: GenMessage<SetModeResponse>;
 
 /**
- * The agent's model and effort.
+ * The agent's model, effort and profile.
  *
  * @generated from message banda.v1.AgentSettings
  */
@@ -1242,6 +1257,14 @@ export declare type AgentSettings = Message$1<"banda.v1.AgentSettings"> & {
    * @generated from field: string effort = 2;
    */
   effort: string;
+
+  /**
+   * Who the agent works with: "engineer" (Claude Code as it is), "spec",
+   * "devops" or "business". Its text is appended to the system prompt.
+   *
+   * @generated from field: string profile = 3;
+   */
+  profile: string;
 };
 
 /**
@@ -1270,6 +1293,11 @@ export declare type SetAgentSettingsRequest = Message$1<"banda.v1.SetAgentSettin
    * @generated from field: string effort = 3;
    */
   effort: string;
+
+  /**
+   * @generated from field: string profile = 4;
+   */
+  profile: string;
 };
 
 /**
@@ -2169,6 +2197,13 @@ export declare type GetSettingsResponse = Message$1<"banda.v1.GetSettingsRespons
    * @generated from field: repeated banda.v1.SecretInfo secrets = 2;
    */
   secrets: SecretInfo[];
+
+  /**
+   * The profile of new threads that don't name one.
+   *
+   * @generated from field: string default_profile = 3;
+   */
+  defaultProfile: string;
 };
 
 /**
@@ -2279,6 +2314,34 @@ export declare type DeleteSecretResponse = Message$1<"banda.v1.DeleteSecretRespo
  * Use `create(DeleteSecretResponseSchema)` to create a new message.
  */
 export declare const DeleteSecretResponseSchema: GenMessage<DeleteSecretResponse>;
+
+/**
+ * @generated from message banda.v1.SetDefaultProfileRequest
+ */
+export declare type SetDefaultProfileRequest = Message$1<"banda.v1.SetDefaultProfileRequest"> & {
+  /**
+   * @generated from field: string profile = 1;
+   */
+  profile: string;
+};
+
+/**
+ * Describes the message banda.v1.SetDefaultProfileRequest.
+ * Use `create(SetDefaultProfileRequestSchema)` to create a new message.
+ */
+export declare const SetDefaultProfileRequestSchema: GenMessage<SetDefaultProfileRequest>;
+
+/**
+ * @generated from message banda.v1.SetDefaultProfileResponse
+ */
+export declare type SetDefaultProfileResponse = Message$1<"banda.v1.SetDefaultProfileResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetDefaultProfileResponse.
+ * Use `create(SetDefaultProfileResponseSchema)` to create a new message.
+ */
+export declare const SetDefaultProfileResponseSchema: GenMessage<SetDefaultProfileResponse>;
 
 /**
  * @generated from message banda.v1.OpenLoginTerminalRequest
@@ -3523,6 +3586,13 @@ export declare type RaceRequest = Message$1<"banda.v1.RaceRequest"> & {
    * @generated from field: banda.v1.PermissionMode permission_mode = 5;
    */
   permissionMode: PermissionMode;
+
+  /**
+   * Every try's; empty: the caller's default profile.
+   *
+   * @generated from field: string profile = 6;
+   */
+  profile: string;
 };
 
 /**
@@ -4234,8 +4304,9 @@ export declare const ThreadService: GenService<{
     output: typeof SetModeResponseSchema;
   },
   /**
-   * Changes the agent's model and effort (owner only). A running agent
-   * restarts with them once its turns have ended; a paused one starts with them.
+   * Changes the agent's model, effort and profile (owner only). A running
+   * agent restarts with them once its turns have ended; a paused one starts
+   * with them.
    *
    * @generated from rpc banda.v1.ThreadService.SetAgentSettings
    */
@@ -4632,6 +4703,16 @@ export declare const SettingsService: GenService<{
     methodKind: "unary";
     input: typeof DeleteSecretRequestSchema;
     output: typeof DeleteSecretResponseSchema;
+  },
+  /**
+   * The profile of the caller's new threads that don't name one.
+   *
+   * @generated from rpc banda.v1.SettingsService.SetDefaultProfile
+   */
+  setDefaultProfile: {
+    methodKind: "unary";
+    input: typeof SetDefaultProfileRequestSchema;
+    output: typeof SetDefaultProfileResponseSchema;
   },
   /**
    * A terminal in the caller's login environment: a small pod that mounts

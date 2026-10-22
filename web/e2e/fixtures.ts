@@ -39,7 +39,8 @@ function env(name: string): string {
 }
 
 // The run's git server (see deploy/dev.sh) serves the fixture repos from deploy/sandbox.Dockerfile:
-// plain, setup-fails, setup-bg and readonly (plain, refusing pushes).
+// plain, setup-fails, setup-bg, setup-hold, profiles (it overrides the spec profile's text) and readonly
+// (plain, refusing pushes).
 export const repo = (name = 'plain') => `git://e2e-git/${name}.git`;
 
 const run = (cmd: string, args: string[], input?: string) =>

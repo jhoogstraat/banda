@@ -67,7 +67,11 @@ func (s *Service) GetSettings(ctx context.Context, _ *bandav1.GetSettingsRequest
 	if st.LoginCheckedAt != nil {
 		acc.LoginCheckedAt = timestamppb.New(*st.LoginCheckedAt)
 	}
-	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}}
+	profile, err := s.store.DefaultProfile(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}, DefaultProfile: profile}
 	for _, sec := range secrets {
 		res.Secrets = append(res.Secrets, &bandav1.SecretInfo{Name: sec.Name, UpdatedAt: timestamppb.New(sec.UpdatedAt)})
 	}
@@ -121,6 +125,13 @@ func (s *Service) DeleteSecret(ctx context.Context, req *bandav1.DeleteSecretReq
 		return nil, err
 	}
 	return &bandav1.DeleteSecretResponse{}, s.store.DeleteSecret(ctx, user(ctx), req.Name)
+}
+
+func (s *Service) SetDefaultProfile(ctx context.Context, req *bandav1.SetDefaultProfileRequest) (*bandav1.SetDefaultProfileResponse, error) {
+	if err := checkProfile(req.Profile); err != nil {
+		return nil, err
+	}
+	return &bandav1.SetDefaultProfileResponse{}, s.store.SetDefaultProfile(ctx, user(ctx), req.Profile)
 }
 
 // loginKey is how a user's login runner is keyed in runners and terminals,

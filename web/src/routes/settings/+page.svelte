@@ -13,20 +13,22 @@
 		type HarnessAccount,
 		type SecretInfo
 	} from '#lib/gen/banda/v1/banda_pb.js';
+	import { profiles } from '#lib/profiles.js';
 	import { ago } from '#lib/utils.js';
 
 	let accounts = $state<HarnessAccount[]>([]);
 	let secrets = $state<SecretInfo[]>([]);
+	let defaultProfile = $state('');
 	let loaded = $state(false);
 	// An error and the section it belongs to.
 	let error = $state('');
-	let errorAt = $state<'accounts' | 'secrets'>('accounts');
+	let errorAt = $state<'accounts' | 'profile' | 'secrets'>('accounts');
 
 	const message = (e: unknown) => ConnectError.from(e).rawMessage;
 
 	async function load() {
 		try {
-			({ accounts, secrets } = await settingsApi.getSettings({}));
+			({ accounts, secrets, defaultProfile } = await settingsApi.getSettings({}));
 			loaded = true;
 			error = '';
 		} catch (e) {
@@ -83,6 +85,13 @@
 			keys[a.harness] = '';
 			delete chosen[a.harness];
 		}
+	}
+
+	// Shows the pick at once, and the saved one again if saving fails.
+	async function setProfile(name: string) {
+		const before = defaultProfile;
+		defaultProfile = name;
+		if (!(await act('profile', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
 	}
 
 	// Secrets: the add form, and the row being replaced.
@@ -193,6 +202,19 @@
 						<p class="p-4 text-sm text-muted-foreground">{loaded ? 'No accounts.' : 'Loading…'}</p>
 					{/each}
 				</div>
+			</section>
+
+			<section>
+				{@render heading('profile', 'Agent profile', 'how the agent works with you in new threads; switch it per thread in the composer')}
+				<fieldset class="divide-y rounded-lg border">
+					<legend class="sr-only">Default profile</legend>
+					{#each profiles as p (p.name)}
+						<label class="flex items-start gap-3 px-4 py-3 text-sm">
+							<input type="radio" name="profile" class="mt-1 accent-primary" checked={p.name === defaultProfile} onchange={() => setProfile(p.name)} />
+							<span><span class="font-medium">{p.label}</span> <span class="block text-muted-foreground">{p.note}</span></span>
+						</label>
+					{/each}
+				</fieldset>
 			</section>
 
 			<section>
