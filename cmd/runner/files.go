@@ -43,17 +43,32 @@ func files(ctx context.Context, r *bandav1.FileRequest, send func(*bandav1.Conne
 	send(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_FileResponse{FileResponse: res}})
 }
 
-// list returns the tracked and unignored files that still exist, sorted.
+// list returns the tracked and unignored files that still exist, sorted;
+// without a repository, all files.
 func list(ctx context.Context, root *os.Root, res *bandav1.FileResponse) error {
-	cmd := exec.CommandContext(ctx, "git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-	cmd.Dir = work
-	out, err := cmd.Output()
-	if ee := new(exec.ExitError); errors.As(err, &ee) {
-		return fmt.Errorf("git ls-files: %w: %s", err, ee.Stderr)
-	} else if err != nil {
-		return err
+	var paths []string
+	if repoURL == "" {
+		// ponytail: no ignore rules without git, so a big node_modules crowds out the rest past maxFiles.
+		fs.WalkDir(root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				paths = append(paths, p)
+			}
+			if len(paths) > maxFiles {
+				return fs.SkipAll
+			}
+			return nil // an unreadable directory is skipped
+		})
+	} else {
+		cmd := exec.CommandContext(ctx, "git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+		cmd.Dir = work
+		out, err := cmd.Output()
+		if ee := new(exec.ExitError); errors.As(err, &ee) {
+			return fmt.Errorf("git ls-files: %w: %s", err, ee.Stderr)
+		} else if err != nil {
+			return err
+		}
+		paths = strings.FieldsFunc(string(out), func(r rune) bool { return r == 0 })
 	}
-	paths := strings.FieldsFunc(string(out), func(r rune) bool { return r == 0 })
 	paths = slices.DeleteFunc(paths, func(p string) bool {
 		_, err := root.Lstat(p) // tracked but deleted
 		return err != nil || !utf8.ValidString(p)

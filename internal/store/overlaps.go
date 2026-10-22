@@ -48,7 +48,7 @@ func (s *Store) Overlaps(ctx context.Context, ids []string, since time.Time) ([]
 		JOIN thread_paths mp ON mp.thread_id = me.id
 		JOIN thread_paths p ON p.path = mp.path AND p.thread_id <> me.id
 		JOIN threads o ON o.id = p.thread_id
-		WHERE me.id = ANY($1) AND o.repo_url = me.repo_url AND o.base_branch = me.base_branch
+		WHERE me.id = ANY($1) AND me.repo_url <> '' AND o.repo_url = me.repo_url AND o.base_branch = me.base_branch
 			AND me.updated_at > $2 AND o.updated_at > $2
 			AND NOT EXISTS (SELECT 1 FROM thread_views v WHERE v.user_id = me.owner_id AND v.thread_id = me.id AND v.settled_at IS NOT NULL)
 			AND NOT EXISTS (SELECT 1 FROM thread_views v WHERE v.user_id = o.owner_id AND v.thread_id = o.id AND v.settled_at IS NOT NULL)

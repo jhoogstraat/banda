@@ -15,7 +15,7 @@ func TestForkPrompt(t *testing.T) {
 	}
 	reply := &bandav1.Event{Actor: "agent", Kind: &bandav1.Event_AgentText{AgentText: &bandav1.AgentText{Text: "Added it."}}}
 	tool := &bandav1.Event{Actor: "agent", Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "Bash"}}}
-	src := store.Thread{ID: "t1", Title: "Add a file", BaseBranch: "main"}
+	src := store.Thread{ID: "t1", Title: "Add a file", RepoURL: "git://git/app.git", BaseBranch: "main"}
 	names := map[string]string{"u1": "Ann"}
 
 	got := forkPrompt(names, src, 1, []*bandav1.Event{msg("u1", "add a file"), tool, reply}, "")
@@ -43,6 +43,10 @@ func TestForkPrompt(t *testing.T) {
 	got = forkPrompt(names, src, 0, []*bandav1.Event{msg("u1", strings.Repeat("é", maxTranscript))}, "")
 	if !strings.Contains(got, "Ann: é") || !strings.Contains(got, "é …") || len(got) > maxTranscript/2 {
 		t.Errorf("one huge message should be kept, shortened: %d bytes", len(got))
+	}
+	src.RepoURL = "" // no repository: only the conversation carries over
+	if got := forkPrompt(names, src, 1, nil, "go"); !strings.Contains(got, "you start in an empty folder") || strings.Contains(got, "branch") {
+		t.Errorf("a fork without a repository: %q", got)
 	}
 }
 

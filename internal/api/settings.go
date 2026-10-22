@@ -67,7 +67,11 @@ func (s *Service) GetSettings(ctx context.Context, _ *bandav1.GetSettingsRequest
 	if st.LoginCheckedAt != nil {
 		acc.LoginCheckedAt = timestamppb.New(*st.LoginCheckedAt)
 	}
-	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}}
+	profile, err := s.store.DefaultProfile(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}, DefaultProfile: profile}
 	for _, sec := range secrets {
 		res.Secrets = append(res.Secrets, &bandav1.SecretInfo{Name: sec.Name, UpdatedAt: timestamppb.New(sec.UpdatedAt)})
 	}
@@ -121,6 +125,50 @@ func (s *Service) DeleteSecret(ctx context.Context, req *bandav1.DeleteSecretReq
 		return nil, err
 	}
 	return &bandav1.DeleteSecretResponse{}, s.store.DeleteSecret(ctx, user(ctx), req.Name)
+}
+
+func (s *Service) SetDefaultProfile(ctx context.Context, req *bandav1.SetDefaultProfileRequest) (*bandav1.SetDefaultProfileResponse, error) {
+	if err := checkProfile(req.Profile); err != nil {
+		return nil, err
+	}
+	return &bandav1.SetDefaultProfileResponse{}, s.store.SetDefaultProfile(ctx, user(ctx), req.Profile)
+}
+
+func (s *Service) ListTeamSecrets(ctx context.Context, _ *bandav1.ListTeamSecretsRequest) (*bandav1.ListTeamSecretsResponse, error) {
+	secrets, err := s.store.TeamSecrets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.ListTeamSecretsResponse{}
+	for _, sec := range secrets {
+		res.Secrets = append(res.Secrets, &bandav1.SecretInfo{Name: sec.Name, UpdatedAt: timestamppb.New(sec.UpdatedAt), UpdatedBy: sec.UpdatedBy})
+	}
+	return res, nil
+}
+
+// SetTeamSecret and DeleteTeamSecret work like SetSecret and DeleteSecret,
+// on the team's secrets: anyone signed in may change them.
+func (s *Service) SetTeamSecret(ctx context.Context, req *bandav1.SetTeamSecretRequest) (*bandav1.SetTeamSecretResponse, error) {
+	if err := checkSecretName(req.Name); err != nil {
+		return nil, err
+	}
+	if err := checkNotOAuth(req.Value); err != nil {
+		return nil, err
+	}
+	if err := s.store.PutTeamSecret(ctx, req.Name, user(ctx)); err != nil {
+		return nil, err
+	}
+	return &bandav1.SetTeamSecretResponse{}, s.sandboxes.SetTeamSecret(ctx, req.Name, []byte(req.Value))
+}
+
+func (s *Service) DeleteTeamSecret(ctx context.Context, req *bandav1.DeleteTeamSecretRequest) (*bandav1.DeleteTeamSecretResponse, error) {
+	if !secretName.MatchString(req.Name) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "invalid secret name")
+	}
+	if err := s.sandboxes.SetTeamSecret(ctx, req.Name, nil); err != nil {
+		return nil, err
+	}
+	return &bandav1.DeleteTeamSecretResponse{}, s.store.DeleteTeamSecret(ctx, req.Name)
 }
 
 // loginKey is how a user's login runner is keyed in runners and terminals,

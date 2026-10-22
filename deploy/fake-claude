@@ -2,7 +2,8 @@
 # Fake Claude Code for tests: logged in unless `auth logout` ran, and emits
 # stream-json turns like the real CLI, creating one file per prompt (holding
 # the prompt's stream-json line). Replies name the --model and --effort it was
-# started with. A prompt that mentions "preview" starts a web server on :5173
+# started with, and the first line of the profile text in --append-system-prompt
+# (what follows Banda's own paragraph), if there is one. A prompt that mentions "preview" starts a web server on :5173
 # instead (the Browser tab). One that says "commit" also commits. "e2e-ask"
 # runs a Bash command (its description holds $E2E_SECRET, for redaction) that
 # asks for permission first (unless the mode bypasses), "e2e-ask-first" asks
@@ -48,11 +49,12 @@ if [ "$1" = auth ]; then
   esac
   exit
 fi
-model=default effort=default
+model=default effort=default profile=
 while [ $# -gt 0 ]; do
   case "$1" in
     --model) model=$2; shift ;;
     --effort) effort=$2; shift ;;
+    --append-system-prompt) profile=$(awk 'p { print; exit } /^$/ { p = 1 }' <<<"$2"); shift ;;
   esac
   shift
 done
@@ -245,6 +247,7 @@ JSON
         types=$(grep -o '"media_type":"[^"]*"' <<<"$line" | cut -d'"' -f4 | tr '\n' ' ')
         echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Received $images image blocks (${types% }) and $files text files\"}]},\"parent_tool_use_id\":null}"
       fi
+      reply=$(text "Created hello$n.txt with $model · $effort${profile:+ · $profile}")
       queued
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
@@ -263,7 +266,7 @@ JSON
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_$n","type":"tool_result","content":"ok","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
-{"type":"assistant","message":{"content":[{"type":"text","text":"Created hello$n.txt with $model · $effort"}]},"parent_tool_use_id":null}
+$reply
 {"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost,"queued_turn_count":$nq}
 JSON
       ;;

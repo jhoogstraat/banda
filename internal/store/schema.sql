@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS secrets (
   PRIMARY KEY (user_id, name)
 );
 
+-- Names of the team's secrets, in every user's threads, and who set each
+-- last. The values live only in the Kubernetes Secret banda-env-team.
+CREATE TABLE IF NOT EXISTS team_secrets (
+  name       text PRIMARY KEY,
+  updated_by text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Authenticates the runner of the user's login environment.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS login_token text;
 -- Runner tokens are kept as SHA-256 hashes only (pods read theirs from a
@@ -178,3 +186,11 @@ CREATE TABLE IF NOT EXISTS overlap_notices (
 -- many handoffs it has had: each starts a new Claude Code session.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoff_to text NOT NULL DEFAULT '';
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS handoffs int NOT NULL DEFAULT 0;
+-- Who the agent works with (see AgentSettings.profile), and each user's
+-- profile for new threads that don't name one.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS profile text NOT NULL DEFAULT 'engineer';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_profile text NOT NULL DEFAULT 'engineer';
+-- A sub-thread whose reports (finished, failed) also start a turn of its
+-- parent's agent (create_thread's wake_parent), and when one last did.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS wake_parent boolean NOT NULL DEFAULT false;
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS woke_parent_at timestamptz;

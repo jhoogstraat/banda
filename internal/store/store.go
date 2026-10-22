@@ -36,6 +36,7 @@ type Thread struct {
 	Branch        string
 	Model         string
 	Effort        string
+	Profile       string // "engineer", "spec", "devops" or "business"
 	PendingPrompt string
 	PendingImages []string // attachment ids of pending_prompt's images
 	RunnerHash    string   // see TokenHash
@@ -49,11 +50,13 @@ type Thread struct {
 	PermissionMode string
 	Permissions    map[string]string // pending requests: id -> tool name
 	AllowedTools   []string
-	ForkedFrom     string // the source thread of a fork
-	ForkTurn       int    // turns the source had finished then
-	RaceID         string // shared by threads started together
-	ParentID       string // the thread this one was spawned from
-	Handoffs       int    // accepted handoffs; each starts a new Claude Code session
+	ForkedFrom     string     // the source thread of a fork
+	ForkTurn       int        // turns the source had finished then
+	RaceID         string     // shared by threads started together
+	ParentID       string     // the thread this one was spawned from
+	WakeParent     bool       // its reports start a turn of the parent's agent
+	WokeParent     *time.Time // when it last did; see SetWokeParent
+	Handoffs       int        // accepted handoffs; each starts a new Claude Code session
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
@@ -118,13 +121,13 @@ func applySchema(ctx context.Context, db *pgxpool.Pool, sum string) error {
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id, env_pushed, handoff_to, handoffs`
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at, handoff_to, handoffs`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.HandoffTo, &t.Handoffs}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent, &t.HandoffTo, &t.Handoffs}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -151,10 +154,10 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id, profile, wake_parent)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID)
+		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID, t.Profile, t.WakeParent)
 	return err
 }
 
@@ -292,6 +295,21 @@ func (s *Store) LastAgentText(ctx context.Context, id string) (string, error) {
 	return text, err
 }
 
+// LastPost is when a person (not an agent) last posted a message or a turn
+// request in any of the threads, or nil.
+func (s *Store) LastPost(ctx context.Context, ids ...string) (*time.Time, error) {
+	var at *time.Time
+	err := s.db.QueryRow(ctx, `SELECT max((body->>'time')::timestamptz) FROM events WHERE thread_id = ANY($1)
+		AND kind IN ('message', 'turnRequest') AND body->>'actor' NOT LIKE 'agent:%'`, ids).Scan(&at)
+	return at, err
+}
+
+// SetWokeParent records that the sub-thread just started a turn of its parent's agent.
+func (s *Store) SetWokeParent(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET woke_parent_at = now() WHERE id = $1`, id)
+	return err
+}
+
 // Pushed reports whether the thread's branch was ever pushed to origin.
 func (s *Store) Pushed(ctx context.Context, id string) (bool, error) {
 	var ok bool
@@ -397,9 +415,9 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
 		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18,
-		owner_id=$19, handoff_to=$20, handoffs=$21, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
+		owner_id=$19, handoff_to=$20, handoffs=$21, profile=$22, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, t.Profile).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

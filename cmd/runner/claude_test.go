@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -79,5 +82,36 @@ func TestUserMessage(t *testing.T) {
 	want := `{"message":{"content":[{"text":"look","type":"text"},{"source":{"data":"cG5n","media_type":"image/png","type":"base64"},"type":"image"}],"role":"user"},"type":"user"}`
 	if string(img) != want {
 		t.Errorf("with an image:\n%s\nwant\n%s", img, want)
+	}
+}
+
+func TestProfileText(t *testing.T) {
+	dir, outside := t.TempDir(), t.TempDir()
+	defer func(w string) { work = w }(work)
+	work = dir
+	builtin := func(name string) string {
+		text, _ := profiles.ReadFile("profiles/" + name + ".md")
+		return strings.TrimSpace(string(text))
+	}
+	if got := profileText("spec"); got != builtin("spec") || got == "" {
+		t.Errorf("spec without a checkout: %q", got)
+	}
+
+	os.MkdirAll(filepath.Join(dir, ".banda", "profiles"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".banda", "profiles", "spec.md"), []byte("Repo spec\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".banda", "profiles", "other.md"), []byte("Other"), 0o644)
+	os.WriteFile(filepath.Join(outside, "login"), []byte("sk-ant-oat01-secret"), 0o600)
+	os.Symlink(filepath.Join(outside, "login"), filepath.Join(dir, ".banda", "profiles", "business.md"))
+	for name, want := range map[string]string{
+		"spec":     "Repo spec",         // the repo's replaces the built-in
+		"devops":   builtin("devops"),   // no override
+		"engineer": "",                  // adds nothing
+		"business": builtin("business"), // a symlink out of the checkout is ignored
+		"other":    "",                  // not a built-in
+		"../spec":  "",                  // nor a path
+	} {
+		if got := profileText(name); got != want {
+			t.Errorf("%s: got %q, want %q", name, got, want)
+		}
 	}
 }

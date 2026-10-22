@@ -44,8 +44,13 @@ type pusher struct {
 	report func(*bandav1.Event) error
 }
 
-// push pushes the branch, reports the result and returns it.
+// push pushes the branch, reports the result and returns it. Without a
+// repository it only answers that the work lives here: the chat needn't say
+// so on every suspend.
 func (p *pusher) push(ctx context.Context) *bandav1.AutoPush {
+	if repoURL == "" {
+		return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_UNAVAILABLE}
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	r := pushBranch(ctx)
