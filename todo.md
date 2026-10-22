@@ -62,17 +62,26 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 
 - [ ] A cluster dedicated to Banda, separate from production, with a CNI that enforces NetworkPolicy (Calico, Cilium); its pod network in the chart's `podCIDR`.
 - [ ] Multi-node volumes: the per-user Claude volume and thread volumes are RWO. Pin a user's pods to one node, or use RWX storage.
-- [ ] Sandbox sizes as settings instead of fixed 4 CPU / 8 GiB (`internal/sandbox/sandbox.go`); size nodes for concurrent threads.
-- [ ] Clean up what lingers: per-thread token Secrets outlive deleted Sandboxes; sandboxes of threads never settled stay forever outside dev (`mise run clean` is dev-only).
+- [x] Sandbox sizes as settings (`SANDBOX_CPU`, `SANDBOX_MEMORY`, … and the chart's `sandboxes:`).
+- [ ] Size nodes for concurrent threads.
+- [x] Clean up what lingers: token Secrets are owned by their Sandbox; pushed environments idle for `DELETE_IDLE_AFTER` (30 days) are deleted like settled ones. Token Secrets from before this change go only with a one-off `kubectl delete`.
 - [ ] `SANDBOX_EGRESS_ALLOW` for the private networks agents need (git host, staging); a read-only kubeconfig as a team secret for DevOps.
 - [ ] Monitoring: API logs and errors, sandbox count, disk use of PVCs.
+
+## Built 2026-10-22 (needs real use)
+
+- [x] Settings in sections: Claude Code, Git identity (commits as you, not "Banda"), defaults for new threads, notifications per kind, theme, shortcuts.
+- [x] Person pages (`/u/<id>`), names linking to them, and an account menu on your name.
+- [x] Banda's own sign-in and signed-out page (`OIDC_PROVIDER_NAME`); the bundled Dex in Banda's look; a favicon.
+- [ ] Try the light theme and the Dex pages on a phone.
 
 ## Later (not needed to run fully)
 
 - [ ] Several API replicas: Postgres `LISTEN/NOTIFY` fan-out; the in-memory "suspend after the turn" moves to the database.
 - [ ] A GitHub App (per-user OAuth) instead of personal tokens; webhooks as an add-on to polling for installs that can receive them.
-- [ ] Pull requests: search on the forge in the repo picker; reviewers and labels from lists; resolving review threads; spotting a pull request the agent opened itself.
-- [ ] New threads with attachments; "Spawn sub-thread" with a profile chip; agents handing off through MCP.
-- [ ] Files tab ignore rules without git; adding a repository to a repo-less thread.
+- [x] Pull requests: search on the forge in the repo picker; reviewers and labels from lists; resolving review threads; spotting a pull request the agent opened itself (fake forge only, like the rest).
+- [ ] Reviewers and labels in the create dialog, not only the Pull request tab.
+- [x] New threads and races with attachments; "Spawn sub-thread" with a profile chip; agents handing off through MCP (`handoff_thread`).
+- [x] Files tab ignore rules without git; adding a repository to a repo-less thread.
 - [ ] Per-thread preview origins (needs wildcard DNS).
 - [ ] Codex and other harnesses, only after checking their terms (non-goal until Claude Code is proven).

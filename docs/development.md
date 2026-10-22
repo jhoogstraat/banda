@@ -16,7 +16,7 @@ Everything is a mise task (`mise tasks` lists them). Settings come from the envi
 3. The first time, the thread shows "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. The login is kept in your personal volume and shared by all your threads. You can also log in from Settings, which offers an Anthropic API key instead of the subscription.
 4. `mise run down` stops the servers and the kind node.
 
-Every thread leaves a sandbox behind until it is settled and pushed. `mise run clean` deletes the sandboxes, and their volumes, of threads with a repository nobody touched for `CLEAN_HOURS` (default 24); a later prompt starts a fresh checkout.
+A thread's sandbox stays until its work is on origin and it is settled (7 days) or idle for `DELETE_IDLE_AFTER` (30 days), too long for a dev loop. `mise run clean` deletes the sandboxes, and their volumes, of threads with a repository nobody touched for `CLEAN_HOURS` (default 24); a later prompt starts a fresh checkout.
 
 In the app, Cmd/Ctrl-K opens the command palette and `?` lists the keyboard shortcuts.
 
