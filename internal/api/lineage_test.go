@@ -3,6 +3,7 @@ package api
 import (
 	"strings"
 	"testing"
+	"time"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
@@ -45,5 +46,34 @@ func TestLineageInPrompt(t *testing.T) {
 	}
 	if got := firstLine(strings.Repeat("x", 300)+"\nmore", maxLineage); len([]rune(got)) != 201 {
 		t.Errorf("first line not truncated: %d", len([]rune(got)))
+	}
+}
+
+func TestMayWake(t *testing.T) {
+	woke, before, after := time.Now(), time.Now().Add(-time.Minute), time.Now().Add(time.Minute)
+	tests := []struct {
+		name         string
+		woke, posted *time.Time
+		want         bool
+	}{
+		{"the first report wakes", nil, nil, true},
+		{"the first report wakes after people posted", nil, &before, true},
+		{"no one posted since the last wake", &woke, nil, false},
+		{"people posted only before it", &woke, &before, false},
+		{"a person posted since", &woke, &after, true},
+	}
+	for _, tt := range tests {
+		if got := mayWake(tt.woke, tt.posted); got != tt.want {
+			t.Errorf("%s: got %v", tt.name, got)
+		}
+	}
+}
+
+func TestWakeText(t *testing.T) {
+	got := wakeText(&bandav1.LineageUpdate{ThreadId: "c1", Title: "build the page", Status: bandav1.Status_STATUS_ERRORED, Text: "Setup failed: checkout"})
+	for _, want := range []string{`[Sub-thread c1 "build the page" failed] Setup failed: checkout` + "\n", "read_thread (thread_id c1"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("wake text %q lacks %q", got, want)
+		}
 	}
 }

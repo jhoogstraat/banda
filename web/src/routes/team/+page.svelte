@@ -8,7 +8,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { api } from '#lib/api.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
-	import { projectName, threads, unread, userName, waiting } from '#lib/threads.svelte.js';
+	import { noRepo, projectName, projectOf, threads, unread, userName, waiting } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
 	import { timestampMs } from '@bufbuild/protobuf/wkt';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
@@ -38,8 +38,8 @@
 	});
 
 	const me = $derived(threads.me?.id ?? '');
-	const projects = $derived([...new Set(board.map((t) => t.repoUrl))]);
-	const shown = $derived(board.filter((t) => !threads.project || t.repoUrl === threads.project));
+	const projects = $derived([...new Set(board.map(projectOf))]);
+	const shown = $derived(board.filter((t) => !threads.project || projectOf(t) === threads.project));
 	const last = (t: Thread) => {
 		const ts = t.activity?.time ?? t.updatedAt;
 		return ts ? timestampMs(ts) : 0;
@@ -113,7 +113,7 @@
 					<DropdownMenu.RadioGroup bind:value={threads.project}>
 						<DropdownMenu.RadioItem value="">All projects</DropdownMenu.RadioItem>
 						{#each projects as p (p)}
-							<DropdownMenu.RadioItem value={p} title={p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
+							<DropdownMenu.RadioItem value={p} title={p === noRepo ? undefined : p}><span class="truncate">{projectName(p)}</span></DropdownMenu.RadioItem>
 						{/each}
 					</DropdownMenu.RadioGroup>
 				</DropdownMenu.Content>

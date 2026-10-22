@@ -2,11 +2,11 @@
 // browser-facing defences of open risk 6 (F8). Sandboxes run untrusted code: a malicious repo or a
 // prompt-injected agent. Probes run in the pods, as that code would.
 import { LoginAction } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { API, expect, kexec, kube, refused, repo, sql, Status, test, userHash, type Thread, type User } from './fixtures.ts';
+import { API, expect, kexec, kube, kubeIn, NAMESPACE, refused, repo, sql, Status, test, userHash, type Thread, type User } from './fixtures.ts';
 
-/** Whether a TCP connection from the pod to host:port opens within 3 s. */
-const reaches = async (pod: string, host: string, port: number) =>
-	(await kexec(pod, `timeout 3 bash -c '</dev/tcp/${host}/${port}' 2>/dev/null && echo open || echo closed`)).trim() === 'open';
+/** Whether a TCP connection from the pod (in the run's namespace, or ns) to host:port opens within 3 s. */
+const reaches = async (pod: string, host: string, port: number, ns?: string) =>
+	(await kexec(pod, `timeout 3 bash -c '</dev/tcp/${host}/${port}' 2>/dev/null && echo open || echo closed`, ns)).trim() === 'open';
 
 const loginTerminal = (u: User, action: LoginAction) =>
 	u.terminal((signal) => u.settings.openLoginTerminal({ harness: 'claude', action, cols: 80, rows: 24 }, { signal }));
@@ -53,6 +53,57 @@ test.describe('network', () => {
 
 	test('F1: Postgres accepts connections only from the API, not from other pods', async () => {
 		expect(await reaches('e2e-git', 'postgres.banda.svc.cluster.local', 5432)).toBe(false);
+	});
+});
+
+// SANDBOX_EGRESS_ALLOW applies to a whole namespace, so these tests run their sandboxes in one of their own.
+test.describe('egress allowlist', () => {
+	const plain = 'file:///opt/e2e/plain.git';
+
+	test('a sandbox reaches a private range SANDBOX_EGRESS_ALLOW covers, and no more once it is empty', async ({ as, startApi }) => {
+		// The git server stands in for production: a pod, so on a private network.
+		const git = await kube('get', 'pod', 'e2e-git', '-o', 'jsonpath={.status.podIP}');
+		const api = await startApi({ SANDBOX_EGRESS_ALLOW: `${git}/32` }, { namespace: true });
+		const t = await as('alice', api).create({ repoUrl: `git://${git}/plain.git` });
+		await t.waitForStatus(Status.AWAITING_INPUT); // cloned from it
+		expect(await reaches(t.pod, git, 9418, api.namespace)).toBe(true);
+
+		await startApi({ SANDBOX_NAMESPACE: api.namespace }); // empty: it removes the policy
+		await expect.poll(() => reaches(t.pod, git, 9418, api.namespace), { timeout: 15_000 }).toBe(false);
+	});
+
+	test('Postgres, Dex, the API’s other ports, other sandboxes and the Kubernetes API stay closed when an allowed range covers them', async ({ as, startApi }) => {
+		const api = await startApi({ SANDBOX_EGRESS_ALLOW: '10.0.0.0/8' }, { namespace: true }); // kind's pods, services and node
+		const ns = api.namespace;
+		// The API in the cluster (deploy/banda.yaml) as the network sees it: the runner port and the preview's.
+		await kubeIn(ns, 'run', 'banda-api', `--image=${process.env.SANDBOX_IMAGE}`, '--image-pull-policy=Never', '--labels=app=banda-api',
+			'--command', '--', 'sh', '-c', 'python3 -m http.server 8788 & exec python3 -m http.server 8787');
+		const alice = as('alice', api);
+		const [a, b] = [await alice.create({ repoUrl: plain }), await alice.create({ repoUrl: plain })];
+		await a.waitForStatus(Status.AWAITING_INPUT);
+		await b.waitForStatus(Status.AWAITING_INPUT);
+		await b.turn(() => b.send('start the preview'));
+		await expect.poll(() => kexec(b.pod, 'curl -s localhost:5173/', ns), { timeout: 30_000 }).toContain('e2e-preview-page');
+		await expect.poll(() => kexec('banda-api', 'curl -s -o /dev/null -o /dev/null -w %{http_code} localhost:8787 localhost:8788', ns).catch(() => ''), { timeout: 30_000 }).toBe('200200');
+		const ip = (pod: string) => kubeIn(ns, 'get', 'pod', pod, '-o', 'jsonpath={.status.podIP}');
+		const [apiIP, bIP] = [await ip('banda-api'), await ip(b.pod)];
+		const node = await kube('get', 'nodes', '-o', 'jsonpath={.items[0].status.addresses[0].address}');
+
+		// The range opens what the base policy refuses: the in-cluster API's pod, the Kubernetes API.
+		expect(await reaches(a.pod, apiIP, 8787, ns)).toBe(true);
+		expect(await reaches(a.pod, 'kubernetes.default.svc', 443, ns)).toBe(true);
+		const closed = {
+			'Postgres': ['postgres.banda.svc.cluster.local', 5432],
+			'Postgres through its NodePort': [node, 30432],
+			'Dex': [`dex.${NAMESPACE}.svc.cluster.local`, 5556],
+			'the API’s preview port': [apiIP, 8788],
+			'another thread’s dev server': [bIP, 5173]
+		} as const;
+		for (const [what, [host, port]] of Object.entries(closed)) expect(await reaches(a.pod, host, port, ns), what).toBe(false);
+		// Sandboxes carry no token: the Kubernetes API and the kubelet answer, but refuse.
+		const status = (url: string) => kexec(a.pod, `curl -sk -o /dev/null -w %{http_code} ${url}`, ns);
+		expect(['401', '403']).toContain(await status(`https://kubernetes.default.svc/api/v1/namespaces/${ns}/secrets`));
+		expect(['401', '403']).toContain(await status(`https://${node}:10250/pods`));
 	});
 });
 

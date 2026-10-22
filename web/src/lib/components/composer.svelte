@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BrainIcon from '@lucide/svelte/icons/brain';
+	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
@@ -18,6 +19,7 @@
 	import type { Chat } from '#lib/events.js';
 	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes, ruleLabel } from '#lib/permissions.js';
+	import { profileLabel, profileLabels, profileName } from '#lib/profiles.js';
 
 	// The bottom of a thread: who is producing something, the error, banners, the plan and the prompt box.
 	// typing: the names of the others typing. send throws to keep the prompt; typed reports typing.
@@ -40,7 +42,7 @@
 		act: (call: Promise<unknown>) => Promise<boolean>;
 		send: (m: PromptInputMessage) => Promise<void>;
 		typed: () => void;
-		setAgent: (change: { model?: string; effort?: string }) => void;
+		setAgent: (change: { model?: string; effort?: string; profile?: string }) => void;
 	} = $props();
 
 	const typingText = $derived(
@@ -77,9 +79,15 @@
 				<div class="flex items-center gap-1.5 pl-1">
 					<AttachButton />
 					{#if thread && owner}
-						<!-- A running agent switches model and effort once its turns have ended, permissions at once. -->
+						<!-- A running agent switches model, effort and profile once its turns have ended, permissions at once. -->
 						<OptionMenu label="Model" icon={CpuIcon} bind:value={() => thread!.model, (model) => setAgent({ model })} options={models} />
 						<OptionMenu label="Effort" icon={BrainIcon} bind:value={() => thread!.effort, (effort) => setAgent({ effort })} options={efforts} />
+						<OptionMenu
+							label="Profile"
+							icon={ContactRoundIcon}
+							options={profileLabels}
+							bind:value={() => profileLabel(thread!.profile), (v) => setAgent({ profile: profileName(v) })}
+						/>
 						<OptionMenu
 							label="Permissions"
 							icon={ShieldIcon}
@@ -89,6 +97,7 @@
 					{:else if thread}
 						<Badge variant="outline" class="font-normal text-muted-foreground"><CpuIcon /> {thread.model}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><BrainIcon /> {thread.effort}</Badge>
+						<Badge variant="outline" class="font-normal text-muted-foreground"><ContactRoundIcon /> {profileLabel(thread.profile)}</Badge>
 						<Badge variant="outline" class="font-normal text-muted-foreground"><ShieldIcon /> {permissionLabel(thread.permissionMode)}</Badge>
 					{/if}
 					{#if thread?.allowedTools.length}

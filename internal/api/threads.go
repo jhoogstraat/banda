@@ -17,23 +17,20 @@ import (
 )
 
 func (s *Service) CreateThread(ctx context.Context, req *bandav1.CreateThreadRequest) (*bandav1.CreateThreadResponse, error) {
-	if req.RepoUrl == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "repo_url is required")
-	}
 	mode, err := newPermissionMode(req.PermissionMode)
 	if err != nil {
 		return nil, err
 	}
 	t, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: user(ctx)}, RepoURL: req.RepoUrl,
-		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, PermissionMode: mode}, user(ctx), req.Prompt)
+		BaseBranch: req.BaseBranch, Model: req.Model, Effort: req.Effort, Profile: req.Profile, PermissionMode: mode}, user(ctx), req.Prompt)
 	if err != nil {
 		return nil, err
 	}
 	return &bandav1.CreateThreadResponse{Thread: toProto(t)}, nil
 }
 
-// create starts a thread (owner, repo, base, model, effort, permission mode and
-// parent taken from t, see start) with its first prompt, posted by `by`.
+// create starts a thread (owner, repo, base, model, effort, profile, permission
+// mode and parent taken from t, see start) with its first prompt, posted by `by`.
 func (s *Service) create(ctx context.Context, t store.Thread, by, prompt string) (store.Thread, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return t, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
@@ -49,9 +46,9 @@ var scpLike = regexp.MustCompile(`^\w[\w.~-]*@\w[\w.-]*:[\w./~-]+$`)
 // checkRepoURL accepts only URLs that git clones plainly: anything else may
 // reach git as a transport that runs commands (ext::) or as an option. It
 // refuses credentials in an https URL: everyone sees a thread's repository,
-// forks reuse it, and the runner redacts only GIT_TOKEN.
+// forks reuse it, and the runner redacts only GIT_TOKEN. Empty is no repository.
 func checkRepoURL(repo string) error {
-	if scpLike.MatchString(repo) {
+	if repo == "" || scpLike.MatchString(repo) {
 		return nil
 	}
 	u, err := url.Parse(repo) // refuses control characters
@@ -66,7 +63,8 @@ func checkRepoURL(repo string) error {
 
 // start stores a new thread, posts its first message (if any) as `by` (the
 // owner, or the agent that spawned it) and provisions its environment. It sets the id and branch,
-// and the defaults for what t leaves empty.
+// and the defaults for what t leaves empty (the profile: the owner's default).
+// A thread without a repository has no branches.
 func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
 	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
 	t.PermissionMode = or(t.PermissionMode, "bypass")
@@ -74,8 +72,20 @@ func (s *Service) start(ctx context.Context, t store.Thread, by string, first *b
 	if err := checkRepoURL(t.RepoURL); err != nil {
 		return t, err
 	}
+	if t.Profile == "" {
+		var err error
+		if t.Profile, err = s.store.DefaultProfile(ctx, t.OwnerID); err != nil {
+			return t, err
+		}
+	}
+	if err := checkProfile(t.Profile); err != nil {
+		return t, err
+	}
 	t.ID = strings.ToLower(rand.Text())
 	t.Branch = "banda/" + t.ID
+	if t.RepoURL == "" {
+		t.BaseBranch, t.Branch = "", ""
+	}
 	if err := s.store.Create(ctx, t); err != nil {
 		return t, err
 	}
@@ -110,20 +120,16 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	s.previewChanged(t.ID)
 	s.mu.Unlock()
 	st, err := s.store.Settings(ctx, t.OwnerID, harness)
-	var secrets []store.Secret
+	var secrets []string
 	if err == nil {
-		secrets, err = s.store.Secrets(ctx, t.OwnerID)
+		secrets, err = s.store.SecretNames(ctx, t.OwnerID)
 	}
 	var token string // a new one for every pod: an old pod's can't connect any more
 	if err == nil {
 		token, err = s.store.NewRunnerToken(ctx, t.ID)
 	}
 	if err == nil {
-		var names []string
-		for _, sec := range secrets {
-			names = append(names, sec.Name)
-		}
-		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, names)
+		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets)
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
@@ -191,17 +197,31 @@ func (s *Service) SetMode(ctx context.Context, req *bandav1.SetModeRequest) (*ba
 }
 
 func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSettingsRequest) (*bandav1.SetAgentSettingsResponse, error) {
+	if req.Profile != "" {
+		if err := checkProfile(req.Profile); err != nil {
+			return nil, err
+		}
+	}
 	var changed *bandav1.AgentSettings
 	_, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		if err := t.CheckOwner(user(ctx)); err != nil {
 			return nil, err
 		}
-		if or(req.Model, t.Model) == t.Model && or(req.Effort, t.Effort) == t.Effort {
+		model, effort, profile := or(req.Model, t.Model), or(req.Effort, t.Effort), or(req.Profile, t.Profile)
+		if model == t.Model && effort == t.Effort && profile == t.Profile {
 			return nil, nil
 		}
-		t.Model, t.Effort = or(req.Model, t.Model), or(req.Effort, t.Effort)
+		// The event says what changed, so the chat's divider can.
+		event := &bandav1.AgentSettings{}
+		if model != t.Model || effort != t.Effort {
+			event.Model, event.Effort = model, effort
+		}
+		if profile != t.Profile {
+			event.Profile = profile
+		}
+		t.Model, t.Effort, t.Profile = model, effort, profile
 		changed = agentSettings(*t)
-		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: changed}}}, nil
+		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_AgentSettings{AgentSettings: event}}}, nil
 	})
 	if err != nil {
 		return nil, err
@@ -214,7 +234,18 @@ func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSet
 }
 
 func agentSettings(t store.Thread) *bandav1.AgentSettings {
-	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort}
+	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort, Profile: t.Profile}
+}
+
+// profiles are the agent's profiles. Their texts are the runner's
+// (cmd/runner/profiles), which a repo may replace.
+var profiles = []string{"engineer", "spec", "devops", "business"}
+
+func checkProfile(p string) error {
+	if !slices.Contains(profiles, p) {
+		return connect.NewError(connect.CodeInvalidArgument, "the profile must be engineer, spec, devops or business")
+	}
+	return nil
 }
 
 func (s *Service) Retry(ctx context.Context, req *bandav1.RetryRequest) (*bandav1.RetryResponse, error) {

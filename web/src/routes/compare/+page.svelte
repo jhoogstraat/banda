@@ -299,11 +299,13 @@
 								<span>{e.turns} {e.turns === 1 ? 'turn' : 'turns'}</span>
 								<span>${e.costUsd.toFixed(2)}</span>
 								<span>{seconds(e.durationMs)}</span>
-								<span>
-									{s.files} {s.files === 1 ? 'file' : 'files'}
-									<span class="text-emerald-600 dark:text-emerald-400">+{s.add}</span>
-									<span class="text-red-600 dark:text-red-400">−{s.del}</span>
-								</span>
+								{#if t.repoUrl}
+									<span>
+										{s.files} {s.files === 1 ? 'file' : 'files'}
+										<span class="text-emerald-600 dark:text-emerald-400">+{s.add}</span>
+										<span class="text-red-600 dark:text-red-400">−{s.del}</span>
+									</span>
+								{/if}
 							</div>
 						</div>
 						{#if reply}
@@ -320,6 +322,7 @@
 						{:else if running(t)}
 							<p class="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">Working on it…</p>
 						{/if}
+						{#if t.repoUrl}
 						<div class="flex flex-col md:min-h-0 md:flex-1">
 							<DiffView
 								diff={t.diff}
@@ -330,6 +333,9 @@
 								onsend={(summary) => review(t.id, summary)}
 							/>
 						</div>
+						{:else}
+							<p class="p-4 text-sm text-muted-foreground">No repository, so no diff: open the try to read its work.</p>
+						{/if}
 					</section>
 				{/each}
 			</div>

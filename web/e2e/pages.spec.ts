@@ -71,7 +71,7 @@ test('compare: tries go by model, update live without polling, show replies and 
 	expect(compares).toBe(before);
 	await Promise.all([a.release('cmp'), b.release('cmp')]);
 	await expect(page.getByRole('region', { name: 'Last reply of sonnet-5-5 · high' })).toContainText('with claude-sonnet-5-5 · high', { timeout: 60_000 });
-	await expect(opus.getByText('Needs input')).toBeVisible();
+	await expect(opus.getByText('Ready', { exact: true })).toBeVisible();
 	await expect(opus.getByText('1 turn', { exact: true })).toBeVisible();
 	// Different second turns, and a third in one try only.
 	await Promise.all([a.turn(() => a.send('e2e: alpha')), b.turn(() => b.send('e2e: beta'))]);
@@ -181,20 +181,21 @@ test('settings: secrets are added, replaced and deleted, never shown; the accoun
 	page.on('dialog', (d) => d.accept());
 
 	await test.step('secrets', async () => {
-		await page.getByRole('textbox', { name: 'Name' }).fill('lower-case');
-		await page.getByLabel('Value', { exact: true }).fill('x');
-		await page.getByRole('button', { name: 'Add', exact: true }).click();
-		await expect(page.getByText('Names are environment variables')).toBeVisible();
-		await page.getByRole('textbox', { name: 'Name' }).fill('E2E_TOKEN');
-		await page.getByRole('button', { name: 'Add', exact: true }).click();
-		await expect(page.getByText('E2E_TOKEN', { exact: true })).toBeVisible();
-		await expect(page.getByText(/^set · /)).toBeVisible();
-		await page.getByRole('button', { name: 'Replace' }).click();
-		await page.getByLabel('New value of E2E_TOKEN').fill('y');
-		await page.getByRole('button', { name: 'Save', exact: true }).click();
-		await expect(page.getByLabel('New value of E2E_TOKEN')).toBeHidden();
-		await page.getByRole('button', { name: 'Delete' }).click();
-		await expect(page.getByText('E2E_TOKEN', { exact: true })).toBeHidden();
+		const secrets = page.getByRole('region', { name: 'Secrets & variables' }); // not the team's
+		await secrets.getByRole('textbox', { name: 'Name' }).fill('lower-case');
+		await secrets.getByLabel('Value', { exact: true }).fill('x');
+		await secrets.getByRole('button', { name: 'Add', exact: true }).click();
+		await expect(secrets.getByText('Names are environment variables')).toBeVisible();
+		await secrets.getByRole('textbox', { name: 'Name' }).fill('E2E_TOKEN');
+		await secrets.getByRole('button', { name: 'Add', exact: true }).click();
+		await expect(secrets.getByText('E2E_TOKEN', { exact: true })).toBeVisible();
+		await expect(secrets.getByText(/^set · /)).toBeVisible();
+		await secrets.getByRole('button', { name: 'Replace' }).click();
+		await secrets.getByLabel('New value of E2E_TOKEN').fill('y');
+		await secrets.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(secrets.getByLabel('New value of E2E_TOKEN')).toBeHidden();
+		await secrets.getByRole('button', { name: 'Delete' }).click();
+		await expect(secrets.getByText('E2E_TOKEN', { exact: true })).toBeHidden();
 	});
 	await test.step('the account’s sign-in method', async () => {
 		await page.getByRole('radio', { name: 'API key' }).check();

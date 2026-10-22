@@ -1,121 +1,100 @@
-// Handing a thread to a teammate: the offer and briefing, accepting (the environment restarts as theirs),
-// declining, cancelling, and who may do what.
-import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
+// Sub-threads started with create_thread's wake_parent (the Specification agent's handoff to an Engineer):
+// their reports also start a turn of the parent's agent, as a request from the sub-thread's agent, guarded so
+// that agents don't keep each other busy without a person. The fake agent writes each prompt it gets into a
+// file (deploy/fake-claude), so the parent's diff holds the prompt that woke it.
+import { expect, repo, Status, test, until, type Thread } from './fixtures.ts';
 
-/** A teammate who has signed in once, so others can hand them threads. */
-const teammate = async (u: User) => (await u.users.me({}), u);
+/** Starts a sub-thread of parent as its agent does (create_thread). */
+async function spawn(parent: Thread, args: object) {
+	const out = await parent.mcp('create_thread', { prompt: 'e2e: build it', ...args });
+	const id = out.match(/thread_id[^a-z0-9]+([a-z0-9]{26})/)?.[1];
+	expect(id, out).toBeTruthy();
+	return parent.user.thread(id!);
+}
 
-test('accepting a handoff makes the thread the teammate’s: the next turns run with their Claude volume and secrets, in a session that gets the conversation and the briefing', async ({ as }) => {
-	const [alice, bob] = [await teammate(as('alice')), await teammate(as('bob'))];
-	const secret = `e2e-bob-${Date.now()}`;
-	await bob.settings.setSecret({ name: 'E2E_SECRET', value: secret });
-	const t = await alice.create({ prompt: 'e2e: build the thing' });
-	await t.waitForStatus(Status.AWAITING_INPUT);
+/** The messages child's reports posted in parent to wake its agent. */
+const wakes = async (parent: Thread, child: Thread) =>
+	(await parent.events()).filter((e) => e.kind.case === 'message' && e.actor === `agent:${child.id}`).map((e) => e.kind.value);
 
-	await test.step('the offer asks the idle agent for a briefing, as alice’s turn; bob sees the thread under Mentioned', async () => {
-		// The note reaches the briefing prompt: the fake holds that turn, and later echoes bob’s first prompt.
-		await alice.threads.handoffOffer({ threadId: t.id, toUserId: bob.id, note: 'tests are next e2e-hold:brief e2e-echo' });
-		expect((await t.get()).handoffTo).toBe(bob.id);
-		expect((await bob.threads.listMentioned({})).threads.map((x) => x.id)).toContain(t.id);
-		const offered = (await t.of('handoffOffered'))[0];
-		expect([offered.toUserId, offered.noBriefing]).toEqual([bob.id, '']);
-	});
+/** In the woken prompt, as the fake's file holds it (JSON, so a newline is \n). */
+const asked = (child: Thread) => `agent in thread ${child.id}: [Sub-thread ${child.id} `;
+const readIt = (child: Thread) => `\\nYou started this sub-thread with wake_parent. Read it with read_thread (thread_id ${child.id}, include_diff`;
 
-	await test.step('bob can’t accept while the briefing is being written', async () => {
-		await t.waitForStatus(Status.WORKING);
-		expect(await refused(bob.threads.handoffAccept({ threadId: t.id }))).toMatch(/working/);
-		await t.turn(() => t.release('brief'));
-		expect((await t.prompts()).at(-1)).toContain(`is handing this thread over to ${bob.id}`);
-	});
-
-	await test.step('accepting restarts the environment as bob’s, with a fresh session that gets the conversation and the briefing', async () => {
-		const bt = t.as(bob);
-		const info = await bt.turn(() => bob.threads.handoffAccept({ threadId: t.id }));
-		expect([info.ownerId, info.handoffTo]).toEqual([bob.id, '']);
-		const first = (await bt.prompts()).at(-1)!;
-		expect(first).toContain(`${alice.id} handed it over to ${bob.id}`);
-		expect(first).toContain(`${alice.id}: e2e: build the thing`);
-		expect(first).toMatch(new RegExp(`Your briefing for ${bob.id}, written before the handover:\\n\\nReceived: ${alice.id} is handing`));
-		const resolved = await t.events().then((es) => es.find((e) => e.kind.case === 'handoffResolved')!);
-		expect([resolved.actor, resolved.kind.value]).toMatchObject([bob.id, { accepted: true }]);
-	});
-
-	await test.step('the pod mounts bob’s Claude volume and secrets, not alice’s', async () => {
-		const spec = JSON.parse(await kube('get', 'pod', t.pod, '-o', 'json')).spec;
-		expect(spec.volumes.find((v: { name: string }) => v.name === 'claude').persistentVolumeClaim.claimName).toBe(`claude-${userHash(bob.id)}`);
-		const from = spec.containers[0].envFrom.map((e: { secretRef: { name: string } }) => e.secretRef.name);
-		expect(from).toContain(`banda-env-${userHash(bob.id)}`);
-		expect(from).not.toContain(`banda-env-${userHash(alice.id)}`);
-		const env = spec.containers[0].env as { name: string; value?: string }[];
-		expect(env.find((e) => e.name === 'BANDA_SESSION_KEY')?.value).toBe('/handoff-1'); // a new Claude Code session
-		expect(await t.as(bob).terminal('echo secret-$E2E_SECRET')).toContain(`secret-${secret}`);
-		await refused(alice.terminal((signal) => alice.threads.openTerminal({ threadId: t.id, cols: 80, rows: 24, command: 'true' }, { signal })));
-	});
-
-	await test.step('the thread moves to bob’s list; his posts start turns, alice’s are chat', async () => {
-		expect((await alice.threads.listThreads({})).threads.map((x) => x.id)).not.toContain(t.id);
-		expect((await bob.threads.listThreads({})).threads.map((x) => x.id)).toContain(t.id);
-		expect((await bob.threads.listMentioned({})).threads.map((x) => x.id)).not.toContain(t.id);
-		await t.as(bob).turn(() => t.as(bob).send('keep going'));
-		expect(await refused(alice.threads.handoffOffer({ threadId: t.id, toUserId: alice.id }))).toMatch(/only the thread owner/);
-	});
-});
-
-test('a handoff can be declined by the recipient and cancelled by the owner; nobody else hands off, accepts or withdraws', async ({ as }) => {
-	const [alice, bob, carol] = [as('alice'), await teammate(as('bob')), await teammate(as('carol'))];
-	const t = await alice.create();
-	await t.waitForStatus(Status.AWAITING_INPUT);
-	await t.snooze();
-	await t.waitForStatus(Status.SUSPENDED);
-
-	await refused(bob.threads.handoffOffer({ threadId: t.id, toUserId: bob.id }));
-	await refused(alice.threads.handoffOffer({ threadId: t.id, toUserId: 'nobody-e2e' }));
-	await alice.threads.handoffOffer({ threadId: t.id, toUserId: bob.id });
-	expect((await t.of('handoffOffered')).at(-1)!.noBriefing).toBe('the environment is paused');
-	expect((await t.get()).status).toBe(Status.SUSPENDED); // no briefing, and it stays asleep
-	await refused(alice.threads.handoffOffer({ threadId: t.id, toUserId: carol.id }));
-	await refused(carol.threads.handoffAccept({ threadId: t.id }));
-	await refused(carol.threads.handoffDecline({ threadId: t.id }));
-
-	await bob.threads.handoffDecline({ threadId: t.id });
-	expect((await t.get()).handoffTo).toBe('');
-	await refused(bob.threads.handoffAccept({ threadId: t.id }));
-	expect((await bob.threads.listMentioned({})).threads.map((x) => x.id)).not.toContain(t.id);
-
-	await alice.threads.handoffOffer({ threadId: t.id, toUserId: carol.id });
-	await alice.threads.handoffDecline({ threadId: t.id });
-	const resolved = (await t.events()).filter((e) => e.kind.case === 'handoffResolved');
-	expect(resolved.map((e) => [e.actor, e.kind.value])).toMatchObject([
-		[bob.id, { accepted: false }],
-		[alice.id, { accepted: false }]
+test('a Specification thread hands its spec to an Engineer sub-thread with wake_parent; its finished turn wakes the parent’s agent', async ({ as }) => {
+	const parent = await as('alice').create({ profile: 'spec' });
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	let child!: Thread;
+	const woken = await parent.turn(async () => (child = await spawn(parent, { profile: 'engineer', wake_parent: true })), 180_000);
+	expect((await child.get()).profile).toBe('engineer');
+	expect(await child.reply()).toBe('Created hello1.txt with claude-opus-5-5 · high'); // the engineer's profile adds no text
+	expect(await wakes(parent, child)).toEqual([
+		expect.objectContaining({ mentionsAgent: true, text: expect.stringContaining('finished] Created hello1.txt with claude-opus-5-5 · high\nYou started') })
 	]);
-	const info = await t.get();
-	expect([info.ownerId, info.handoffTo, info.status]).toEqual([alice.id, '', Status.SUSPENDED]);
+	// The report still shows as the lineage line, before the request.
+	expect((await parent.of('lineageUpdate')).filter((u) => u.threadId === child.id).map((u) => u.status)).toEqual([Status.STARTING, Status.AWAITING_INPUT]);
+	expect(woken.diff).toContain(asked(child));
+	expect(woken.diff).toContain(`finished] Created hello1.txt with claude-opus-5-5`);
+	expect(woken.diff).toContain(readIt(child));
 });
 
-test('in the browser: alice hands off from the header, bob accepts from the card in the chat', async ({ as }) => {
-	const [alice, bob] = [as('alice'), await teammate(as('bob'))];
-	const t = await alice.create({ prompt: 'e2e: hand me over' });
-	await t.waitForStatus(Status.AWAITING_INPUT);
+test('a failed sub-thread wakes its parent too; one without wake_parent only reports', async ({ as }) => {
+	const parent = await as('alice').create();
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	const quiet = await spawn(parent, {});
+	await parent.waitForEvent(
+		(e) => e.kind.case === 'lineageUpdate' && e.kind.value.threadId === quiet.id && e.kind.value.status === Status.AWAITING_INPUT,
+		'the report of the sub-thread without wake_parent',
+		120_000
+	);
+	let failing!: Thread;
+	const woken = await parent.turn(async () => (failing = await spawn(parent, { repo_url: repo('setup-fails'), wake_parent: true })), 180_000);
+	expect((await failing.get()).status).toBe(Status.ERRORED);
+	expect(woken.diff).toContain(asked(failing));
+	expect(woken.diff).toContain('failed] Setup failed');
+	expect(woken.diff).toContain(readIt(failing));
+	// The quiet one reported long before and started no turn: the parent ran its first turn and the woken one.
+	expect(await wakes(parent, quiet)).toEqual([]);
+	expect(await parent.of('turnEnded')).toHaveLength(2);
+});
 
-	const page = await alice.page();
-	await page.goto(`/t/${t.id}`);
-	await page.getByRole('button', { name: 'Hand off to a teammate' }).click();
-	await page.getByRole('combobox', { name: 'Teammate' }).selectOption(bob.id);
-	await page.getByRole('textbox', { name: 'Note' }).fill('over to you');
-	await page.getByRole('button', { name: 'Hand off', exact: true }).click();
-	const card = page.getByRole('group', { name: `Handoff to ${bob.id}` });
-	await expect(card.getByText('over to you')).toBeVisible();
-	await expect(card.getByText(`Waiting for ${bob.id} to accept`)).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Hand off to a teammate' })).toBeHidden();
+test('loop guard: a sub-thread wakes its parent again only once a person posted in either thread since its last wake', async ({ as }) => {
+	const parent = await as('alice').create();
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	let child!: Thread;
+	await parent.turn(async () => (child = await spawn(parent, { wake_parent: true })), 180_000); // the first report wakes
+	const reports = async () => (await parent.of('lineageUpdate')).filter((u) => u.threadId === child.id && u.status === Status.AWAITING_INPUT).length;
+	/** The parent's agent asks the sub-thread for more; returns once the sub-thread reported back. */
+	const ask = async () => {
+		const n = await reports();
+		await child.turn(() => parent.mcp('post_message', { thread_id: child.id, text: 'e2e: more', mention_agent: true }));
+		await until(async () => (await reports()) > n, () => `report ${n + 1} of ${child.id} in ${parent.id}`);
+	};
+	await ask(); // agents only since the wake: no turn
+	await parent.turn(() => child.turn(() => child.send('e2e: alice in the sub-thread'))); // a person posted in the child
+	await ask();
+	await parent.turn(() => parent.send('e2e: alice in the parent')); // a person posted in the parent (her own turn)
+	await parent.turn(ask);
+	// Every report shows as a line; only those after a person's post (and the first) woke the parent's agent, once each.
+	const seq = (await parent.events()).flatMap((e) =>
+		e.kind.case === 'lineageUpdate' && e.kind.value.threadId === child.id && e.kind.value.status === Status.AWAITING_INPUT
+			? ['report']
+			: e.kind.case === 'message' && e.actor === `agent:${child.id}`
+				? ['wake']
+				: []
+	);
+	expect(seq).toEqual(['report', 'wake', 'report', 'report', 'wake', 'report', 'report', 'wake']);
+});
 
-	const bobs = await bob.page();
-	await bobs.goto('/');
-	await bobs.getByRole('region', { name: 'Mentioned' }).getByRole('link', { name: /e2e: hand me over/ }).click();
-	const accept = bobs.getByRole('group', { name: `Handoff to ${bob.id}` }).getByRole('button', { name: 'Accept' });
-	await t.waitForStatus(Status.AWAITING_INPUT); // the briefing is written
-	await accept.click();
-	await expect(card.getByText(`${bob.id} accepted`)).toBeVisible();
-	await t.as(bob).waitFor('to be bob’s and idle', (x) => x.ownerId === bob.id && x.status === Status.AWAITING_INPUT);
-	await expect(bobs.getByRole('button', { name: 'Hand off to a teammate' })).toBeVisible();
+test('a paused parent wakes for its sub-thread’s report', async ({ as }) => {
+	const parent = await as('alice').create();
+	await parent.waitForStatus(Status.AWAITING_INPUT);
+	// The directive on a line of its own: the title (the first line) is quoted in the woken prompt.
+	const child = await spawn(parent, { prompt: 'e2e: build it\ne2e-hold:h', wake_parent: true });
+	await child.waitForEvent((e) => e.kind.case === 'agentText' && e.kind.value.text === 'Holding h', 'the held turn', 120_000);
+	await parent.snooze();
+	await parent.waitForStatus(Status.SUSPENDED);
+	await parent.podGone();
+	const woken = await parent.turn(() => child.release('h'), 180_000);
+	expect(woken.diff).toContain(asked(child));
+	expect(woken.diff).toContain(readIt(child));
 });

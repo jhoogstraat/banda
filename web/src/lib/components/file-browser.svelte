@@ -13,8 +13,9 @@
 	import type { ReadFileResponse } from '#lib/gen/banda/v1/banda_pb.js';
 
 	// Read-only: a filterable list of the checkout's files, and one file's content.
-	// `diff` changes whenever the agent changed files, so it triggers a refresh.
-	let { threadId, diff }: { threadId: string; diff: string } = $props();
+	// `version` changes whenever the agent may have changed files (the diff, or without a repository the
+	// thread's status), so it triggers a refresh.
+	let { threadId, version }: { threadId: string; version: string } = $props();
 
 	let paths = $state<string[]>([]);
 	let truncated = $state(false);
@@ -53,7 +54,7 @@
 	}
 
 	$effect(() => {
-		diff;
+		version;
 		untrack(() => {
 			list();
 			if (open) read(open);

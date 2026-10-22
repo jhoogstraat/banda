@@ -34,6 +34,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("sandbox client: %v", err)
 	}
+	allow, err := sandbox.ParseCIDRs(os.Getenv("SANDBOX_EGRESS_ALLOW"))
+	if err == nil {
+		err = sb.AllowEgress(ctx, allow)
+	}
+	if err != nil {
+		log.Fatalf("SANDBOX_EGRESS_ALLOW: %v", err)
+	}
 
 	auth, httpUser := api.DevAuth(), api.DevUser
 	var sso *api.OIDC

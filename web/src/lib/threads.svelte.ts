@@ -4,7 +4,7 @@ import { api, userApi } from './api';
 import type { Decision, Thread, User } from './gen/banda/v1/banda_pb.js';
 import { alerts, asking, asks, families, sectionOf, type Alert, type Family, type Inbox } from './inbox';
 
-// `search` and `project` (a repo URL) filter the sidebar's threads.
+// `search` and `project` (a repo URL, or noRepo) filter the sidebar's threads.
 export const threads = $state({
 	list: [] as Thread[],
 	mentioned: [] as Thread[],
@@ -88,21 +88,27 @@ export function userName(id: string) {
 		: (threads.users.find((u) => u.id === id)?.name ?? id);
 }
 
+// The project of threads without a repository, where a project is a repo URL and '' means all of them.
+export const noRepo = 'none';
+export const projectOf = (t: { repoUrl: string }) => t.repoUrl || noRepo;
+
 // "github.com/org/repo.git" -> "org/repo".
 export const projectName = (url: string) =>
-	url
-		.replace(/\.git$/, '')
-		.split('/')
-		.slice(-2)
-		.join('/');
+	!url || url === noRepo
+		? 'No repository'
+		: url
+				.replace(/\.git$/, '')
+				.split('/')
+				.slice(-2)
+				.join('/');
 
-// The repositories of all loaded threads, most recently active first.
-export const projects = () => [...new Set([...threads.list, ...threads.mentioned].map((t) => t.repoUrl))];
+// The projects of all loaded threads, most recently active first.
+export const projects = () => [...new Set([...threads.list, ...threads.mentioned].map(projectOf))];
 
 export function matches(t: Thread) {
 	const q = threads.search.trim().toLowerCase();
 	return (
-		(!threads.project || t.repoUrl === threads.project) &&
+		(!threads.project || projectOf(t) === threads.project) &&
 		(!q || `${t.title} ${projectName(t.repoUrl)}`.toLowerCase().includes(q))
 	);
 }
