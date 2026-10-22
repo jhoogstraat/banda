@@ -28,3 +28,7 @@ A web app where a team builds software together with coding agents. Each thread 
 
 - `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. A bug fix comes with an e2e test that fails before it; a known bug not fixed yet is reproduced in its spec as `test.fail()`.
 - `node web/src/lib/events.check.ts`: web event reducer. `pnpm -C web check`: Svelte types. `mise run chart-check`: the chart and Kustomize overlays. CI (`.github/workflows`) runs these on pull requests; a `v*` tag releases images and the chart.
+
+## Git
+
+- The remote is `github.com/jhoogstraat/banda` (private for now). Pushing to `main` is fine once your changes are squashed into a single commit with a message that says what changed and why. Never force-push `main`, and don't create tags: a `v*` tag publishes a release.

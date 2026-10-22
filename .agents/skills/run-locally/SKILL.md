@@ -21,7 +21,7 @@ mise run down   # stop the servers and the kind node; the shared Podman machine 
 
 - Never run the real `claude` binary for tests: it uses the user's personal Claude subscription. Use `mise run e2e`.
 - Banda runs in `podman-machine-default`, shared with the user's other projects. Never stop it or other Podman machines without asking.
-- Do not push.
+- Push only as AGENTS.md (Git) allows: one squashed commit to `main`, no tags.
 
 ## Troubleshooting
 
