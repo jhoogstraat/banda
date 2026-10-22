@@ -19,9 +19,13 @@ test('with a one-connection pool, approving a teammate’s turn does not deadloc
 // B11: posts, approvals and forks loaded every event since the last delivery (or all of them), tool outputs included.
 test('a 20k-event thread: posting, resolving turn requests and forking stay fast', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
-	const { stdout } = await promisify(execFile)('../deploy/long-thread.sh', ['20000'], { env: { ...process.env, DB, OWNER: alice.id } });
-	const t = alice.thread(stdout.trim());
-	await t.get(); // connected
+	const seed = async (events: number) => {
+		const { stdout } = await promisify(execFile)('../deploy/long-thread.sh', [String(events)], { env: { ...process.env, DB, OWNER: alice.id } });
+		const t = alice.thread(stdout.trim());
+		await t.get(); // connected
+		return t;
+	};
+	const [t, short] = [await seed(20000), await seed(25)];
 	// The fastest of three, so a busy machine doesn't fail it; they took 140-200 ms each.
 	const fastest = async (call: (i: number) => Promise<unknown>) => {
 		const ms: number[] = [];
@@ -38,8 +42,17 @@ test('a 20k-event thread: posting, resolving turn requests and forking stay fast
 	const resolve = await fastest((i) =>
 		(i < 2 ? alice.threads.declineTurn : alice.threads.approveTurn)({ threadId: t.id, requestSeq: requests[i] })
 	);
-	const fork = await fastest(() => alice.threads.fork({ threadId: t.id }));
-	expect(Math.max(post, resolve, fork), `ms: ${JSON.stringify({ post, resolve, fork })}`).toBeLessThan(50);
+	// A fork also starts a thread and its sandbox whatever the source's length: only what the 20k events
+	// add counts. That start took 800 ms from the third fork in a row while client-go held the API to 5
+	// Kubernetes requests a second.
+	const long = await fastest(() => alice.threads.fork({ threadId: t.id }));
+	const base = await fastest(() => alice.threads.fork({ threadId: short.id }));
+	expect(base, 'a fork of a one-turn thread').toBeLessThan(300);
+	const fork = long - base;
+	// Against loading all 20k events, so a slower machine (Actions) is measured by its own speed: loading
+	// them all is what each of these did (half a load), now a few ms of 300.
+	const load = await fastest(() => t.events());
+	expect(Math.max(post, resolve, fork) / load, `ms: ${JSON.stringify({ post, resolve, fork, load })}`).toBeLessThan(0.15);
 });
 
 // B14: the runner reports the diff after every turn, and each report was a diffChanged that made every viewer fetch it.

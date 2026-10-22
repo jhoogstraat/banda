@@ -53,11 +53,17 @@ jobs:
   # gateway of kind's network (host_ip in deploy/dev.sh).
   e2e:
     runs-on: ubuntu-24.04
-    # ponytail: not proven on Actions yet (built on macOS with Podman); drop once it has passed.
+    # ponytail: not one fully green run on Actions yet (see todo.md); drop once it has one.
     continue-on-error: true
-    timeout-minutes: 45
+    # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # The images, kind's copy of them and ~200 tests' sandboxes fill the runner's disk: drop toolchains it never uses.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: jdx/mise-action@v5
       - name: Docker instead of Podman
         run: |
@@ -71,7 +77,9 @@ jobs:
       - run: mise run e2e
         env:
           E2E_WORKERS: "2"
-      - if: failure()
+      - if: always()
+        run: df -h /
+      - if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: e2e

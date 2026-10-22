@@ -529,6 +529,19 @@ func (s *Store) Before(ctx context.Context, id string, beforeSeq int64, limit in
 		ORDER BY seq DESC LIMIT $3) e ORDER BY seq`, id, beforeSeq, limit)
 }
 
+// LatestOf is Before of the given kinds only.
+func (s *Store) LatestOf(ctx context.Context, id string, beforeSeq int64, limit int, kinds ...string) ([]*bandav1.Event, error) {
+	return s.events(ctx, `SELECT body FROM (SELECT seq, body FROM events WHERE thread_id = $1 AND seq < $2 AND kind = ANY($4)
+		ORDER BY seq DESC LIMIT $3) e ORDER BY seq`, id, beforeSeq, limit, kinds)
+}
+
+// Count is the number of the thread's events of a kind.
+func (s *Store) Count(ctx context.Context, id, kind string) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `SELECT count(*) FROM events WHERE thread_id = $1 AND kind = $2`, id, kind).Scan(&n)
+	return n, err
+}
+
 // Plan returns the latest TodoWrite call of the agent itself (not of a subagent) with seq < beforeSeq, or nil.
 func (s *Store) Plan(ctx context.Context, id string, beforeSeq int64) (*bandav1.Event, error) {
 	events, err := s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq < $2
