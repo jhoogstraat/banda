@@ -181,6 +181,11 @@ service SettingsService {
   rpc OpenLoginTerminal(OpenLoginTerminalRequest) returns (stream OpenTerminalResponse);
   rpc WriteLoginTerminal(WriteLoginTerminalRequest) returns (WriteTerminalResponse);
   rpc ResizeLoginTerminal(ResizeLoginTerminalRequest) returns (ResizeTerminalResponse);
+  // The name and email of commits in the caller's environments; empty ones
+  // fall back to their sign-in's. Applies to environments started afterwards.
+  rpc SetGitIdentity(SetGitIdentityRequest) returns (SetGitIdentityResponse);
+  // What the caller's new threads start with when they don't say.
+  rpc SetThreadDefaults(SetThreadDefaultsRequest) returns (SetThreadDefaultsResponse);
 }
 
 // RunnerService is dialed by the runner inside each sandbox pod, so the API
@@ -892,6 +897,8 @@ message GetSettingsResponse {
   repeated SecretInfo secrets = 2;
   // The profile of new threads that don't name one.
   string default_profile = 3;
+  GitIdentity git_identity = 4;
+  ThreadDefaults thread_defaults = 5;
 }
 
 message SetAuthMethodRequest {
@@ -1710,3 +1717,31 @@ message PullRequestResolveRequest {
 message PullRequestResolveResponse {
   PullRequest pull_request = 1;
 }
+
+message GitIdentity {
+  // The caller's own choice; empty uses their sign-in's (sign_in_*).
+  string name = 1;
+  string email = 2;
+  string sign_in_name = 3;
+  string sign_in_email = 4;
+}
+
+message SetGitIdentityRequest {
+  string name = 1;
+  string email = 2;
+}
+
+message SetGitIdentityResponse {}
+
+// Empty (unspecified) uses Banda's default.
+message ThreadDefaults {
+  string model = 1;
+  string effort = 2;
+  PermissionMode permission_mode = 3;
+}
+
+message SetThreadDefaultsRequest {
+  ThreadDefaults defaults = 1;
+}
+
+message SetThreadDefaultsResponse {}

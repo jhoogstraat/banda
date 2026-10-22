@@ -66,7 +66,9 @@ export function families(list: Thread[], now = Date.now()) {
 // "Fix the login (2/3)" -> "Fix the login".
 export const raceTitle = (t: Thread) => t.title.replace(/ \(\d+\/\d+\)$/, '');
 
-export type Alert = { href: string; title: string; body: string };
+// Which setting (Settings, Notifications) an alert falls under: my agent asks, finishes or fails, a mention (or handoff), a login needed.
+export type AlertKind = 'asks' | 'done' | 'mention' | 'login';
+export type Alert = { href: string; title: string; body: string; kind: AlertKind };
 
 // What deserves a notification between two inbox snapshots, for my threads unless snoozed or settled: a new
 // teammate turn request, the agent asking for permission or a plan approval, a turn finished, a failure; also a
@@ -74,24 +76,24 @@ export type Alert = { href: string; title: string; body: string };
 export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = (id) => id): Alert[] {
 	const was = new Map(prev.threads.map((t) => [t.id, t]));
 	const out: Alert[] = [];
-	const push = (t: Thread, title: string) => out.push({ href: `/t/${t.id}`, title, body: t.title });
+	const push = (t: Thread, title: string, kind: AlertKind) => out.push({ href: `/t/${t.id}`, title, body: t.title, kind });
 	for (const t of next.threads) {
 		if (['snoozed', 'settled'].includes(sectionOf(t))) continue;
 		const p = was.get(t.id);
-		if (t.turnRequests > (p?.turnRequests ?? 0)) push(t, 'A teammate asks to run your agent');
+		if (t.turnRequests > (p?.turnRequests ?? 0)) push(t, 'A teammate asks to run your agent', 'asks');
 		const fresh = t.permissionTools.filter((n) => !p?.permissionTools.includes(n));
-		if (fresh.includes('ExitPlanMode')) push(t, 'Your agent has a plan for you to approve');
-		else if (fresh.includes('AskUserQuestion')) push(t, 'Your agent has a question');
-		else if (fresh.length) push(t, `Your agent asks to use ${fresh[0]}`);
+		if (fresh.includes('ExitPlanMode')) push(t, 'Your agent has a plan for you to approve', 'asks');
+		else if (fresh.includes('AskUserQuestion')) push(t, 'Your agent has a question', 'asks');
+		else if (fresh.length) push(t, `Your agent asks to use ${fresh[0]}`, 'asks');
 		if (p?.status === t.status) continue;
-		if (t.status === Status.AWAITING_INPUT && !t.turnRequests) push(t, 'Your agent finished');
-		if (t.status === Status.ERRORED) push(t, 'Your thread failed');
+		if (t.status === Status.AWAITING_INPUT && !t.turnRequests) push(t, 'Your agent finished', 'done');
+		if (t.status === Status.ERRORED) push(t, 'Your thread failed', 'done');
 	}
 	const mentioned = new Set(prev.mentioned.map((t) => t.id));
 	for (const t of next.mentioned) {
-		if (!mentioned.has(t.id)) push(t, t.handoffTo ? `${name(t.ownerId)} hands you a thread` : `You were mentioned in ${name(t.ownerId)}'s thread`);
+		if (!mentioned.has(t.id)) push(t, t.handoffTo ? `${name(t.ownerId)} hands you a thread` : `You were mentioned in ${name(t.ownerId)}'s thread`, 'mention');
 	}
 	if (next.loginNeeded && !prev.loginNeeded)
-		out.push({ href: '/settings', title: 'Log in to Claude', body: 'Your agents can’t run until you log in again.' });
+		out.push({ href: '/settings', title: 'Log in to Claude', body: 'Your agents can’t run until you log in again.', kind: 'login' });
 	return out;
 }

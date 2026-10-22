@@ -2494,6 +2494,16 @@ export declare type GetSettingsResponse = Message$1<"banda.v1.GetSettingsRespons
    * @generated from field: string default_profile = 3;
    */
   defaultProfile: string;
+
+  /**
+   * @generated from field: banda.v1.GitIdentity git_identity = 4;
+   */
+  gitIdentity?: GitIdentity | undefined;
+
+  /**
+   * @generated from field: banda.v1.ThreadDefaults thread_defaults = 5;
+   */
+  threadDefaults?: ThreadDefaults | undefined;
 };
 
 /**
@@ -5516,6 +5526,128 @@ export declare type PullRequestResolveResponse = Message$1<"banda.v1.PullRequest
 export declare const PullRequestResolveResponseSchema: GenMessage<PullRequestResolveResponse>;
 
 /**
+ * @generated from message banda.v1.GitIdentity
+ */
+export declare type GitIdentity = Message$1<"banda.v1.GitIdentity"> & {
+  /**
+   * The caller's own choice; empty uses their sign-in's (sign_in_*).
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string email = 2;
+   */
+  email: string;
+
+  /**
+   * @generated from field: string sign_in_name = 3;
+   */
+  signInName: string;
+
+  /**
+   * @generated from field: string sign_in_email = 4;
+   */
+  signInEmail: string;
+};
+
+/**
+ * Describes the message banda.v1.GitIdentity.
+ * Use `create(GitIdentitySchema)` to create a new message.
+ */
+export declare const GitIdentitySchema: GenMessage<GitIdentity>;
+
+/**
+ * @generated from message banda.v1.SetGitIdentityRequest
+ */
+export declare type SetGitIdentityRequest = Message$1<"banda.v1.SetGitIdentityRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string email = 2;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message banda.v1.SetGitIdentityRequest.
+ * Use `create(SetGitIdentityRequestSchema)` to create a new message.
+ */
+export declare const SetGitIdentityRequestSchema: GenMessage<SetGitIdentityRequest>;
+
+/**
+ * @generated from message banda.v1.SetGitIdentityResponse
+ */
+export declare type SetGitIdentityResponse = Message$1<"banda.v1.SetGitIdentityResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetGitIdentityResponse.
+ * Use `create(SetGitIdentityResponseSchema)` to create a new message.
+ */
+export declare const SetGitIdentityResponseSchema: GenMessage<SetGitIdentityResponse>;
+
+/**
+ * Empty (unspecified) uses Banda's default.
+ *
+ * @generated from message banda.v1.ThreadDefaults
+ */
+export declare type ThreadDefaults = Message$1<"banda.v1.ThreadDefaults"> & {
+  /**
+   * @generated from field: string model = 1;
+   */
+  model: string;
+
+  /**
+   * @generated from field: string effort = 2;
+   */
+  effort: string;
+
+  /**
+   * @generated from field: banda.v1.PermissionMode permission_mode = 3;
+   */
+  permissionMode: PermissionMode;
+};
+
+/**
+ * Describes the message banda.v1.ThreadDefaults.
+ * Use `create(ThreadDefaultsSchema)` to create a new message.
+ */
+export declare const ThreadDefaultsSchema: GenMessage<ThreadDefaults>;
+
+/**
+ * @generated from message banda.v1.SetThreadDefaultsRequest
+ */
+export declare type SetThreadDefaultsRequest = Message$1<"banda.v1.SetThreadDefaultsRequest"> & {
+  /**
+   * @generated from field: banda.v1.ThreadDefaults defaults = 1;
+   */
+  defaults?: ThreadDefaults | undefined;
+};
+
+/**
+ * Describes the message banda.v1.SetThreadDefaultsRequest.
+ * Use `create(SetThreadDefaultsRequestSchema)` to create a new message.
+ */
+export declare const SetThreadDefaultsRequestSchema: GenMessage<SetThreadDefaultsRequest>;
+
+/**
+ * @generated from message banda.v1.SetThreadDefaultsResponse
+ */
+export declare type SetThreadDefaultsResponse = Message$1<"banda.v1.SetThreadDefaultsResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetThreadDefaultsResponse.
+ * Use `create(SetThreadDefaultsResponseSchema)` to create a new message.
+ */
+export declare const SetThreadDefaultsResponseSchema: GenMessage<SetThreadDefaultsResponse>;
+
+/**
  * @generated from enum banda.v1.Status
  */
 export enum Status {
@@ -6737,6 +6869,27 @@ export declare const SettingsService: GenService<{
     methodKind: "unary";
     input: typeof ResizeLoginTerminalRequestSchema;
     output: typeof ResizeTerminalResponseSchema;
+  },
+  /**
+   * The name and email of commits in the caller's environments; empty ones
+   * fall back to their sign-in's. Applies to environments started afterwards.
+   *
+   * @generated from rpc banda.v1.SettingsService.SetGitIdentity
+   */
+  setGitIdentity: {
+    methodKind: "unary";
+    input: typeof SetGitIdentityRequestSchema;
+    output: typeof SetGitIdentityResponseSchema;
+  },
+  /**
+   * What the caller's new threads start with when they don't say.
+   *
+   * @generated from rpc banda.v1.SettingsService.SetThreadDefaults
+   */
+  setThreadDefaults: {
+    methodKind: "unary";
+    input: typeof SetThreadDefaultsRequestSchema;
+    output: typeof SetThreadDefaultsResponseSchema;
   },
 }>;
 

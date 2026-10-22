@@ -25,6 +25,16 @@ The permission chip in the composer sets what the agent asks for in that thread:
 
 The profile chip in the composer sets who the agent works with in that thread: **Engineer** (Claude Code as it is, the default), **Specification** (talks through what you want in plain language and writes it up as a spec with you; once you confirm it, an Engineer sub-thread builds it, and the agent tells you what came of it), **DevOps** (explores and explains production with the credentials in your environment, read-only first, asking before any change) or **Business** (does business work for you, such as documents, data and automation, and shows results, not code). A profile changes how the agent talks and works with you, never what it may do. Settings sets the profile new threads start with; the owner switches it in a thread, applied once the agent's turns have ended. A sub-thread starts with its parent's; the spawn dialog's chip picks another.
 
+## Settings
+
+Settings has a section each, linked from its side nav (`/settings#claude`, `#git`, `#defaults`, `#notifications`, `#appearance`, `#secrets`, `#team-secrets`, `#shortcuts`):
+
+- **Claude Code**: sign in with your subscription or an API key.
+- **Git identity**: the name and email of commits in your threads, by default your sign-in's. A thread handed to you uses yours. Like secrets, it applies when an environment next starts.
+- **New threads**: the model, effort, permission mode and profile the new-thread composer (and a race) starts with, and what threads created through the API without them get (sub-threads keep their parent's).
+- **Notifications** and **Appearance** (System, Light or Dark; dark by default) are per browser.
+- **Secrets**, **Team secrets** and the **keyboard shortcuts**.
+
 ## Work without a repository
 
 For work without code, pick **No repository** in the composer's repository chip. The agent starts in an empty folder in the thread's environment; the Files tab and the terminal work on it, but there is no diff, push or pull request. The folder lives only in that environment, so settling the thread never deletes it. A fork gets the conversation but not the files, and sub-threads have no repository either.

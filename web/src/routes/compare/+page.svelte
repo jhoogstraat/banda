@@ -254,7 +254,7 @@
 								<span class="truncate font-mono" title={d.path}>{d.path}</span>
 								{#each d.per as f, i}
 									<span class="font-mono" title={labels[i]}>
-										{#if f}<span class="text-green-400">+{f.add}</span> <span class="text-red-400">−{f.del}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
+										{#if f}<span class="text-green-600 dark:text-green-400">+{f.add}</span> <span class="text-red-600 dark:text-red-400">−{f.del}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
 									</span>
 								{/each}
 								<span class={d.kind === 'Same' ? 'text-muted-foreground' : 'font-medium text-amber-500'}>{d.kind}</span>
@@ -303,7 +303,7 @@
 									<span>
 										{s.files} {s.files === 1 ? 'file' : 'files'}
 										<span class="text-emerald-600 dark:text-emerald-400">+{s.add}</span>
-										<span class="text-red-600 dark:text-red-400">−{s.del}</span>
+										<span class="text-red-600 dark:text-red-600 dark:text-red-400">−{s.del}</span>
 									</span>
 								{/if}
 							</div>

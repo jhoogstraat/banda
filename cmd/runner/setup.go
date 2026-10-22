@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -208,9 +209,10 @@ func checkout(ctx context.Context) error {
 		}
 		return nil
 	}
+	// The owner's identity (Settings), set on every start so a change applies.
 	steps := [][]string{
-		{"config", "--global", "user.name", "Banda"},
-		{"config", "--global", "user.email", "banda@localhost"},
+		{"config", "--global", "user.name", cmp.Or(os.Getenv("BANDA_GIT_NAME"), "Banda")},
+		{"config", "--global", "user.email", cmp.Or(os.Getenv("BANDA_GIT_EMAIL"), "banda@localhost")},
 	}
 	if u, err := url.Parse(os.Getenv("BANDA_REPO_URL")); err == nil && u.Scheme == "https" && os.Getenv("GIT_TOKEN") != "" {
 		// Only for the repo's host. Reads the token from the environment at use

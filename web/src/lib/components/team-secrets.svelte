@@ -70,7 +70,7 @@
 	}
 </script>
 
-<section aria-label="Team secrets">
+<section id="team-secrets" aria-label="Team secrets">
 	<h2 class="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
 		Team secrets
 		<span class="text-xs font-normal text-muted-foreground">

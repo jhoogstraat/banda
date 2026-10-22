@@ -198,6 +198,12 @@ const (
 	// SettingsServiceResizeLoginTerminalProcedure is the procedure name of the SettingsService's
 	// ResizeLoginTerminal RPC.
 	SettingsServiceResizeLoginTerminalProcedure = "/banda.v1.SettingsService/ResizeLoginTerminal"
+	// SettingsServiceSetGitIdentityProcedure is the procedure name of the SettingsService's
+	// SetGitIdentity RPC.
+	SettingsServiceSetGitIdentityProcedure = "/banda.v1.SettingsService/SetGitIdentity"
+	// SettingsServiceSetThreadDefaultsProcedure is the procedure name of the SettingsService's
+	// SetThreadDefaults RPC.
+	SettingsServiceSetThreadDefaultsProcedure = "/banda.v1.SettingsService/SetThreadDefaults"
 	// RunnerServiceConnectProcedure is the procedure name of the RunnerService's Connect RPC.
 	RunnerServiceConnectProcedure = "/banda.v1.RunnerService/Connect"
 	// RunnerServiceForkPatchProcedure is the procedure name of the RunnerService's ForkPatch RPC.
@@ -2620,6 +2626,20 @@ var (
 			Procedure:  SettingsServiceResizeLoginTerminalProcedure,
 		}
 	})
+	settingsServiceSetGitIdentitySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetGitIdentity"),
+			Procedure:  SettingsServiceSetGitIdentityProcedure,
+		}
+	})
+	settingsServiceSetThreadDefaultsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetThreadDefaults"),
+			Procedure:  SettingsServiceSetThreadDefaultsProcedure,
+		}
+	})
 )
 
 // SettingsServiceClient is a client for the banda.v1.SettingsService service.
@@ -2646,6 +2666,11 @@ type SettingsServiceClient interface {
 	OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest) (SettingsServiceOpenLoginTerminalClientStream, error)
 	WriteLoginTerminal(context.Context, *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error)
 	ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error)
+	// The name and email of commits in the caller's environments; empty ones
+	// fall back to their sign-in's. Applies to environments started afterwards.
+	SetGitIdentity(context.Context, *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error)
+	// What the caller's new threads start with when they don't say.
+	SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error)
 }
 
 // NewSettingsServiceClient constructs a client for the banda.v1.SettingsService service. Multiple
@@ -2699,6 +2724,11 @@ type SettingsServiceHandler interface {
 	OpenLoginTerminal(context.Context, *v1.OpenLoginTerminalRequest, SettingsServiceOpenLoginTerminalServerStream) error
 	WriteLoginTerminal(context.Context, *v1.WriteLoginTerminalRequest) (*v1.WriteTerminalResponse, error)
 	ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error)
+	// The name and email of commits in the caller's environments; empty ones
+	// fall back to their sign-in's. Applies to environments started afterwards.
+	SetGitIdentity(context.Context, *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error)
+	// What the caller's new threads start with when they don't say.
+	SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error)
 }
 
 // RegisterSettingsServiceHandler registers svc as the banda.v1.SettingsService implementation on
@@ -2717,6 +2747,8 @@ func RegisterSettingsServiceHandler(server *connect.Server, svc SettingsServiceH
 		connect.Method{Spec: settingsServiceOpenLoginTerminalSpec(), Handler: adapter.openLoginTerminal},
 		connect.Method{Spec: settingsServiceWriteLoginTerminalSpec(), Handler: adapter.writeLoginTerminal},
 		connect.Method{Spec: settingsServiceResizeLoginTerminalSpec(), Handler: adapter.resizeLoginTerminal},
+		connect.Method{Spec: settingsServiceSetGitIdentitySpec(), Handler: adapter.setGitIdentity},
+		connect.Method{Spec: settingsServiceSetThreadDefaultsSpec(), Handler: adapter.setThreadDefaults},
 	)
 }
 
@@ -2781,6 +2813,14 @@ func (UnimplementedSettingsServiceHandler) WriteLoginTerminal(context.Context, *
 
 func (UnimplementedSettingsServiceHandler) ResizeLoginTerminal(context.Context, *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.ResizeLoginTerminal is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetGitIdentity(context.Context, *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetGitIdentity is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetThreadDefaults is not implemented")
 }
 
 type settingsServiceClient struct {
@@ -2870,6 +2910,22 @@ func (c *settingsServiceClient) WriteLoginTerminal(ctx context.Context, req *v1.
 func (c *settingsServiceClient) ResizeLoginTerminal(ctx context.Context, req *v1.ResizeLoginTerminalRequest) (*v1.ResizeTerminalResponse, error) {
 	var res v1.ResizeTerminalResponse
 	if err := c.client.CallUnary(ctx, settingsServiceResizeLoginTerminalSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetGitIdentity(ctx context.Context, req *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error) {
+	var res v1.SetGitIdentityResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetGitIdentitySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetThreadDefaults(ctx context.Context, req *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error) {
+	var res v1.SetThreadDefaultsResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetThreadDefaultsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2999,6 +3055,30 @@ func (h settingsServiceHandler) resizeLoginTerminal(ctx context.Context, _ conne
 		return err
 	}
 	res, err := h.svc.ResizeLoginTerminal(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setGitIdentity(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetGitIdentityRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetGitIdentity(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setThreadDefaults(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetThreadDefaultsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetThreadDefaults(ctx, &req)
 	if err != nil {
 		return err
 	}

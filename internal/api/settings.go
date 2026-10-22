@@ -13,6 +13,7 @@ import (
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
+	"github.com/jhoogstraat/banda/internal/store"
 )
 
 // Secret and API key values go straight to Kubernetes Secrets: they are never
@@ -67,11 +68,17 @@ func (s *Service) GetSettings(ctx context.Context, _ *bandav1.GetSettingsRequest
 	if st.LoginCheckedAt != nil {
 		acc.LoginCheckedAt = timestamppb.New(*st.LoginCheckedAt)
 	}
-	profile, err := s.store.DefaultProfile(ctx, u)
+	d, err := s.store.Defaults(ctx, u)
 	if err != nil {
 		return nil, err
 	}
-	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}, DefaultProfile: profile}
+	git, err := s.store.GitIdentity(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	res := &bandav1.GetSettingsResponse{Accounts: []*bandav1.HarnessAccount{acc}, DefaultProfile: d.Profile,
+		GitIdentity:    &bandav1.GitIdentity{Name: git.Name, Email: git.Email, SignInName: git.SignInName, SignInEmail: git.SignInEmail},
+		ThreadDefaults: &bandav1.ThreadDefaults{Model: d.Model, Effort: d.Effort, PermissionMode: permissionModeToProto[d.PermissionMode]}}
 	for _, sec := range secrets {
 		res.Secrets = append(res.Secrets, &bandav1.SecretInfo{Name: sec.Name, UpdatedAt: timestamppb.New(sec.UpdatedAt)})
 	}
@@ -134,6 +141,32 @@ func (s *Service) SetDefaultProfile(ctx context.Context, req *bandav1.SetDefault
 		return nil, err
 	}
 	return &bandav1.SetDefaultProfileResponse{}, s.store.SetDefaultProfile(ctx, user(ctx), req.Profile)
+}
+
+func (s *Service) SetThreadDefaults(ctx context.Context, req *bandav1.SetThreadDefaultsRequest) (*bandav1.SetThreadDefaultsResponse, error) {
+	d := req.GetDefaults()
+	mode, err := newPermissionMode(d.GetPermissionMode())
+	if err != nil {
+		return nil, err
+	}
+	if len(d.GetModel()) > 100 || len(d.GetEffort()) > 100 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the model or effort is too long")
+	}
+	return &bandav1.SetThreadDefaultsResponse{}, s.store.SetDefaults(ctx, user(ctx), store.Defaults{Model: d.GetModel(), Effort: d.GetEffort(), PermissionMode: mode})
+}
+
+// What git refuses in a name or email, and line breaks.
+var badIdentity = regexp.MustCompile(`[<>\n\r]`)
+
+func (s *Service) SetGitIdentity(ctx context.Context, req *bandav1.SetGitIdentityRequest) (*bandav1.SetGitIdentityResponse, error) {
+	name, email := strings.TrimSpace(req.Name), strings.TrimSpace(req.Email)
+	if badIdentity.MatchString(name+email) || len(name) > 200 || len(email) > 200 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "a name or email can't contain <, > or line breaks")
+	}
+	if email != "" && !strings.Contains(email, "@") {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "that isn't an email address")
+	}
+	return &bandav1.SetGitIdentityResponse{}, s.store.SetGitIdentity(ctx, user(ctx), name, email)
 }
 
 func (s *Service) ListTeamSecrets(ctx context.Context, _ *bandav1.ListTeamSecretsRequest) (*bandav1.ListTeamSecretsResponse, error) {

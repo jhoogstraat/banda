@@ -12,25 +12,38 @@
 		AuthMethod,
 		LoginAction,
 		LoginState,
+		PermissionMode,
+		type GitIdentity,
 		type HarnessAccount,
-		type SecretInfo
+		type SecretInfo,
+		type ThreadDefaults
 	} from '#lib/gen/banda/v1/banda_pb.js';
 	import { profiles } from '#lib/profiles.js';
+	import { efforts, models } from '#lib/components/option-menu.svelte';
+	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
+	import { permissionLabel, permissionModes } from '#lib/permissions.js';
+	import { shortcuts } from '#lib/shortcuts.svelte.js';
+	import { askNotify, notifyKinds, setNotifyKind, threads } from '#lib/threads.svelte.js';
+	import type { AlertKind } from '#lib/inbox.js';
 	import { ago } from '#lib/utils.js';
+	import { setMode, userPrefersMode } from 'mode-watcher';
 
 	let accounts = $state<HarnessAccount[]>([]);
 	let secrets = $state<SecretInfo[]>([]);
 	let defaultProfile = $state('');
+	let gitIdentity = $state<GitIdentity>();
+	let threadDefaults = $state<ThreadDefaults>();
 	let loaded = $state(false);
 	// An error and the section it belongs to.
 	let error = $state('');
-	let errorAt = $state<'accounts' | 'profile' | 'secrets'>('accounts');
+	let errorAt = $state<'accounts' | 'git' | 'defaults' | 'secrets'>('accounts');
 
 	const message = (e: unknown) => ConnectError.from(e).rawMessage;
 
 	async function load() {
 		try {
-			({ accounts, secrets, defaultProfile } = await settingsApi.getSettings({}));
+			({ accounts, secrets, defaultProfile, gitIdentity, threadDefaults } = await settingsApi.getSettings({}));
+			if (!loaded) ({ name: gitName, email: gitEmail } = gitIdentity ?? { name: '', email: '' });
 			loaded = true;
 			error = '';
 		} catch (e) {
@@ -93,8 +106,58 @@
 	async function setProfile(name: string) {
 		const before = defaultProfile;
 		defaultProfile = name;
-		if (!(await act('profile', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
+		if (!(await act('defaults', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
 	}
+
+	// What new threads start with: Banda's default until changed (the API's, as in the composer).
+	const shown = $derived({
+		model: threadDefaults?.model || models[0],
+		effort: threadDefaults?.effort || 'high',
+		permissions: permissionLabel(threadDefaults?.permissionMode || PermissionMode.BYPASS)
+	});
+	function setDefaults(change: Partial<typeof shown>) {
+		const d = { ...shown, ...change };
+		act('defaults', settingsApi.setThreadDefaults({ defaults: { model: d.model, effort: d.effort, permissionMode: permissionModes[d.permissions] } }));
+	}
+
+	// Git identity: empty fields use the sign-in's name and email.
+	let gitName = $state('');
+	let gitEmail = $state('');
+	async function saveGit(e: SubmitEvent) {
+		e.preventDefault();
+		await act('git', settingsApi.setGitIdentity({ name: gitName, email: gitEmail }));
+	}
+	const commitsBy = $derived(
+		`${gitIdentity?.name || gitIdentity?.signInName || 'Banda'} <${gitIdentity?.email || gitIdentity?.signInEmail || 'banda@localhost'}>`
+	);
+
+	const kinds: [AlertKind, string, string][] = [
+		['asks', 'My agent asks', 'a permission, a plan, a question, or a teammate asks to run it'],
+		['done', 'My agent finishes or fails', ''],
+		['mention', 'Mentions', 'also a thread handed to me'],
+		['login', 'Login needed', 'Claude Code needs me to log in again']
+	];
+	// The browser's permission: 'denied' also where there are no notifications.
+	const permission = $derived(
+		typeof Notification === 'undefined'
+			? 'This browser has no notifications.'
+			: threads.notify === 'granted'
+				? 'On in this browser.'
+				: threads.notify === 'denied'
+					? 'Blocked: allow notifications for this site in the browser’s settings.'
+					: 'Off: the browser hasn’t been asked yet.'
+	);
+
+	const sections = [
+		['claude', 'Claude Code'],
+		['git', 'Git identity'],
+		['defaults', 'New threads'],
+		['notifications', 'Notifications'],
+		['appearance', 'Appearance'],
+		['secrets', 'Secrets'],
+		['team-secrets', 'Team secrets'],
+		['shortcuts', 'Keyboard shortcuts']
+	];
 
 	// Secrets: the add form (?secret=NAME fills in the name, e.g. from a thread that needs GIT_TOKEN), and the row being replaced.
 	let name = $state(page.url.searchParams.get('secret') ?? '');
@@ -123,7 +186,7 @@
 	}
 </script>
 
-{#snippet heading(at: typeof errorAt, text: string, note: string)}
+{#snippet heading(at: typeof errorAt | '', text: string, note: string)}
 	<h2 class="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
 		{text}
 		{#if note}<span class="text-xs font-normal text-muted-foreground">{note}</span>{/if}
@@ -135,9 +198,20 @@
 	<PageHeader><h1 class="text-sm font-medium">Settings</h1></PageHeader>
 
 	<div class="min-h-0 flex-1 overflow-y-auto">
-		<div class="mx-auto w-full max-w-3xl space-y-8 p-4">
-			<section>
-				{@render heading('accounts', 'Accounts', 'applies to environments started afterwards')}
+		<!-- The section nav: a sticky column on desktop, a row of links above the sections on a phone. -->
+		<div class="mx-auto w-full max-w-5xl p-4 md:flex md:gap-8">
+			<nav aria-label="Settings sections" class="mb-6 md:sticky md:top-4 md:mb-0 md:w-44 md:shrink-0 md:self-start">
+				<ul class="flex flex-wrap gap-1 md:flex-col">
+					{#each sections as [id, label] (id)}
+						<li>
+							<a href="#{id}" class="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">{label}</a>
+						</li>
+					{/each}
+				</ul>
+			</nav>
+			<div class="min-w-0 flex-1 space-y-10 [&>section]:scroll-mt-4">
+			<section id="claude" aria-label="Claude Code">
+				{@render heading('accounts', 'Claude Code', 'applies to environments started afterwards')}
 				<div class="divide-y rounded-lg border">
 					{#each accounts as a (a.harness)}
 						{@const [dot, label] = status(a)}
@@ -206,14 +280,85 @@
 				</div>
 			</section>
 
-			<section>
-				{@render heading('profile', 'Agent profile', 'how the agent works with you in new threads; switch it per thread in the composer')}
-				<fieldset class="divide-y rounded-lg border">
-					<legend class="sr-only">Default profile</legend>
-					{#each profiles as p (p.name)}
+			<section id="git" aria-label="Git identity">
+				{@render heading('git', 'Git identity', 'who commits in your threads are by; applies to environments started afterwards')}
+				<form class="space-y-3 rounded-lg border p-4" onsubmit={saveGit}>
+					<div class="flex flex-wrap gap-2">
+						<Input class="w-48 flex-auto" aria-label="Name" placeholder={gitIdentity?.signInName || 'Name'} autocomplete="off" bind:value={gitName} />
+						<Input class="w-48 flex-auto" type="email" aria-label="Email" placeholder={gitIdentity?.signInEmail || 'Email'} autocomplete="off" bind:value={gitEmail} />
+						<Button type="submit" size="sm" variant="outline">Save</Button>
+					</div>
+					<p class="text-xs text-muted-foreground">
+						Commits are by <span class="font-mono">{commitsBy}</span>. Empty fields use your sign-in’s; a thread handed to you uses yours.
+					</p>
+				</form>
+			</section>
+
+			<section id="defaults" aria-label="New threads">
+				{@render heading('defaults', 'New threads', 'what the new-thread composer starts with; change them per thread there')}
+				<div class="divide-y rounded-lg border">
+					<div class="flex flex-wrap gap-x-6 gap-y-3 p-4 text-sm">
+						<label class="flex items-center gap-2">
+							Model
+							<NativeSelect.Root size="sm" value={shown.model} onchange={(e) => setDefaults({ model: e.currentTarget.value })}>
+								{#each models as m (m)}<NativeSelect.Option value={m}>{m}</NativeSelect.Option>{/each}
+							</NativeSelect.Root>
+						</label>
+						<label class="flex items-center gap-2">
+							Effort
+							<NativeSelect.Root size="sm" value={shown.effort} onchange={(e) => setDefaults({ effort: e.currentTarget.value })}>
+								{#each efforts as m (m)}<NativeSelect.Option value={m}>{m}</NativeSelect.Option>{/each}
+							</NativeSelect.Root>
+						</label>
+						<label class="flex items-center gap-2">
+							Permissions
+							<NativeSelect.Root size="sm" value={shown.permissions} onchange={(e) => setDefaults({ permissions: e.currentTarget.value })}>
+								{#each Object.keys(permissionModes) as m (m)}<NativeSelect.Option value={m}>{m}</NativeSelect.Option>{/each}
+							</NativeSelect.Root>
+						</label>
+					</div>
+					<fieldset class="divide-y">
+						<legend class="sr-only">Default profile</legend>
+						<p class="px-4 py-3 text-sm text-muted-foreground">Agent profile: how the agent works with you</p>
+						{#each profiles as p (p.name)}
+							<label class="flex items-start gap-3 px-4 py-3 text-sm">
+								<input type="radio" name="profile" class="mt-1 accent-primary" checked={p.name === defaultProfile} onchange={() => setProfile(p.name)} />
+								<span><span class="font-medium">{p.label}</span> <span class="block text-muted-foreground">{p.note}</span></span>
+							</label>
+						{/each}
+					</fieldset>
+				</div>
+			</section>
+
+			<section id="notifications" aria-label="Notifications">
+				{@render heading('', 'Notifications', 'in this browser, never for the page on screen')}
+				<div class="divide-y rounded-lg border">
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm">
+						<span>{permission}</span>
+						{#if threads.notify === 'default'}<Button size="sm" class="ml-auto" onclick={askNotify}>Enable</Button>{/if}
+					</div>
+					{#each kinds as [kind, label, note] (kind)}
 						<label class="flex items-start gap-3 px-4 py-3 text-sm">
-							<input type="radio" name="profile" class="mt-1 accent-primary" checked={p.name === defaultProfile} onchange={() => setProfile(p.name)} />
-							<span><span class="font-medium">{p.label}</span> <span class="block text-muted-foreground">{p.note}</span></span>
+							<input
+								type="checkbox"
+								class="mt-1 accent-primary"
+								checked={notifyKinds[kind]}
+								onchange={(e) => setNotifyKind(kind, e.currentTarget.checked)}
+							/>
+							<span><span class="font-medium">{label}</span>{#if note}<span class="block text-muted-foreground">{note}</span>{/if}</span>
+						</label>
+					{/each}
+				</div>
+			</section>
+
+			<section id="appearance" aria-label="Appearance">
+				{@render heading('', 'Appearance', 'in this browser')}
+				<fieldset class="flex flex-wrap gap-x-6 gap-y-2 rounded-lg border px-4 py-3 text-sm">
+					<legend class="sr-only">Theme</legend>
+					{#each [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']] as const as [m, text] (m)}
+						<label class="flex items-center gap-1.5">
+							<input type="radio" name="theme" class="accent-primary" checked={userPrefersMode.current === m} onchange={() => setMode(m)} />
+							{text}
 						</label>
 					{/each}
 				</fieldset>
@@ -259,6 +404,17 @@
 			</section>
 
 			<TeamSecrets />
+
+			<section id="shortcuts" aria-label="Keyboard shortcuts">
+				{@render heading('', 'Keyboard shortcuts', 'never while typing; ? shows them anywhere')}
+				<dl class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-lg border p-4 text-sm">
+					{#each shortcuts as [keys, what] (keys)}
+						<dt><kbd class="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{keys}</kbd></dt>
+						<dd class="text-muted-foreground">{what}</dd>
+					{/each}
+				</dl>
+			</section>
+			</div>
 		</div>
 	</div>
 </div>

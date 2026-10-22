@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import { page } from '$app/state';
-	import { ModeWatcher, setMode } from 'mode-watcher';
+	import { ModeWatcher } from 'mode-watcher';
 	import CommandPalette from '#lib/components/command-palette.svelte';
 	import AppSidebar from '#lib/components/sidebar.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
@@ -11,9 +11,6 @@
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
-
-	// Dark by default. ModeWatcher's defaultMode only applies to a server-rendered head script.
-	setMode('dark');
 
 	// The sign-in page shows without a session: no sidebar, no calls that need one.
 	const bare = $derived(page.url.pathname === '/signin');
@@ -42,6 +39,7 @@
 
 <svelte:window {onkeydown} />
 
+<!-- The theme is chosen in Settings (System, Light or Dark), per browser; app.html applies it before the app loads. -->
 <ModeWatcher />
 
 {#if bare}

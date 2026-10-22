@@ -43,6 +43,12 @@ eq(titles(perm(), perm('ExitPlanMode')), ['/t/a: Your agent has a plan for you t
 eq(titles(perm('Bash'), perm('Bash')), [], 'a pending permission is not news');
 eq(titles(perm('Bash'), perm()), [], 'an answered permission is quiet');
 eq(titles({ threads: [], mentioned: [] }, { threads: [], mentioned: [], loginNeeded: true }), ['/settings: Log in to Claude'], 'a login needed alerts once');
+const kinds = (prev: Inbox, next: Inbox) => alerts(prev, next).map((a) => a.kind);
+eq(
+	[...kinds(perm(), perm('Bash')), ...kinds(requests(0), requests(1)), ...kinds(working, { threads: [t('a', Status.ERRORED)], mentioned: [t('n', Status.WORKING)] })],
+	['asks', 'asks', 'done', 'mention'],
+	'alerts have the kind their setting turns off'
+);
 
 const old = timestampFromMs(now - 4 * 24 * 3600_000);
 eq(sectionOf(t('r', Status.AWAITING_INPUT)), 'ready', 'a finished thread is ready');

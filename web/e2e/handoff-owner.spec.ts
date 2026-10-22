@@ -49,6 +49,7 @@ test('accepting a handoff makes the thread the teammate’s: the next turns run 
 		expect(from).not.toContain(`banda-env-${userHash(alice.id)}`);
 		const env = spec.containers[0].env as { name: string; value?: string }[];
 		expect(env.find((e) => e.name === 'BANDA_SESSION_KEY')?.value).toBe('/handoff-1'); // a new Claude Code session
+		expect(env.find((e) => e.name === 'BANDA_GIT_NAME')?.value).toBe(bob.id); // commits are bob's now (dev auth: name = id)
 		expect(await t.as(bob).terminal('echo secret-$E2E_SECRET')).toContain(`secret-${secret}`);
 		await refused(alice.terminal((signal) => alice.threads.openTerminal({ threadId: t.id, cols: 80, rows: 24, command: 'true' }, { signal })));
 	});

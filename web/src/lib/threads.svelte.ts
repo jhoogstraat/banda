@@ -2,7 +2,7 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { api, userApi } from './api';
 import type { Decision, Thread, User } from './gen/banda/v1/banda_pb.js';
-import { alerts, asking, asks, families, sectionOf, type Alert, type Family, type Inbox } from './inbox';
+import { alerts, asking, asks, families, sectionOf, type Alert, type AlertKind, type Family, type Inbox } from './inbox';
 
 // `search` and `project` (a repo URL, or noRepo) filter the sidebar's threads.
 export const threads = $state({
@@ -69,8 +69,8 @@ export async function watchInbox(signal: AbortSignal) {
 	}
 }
 
-function notify({ href, title, body }: Alert) {
-	if (threads.notify !== 'granted' || (!document.hidden && page.url.pathname === href)) return;
+function notify({ href, title, body, kind }: Alert) {
+	if (threads.notify !== 'granted' || !notifyKinds[kind] || (!document.hidden && page.url.pathname === href)) return;
 	const n = new Notification(title, { body, tag: href });
 	n.onclick = () => {
 		window.focus();
@@ -80,6 +80,20 @@ function notify({ href, title, body }: Alert) {
 }
 
 export const askNotify = async () => (threads.notify = await Notification.requestPermission());
+
+// Which kinds of notification this browser shows (Settings), all by default. Per browser, so no backend.
+const kindsKey = 'banda.notify';
+export const notifyKinds: Record<AlertKind, boolean> = $state({
+	asks: true,
+	done: true,
+	mention: true,
+	login: true,
+	...JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(kindsKey)) || '{}')
+});
+export function setNotifyKind(kind: AlertKind, on: boolean) {
+	notifyKinds[kind] = on;
+	localStorage.setItem(kindsKey, JSON.stringify(notifyKinds));
+}
 
 // Actors are user ids, or "agent:<threadId>" for other agents posting through MCP.
 export function userName(id: string) {

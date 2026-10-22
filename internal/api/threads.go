@@ -82,20 +82,18 @@ func checkRepoURL(repo string) error {
 
 // start stores a new thread, posts its first message (if any) as `by` (the
 // owner, or the agent that spawned it) and provisions its environment. It sets the id and branch,
-// and the defaults for what t leaves empty (the profile: the owner's default).
+// and the defaults for what t leaves empty (the owner's from Settings, else Banda's).
 // A thread without a repository has no branches.
 func (s *Service) start(ctx context.Context, t store.Thread, by string, first *bandav1.Message) (store.Thread, error) {
-	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, "claude-opus-5-5"), or(t.Effort, "high")
-	t.PermissionMode = or(t.PermissionMode, "bypass")
+	d, err := s.store.Defaults(ctx, t.OwnerID)
+	if err != nil {
+		return t, err
+	}
+	t.BaseBranch, t.Model, t.Effort = or(t.BaseBranch, "main"), or(t.Model, or(d.Model, "claude-opus-5-5")), or(t.Effort, or(d.Effort, "high"))
+	t.PermissionMode, t.Profile = or(t.PermissionMode, or(d.PermissionMode, "bypass")), or(t.Profile, d.Profile)
 	// Here, so forks of a thread created with a credentialed URL are refused too.
 	if err := checkRepoURL(t.RepoURL); err != nil {
 		return t, err
-	}
-	if t.Profile == "" {
-		var err error
-		if t.Profile, err = s.store.DefaultProfile(ctx, t.OwnerID); err != nil {
-			return t, err
-		}
 	}
 	if err := checkProfile(t.Profile); err != nil {
 		return t, err
@@ -143,12 +141,16 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	if err == nil {
 		secrets, err = s.store.SecretNames(ctx, t.OwnerID)
 	}
+	var git store.GitIdentity // the owner's: after a handoff, the new owner's
+	if err == nil {
+		git, err = s.store.GitIdentity(ctx, t.OwnerID)
+	}
 	var token string // a new one for every pod: an old pod's can't connect any more
 	if err == nil {
 		token, err = s.store.NewRunnerToken(ctx, t.ID)
 	}
 	if err == nil {
-		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets)
+		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets, git)
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)

@@ -207,3 +207,10 @@ CREATE TABLE IF NOT EXISTS pull_requests (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS brief_seen_at timestamptz;
 CREATE INDEX IF NOT EXISTS thread_views_settled ON thread_views (settled_at) WHERE settled_at IS NOT NULL;
+-- Each user's git identity in their environments ('' uses the sign-in's name
+-- or email) and what their new threads start with ('' is Banda's default).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS git_name text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS git_email text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_model text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_effort text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_permission_mode text NOT NULL DEFAULT '';

@@ -28,10 +28,10 @@
 	const saved = (key: string, fallback: string) => localStorage.getItem(`banda.${key}`) ?? fallback;
 	let repoUrl = $state(threads.project || saved('repoUrl', ''));
 	let baseBranch = $state(saved('baseBranch', 'main'));
-	let model = $state(saved('model', models[0]));
-	let effort = $state(saved('effort', 'high'));
-	let permissions = $state(saved('permissions', permissionLabel(PermissionMode.BYPASS)));
-	// Not remembered: it starts at the default profile from Settings ('' until loaded: the API uses that default).
+	// Not remembered: they start at the defaults from Settings (Banda's until loaded; '' profile: the API uses the default).
+	let model = $state(models[0]);
+	let effort = $state('high');
+	let permissions = $state(permissionLabel(PermissionMode.BYPASS));
 	let profile = $state('');
 	// Not remembered: every try runs (and bills) its own agent.
 	let tries = $state(tryOptions[0]);
@@ -51,8 +51,14 @@
 	const checkAccount = () =>
 		settingsApi
 			.getSettings({})
-			.then(({ accounts, defaultProfile }) => {
-				profile ||= defaultProfile;
+			.then(({ accounts, defaultProfile, threadDefaults: d }) => {
+				if (!profile) {
+					// The first load: the defaults, not what was picked since (closing the login dialog reloads).
+					profile = defaultProfile;
+					model = d?.model || model;
+					effort = d?.effort || effort;
+					if (d?.permissionMode) permissions = permissionLabel(d.permissionMode);
+				}
 				const a = accounts.find((a) => a.harness === 'claude');
 				if (!a) connect = '';
 				else if (a.authMethod === AuthMethod.API_KEY) connect = a.apiKeySet ? '' : 'key';
@@ -73,7 +79,7 @@
 		}
 		busy = true;
 		error = '';
-		for (const [k, v] of Object.entries({ repoUrl, baseBranch, model, effort, permissions })) localStorage.setItem(`banda.${k}`, v);
+		for (const [k, v] of Object.entries({ repoUrl, baseBranch })) localStorage.setItem(`banda.${k}`, v);
 		const repo = repoUrl === noRepo ? '' : repoUrl;
 		try {
 			const attachments = await Promise.all(files.map((f) => upload(f.file)));

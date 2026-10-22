@@ -19,7 +19,7 @@ func TestEnvFromOrder(t *testing.T) {
 		"api_key":      {"banda-git", "banda-env-team", envSecret("alice"), authSecret("alice")},
 	} {
 		var got []string
-		for _, f := range c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, method, nil).Spec.PodTemplate.Spec.Containers[0].EnvFrom {
+		for _, f := range c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, method, nil, store.GitIdentity{}).Spec.PodTemplate.Spec.Containers[0].EnvFrom {
 			got = append(got, f.SecretRef.Name)
 		}
 		if !slices.Equal(got, want) {
@@ -68,7 +68,7 @@ func TestParseSizes(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := &Client{cfg: Config{Sizes: s}}
-	sb := c.sandbox("t-1", "claude", store.Thread{ID: "1"}, "subscription", nil)
+	sb := c.sandbox("t-1", "claude", store.Thread{ID: "1"}, "subscription", nil, store.GitIdentity{})
 	lim := sb.Spec.PodTemplate.Spec.Containers[0].Resources.Limits
 	if lim.Memory().String() != "16Gi" || lim.Cpu().String() != "4" || lim.StorageEphemeral().String() != "10Gi" {
 		t.Errorf("thread limits %v", lim)

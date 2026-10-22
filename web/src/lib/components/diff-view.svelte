@@ -155,8 +155,8 @@
 			<button class="flex w-full items-center gap-1 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted/50" onclick={() => (listOpen = !listOpen)}>
 				<ChevronRightIcon class="size-3.5 transition-transform {listOpen ? 'rotate-90' : ''}" />
 				{files.length} file{files.length > 1 ? 's' : ''} changed
-				<span class="font-mono text-green-400">+{files.reduce((n, f) => n + f.add, 0)}</span>
-				<span class="font-mono text-red-400">−{files.reduce((n, f) => n + f.del, 0)}</span>
+				<span class="font-mono text-green-600 dark:text-green-400">+{files.reduce((n, f) => n + f.add, 0)}</span>
+				<span class="font-mono text-red-600 dark:text-red-400">−{files.reduce((n, f) => n + f.del, 0)}</span>
 			</button>
 			{#if listOpen}
 				<ul class="pb-2 text-xs">
@@ -165,8 +165,8 @@
 							<button class="flex w-full items-center gap-2 px-3 py-0.5 pl-8 text-left hover:bg-muted/50" onclick={() => show(f.path)}>
 								<span class="min-w-0 flex-1 truncate font-mono" title={f.path}>{f.path}</span>
 								{@render overlapMark(f.path)}
-								<span class="shrink-0 font-mono text-green-400">+{f.add}</span>
-								<span class="shrink-0 font-mono text-red-400">−{f.del}</span>
+								<span class="shrink-0 font-mono text-green-600 dark:text-green-400">+{f.add}</span>
+								<span class="shrink-0 font-mono text-red-600 dark:text-red-400">−{f.del}</span>
 							</button>
 						</li>
 					{/each}
@@ -183,8 +183,8 @@
 						<span class="min-w-0 flex-1 truncate font-mono" title={f.path}>{f.path}</span>
 						{#if fileNotes?.size}<MessageSquareIcon class="size-3 shrink-0 text-muted-foreground" />{/if}
 						{@render overlapMark(f.path)}
-						<span class="shrink-0 font-mono text-green-400">+{f.add}</span>
-						<span class="shrink-0 font-mono text-red-400">−{f.del}</span>
+						<span class="shrink-0 font-mono text-green-600 dark:text-green-400">+{f.add}</span>
+						<span class="shrink-0 font-mono text-red-600 dark:text-red-400">−{f.del}</span>
 					</button>
 					{#if isOpen(f)}
 						<div class="py-1 font-mono text-xs leading-5">

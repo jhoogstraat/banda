@@ -79,14 +79,62 @@ func (s *Store) DeleteSecret(ctx context.Context, userID, name string) error {
 	return err
 }
 
-// DefaultProfile is the profile of the user's new threads that don't name one.
-func (s *Store) DefaultProfile(ctx context.Context, userID string) (string, error) {
-	profile := "engineer"
-	err := s.db.QueryRow(ctx, `SELECT default_profile FROM users WHERE id = $1`, userID).Scan(&profile)
+// Defaults is what the user's new threads start with when they don't say:
+// a profile always, the rest empty for Banda's default.
+type Defaults struct {
+	Profile, Model, Effort, PermissionMode string
+}
+
+func (s *Store) Defaults(ctx context.Context, userID string) (Defaults, error) {
+	d := Defaults{Profile: "engineer"}
+	err := s.db.QueryRow(ctx, `SELECT default_profile, default_model, default_effort, default_permission_mode FROM users WHERE id = $1`,
+		userID).Scan(&d.Profile, &d.Model, &d.Effort, &d.PermissionMode)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
-	return profile, err
+	return d, err
+}
+
+// SetDefaults stores all but the profile (SetDefaultProfile).
+func (s *Store) SetDefaults(ctx context.Context, userID string, d Defaults) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, default_model, default_effort, default_permission_mode) VALUES ($1, $1, $2, $3, $4)
+		ON CONFLICT (id) DO UPDATE SET default_model = excluded.default_model, default_effort = excluded.default_effort,
+		default_permission_mode = excluded.default_permission_mode`, userID, d.Model, d.Effort, d.PermissionMode)
+	return err
+}
+
+// GitIdentity is a user's name and email for commits: their own choice
+// (Name, Email; empty when none) and their sign-in's.
+type GitIdentity struct {
+	Name, Email, SignInName, SignInEmail string
+}
+
+// Commits is the identity commits get.
+func (g GitIdentity) Commits() (name, email string) {
+	name, email = g.Name, g.Email
+	if name == "" {
+		name = g.SignInName
+	}
+	if email == "" {
+		email = g.SignInEmail
+	}
+	return name, email
+}
+
+func (s *Store) GitIdentity(ctx context.Context, userID string) (GitIdentity, error) {
+	g := GitIdentity{SignInName: userID} // a user who never signed in (dev auth) is named by their id
+	err := s.db.QueryRow(ctx, `SELECT git_name, git_email, name, email FROM users WHERE id = $1`, userID).
+		Scan(&g.Name, &g.Email, &g.SignInName, &g.SignInEmail)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = nil
+	}
+	return g, err
+}
+
+func (s *Store) SetGitIdentity(ctx context.Context, userID, name, email string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, git_name, git_email) VALUES ($1, $1, $2, $3)
+		ON CONFLICT (id) DO UPDATE SET git_name = excluded.git_name, git_email = excluded.git_email`, userID, name, email)
+	return err
 }
 
 func (s *Store) SetDefaultProfile(ctx context.Context, userID, profile string) error {

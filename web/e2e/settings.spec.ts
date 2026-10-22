@@ -1,5 +1,6 @@
-// A user's account: the Claude login environment, secrets and the API key.
-import { AuthMethod, LoginAction, LoginState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
+// A user's settings: the Claude login environment, secrets, the API key, the git identity, new threads' defaults,
+// notifications, the theme and the section nav.
+import { AuthMethod, AutoPushState, LoginAction, LoginState, PermissionMode, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
 
 const loginState = async (u: User) => (await u.settings.getSettings({})).accounts[0]?.loginState;
@@ -52,4 +53,114 @@ test('API key mode: the key reaches the environment and the login wait is skippe
 		await t.turn(() => t.send('wake up'));
 		expect(await t.terminal('echo key-${ANTHROPIC_API_KEY:-none}')).toContain('key-none');
 	});
+});
+
+test('git identity: set in Settings, it is who commits in the sandbox are by; empty uses the sign-in’s; bad ones refused', async ({ as }) => {
+	const alice = as('alice');
+	expect((await alice.settings.getSettings({})).gitIdentity).toMatchObject({ name: '', email: '', signInName: alice.id });
+	await refused(alice.settings.setGitIdentity({ name: 'Alice <x>', email: '' }));
+	await refused(alice.settings.setGitIdentity({ name: '', email: 'no-at-sign' }));
+
+	const page = await alice.page();
+	await page.goto('/settings#git');
+	const git = page.getByRole('region', { name: 'Git identity' });
+	await expect(git.getByText(`${alice.id} <banda@localhost>`)).toBeVisible(); // dev auth: no email
+	await git.getByLabel('Name').fill('Alice Example');
+	await git.getByLabel('Email').fill('alice@example.com');
+	await git.getByRole('button', { name: 'Save' }).click();
+	await expect(git.getByText('Alice Example <alice@example.com>')).toBeVisible();
+
+	const t = await alice.create({ prompt: 'e2e: commit a file' });
+	await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 150_000);
+	expect(await t.origin(`log -1 --format=%an/%ae/%cn/%ce ${(await t.get()).branch}`)).toContain(
+		'Alice Example/alice@example.com/Alice Example/alice@example.com'
+	);
+});
+
+test('defaults for new threads: set in Settings, the composer starts with them and threads that don’t say get them', async ({ as }) => {
+	const alice = as('alice');
+	const page = await alice.page();
+	await page.goto('/settings#defaults');
+	const defaults = page.getByRole('region', { name: 'New threads' });
+	await defaults.getByLabel('Model').selectOption('claude-sonnet-5-5');
+	await expect.poll(async () => (await alice.settings.getSettings({})).threadDefaults?.model).toBe('claude-sonnet-5-5');
+	await defaults.getByLabel('Effort').selectOption('low');
+	await expect.poll(async () => (await alice.settings.getSettings({})).threadDefaults?.effort).toBe('low');
+	await defaults.getByLabel('Permissions').selectOption('Plan');
+	await expect
+		.poll(async () => (await alice.settings.getSettings({})).threadDefaults)
+		.toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
+
+	await page.goto('/');
+	for (const name of ['Model: claude-sonnet-5-5', 'Effort: low', 'Permissions: Plan']) await expect(page.getByRole('button', { name })).toBeVisible();
+
+	const t = await alice.create({ prompt: 'e2e' });
+	expect(await t.get()).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
+});
+
+test('notifications: the section enables them and turns a kind off in this browser', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const page = await alice.page();
+	// The browser's Notification, recorded: asks once, then shows.
+	await page.addInitScript(() => {
+		const w = window as unknown as { shown: string[]; Notification: unknown };
+		w.shown = [];
+		w.Notification = class {
+			static permission = 'default';
+			static async requestPermission() {
+				return (this.permission = 'granted');
+			}
+			constructor(title: string) {
+				w.shown.push(title);
+			}
+			close() {}
+		};
+	});
+	const shown = () => page.evaluate(() => (window as unknown as { shown: string[] }).shown);
+	await page.goto('/settings#notifications');
+	const section = page.getByRole('region', { name: 'Notifications' });
+	await expect(section.getByText('Off: the browser hasn’t been asked yet.')).toBeVisible();
+	await section.getByRole('button', { name: 'Enable' }).click();
+	await expect(section.getByText('On in this browser.')).toBeVisible();
+
+	const t = await alice.create({ prompt: 'e2e' });
+	await expect.poll(shown, { timeout: 90_000 }).toContain('Your agent finished');
+	await section.getByRole('checkbox', { name: /My agent finishes or fails/ }).uncheck();
+	await t.turn(() => t.send('again'));
+	// A mention, which still notifies, shows the finished turn has reached the page too.
+	const b = await bob.create({ prompt: 'e2e' });
+	await b.send(`@${alice.id} look`, { mentionedUserIds: [alice.id] });
+	await expect.poll(shown).toContain(`You were mentioned in ${bob.id}'s thread`);
+	expect((await shown()).filter((s) => s === 'Your agent finished')).toHaveLength(1);
+});
+
+test('appearance: dark by default; Light and System persist in this browser', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/settings#appearance');
+	const html = page.locator('html');
+	const section = page.getByRole('region', { name: 'Appearance' });
+	await expect(section.getByRole('radio', { name: 'Dark' })).toBeChecked();
+	await expect(html).toHaveClass(/dark/);
+	await section.getByRole('radio', { name: 'Light' }).check();
+	await expect(html).not.toHaveClass(/dark/);
+	await page.reload();
+	await expect(section.getByRole('radio', { name: 'Light' })).toBeChecked();
+	await expect(html).not.toHaveClass(/dark/);
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await section.getByRole('radio', { name: 'System' }).check();
+	await expect(html).toHaveClass(/dark/);
+});
+
+test('the section nav links to every section; the shortcuts are listed', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/settings');
+	const nav = page.getByRole('navigation', { name: 'Settings sections' });
+	for (const id of ['claude', 'git', 'defaults', 'notifications', 'appearance', 'secrets', 'team-secrets', 'shortcuts']) {
+		await expect(nav.locator(`a[href="#${id}"]`)).toHaveCount(1);
+		await expect(page.locator(`section#${id}`)).toHaveCount(1);
+	}
+	await nav.getByRole('link', { name: 'Keyboard shortcuts' }).click();
+	const shortcuts = page.getByRole('region', { name: 'Keyboard shortcuts' });
+	await expect(shortcuts).toBeInViewport();
+	await expect(shortcuts.getByText('Command palette')).toBeVisible();
 });

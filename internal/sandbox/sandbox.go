@@ -112,8 +112,9 @@ func New(cfg Config) (*Client, error) {
 
 // Ensure gives the thread a freshly started pod, with token as its runner
 // token. authMethod is the owner's: "subscription" or "api_key"; secrets are
-// the names of the team's and the owner's secrets, which the runner redacts.
-func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod string, secrets []string) error {
+// the names of the team's and the owner's secrets, which the runner redacts;
+// git is who the owner's commits are by.
+func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod string, secrets []string, git store.GitIdentity) error {
 	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID)
 	if err == nil {
 		err = c.putToken(ctx, "t-"+t.ID, token)
@@ -121,7 +122,7 @@ func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod s
 	if err != nil {
 		return err
 	}
-	return c.start(ctx, c.sandbox("t-"+t.ID, claim, t, authMethod, secrets))
+	return c.start(ctx, c.sandbox("t-"+t.ID, claim, t, authMethod, secrets, git))
 }
 
 // EnsureLogin gives the user's login environment a freshly started pod, with
@@ -402,7 +403,8 @@ func (c *Client) suspend(ctx context.Context, name string) error {
 	return err
 }
 
-func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod string, secrets []string) *sbv1.Sandbox {
+func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod string, secrets []string, git store.GitIdentity) *sbv1.Sandbox {
+	gitName, gitEmail := git.Commits()
 	env := map[string]string{
 		"HOME":                         home,
 		"CLAUDE_CONFIG_DIR":            claudeDir,
@@ -417,6 +419,8 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_PROFILE":                t.Profile,
 		"BANDA_AUTH_METHOD":            authMethod,
 		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
+		"BANDA_GIT_NAME":               gitName, // empty: the runner's default
+		"BANDA_GIT_EMAIL":              gitEmail,
 	}
 	if t.Handoffs > 0 { // a new owner's session: the old one's transcript is on the old owner's volume
 		env["BANDA_SESSION_KEY"] = fmt.Sprintf("/handoff-%d", t.Handoffs)
