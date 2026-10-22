@@ -491,7 +491,7 @@ export const test = base.extend<Fixtures>({
 			let db = DB;
 			if (!opts.sharedDatabase) {
 				db = `${DB}_${randomBytes(3).toString('hex')}`;
-				await sql(`CREATE DATABASE ${db}`);
+				await sql(`CREATE DATABASE ${db} OWNER banda_api`);
 				dbs.push(db);
 			}
 			const url = `${process.env.DATABASE_URL!.replace(/\/[^/?]*(\?.*)?$/, `/${db}`)}${opts.query ? `?${opts.query}` : ''}`;

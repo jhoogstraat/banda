@@ -43,7 +43,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] CI: Go vet and tests, `pnpm -C web check`, the `.check.ts` scripts, the generated code, the chart and both images on every pull request; releases push multi-arch images, the chart (OCI) and `banda.yaml` on a `v*` tag.
 - [ ] CI e2e on kind with Docker: written (`deploy/dev.sh` derives the host from kind's network), not yet green on Actions; drop its `continue-on-error` once it is.
 - [x] Postgres: generated password in a Secret, no NodePort outside kind, or your own database.
-- [ ] Postgres for real: a non-superuser role for the API, backups (or CloudNativePG / a managed database).
+- [x] Postgres for real: the API connects as `banda_api` (owns its database, no superuser; made by the API pod's init container, also on upgrades), nightly `pg_dump` to a volume with rotation and a restore procedure (docs/deployment.md, "Postgres"). CloudNativePG or a managed database is the step up.
 - [x] Ingress with TLS for `banda.<domain>` and `preview.banda.<domain>` in the chart (`ingress.*`); `PUBLIC_URL`, `PREVIEW_URL` follow.
 - [x] Streams survive proxies: every server stream sends a keepalive every 25 s; the chart's `ingress.annotations` comment and the Kustomize example set ingress-nginx's timeouts.
 - [ ] Ingress on a real cluster: confirm a quiet thread page stays connected for minutes behind the team's controller.

@@ -123,7 +123,9 @@ e2e() {
 	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!
 	pnpm -C web exec playwright install chromium >/dev/null & local chromium=$!
 	e2e_wipe
-	pg -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db"
+	# The APIs connect as banda_api, as the chart's does: owner of its databases, not a superuser.
+	pg -c "DO \$\$ BEGIN CREATE ROLE banda_api LOGIN PASSWORD 'banda'; EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END \$\$" \
+		-c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db OWNER banda_api"
 	kc create ns "$ns" >/dev/null
 	kc -n "$ns" apply -f - >/dev/null <<EOF
 apiVersion: networking.k8s.io/v1
@@ -151,7 +153,7 @@ EOF
 	until_ok dex curl -sf "http://localhost:$dp/dex/.well-known/openid-configuration"
 	wait $api
 	wait $web || { tail -30 "$LOG/web.log"; exit 1; }
-	export DATABASE_URL=postgres://banda:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
+	export DATABASE_URL=postgres://banda_api:banda@localhost:5432/$db SANDBOX_NAMESPACE=$ns WEB_DIR=web/build DELETE_SETTLED_AFTER=20s IDLE_SWEEP_EVERY=2s
 	# Every thread on the plain repo writes hello1.txt: overlaps would tie all tests together. Their test turns them on.
 	export OVERLAP_WINDOW=0
 	host_api "$ns" "$p"; host_api "$ns" "$op"

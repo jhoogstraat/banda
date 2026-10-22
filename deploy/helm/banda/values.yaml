@@ -26,8 +26,8 @@ api:
   enabled: true
   # Settings from a Secret of your own instead of the one this chart makes
   # (banda-api). It needs SESSION_SECRET, OIDC_CLIENT_SECRET (with OIDC or
-  # Dex), POSTGRES_PASSWORD (with the bundled Postgres) or DATABASE_URL
-  # (without it), and can hold any other setting.
+  # Dex), POSTGRES_PASSWORD and POSTGRES_API_PASSWORD (with the bundled
+  # Postgres) or DATABASE_URL (without it), and can hold any other setting.
   existingSecret: ""
   # Plain settings, e.g. {IDLE_SUSPEND_AFTER: 1h, MAX_AGENT_THREADS: "4"}.
   env: {}
@@ -87,8 +87,18 @@ postgres:
   enabled: true
   image: postgres:18
   storage: 5Gi
-  # Empty: generated on install and kept on upgrades. Must be URL-safe.
+  # The superuser banda's, which only the API's init container and you
+  # (kubectl exec) use. Empty: generated on install and kept on upgrades.
   password: ""
+  # The API's role banda_api, which owns the database banda but is no superuser.
+  # Empty: generated on install and kept on upgrades. Must be URL-safe.
+  apiPassword: ""
+  # pg_dump of the database banda to the volume postgres-backup, kept on uninstall.
+  backup:
+    enabled: true
+    schedule: "0 3 * * *"
+    keep: 7 # dumps, newest first
+    storage: 5Gi
   # Dev only: a NodePort for an API outside the cluster.
   nodePort: null
 

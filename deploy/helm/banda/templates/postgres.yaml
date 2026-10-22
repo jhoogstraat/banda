@@ -1,6 +1,9 @@
 {{- if .Values.postgres.enabled }}
-# ponytail: one superuser "banda", no backups. A non-superuser role for the API
-# and backups (or CloudNativePG, a managed database) before data matters.
+{{- /* nil after helm upgrade --reuse-values from a chart without backups */}}
+{{- $backup := .Values.postgres.backup | default dict }}
+# One Postgres: the superuser banda, the API's role banda_api (made by the API's
+# init container, api.yaml) and nightly dumps (below). ponytail: no failover or
+# point-in-time recovery; CloudNativePG or a managed database when that matters.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -29,7 +32,7 @@ spec:
             - {name: POSTGRES_PASSWORD, value: {{ .Values.postgres.password | quote }}}
             {{- else }}
             - name: POSTGRES_PASSWORD
-              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: {{ include "banda.postgresSecret" . }}, key: POSTGRES_PASSWORD}}
             {{- end }}
             - {name: POSTGRES_DB, value: banda}
           readinessProbe:
@@ -38,6 +41,16 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql
+            {{- if $backup.enabled }}
+            # The dumps, to restore from here. Also binds the volume on install, which helm --wait needs
+            # with a WaitForFirstConsumer storage class.
+            - {name: backup, mountPath: /backup, readOnly: true}
+            {{- end }}
+      {{- if $backup.enabled }}
+      volumes:
+        - name: backup
+          persistentVolumeClaim: {claimName: postgres-backup}
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -61,8 +74,8 @@ spec:
       nodePort: {{ . }}
       {{- end }}
 ---
-# Only the API reaches Postgres: in the cluster, or from outside it through
-# the NodePort (dev). No other pod does, not even through the NodePort.
+# Only the API and the backups reach Postgres: in the cluster, or from outside
+# it through the NodePort (dev). No other pod does, not even through the NodePort.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -75,6 +88,73 @@ spec:
     - from:
         - podSelector: {matchLabels: {app: banda-api}}
         - ipBlock: {cidr: 0.0.0.0/0, except: [{{ .Values.podCIDR }}]}
+        - podSelector: {matchLabels: {app: postgres-backup}}
       ports:
         - port: 5432
+{{- with $backup }}
+{{- if .enabled }}
+---
+# Kept on uninstall: it's what's left if the data volume goes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backup
+  labels: {{- include "banda.labels" $ | nindent 4 }}
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .storage }}
+---
+# A custom-format dump of the database banda as its owner banda_api, then the
+# newest `keep` dumps stay. Restore: docs/deployment.md, "Backups".
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  labels: {{- include "banda.labels" $ | nindent 4 }}
+spec:
+  schedule: {{ .schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels: {app: postgres-backup}
+        spec:
+          restartPolicy: Never
+          # The volume is ReadWriteOnce and Postgres has it mounted: the same node.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector: {matchLabels: {app: postgres}}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: backup
+              image: {{ $.Values.postgres.image }}
+              env:
+                - {name: PGHOST, value: postgres}
+                - {name: PGUSER, value: banda_api}
+                - {name: PGDATABASE, value: banda}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: {{ include "banda.secret" $ }}, key: POSTGRES_API_PASSWORD}}
+                - {name: KEEP, value: {{ .keep | quote }}}
+              command: [bash, -ec]
+              args:
+                - |
+                  rm -f /backup/*.part
+                  f=/backup/banda-$(date -u +%Y%m%dT%H%M%SZ).dump
+                  pg_dump -Fc -f "$f.part"
+                  mv "$f.part" "$f"
+                  ls -1t /backup/banda-*.dump | tail -n +$((KEEP + 1)) | xargs -r rm --
+                  ls -l /backup
+              volumeMounts:
+                - {name: backup, mountPath: /backup}
+          volumes:
+            - name: backup
+              persistentVolumeClaim: {claimName: postgres-backup}
+{{- end }}
+{{- end }}
 {{- end }}

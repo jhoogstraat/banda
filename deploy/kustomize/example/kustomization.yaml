@@ -23,6 +23,7 @@ secretGenerator:
       - OIDC_CLIENT_SECRET=change-me
       - SESSION_SECRET=change-me-to-48-random-characters
       - POSTGRES_PASSWORD=change-me-url-safe
+      - POSTGRES_API_PASSWORD=change-me-too-url-safe
 patches:
   - target: {kind: Deployment, name: banda-api}
     patch: |

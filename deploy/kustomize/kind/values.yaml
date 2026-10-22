@@ -10,7 +10,9 @@ oidc:
   clientSecret: banda-dev-secret
 postgres:
   password: banda
+  apiPassword: banda
   nodePort: 30432
+  backup: {enabled: false}
 dex:
   enabled: true
   nodePort: 30556

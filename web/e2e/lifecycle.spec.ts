@@ -76,7 +76,7 @@ test('a bad base branch errors once, without a crash loop', async ({ as }) => {
 
 test('APIs starting together on a fresh database all come up: they apply the schema one at a time', async ({ startApi }) => {
 	const db = `${DB}_${Date.now()}`;
-	await sql(`CREATE DATABASE ${db}`);
+	await sql(`CREATE DATABASE ${db} OWNER banda_api`);
 	try {
 		const url = process.env.DATABASE_URL!.replace(/\/[^/?]*(\?|$)/, `/${db}$1`);
 		await Promise.all([1, 2, 3, 4].map(() => startApi({ DATABASE_URL: url }, { sharedDatabase: true })));

@@ -20,14 +20,14 @@ helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-name
   --set oidc.issuer=https://login.example.com,oidc.clientSecret=... --set podCIDR=10.42.0.0/16
 ```
 
-Register `$PUBLIC_URL/auth/callback` with your provider. To try it without one, `--set dex.enabled=true` with `dex.users` (see `deploy/kustomize/kind/values.yaml`): the API serves Dex at `$PUBLIC_URL/dex`, so it needs no host of its own (see "Sign-in with the bundled Dex" below). The session secret, Postgres password and Dex client secret are generated on install and kept on upgrades.
+Register `$PUBLIC_URL/auth/callback` with your provider. To try it without one, `--set dex.enabled=true` with `dex.users` (see `deploy/kustomize/kind/values.yaml`): the API serves Dex at `$PUBLIC_URL/dex`, so it needs no host of its own (see "Sign-in with the bundled Dex" below). The session secret, both Postgres passwords and the Dex client secret are generated on install and kept on upgrades.
 
 Without Helm: every release has `banda.yaml`, the chart rendered as the Kustomize base renders it, and `deploy/kustomize/base` inflates the chart for Kustomize (`kubectl kustomize --enable-helm`, which runs `helm`); `deploy/kustomize/example` patches it for a real cluster. Neither can keep generated secrets, so both read their settings from a Secret you create first:
 
 ```sh
 kubectl create namespace banda
 kubectl -n banda create secret generic banda-api --from-literal=SESSION_SECRET=$(openssl rand -hex 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) --from-literal=OIDC_ISSUER=... --from-literal=OIDC_CLIENT_ID=... --from-literal=OIDC_CLIENT_SECRET=...
+  --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) --from-literal=POSTGRES_API_PASSWORD=$(openssl rand -hex 16) --from-literal=OIDC_ISSUER=... --from-literal=OIDC_CLIENT_ID=... --from-literal=OIDC_CLIENT_SECRET=...
 kubectl -n banda apply -f https://github.com/jhoogstraat/banda/releases/download/v1.0.0/banda.yaml
 ```
 
@@ -42,7 +42,7 @@ The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` t
 | Piece | How | Notes |
 |---|---|---|
 | `banda-api` (Go, serves the SPA with `WEB_DIR`) | The chart; in dev `mise run api` on the Mac instead | Creates `Sandbox` CRs, PVCs, Secrets and NetworkPolicies through the Kubernetes API. One replica (in-memory fan-out), `strategy: Recreate`. |
-| Postgres | The chart (`postgres.enabled`, default), or your own database through `DATABASE_URL` | One superuser, generated password, no backups. |
+| Postgres | The chart (`postgres.enabled`, default), or your own database through `DATABASE_URL` | The API connects as `banda_api`, not a superuser; nightly dumps to a volume. See "Postgres" below. |
 | OIDC provider | Your provider (`oidc.*`), or the chart's Dex (`dex.enabled`) with static users for demos and dev | |
 | agent-sandbox controller | Upstream `sandbox.yaml` v1.0.7, applied once by hand | A third-party operator Banda depends on; not in the chart. |
 | Sandbox image | `ghcr.io/<owner>/banda-sandbox`, released for amd64 and arm64; in kind `mise run image` | Must be pullable by every node. |
@@ -59,7 +59,7 @@ The important fact: **Banda is Kubernetes-native by design.** The API's main job
 - **A rendered manifest** on every GitHub release (`banda.yaml`, what the base renders) for `kubectl apply` without either tool.
 - **The dev loop** installs the same chart: `mise run dex` (Postgres, Dex, policies; no API), `mise run deploy` (with the API), and the e2e world renders its Dex and policies from it. The kind values live in `deploy/kustomize/kind/values.yaml`, shared by the overlay and the tasks.
 
-Generated secrets (session secret, Postgres password, Dex client secret) survive `helm upgrade` through `lookup`; `helm template` and Kustomize can't look anything up, so the base and the release manifest take every secret from a Secret `banda-api` you create.
+Generated secrets (session secret, Postgres passwords, Dex client secret) survive `helm upgrade` through `lookup`; `helm template` and Kustomize can't look anything up, so the base and the release manifest take every secret from a Secret `banda-api` you create.
 
 ### Not chosen
 
@@ -69,6 +69,35 @@ Generated secrets (session secret, Postgres password, Dex client secret) survive
 - **An operator (a `Banda` CRD):** Banda has one instance per team, and its dynamic part (one sandbox per thread) is already reconciled by agent-sandbox and the API. For Postgres use CloudNativePG or a managed database if backups and failover are needed; don't write one.
 - **The controller in the chart, or a pre-install hook applying it:** it's cluster-wide (CRDs, its own namespace) and shared with anything else using agent-sandbox; a hook would need cluster-admin from a release that otherwise needs a namespace. One documented `kubectl apply` is simpler and honest.
 - **GitOps (Argo CD, Flux):** optional on top; both take a chart or a Kustomize overlay as they are.
+
+## Postgres
+
+The bundled Postgres (`postgres.enabled`, default) is one StatefulSet with two roles:
+
+- **`banda`**, the superuser. Its password (`POSTGRES_PASSWORD`) is in the Secret `banda-postgres` (with `api.existingSecret`: in that Secret), read by Postgres on a new volume and by the API pod's init container. You reach it with `kubectl -n banda exec postgres-0 -- psql -U banda` (no password over the pod's socket).
+- **`banda_api`**, what the API connects as (`POSTGRES_API_PASSWORD` in `banda-api`). It owns the database `banda` and so runs the migrations, but isn't a superuser and can't create roles or databases. The API never gets the superuser's password, except through `api.existingSecret`, whose keys all reach its environment.
+
+The API pod's init container `postgres-role` makes `banda_api` as the superuser on every start: it creates the role if missing, sets its password from the Secret and hands it the database `banda` and the tables and functions in it that anyone else owns. So an install from before the role upgrades with `helm upgrade` and nothing else: the superuser's password moves from `banda-api` to `banda-postgres` as it was, Postgres restarts once, the API starts as `banda_api` on the same data. With `api.existingSecret`, add `POSTGRES_API_PASSWORD` to that Secret first. A database of your own (`postgres.enabled=false`) is untouched: the API connects with your `DATABASE_URL`, and should own its database, not be a superuser.
+
+### Backups
+
+`postgres.backup` (on by default): the CronJob `postgres-backup` dumps the database `banda` (`pg_dump -Fc`, as `banda_api`) at `schedule` (default 03:00 UTC daily) to the volume `postgres-backup` (`storage`, 5Gi) and keeps the newest `keep` (7). Helm keeps that volume on uninstall. Postgres mounts it read-only at `/backup`, which also places the backups on Postgres's node (the volume is ReadWriteOnce). A dump now: `kubectl -n banda create job --from=cronjob/postgres-backup backup-now`.
+
+The volume sits on the same cluster: copy dumps somewhere else for a real disaster (`kubectl -n banda cp postgres-0:/backup/<dump> <dump>`). The step up, with point-in-time recovery and failover, is [CloudNativePG](https://cloudnative-pg.io) or a managed database through `postgres.enabled=false` and `DATABASE_URL`.
+
+Restore into a scratch database, check it, then swap it in, keeping the old one:
+
+```sh
+kubectl -n banda exec postgres-0 -- ls -t /backup   # newest first
+kubectl -n banda exec postgres-0 -- psql -U banda -c "CREATE DATABASE banda_restore OWNER banda_api"
+kubectl -n banda exec postgres-0 -- pg_restore -U banda -d banda_restore --no-owner --role=banda_api --exit-on-error /backup/banda-<time>.dump
+kubectl -n banda exec postgres-0 -- psql -U banda -d banda_restore -c "select count(*) from threads"
+kubectl -n banda scale deployment/banda-api --replicas 0
+kubectl -n banda exec postgres-0 -- psql -U banda -d postgres -c "ALTER DATABASE banda RENAME TO banda_old" -c "ALTER DATABASE banda_restore RENAME TO banda"
+kubectl -n banda scale deployment/banda-api --replicas 1
+```
+
+Drop `banda_old` once the restored one is right. A dump copied in from elsewhere goes through `kubectl -n banda exec -i postgres-0 -- pg_restore ... < <dump>` instead (pg_restore reads standard input).
 
 ## Sign-in with the bundled Dex
 
@@ -90,7 +119,7 @@ A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native am
 
 Also in [todo.md](../todo.md).
 
-- **Postgres:** the bundled one is a single superuser `banda` without backups. A non-superuser role for the API and backups (or CloudNativePG, a managed database) before data matters. Schema changes are an idempotent file, fine until a column changes.
+- **Postgres:** the bundled one has a non-superuser role for the API and nightly dumps on a volume in the same cluster ("Postgres" above): copy them off the cluster, or use CloudNativePG or a managed database for point-in-time recovery and failover.
 - **Volumes:** sandbox PVCs are RWO (`internal/sandbox/sandbox.go`: "multi-node needs RWX or node pinning"). The per-user Claude volume is mounted by all of a user's pods, so on a multi-node cluster those pods must land on one node, or the volume must be RWX.
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
 - **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists.

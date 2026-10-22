@@ -19,6 +19,9 @@
 
 {{- define "banda.secret" -}}{{ .Values.api.existingSecret | default "banda-api" }}{{- end -}}
 
+{{- /* The Secret with Postgres's superuser password, POSTGRES_PASSWORD. */}}
+{{- define "banda.postgresSecret" -}}{{ .Values.api.existingSecret | default "banda-postgres" }}{{- end -}}
+
 {{- define "banda.image" -}}{{ .image.repository }}:{{ .image.tag | default .root.Chart.AppVersion }}{{- end -}}
 
 {{- define "banda.labels" -}}

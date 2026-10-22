@@ -61,6 +61,38 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
       serviceAccountName: banda-api
+      {{- if .Values.postgres.enabled }}
+      initContainers:
+        # As the superuser, on every start: the API's role banda_api with the password in its Secret,
+        # owning the database banda and what an API connected as the superuser made there before it.
+        # Not a superuser, can't create roles or databases. The API itself never sees the superuser's password.
+        - name: postgres-role
+          image: {{ .Values.postgres.image }}
+          env:
+            - {name: PGHOST, value: postgres}
+            - {name: PGUSER, value: banda}
+            - {name: PGDATABASE, value: banda}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "banda.postgresSecret" . }}, key: POSTGRES_PASSWORD}}
+            - name: API_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_API_PASSWORD}}
+          command: [bash, -ec]
+          args:
+            - |
+              until pg_isready -q; do sleep 2; done
+              psql -q -v ON_ERROR_STOP=1 -v pw="$API_PASSWORD" <<'SQL'
+              SELECT 'CREATE ROLE banda_api' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'banda_api') \gexec
+              ALTER ROLE banda_api LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'pw';
+              ALTER DATABASE banda OWNER TO banda_api;
+              DO $role$ DECLARE o text; BEGIN
+                FOR o IN SELECT format('ALTER TABLE %s OWNER TO banda_api', oid::regclass) FROM pg_class
+                  WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') AND relowner <> 'banda_api'::regrole
+                UNION ALL SELECT format('ALTER ROUTINE %s OWNER TO banda_api', oid::regprocedure) FROM pg_proc
+                  WHERE pronamespace = 'public'::regnamespace AND proowner <> 'banda_api'::regrole
+                LOOP EXECUTE o; END LOOP;
+              END $role$;
+              SQL
+      {{- end }}
       containers:
         - name: api
           image: {{ include "banda.image" (dict "image" .Values.image.api "root" .) }}
@@ -73,9 +105,9 @@ spec:
             {{- end }}
           env:
             {{- if .Values.postgres.enabled }}
-            - name: POSTGRES_PASSWORD
-              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_PASSWORD}}
-            - {name: DATABASE_URL, value: "postgres://banda:$(POSTGRES_PASSWORD)@postgres:5432/banda"}
+            - name: POSTGRES_API_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_API_PASSWORD}}
+            - {name: DATABASE_URL, value: "postgres://banda_api:$(POSTGRES_API_PASSWORD)@postgres:5432/banda"}
             {{- end }}
             - {name: SANDBOX_NAMESPACE, value: {{ .Release.Namespace }}}
             - {name: SANDBOX_IMAGE, value: {{ include "banda.image" (dict "image" .Values.image.sandbox "root" .) | quote }}}
