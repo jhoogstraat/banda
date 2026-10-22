@@ -67,7 +67,7 @@ func TestAnswerQuestionsRulesAndEdits(t *testing.T) {
 	th.OwnerID, th.Trusted = "ann", true
 	answers := map[string]string{"Which?": "A"}
 	for _, r := range []*bandav1.PermissionAnswerRequest{
-		{RequestId: "q", Decision: allow},                     // no answers
+		{RequestId: "q", Decision: allow},                    // no answers
 		{RequestId: "q", Decision: always, Answers: answers}, // a question is never always allowed
 		{RequestId: "b", Decision: always, Rule: "Bash(npm test && rm:*)"},
 		{RequestId: "b", Decision: always, Rule: "Edit(src/**)"},

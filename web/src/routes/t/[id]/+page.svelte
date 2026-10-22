@@ -50,7 +50,7 @@
 	import { api, upload } from '#lib/api.js';
 	import type { Comment } from '#lib/diff.js';
 	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
-	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.js';
 	import { threadKeys, ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
@@ -97,6 +97,12 @@
 	const failed = $derived(!thread && !!loadError);
 	let closed = false;
 	const owner = $derived(!!threads.me && threads.me.id === thread?.ownerId);
+	// The repository's checkout failed (a wrong URL or base branch): the owner may still change or remove it.
+	const repoFixable = $derived.by(() => {
+		if (!owner || thread?.status !== Status.ERRORED || !thread.repoUrl || !reason.startsWith('Setup failed')) return false;
+		const setup = chat.items.findLast((i) => i.kind === 'setup');
+		return setup?.kind === 'setup' && setup.steps.some((s) => s.id === 'checkout' && s.state === SetupState.FAILED);
+	});
 	// Ticks so typing expires; `others` drops the viewer from presence and typing.
 	let now = $state(Date.now());
 	const others = (ids: string[]) => ids.filter((u) => u !== threads.me?.id);
@@ -333,7 +339,7 @@
 		else if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
-		if (owner && !t.repoUrl) c.push({ label: 'Add a repository', icon: FolderGit2Icon, run: () => (repoOpen = true) });
+		if (owner && (!t.repoUrl || repoFixable)) c.push({ label: t.repoUrl ? 'Change the repository' : 'Add a repository', icon: FolderGit2Icon, run: () => (repoOpen = true) });
 		if (owner) {
 			if (!pr && t.repoUrl) c.push({ label: 'Push the branch to origin', icon: UploadIcon, run: push });
 			c.push(t.mode === Mode.CHAT
@@ -391,7 +397,7 @@
 		<PageHeader />
 		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
-		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:repoOpen bind:paneOpen={diffOpen} />
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} {repoFixable} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:repoOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
 		<Overlaps overlaps={thread?.overlaps ?? []} />
 
@@ -429,7 +435,7 @@
 					{:else if thread?.status === Status.SUSPENDED}
 						<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 					{:else if thread?.status === Status.ERRORED}
-						<ThreadError {thread} {owner} {reason} {chat} {retry} onterminal={() => show('terminal')} />
+						<ThreadError {thread} {owner} {reason} {chat} {retry} onterminal={() => show('terminal')} onrepo={repoFixable ? () => (repoOpen = true) : undefined} />
 					{:else if !chat.items.length}
 						<ConversationEmptyState title="No messages yet" description="" />
 					{/if}

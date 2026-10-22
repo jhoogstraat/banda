@@ -611,7 +611,8 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "pullRequestChanged";
   } | {
     /**
-     * The owner (actor) gave the thread without a repository one.
+     * The owner (actor) gave the thread without a repository one, changed it
+     * before its first checkout, or removed it (repo_url empty).
      *
      * @generated from field: banda.v1.RepoAdded repo_added = 42;
      */
@@ -5686,6 +5687,8 @@ export declare type AddRepositoryRequest = Message$1<"banda.v1.AddRepositoryRequ
   threadId: string;
 
   /**
+   * Empty removes a repository never checked out.
+   *
    * @generated from field: string repo_url = 2;
    */
   repoUrl: string;
@@ -6806,7 +6809,8 @@ export declare const ThreadService: GenService<{
   /**
    * Gives a thread without a repository one (owner only, not while the agent
    * works): the environment restarts with the folder as a checkout of the
-   * thread branch, its files kept as uncommitted changes.
+   * thread branch, its files kept as uncommitted changes. Until a checkout of
+   * it succeeded, the repository can be changed, or removed (empty repo_url).
    *
    * @generated from rpc banda.v1.ThreadService.AddRepository
    */

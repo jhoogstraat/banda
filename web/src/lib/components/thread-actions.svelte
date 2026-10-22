@@ -49,6 +49,7 @@
 		act,
 		toggleMode,
 		retry,
+		repoFixable,
 		onfork,
 		onspawn,
 		onhandoff,
@@ -59,6 +60,7 @@
 		act: (call: Promise<unknown>) => Promise<boolean>;
 		toggleMode: () => void;
 		retry: () => void;
+		repoFixable: boolean;
 		onfork: () => void;
 		onspawn: () => void;
 		onhandoff: () => void;
@@ -87,7 +89,7 @@
 		<Menu.Item onclick={onfork}><GitForkIcon /> Fork: try another way<Menu.Shortcut>{threadKeys.fork}</Menu.Shortcut></Menu.Item>
 		<Menu.Item onclick={onspawn}><GitBranchPlusIcon /> Spawn a sub-thread<Menu.Shortcut>{threadKeys.spawn}</Menu.Shortcut></Menu.Item>
 		{#if owner && !thread.handoffTo}<Menu.Item onclick={onhandoff}><HandshakeIcon /> Hand off to a teammate</Menu.Item>{/if}
-		{#if owner && !thread.repoUrl}<Menu.Item onclick={onrepo}><FolderGit2Icon /> Add a repository</Menu.Item>{/if}
+		{#if owner && (!thread.repoUrl || repoFixable)}<Menu.Item onclick={onrepo}><FolderGit2Icon /> {thread.repoUrl ? 'Change the repository' : 'Add a repository'}</Menu.Item>{/if}
 		<Menu.Separator />
 		<Menu.Sub>
 			<Menu.SubTrigger><BellOffIcon /> {snoozed ? `Snoozed until ${when(until!)}` : 'Snooze'}</Menu.SubTrigger>

@@ -753,7 +753,8 @@ type ThreadServiceClient interface {
 	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
 	// Gives a thread without a repository one (owner only, not while the agent
 	// works): the environment restarts with the folder as a checkout of the
-	// thread branch, its files kept as uncommitted changes.
+	// thread branch, its files kept as uncommitted changes. Until a checkout of
+	// it succeeded, the repository can be changed, or removed (empty repo_url).
 	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
 }
 
@@ -1011,7 +1012,8 @@ type ThreadServiceHandler interface {
 	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
 	// Gives a thread without a repository one (owner only, not while the agent
 	// works): the environment restarts with the folder as a checkout of the
-	// thread branch, its files kept as uncommitted changes.
+	// thread branch, its files kept as uncommitted changes. Until a checkout of
+	// it succeeded, the repository can be changed, or removed (empty repo_url).
 	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
 }
 

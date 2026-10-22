@@ -58,6 +58,7 @@ var (
 	ErrNoHandoff = errors.New("no handoff is waiting")
 	ErrHandoff   = errors.New("hand the thread to a teammate, one at a time")
 	ErrBusy      = errors.New("the agent is working: try again once its turn has ended")
+	ErrRepoKept  = errors.New("the thread's repository was checked out: it can't be changed")
 )
 
 // CheckOwner returns ErrForbidden unless by owns the thread.
@@ -136,9 +137,14 @@ type Suspend struct{}
 // Wake resumes a suspended environment without a prompt, e.g. to open a terminal.
 type Wake struct{ By string }
 
-// AddRepo: the owner gave the thread a repository. The environment restarts
-// to check it out, so never mid-turn.
-type AddRepo struct{ By string }
+// AddRepo: the owner gave the thread a repository, changed the one it has
+// or removed it. The environment restarts to check it out, so never mid-turn.
+// CheckedOut: the thread's repository was checked out once, so it stays:
+// work may be on its branch.
+type AddRepo struct {
+	By         string
+	CheckedOut bool
+}
 
 func (Send) action()      {}
 func (Approve) action()   {}
@@ -310,6 +316,9 @@ func Apply(s State, a Action) (State, Effect, error) {
 	case AddRepo:
 		if err := s.CheckOwner(a.By); err != nil {
 			return s, None, err
+		}
+		if a.CheckedOut {
+			return s, None, ErrRepoKept
 		}
 		if s.Status == Working {
 			return s, None, ErrBusy

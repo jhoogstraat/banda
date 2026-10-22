@@ -33,6 +33,7 @@
 		toggleMode,
 		retry,
 		push,
+		repoFixable,
 		onpull,
 		oncreate,
 		forkOpen = $bindable(),
@@ -50,6 +51,8 @@
 		toggleMode: () => void;
 		retry: () => void;
 		push: () => void;
+		// The repository's checkout failed, so it can still be changed.
+		repoFixable: boolean;
 		// Opens the Pull request tab; opens the dialog that creates one.
 		onpull: () => void;
 		oncreate: () => void;
@@ -137,7 +140,7 @@
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" keys={threadKeys.pane} variant={paneOpen ? 'secondary' : 'ghost'} onclick={() => (paneOpen = !paneOpen)} />
 		{#if thread}
-			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} onrepo={() => (repoOpen = true)} />
+			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} {repoFixable} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} onrepo={() => (repoOpen = true)} />
 		{/if}
 	</div>
 </PageHeader>

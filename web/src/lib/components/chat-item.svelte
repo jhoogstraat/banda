@@ -326,7 +326,7 @@
 	<!-- The event has the model and effort if they changed, the profile if it did. -->
 	{@render divider(`${userName(item.actor)} switched to ${[s.model && `${s.model} · ${s.effort}`, s.profile && profileLabel(s.profile)].filter(Boolean).join(' · ')}`)}
 {:else if item.kind === 'repo'}
-	{@render divider(`${userName(item.actor)} added ${projectName(item.repo.repoUrl)} · ${item.repo.baseBranch}`)}
+	{@render divider(item.repo.repoUrl ? `${userName(item.actor)} added ${projectName(item.repo.repoUrl)} · ${item.repo.baseBranch}` : `${userName(item.actor)} removed the repository`)}
 {:else if item.kind === 'permissionMode'}
 	{@render divider(`${item.actor === 'agent' ? 'The agent' : userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
 {:else if item.kind === 'revoked'}

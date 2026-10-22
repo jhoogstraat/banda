@@ -260,12 +260,19 @@ func checkout(ctx context.Context) (string, error) {
 // branch, without touching a file in it (never lose work): what differs from
 // the base shows as uncommitted changes, and only the base's files missing
 // from the folder are written. The repository is built beside the folder and
-// moved in last, so a start that dies halfway begins again.
-func adopt(git func(...string) error) error {
+// moved in last, so a start that dies halfway begins again, and one that
+// fails (a wrong URL or base branch) leaves nothing behind: the owner may
+// then change the repository or remove it.
+func adopt(git func(...string) error) (err error) {
 	dir, base := filepath.Join(os.Getenv("HOME"), ".banda", "adopt.git"), os.Getenv("BANDA_BASE_BRANCH")
 	if err := os.RemoveAll(dir); err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(dir)
+		}
+	}()
 	if err := git("init", "-q", "--bare", "--initial-branch="+os.Getenv("BANDA_BRANCH"), dir); err != nil {
 		return err
 	}

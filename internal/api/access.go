@@ -57,6 +57,7 @@ var codes = map[error]connect.Code{
 	thread.ErrNoHandoff:   connect.CodeFailedPrecondition,
 	thread.ErrHandoff:     connect.CodeInvalidArgument,
 	thread.ErrBusy:        connect.CodeFailedPrecondition,
+	thread.ErrRepoKept:    connect.CodeFailedPrecondition,
 
 	context.Canceled:         connect.CodeCanceled, // the client went away
 	context.DeadlineExceeded: connect.CodeDeadlineExceeded,

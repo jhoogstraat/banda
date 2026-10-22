@@ -1,5 +1,5 @@
 // Threads without a repository: the agent works in an empty folder that lives only in the thread's volume.
-import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { AutoPushState, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, kube, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 const files = async (t: Thread) => (await t.user.threads.listFiles({ threadId: t.id })).paths;
@@ -126,7 +126,7 @@ test('the owner adds a repository: the files the agent wrote stay, as changes in
 	expect(await t.terminal('git status --porcelain; git branch --show-current')).toMatch(/M README[^]*\?\? hello1\.txt[^]*banda\//);
 	await page.getByRole('button', { name: 'Toggle right pane' }).click();
 	await expect(page.getByRole('tab', { name: 'Diff' })).toBeVisible();
-	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: repo() }))).toContain('already has a repository');
+	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: repo() }))).toContain("can't be changed");
 
 	await test.step('a turn that commits pushes everything to origin; settling then finds it all there', async () => {
 		await t.turn(() => t.send('e2e: commit it all'));
@@ -135,4 +135,54 @@ test('the owner adds a repository: the files the agent wrote stay, as changes in
 		await alice.threads.settle({ threadId: t.id, settled: true });
 		await until(async () => (await sql(`SELECT env_pushed FROM threads WHERE id = '${t.id}'`)) === 't', () => 'env_pushed is still false');
 	});
+});
+
+test('a repository whose checkout failed is corrected from the error: the folder was left untouched, its files become changes; then it stays', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ repoUrl: '', prompt: 'e2e: write a file' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await alice.threads.addRepository({ threadId: t.id, repoUrl: repo('nope') });
+	await t.waitForStatus(Status.ERRORED);
+	const failed = (await t.of('setupStep')).find((s) => s.id === 'checkout' && s.state === SetupState.FAILED);
+	expect(failed?.output).toContain('nope.git');
+	// No half-made repository in the folder or beside it to confuse the next try.
+	expect(await t.terminal('ls -A; test -e ~/.banda/adopt.git || echo no-temp')).toMatch(/^hello1\.txt\s+no-temp/m);
+
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	const banner = page.getByRole('alert').filter({ hasText: 'Setup failed: Check out' });
+	await expect(banner.getByLabel(/Output of Check out/)).toContainText('nope.git');
+	await banner.getByRole('button', { name: 'Change the repository' }).click();
+	await expect(page.getByLabel('Repository URL')).toHaveValue(repo('nope'));
+	await page.getByLabel('Repository URL').fill(repo());
+	await page.getByRole('button', { name: 'Change repository' }).click();
+	await t.waitFor('to be ready on the corrected repository', (i) => i.repoUrl === repo() && i.status === Status.AWAITING_INPUT);
+	expect((await t.of('repoAdded')).map((r) => r.repoUrl)).toEqual([repo('nope'), repo()]);
+	expect((await t.waitFor('to report its diff', (i) => i.diff !== '')).diff).toContain('+++ b/hello1.txt');
+	expect(await t.terminal('git status --porcelain')).toContain('?? hello1.txt');
+	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: repo('nope') }))).toContain("can't be changed");
+	expect(await refused(alice.threads.addRepository({ threadId: t.id, repoUrl: '' }))).toContain("can't be changed");
+});
+
+test('a repository whose checkout failed is removed from the “…” menu: back to a working thread without one', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create({ repoUrl: '', prompt: 'e2e: write a file' });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await alice.threads.addRepository({ threadId: t.id, repoUrl: repo(), baseBranch: 'no-such-branch' });
+	await t.waitForStatus(Status.ERRORED);
+	expect(await refused(as('bob').threads.addRepository({ threadId: t.id, repoUrl: '' }))).toContain('only the thread owner');
+
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await expect(page.getByRole('alert').filter({ hasText: 'Setup failed: Check out' })).toBeVisible();
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await page.getByRole('menuitem', { name: 'Change the repository' }).click();
+	await expect(page.getByLabel('Base branch')).toHaveValue('no-such-branch');
+	await page.getByRole('button', { name: 'Remove the repository' }).click();
+	await expect(page.getByText(/removed the repository/)).toBeVisible();
+	const info = await t.waitFor('to be ready without a repository', (i) => i.repoUrl === '' && i.status === Status.AWAITING_INPUT);
+	expect([info.branch, info.baseBranch]).toEqual(['', '']);
+	await t.turn(() => t.send('e2e: and another'));
+	expect(await files(t)).toEqual(['hello1.txt', 'hello2.txt']);
+	expect(await t.terminal('test -e .git || echo no-git')).toContain('no-git');
 });

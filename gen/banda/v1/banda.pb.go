@@ -1908,7 +1908,8 @@ type Event_PullRequestChanged struct {
 }
 
 type Event_RepoAdded struct {
-	// The owner (actor) gave the thread without a repository one.
+	// The owner (actor) gave the thread without a repository one, changed it
+	// before its first checkout, or removed it (repo_url empty).
 	RepoAdded *RepoAdded `protobuf:"bytes,42,opt,name=repo_added,json=repoAdded,proto3,oneof"`
 }
 
@@ -13576,7 +13577,8 @@ func (x *RepoAdded) GetBaseBranch() string {
 type AddRepositoryRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	RepoUrl  string                 `protobuf:"bytes,2,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
+	// Empty removes a repository never checked out.
+	RepoUrl string `protobuf:"bytes,2,opt,name=repo_url,json=repoUrl,proto3" json:"repo_url,omitempty"`
 	// Empty is main.
 	BaseBranch    string `protobuf:"bytes,3,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields

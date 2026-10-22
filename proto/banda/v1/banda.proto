@@ -150,7 +150,8 @@ service ThreadService {
   rpc PullRequestResolve(PullRequestResolveRequest) returns (PullRequestResolveResponse);
   // Gives a thread without a repository one (owner only, not while the agent
   // works): the environment restarts with the folder as a checkout of the
-  // thread branch, its files kept as uncommitted changes.
+  // thread branch, its files kept as uncommitted changes. Until a checkout of
+  // it succeeded, the repository can be changed, or removed (empty repo_url).
   rpc AddRepository(AddRepositoryRequest) returns (AddRepositoryResponse);
 }
 
@@ -400,7 +401,8 @@ message Event {
     // failed or passed, a review, merged, closed). Ephemeral (seq 0, change
     // empty) for any other change, so open pages refetch it.
     PullRequestChanged pull_request_changed = 41;
-    // The owner (actor) gave the thread without a repository one.
+    // The owner (actor) gave the thread without a repository one, changed it
+    // before its first checkout, or removed it (repo_url empty).
     RepoAdded repo_added = 42;
   }
 }
@@ -1759,6 +1761,7 @@ message RepoAdded {
 
 message AddRepositoryRequest {
   string thread_id = 1;
+  // Empty removes a repository never checked out.
   string repo_url = 2;
   // Empty is main.
   string base_branch = 3;
