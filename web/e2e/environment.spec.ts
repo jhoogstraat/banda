@@ -212,3 +212,36 @@ test('B18: the deletion of a settled environment reaches an open page: the banne
 	await expect(page.getByText('Environment deleted.')).toBeVisible({ timeout: 120_000 });
 	await expect(page.getByRole('button', { name: 'Recreate environment' })).toBeVisible();
 });
+
+test('an unsettled environment unused for DELETE_IDLE_AFTER with all its work on origin is deleted with its runner token, and the open page shows it; one with uncommitted work stays', async ({ as, startApi }) => {
+	test.setTimeout(360_000);
+	const api = await startApi({ DELETE_IDLE_AFTER: '20s', IDLE_SWEEP_EVERY: '1s' });
+	const alice = as('alice', api);
+	const [pushed, dirty] = await Promise.all([alice.create({ prompt: 'e2e: commit one' }), alice.create({ prompt: 'e2e: commit one' })]);
+	for (const t of [pushed, dirty]) await t.waitFor('pushed', (i) => i.autoPush === AutoPushState.PUSHED, 150_000);
+	await dirty.terminal('echo by-hand > by-hand.txt && echo done');
+	expect(await kube('get', 'secret', `${pushed.pod}-token`, '-o', 'jsonpath={.metadata.ownerReferences[0].kind}')).toBe('Sandbox');
+	const page = await alice.page();
+	await page.goto(`/t/${pushed.id}`);
+	await Promise.all([pushed.snooze(), dirty.snooze()]);
+	await expect(page.getByText('Environment paused.')).toBeVisible();
+
+	await test.step('the pushed environment is deleted, its volume and token with it; the chat and the open page say so', async () => {
+		await expect(page.getByText('Environment deleted.')).toBeVisible({ timeout: 120_000 });
+		await expect(page.getByRole('button', { name: 'Recreate environment' })).toBeVisible();
+		await pushed.waitForEvent((e) => e.kind.case === 'notice' && e.kind.value.text.startsWith('The unused environment was deleted'), 'the notice');
+		await until(async () => !(await exists('sandbox', pushed.pod)), () => 'the environment is still there', 60_000);
+		await until(async () => !(await exists('pvc', `home-${pushed.pod}`)), () => 'its volume is still there', 60_000);
+		await until(async () => !(await exists('secret', `${pushed.pod}-token`)), () => 'its runner token is still there', 60_000);
+	});
+
+	await test.step('the environment with uncommitted work, unused as long, stays', async () => {
+		await until(
+			async () => (await sql(`select updated_at < now() - interval '25 seconds' from threads where id = '${dirty.id}'`, api.db)) === 't',
+			() => 'the unpushed thread is not idle long enough yet'
+		);
+		expect(await exists('sandbox', dirty.pod)).toBe(true);
+		expect(await sandbox(dirty.id, 'shutdownTime')).toBe('');
+		expect(await sql(`select env_delete_at is null from threads where id = '${dirty.id}'`, api.db)).toBe('t');
+	});
+});

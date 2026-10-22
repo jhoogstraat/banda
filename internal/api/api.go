@@ -30,6 +30,9 @@ type Service struct {
 	// DeleteSettledAfter is how long after the owner settles a thread its
 	// pushed environment is kept.
 	DeleteSettledAfter time.Duration
+	// DeleteIdleAfter is how long a suspended environment with all its work
+	// on origin is kept without activity, settled or not; zero keeps it.
+	DeleteIdleAfter time.Duration
 	// LoginIdle is how long a login environment runs without a terminal.
 	LoginIdle time.Duration
 	// MaxSubthreadDepth is how deep agents may nest sub-threads, and
@@ -99,6 +102,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		tokens:    forgeTokens{m: map[string]cachedToken{}, backoff: map[string]time.Time{}},
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
+		DeleteIdleAfter:    30 * 24 * time.Hour,
 		LoginIdle:          10 * time.Minute,
 		MaxSubthreadDepth:  3,
 		MaxAgentThreads:    8,

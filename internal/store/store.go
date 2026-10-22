@@ -519,6 +519,17 @@ func (s *Store) ResetEnv(ctx context.Context, id string) error {
 	return err
 }
 
+// IdlePushed returns the threads suspended with all their work on origin,
+// without a scheduled deletion and unchanged since before.
+func (s *Store) IdlePushed(ctx context.Context, before time.Time) ([]string, error) {
+	rows, err := s.db.Query(ctx, `SELECT id FROM threads
+		WHERE status = 'suspended' AND env_pushed AND repo_url <> '' AND env_delete_at IS NULL AND updated_at < $1`, before)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
 // ClaimDeleted returns the threads whose environment was deleted since the
 // last call, by any API.
 func (s *Store) ClaimDeleted(ctx context.Context) ([]string, error) {

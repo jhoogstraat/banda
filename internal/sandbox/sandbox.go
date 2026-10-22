@@ -42,6 +42,49 @@ type Config struct {
 	Namespace string
 	Image     string
 	APIURL    string // where runners dial the API
+	Sizes     Sizes
+}
+
+// Sizes are what one environment may take: the limits of a thread's and of a
+// login environment's pod, and the size of a thread's home volume and of each
+// user's Claude Code config volume when they are created.
+type Sizes struct {
+	CPU, Memory, Scratch, Home          resource.Quantity
+	LoginCPU, LoginMemory, LoginScratch resource.Quantity
+	ClaudeVolume                        resource.Quantity
+}
+
+// ParseSizes reads the sizes from getenv (SANDBOX_CPU and the rest), with
+// defaults. A limit must cover the pod's request (see limits).
+func ParseSizes(getenv func(string) string) (Sizes, error) {
+	var s Sizes
+	for _, f := range []struct {
+		key, def, min string
+		q             *resource.Quantity
+	}{
+		{"SANDBOX_CPU", "4", "50m", &s.CPU},
+		{"SANDBOX_MEMORY", "8Gi", "128Mi", &s.Memory},
+		{"SANDBOX_SCRATCH", "10Gi", "128Mi", &s.Scratch},
+		{"SANDBOX_HOME_SIZE", "10Gi", "1Mi", &s.Home},
+		{"LOGIN_CPU", "1", "50m", &s.LoginCPU},
+		{"LOGIN_MEMORY", "1Gi", "128Mi", &s.LoginMemory},
+		{"LOGIN_SCRATCH", "1Gi", "128Mi", &s.LoginScratch},
+		{"CLAUDE_VOLUME_SIZE", "1Gi", "1Mi", &s.ClaudeVolume},
+	} {
+		v := getenv(f.key)
+		if v == "" {
+			v = f.def
+		}
+		q, err := resource.ParseQuantity(v)
+		if err != nil {
+			return s, fmt.Errorf("%s: %q is not a Kubernetes quantity such as %s", f.key, v, f.def)
+		}
+		if q.Cmp(resource.MustParse(f.min)) < 0 {
+			return s, fmt.Errorf("%s: %s is below the minimum of %s", f.key, v, f.min)
+		}
+		*f.q = q
+	}
+	return s, nil
 }
 
 type Client struct {
@@ -105,8 +148,8 @@ func (c *Client) EnsureLogin(ctx context.Context, owner string, newToken func() 
 }
 
 // putToken keeps a sandbox's runner token in a Secret of its own, which its
-// pod reads; neither the Sandbox nor the database holds it.
-// ponytail: the Secret outlives a deleted Sandbox (one per thread, holding a token that opens nothing without its pod).
+// pod reads; neither the Sandbox nor the database holds it. start makes the
+// Sandbox own it, so it goes with the Sandbox.
 func (c *Client) putToken(ctx context.Context, sandbox, token string) error {
 	return c.patchSecret(ctx, sandbox+"-token", "runner-token", map[string][]byte{"BANDA_RUNNER_TOKEN": []byte(token)})
 }
@@ -117,14 +160,14 @@ func tokenEnv(sandbox string) corev1.EnvVar {
 }
 
 // limits bound what one sandbox takes from the node its neighbours share.
-// Requests stay small: most environments idle between turns.
-// ponytail: fixed sizes, make them settings when a team needs bigger builds; pids need the kubelet's podPidsLimit (deploy/kind.yaml).
-func limits(cpu, memory, disk string) corev1.ResourceRequirements {
+// Requests stay small: most environments idle between turns. ParseSizes
+// keeps the limits at or above them.
+// ponytail: one size for every thread; pids need the kubelet's podPidsLimit (deploy/kind.yaml).
+func limits(cpu, memory, disk resource.Quantity) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("50m"), corev1.ResourceMemory: resource.MustParse("128Mi"),
 			corev1.ResourceEphemeralStorage: resource.MustParse("128Mi")},
-		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(cpu), corev1.ResourceMemory: resource.MustParse(memory),
-			corev1.ResourceEphemeralStorage: resource.MustParse(disk)},
+		Limits: corev1.ResourceList{corev1.ResourceCPU: cpu, corev1.ResourceMemory: memory, corev1.ResourceEphemeralStorage: disk},
 	}
 }
 
@@ -134,7 +177,10 @@ func limits(cpu, memory, disk string) corev1.ResourceRequirements {
 // deletion is cancelled: the environment is in use again.
 func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 	sandboxes := c.sbx.AgentsV1beta1().Sandboxes(c.cfg.Namespace)
-	_, err := sandboxes.Create(ctx, sb, metav1.CreateOptions{})
+	created, err := sandboxes.Create(ctx, sb, metav1.CreateOptions{})
+	if err == nil {
+		return c.ownToken(ctx, created)
+	}
 	if !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -143,13 +189,29 @@ func (c *Client) start(ctx context.Context, sb *sbv1.Sandbox) error {
 	if err != nil {
 		return err
 	}
-	if _, err := sandboxes.Patch(ctx, sb.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	patched, err := sandboxes.Patch(ctx, sb.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	if err == nil {
+		err = c.ownToken(ctx, patched) // Secrets from before ownership was set
+	}
+	if err != nil {
 		return err
 	}
 	err = c.kube.CoreV1().Pods(c.cfg.Namespace).Delete(ctx, sb.Name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
+	return err
+}
+
+// ownToken makes the Sandbox the owner of its token Secret, so Kubernetes
+// deletes the Secret with the Sandbox. The Secret comes first: the pod reads it.
+func (c *Client) ownToken(ctx context.Context, sb *sbv1.Sandbox) error {
+	patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"ownerReferences": []metav1.OwnerReference{{
+		APIVersion: sbv1.GroupVersion.String(), Kind: "Sandbox", Name: sb.Name, UID: sb.UID}}}})
+	if err != nil {
+		return err
+	}
+	_, err = c.kube.CoreV1().Secrets(c.cfg.Namespace).Patch(ctx, sb.Name+"-token", types.MergePatchType, patch, metav1.PatchOptions{})
 	return err
 }
 
@@ -289,7 +351,7 @@ func (c *Client) ensureClaudeVolume(ctx context.Context, owner string) (string, 
 	name := "claude-" + hash(owner)
 	_, err := c.kube.CoreV1().PersistentVolumeClaims(c.cfg.Namespace).Create(ctx, &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"banda.dev/claude-config": "true"}},
-		Spec:       pvcSpec("1Gi"),
+		Spec:       pvcSpec(c.cfg.Sizes.ClaudeVolume),
 	}, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return "", err
@@ -297,11 +359,11 @@ func (c *Client) ensureClaudeVolume(ctx context.Context, owner string) (string, 
 	return name, nil
 }
 
-func pvcSpec(size string) corev1.PersistentVolumeClaimSpec {
+func pvcSpec(size resource.Quantity) corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(size)},
+			Requests: corev1.ResourceList{corev1.ResourceStorage: size},
 		},
 	}
 }
@@ -396,14 +458,14 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             vars,
 							EnvFrom:         envFrom,
-							Resources:       limits("4", "8Gi", "10Gi"),
+							Resources:       limits(c.cfg.Sizes.CPU, c.cfg.Sizes.Memory, c.cfg.Sizes.Scratch),
 							VolumeMounts:    []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
 						}},
 					},
 				},
 				VolumeClaimTemplates: []sbv1.PersistentVolumeClaimTemplate{{
 					EmbeddedObjectMetadata: sbv1.EmbeddedObjectMetadata{Name: "home"},
-					Spec:                   pvcSpec("10Gi"),
+					Spec:                   pvcSpec(c.cfg.Sizes.Home),
 				}},
 			},
 			OperatingMode: sbv1.SandboxOperatingModeRunning,
@@ -442,7 +504,7 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 								{Name: "BANDA_LOGIN_USER_ID", Value: owner},
 								tokenEnv(name),
 							},
-							Resources:    limits("1", "1Gi", "1Gi"),
+							Resources:    limits(c.cfg.Sizes.LoginCPU, c.cfg.Sizes.LoginMemory, c.cfg.Sizes.LoginScratch),
 							VolumeMounts: []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
 						}},
 					},

@@ -1,6 +1,6 @@
 // What runs in a thread's environment: the terminal, secrets, files and the preview.
 import { request } from '@playwright/test';
-import { collect, expect, refused, sql, Status, test, type User } from './fixtures.ts';
+import { collect, expect, kube, refused, sql, Status, test, type User } from './fixtures.ts';
 
 test('terminal runs commands in the sandbox', async ({ as }) => {
 	const t = await as('alice').create();
@@ -77,4 +77,13 @@ test('the preview of a paused environment says so and does not wake it; teammate
 	await browser.dispose();
 	expect(await refused(ports(bob, t.id, true))).toContain('permission_denied');
 	expect((await t.get()).status).toBe(Status.SUSPENDED);
+});
+
+test('environment sizes are the operator’s settings: the configured limits land in the pod, the home size in its volume', async ({ as, startApi }) => {
+	const api = await startApi({ SANDBOX_CPU: '3', SANDBOX_MEMORY: '3Gi', SANDBOX_SCRATCH: '2Gi', SANDBOX_HOME_SIZE: '2Gi' });
+	const t = await as('alice', api).create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const limits = await kube('get', 'pod', t.pod, '-o', 'jsonpath={.spec.containers[0].resources.limits}');
+	expect(JSON.parse(limits)).toEqual({ cpu: '3', memory: '3Gi', 'ephemeral-storage': '2Gi' });
+	expect(await kube('get', 'pvc', `home-${t.pod}`, '-o', 'jsonpath={.spec.resources.requests.storage}')).toBe('2Gi');
 });

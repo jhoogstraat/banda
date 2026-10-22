@@ -62,6 +62,37 @@ func TestParseCIDRs(t *testing.T) {
 	}
 }
 
+func TestParseSizes(t *testing.T) {
+	s, err := ParseSizes(func(k string) string { return map[string]string{"SANDBOX_MEMORY": "16Gi", "LOGIN_CPU": "500m"}[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{cfg: Config{Sizes: s}}
+	sb := c.sandbox("t-1", "claude", store.Thread{ID: "1"}, "subscription", nil)
+	lim := sb.Spec.PodTemplate.Spec.Containers[0].Resources.Limits
+	if lim.Memory().String() != "16Gi" || lim.Cpu().String() != "4" || lim.StorageEphemeral().String() != "10Gi" {
+		t.Errorf("thread limits %v", lim)
+	}
+	if got := sb.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String(); got != "10Gi" {
+		t.Errorf("home volume %s", got)
+	}
+	if got := c.loginSandbox("alice", "claude").Spec.PodTemplate.Spec.Containers[0].Resources.Limits.Cpu().String(); got != "500m" {
+		t.Errorf("login cpu %s", got)
+	}
+	for env, want := range map[string]string{
+		"SANDBOX_CPU=lots":        `SANDBOX_CPU: "lots" is not a Kubernetes quantity such as 4`,
+		"SANDBOX_MEMORY=8G i":     `SANDBOX_MEMORY: "8G i" is not a Kubernetes quantity`,
+		"LOGIN_MEMORY=64Mi":       "LOGIN_MEMORY: 64Mi is below the minimum of 128Mi",
+		"SANDBOX_HOME_SIZE=0":     "SANDBOX_HOME_SIZE: 0 is below the minimum",
+		"CLAUDE_VOLUME_SIZE=-1Gi": "CLAUDE_VOLUME_SIZE: -1Gi is below the minimum",
+	} {
+		k, v, _ := strings.Cut(env, "=")
+		if _, err := ParseSizes(func(key string) string { return map[string]string{k: v}[key] }); err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Errorf("%s: error %v, want %s", env, err, want)
+		}
+	}
+}
+
 // The policy adds the ranges to the chart's policies.yaml for every sandbox
 // pod, egress only: policies add up, so nothing there is loosened.
 func TestEgressPolicy(t *testing.T) {

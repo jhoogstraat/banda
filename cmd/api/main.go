@@ -27,10 +27,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
+	sizes, err := sandbox.ParseSizes(os.Getenv)
+	if err != nil {
+		log.Fatal(err)
+	}
 	sb, err := sandbox.New(sandbox.Config{
 		Namespace: env("SANDBOX_NAMESPACE", "banda"),
 		Image:     env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
 		APIURL:    env("RUNNER_API_URL", "http://host.containers.internal:8787"),
+		Sizes:     sizes,
 	})
 	if err != nil {
 		log.Fatalf("sandbox client: %v", err)
@@ -73,6 +78,9 @@ func main() {
 	}
 	if svc.DeleteSettledAfter, err = time.ParseDuration(env("DELETE_SETTLED_AFTER", "168h")); err != nil {
 		log.Fatalf("DELETE_SETTLED_AFTER: %v", err)
+	}
+	if svc.DeleteIdleAfter, err = time.ParseDuration(env("DELETE_IDLE_AFTER", "720h")); err != nil {
+		log.Fatalf("DELETE_IDLE_AFTER: %v", err)
 	}
 	if svc.LoginIdle, err = time.ParseDuration(env("LOGIN_IDLE_AFTER", "10m")); err != nil {
 		log.Fatalf("LOGIN_IDLE_AFTER: %v", err)

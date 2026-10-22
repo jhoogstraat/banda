@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect/v2"
 
@@ -77,5 +78,32 @@ func TestPullRequestURL(t *testing.T) {
 	}
 	if got := pullRequestURL(store.Thread{RepoURL: "https://github.com/o/r"}); got != "" {
 		t.Errorf("not pushed: got %q", got)
+	}
+}
+
+// Only an environment suspended with all its work on origin, in a thread
+// with a repository and no deletion scheduled, goes after the idle time.
+func TestIdleDue(t *testing.T) {
+	now := time.Now()
+	due := store.Thread{Status: thread.Suspended, EnvPushed: true, RepoURL: "git://x/r.git", UpdatedAt: now.Add(-2 * time.Hour)}
+	if !idleDue(due, now, time.Hour) {
+		t.Error("an idle pushed environment is due")
+	}
+	scheduled := now.Add(time.Hour)
+	for name, change := range map[string]func(*store.Thread){
+		"recent":        func(t *store.Thread) { t.UpdatedAt = now.Add(-30 * time.Minute) },
+		"unpushed":      func(t *store.Thread) { t.EnvPushed = false },
+		"no repository": func(t *store.Thread) { t.RepoURL = "" },
+		"running":       func(t *store.Thread) { t.Status = thread.AwaitingInput },
+		"scheduled":     func(t *store.Thread) { t.EnvDeleteAt = &scheduled },
+	} {
+		th := due
+		change(&th)
+		if idleDue(th, now, time.Hour) {
+			t.Errorf("%s: due", name)
+		}
+	}
+	if idleDue(due, now, 0) {
+		t.Error("DELETE_IDLE_AFTER=0 deletes nothing")
 	}
 }

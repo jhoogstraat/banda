@@ -94,5 +94,5 @@ Also in [todo.md](../todo.md).
 - **Volumes:** sandbox PVCs are RWO (`internal/sandbox/sandbox.go`: "multi-node needs RWX or node pinning"). The per-user Claude volume is mounted by all of a user's pods, so on a multi-node cluster those pods must land on one node, or the volume must be RWX.
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
 - **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists.
-- **Sizes:** sandbox resources are fixed (4 CPU, 8 GiB, 10 GiB scratch). Plan nodes for the number of threads running at once, not threads in total (suspended threads cost only disk).
+- **Sizes:** each thread's pod may take 4 CPU, 8 GiB and 10 GiB scratch, plus a 10 GiB volume, by default; the chart's `sandboxes` values change them ([configuration](configuration.md)). Plan nodes for the number of threads running at once, not threads in total (suspended threads cost only disk).
 - **Ingress:** thread streams are long-lived; some controllers cut them at their default read timeout (60 s for ingress-nginx). Raise it through `ingress.annotations`.

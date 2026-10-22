@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"connectrpc.com/connect/v2"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
 )
 
@@ -190,8 +192,49 @@ func (s *Service) SuspendIdle(ctx context.Context, idle, every time.Duration) {
 			}
 		}
 		s.suspendIdleLogins(ctx)
+		s.deleteIdle(ctx)
 		s.reportDeleted(ctx)
 	}
+}
+
+// deleteIdle deletes the environments due by idleDue now, the same way as
+// settled ones: the controller deletes the Sandbox and its home volume, and
+// reportDeleted tells the chat.
+func (s *Service) deleteIdle(ctx context.Context) {
+	if s.DeleteIdleAfter <= 0 {
+		return
+	}
+	ids, err := s.store.IdlePushed(ctx, time.Now().Add(-s.DeleteIdleAfter))
+	if err != nil {
+		slog.Error("find idle pushed environments", "err", err)
+		return
+	}
+	for _, id := range ids {
+		// Under the thread's lock: a post or wake since the query wins.
+		_, _, err := s.store.Update(ctx, id, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+			now := time.Now()
+			if !idleDue(*t, now, s.DeleteIdleAfter) {
+				return nil, errNotDue
+			}
+			if err := s.sandboxes.ScheduleDelete(ctx, id, &now); err != nil {
+				return nil, err
+			}
+			return nil, tx.SetEnvDeleteAt(ctx, id, &now)
+		})
+		if err != nil && !errors.Is(err, errNotDue) {
+			slog.Error("delete idle environment", "thread", id, "err", err)
+		}
+	}
+}
+
+var errNotDue = errors.New("not due for deletion")
+
+// idleDue: the environment is suspended with all its work on origin (never
+// without a repository), no deletion is scheduled, and the thread has had no
+// activity for after.
+func idleDue(t store.Thread, now time.Time, after time.Duration) bool {
+	return after > 0 && t.Status == thread.Suspended && t.EnvPushed && t.RepoURL != "" && t.EnvDeleteAt == nil &&
+		t.UpdatedAt.Before(now.Add(-after))
 }
 
 // reportDeleted tells the chats of environments deleted since the last sweep.
@@ -202,7 +245,7 @@ func (s *Service) reportDeleted(ctx context.Context) {
 	}
 	for _, id := range ids {
 		e := &bandav1.Event{Actor: "system", Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{
-			Text: "The settled thread's environment was deleted; its branch is on origin. Recreate it to continue."}}}
+			Text: "The unused environment was deleted; its branch is on origin. Recreate it to continue."}}}
 		if _, err := s.apply(ctx, id, nil, e); err != nil {
 			slog.Error("report deleted environment", "thread", id, "err", err)
 		}

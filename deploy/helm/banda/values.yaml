@@ -51,6 +51,17 @@ sessionSecret: ""
 # SANDBOX_EGRESS_ALLOW: comma-separated CIDRs sandboxes may reach besides the internet.
 egressAllow: ""
 
+# What each environment may take (Kubernetes quantities, SANDBOX_CPU and the
+# rest in docs/configuration.md). Limits apply from each pod's next start,
+# volume sizes to volumes created after the change.
+sandboxes:
+  cpu: "4"
+  memory: 8Gi
+  scratch: 10Gi # disk outside the volumes (ephemeral storage)
+  homeSize: 10Gi # each thread's volume: the checkout and its home directory
+  claudeVolumeSize: 1Gi # each user's Claude Code config, shared by their environments
+  login: {cpu: "1", memory: 1Gi, scratch: 1Gi} # each user's login environment
+
 ingress:
   enabled: false
   className: ""
