@@ -55,8 +55,9 @@ jobs:
     runs-on: ubuntu-24.04
     # ponytail: not one fully green run on Actions yet (see todo.md); drop once it has one.
     continue-on-error: true
-    # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30.
-    timeout-minutes: 60
+    # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30. The steps have their own
+    # limits, below the job's, so a slow run still prints what ran and uploads its artifacts.
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
       # The images, kind's copy of them and ~200 tests' sandboxes fill the runner's disk: drop toolchains it never uses.
@@ -74,7 +75,9 @@ jobs:
           EOF
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web exec playwright install --with-deps chromium
+        timeout-minutes: 15
       - run: mise run e2e
+        timeout-minutes: 50
         env:
           E2E_WORKERS: "2"
       - if: always()
