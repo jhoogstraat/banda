@@ -260,6 +260,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		PermissionMode:     permissionModeToProto[t.PermissionMode],
 		PermissionPending:  len(t.Permissions) > 0,
 		PermissionTools:    slices.Sorted(maps.Values(t.Permissions)),
+		AllowedTools:       t.AllowedTools,
 		RaceId:             t.RaceID,
 		PullRequestUrl:     pullRequestURL(t),
 	}

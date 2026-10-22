@@ -189,6 +189,21 @@ if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a con
 	if (card?.kind !== 'permission' || card.tool.seq !== 2n || card.tool.result?.output !== 'a.go' || steps?.kind !== 'steps' || card.tool !== steps.steps[0] || c.orphans.cards.size)
 		throw new Error('a permission card asked before its call should point at the call once it arrives');
 }
+{
+	// Votes on a question: each person's latest counts, an empty vote withdraws it, and votes after a page edge find their card.
+	const vote = (actor: string, answers: Record<string, string>, seq: bigint) =>
+		({ seq, actor, kind: { case: 'permissionVoted', value: { id: 'q1', answers } } }) as Event;
+	const asked = ev({ case: 'permissionRequested', value: { id: 'q1', toolCallId: 'tq', toolName: 'AskUserQuestion', inputJson: '{}' } }, 1n);
+	const c = newChat();
+	for (const e of [asked, vote('bob', { 'Which?': 'A' }, 2n), vote('bob', { 'Which?': 'B' }, 3n), vote('cy', { 'Which?': 'A' }, 4n), vote('cy', {}, 5n)]) apply(c, e);
+	const q = c.items[0];
+	if (q?.kind !== 'permission' || JSON.stringify(q.votes) !== '{"bob":{"Which?":"B"}}') throw new Error('a vote should replace the voter’s last one');
+	const paged = newChat();
+	apply(paged, vote('bob', { 'Which?': 'A' }, 3n));
+	prepend(paged, [asked]);
+	const p = paged.items[0];
+	if (p?.kind !== 'permission' || p.votes.bob?.['Which?'] !== 'A' || paged.orphans.votes.size) throw new Error('a vote after the page edge should find its card');
+}
 apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'forkNote', value: { threadId: 't2', title: 'Fork of x', turn: 2 } } } as Event);
 const forked = chat.items.at(-1);
 if (forked?.kind !== 'fork' || forked.actor !== 'bob' || forked.note.threadId !== 't2') throw new Error('forkNote should become a link to the fork');

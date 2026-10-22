@@ -46,6 +46,8 @@
 		const k = d.request!.kind;
 		if (k.case === 'turnRequest') return act(key(d), api.approveTurn({ threadId, requestSeq: d.request!.seq }));
 		if (k.case !== 'permissionRequested') return;
+		// A question is answered with its options, in its card.
+		if (k.value.toolName === 'AskUserQuestion') return;
 		const plan = k.value.toolName === 'ExitPlanMode';
 		if (plan && always) return;
 		const decision = always ? PermissionDecision.ALLOW_ALWAYS : PermissionDecision.ALLOW;

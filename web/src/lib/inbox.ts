@@ -8,7 +8,7 @@ export const readyFor = 3 * 24 * 3600_000;
 
 // What the thread waits on from people: its permission requests ("plan" for a plan) and teammates' turn requests.
 export const asks = (t: Thread) => [
-	...t.permissionTools.map((n) => (n === 'ExitPlanMode' ? 'plan' : n)),
+	...t.permissionTools.map((n) => ({ ExitPlanMode: 'plan', AskUserQuestion: 'a question' })[n] ?? n),
 	...Array<string>(t.turnRequests).fill('turn request')
 ];
 // "Bash", "plan", "2 requests".
@@ -81,6 +81,7 @@ export function alerts(prev: Inbox, next: Inbox, name: (id: string) => string = 
 		if (t.turnRequests > (p?.turnRequests ?? 0)) push(t, 'A teammate asks to run your agent');
 		const fresh = t.permissionTools.filter((n) => !p?.permissionTools.includes(n));
 		if (fresh.includes('ExitPlanMode')) push(t, 'Your agent has a plan for you to approve');
+		else if (fresh.includes('AskUserQuestion')) push(t, 'Your agent has a question');
 		else if (fresh.length) push(t, `Your agent asks to use ${fresh[0]}`);
 		if (p?.status === t.status) continue;
 		if (t.status === Status.AWAITING_INPUT && !t.turnRequests) push(t, 'Your agent finished');

@@ -35,7 +35,8 @@ export type Item = { key: number } & (
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
 	| { kind: 'request'; seq: bigint; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; time?: Timestamp; resolved?: TurnRequestResolved & { by: string } }
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
-	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string } }
+	// `votes` are teammates' latest votes on a question (AskUserQuestion), by user.
+	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string }; votes: Record<string, Record<string, string>> }
 	| { kind: 'turn'; turn: TurnEnded }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
@@ -44,6 +45,7 @@ export type Item = { key: number } & (
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
+	| { kind: 'revoked'; actor: string; rule: string }
 	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
 	| { kind: 'push'; text: string; pushed: boolean; unavailable: boolean }
 	| { kind: 'fork'; actor: string; note: ForkNote }
@@ -53,7 +55,7 @@ export type Item = { key: number } & (
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
 // `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
-// subagent calls by parent id, turn request resolutions by request seq, permission answers by request id,
+// subagent calls by parent id, turn request resolutions by request seq, permission answers and votes by request id,
 // and live permission cards whose call comes next, by call id. `planSeq` is the seq of the TodoWrite behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
@@ -69,6 +71,7 @@ export type Chat = {
 		calls: Map<string, Tool[]>;
 		resolved: Map<bigint, TurnRequestResolved & { by: string }>;
 		answers: Map<string, PermissionResolved & { by: string }>;
+		votes: Map<string, Record<string, Record<string, string>>>;
 		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
 	};
 	present: string[];
@@ -82,7 +85,7 @@ export const newChat = (): Chat => ({
 	planSeq: 0n,
 	seq: 0n,
 	tools: new Map(),
-	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map(), cards: new Map() },
+	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
 	present: [],
 	typing: {}
 });
@@ -206,7 +209,7 @@ export function apply(chat: Chat, e: Event) {
 			const r = k.value;
 			const call = { id: r.toolCallId, name: r.toolName, inputJson: r.inputJson } as ToolCall;
 			const tool = chat.tools.get(r.toolCallId);
-			chat.items.push({ key, kind: 'permission', req: r, tool: tool ?? { kind: 'tool', call, children: [], seq: 0n } });
+			chat.items.push({ key, kind: 'permission', req: r, tool: tool ?? { kind: 'tool', call, children: [], seq: 0n }, votes: {} });
 			// The CLI may ask before it streams the call: the card points at it once it arrives.
 			if (!tool) chat.orphans.cards.set(r.toolCallId, chat.items.at(-1) as Extract<Item, { kind: 'permission' }>);
 			break;
@@ -218,6 +221,18 @@ export function apply(chat: Chat, e: Event) {
 			else chat.orphans.answers.set(id, { ...k.value, by: e.actor }); // its request is in older history
 			break;
 		}
+		case 'permissionVoted': {
+			const { id, answers } = k.value;
+			const req = chat.items.findLast((i): i is Extract<Item, { kind: 'permission' }> => i.kind === 'permission' && i.req.id === id);
+			const votes = req?.votes ?? chat.orphans.votes.get(id) ?? {};
+			if (Object.keys(answers).length) votes[e.actor] = answers;
+			else delete votes[e.actor];
+			if (!req) chat.orphans.votes.set(id, votes);
+			break;
+		}
+		case 'permissionRevoked':
+			chat.items.push({ key, kind: 'revoked', actor: e.actor, rule: k.value.rule });
+			break;
 		case 'turnEnded':
 			chat.streaming = '';
 			chat.items.push({ key, kind: 'turn', turn: k.value });
@@ -289,6 +304,10 @@ export function prepend(chat: Chat, events: Event[]) {
 		if (item.kind === 'permission' && chat.orphans.answers.has(item.req.id)) {
 			item.resolved = chat.orphans.answers.get(item.req.id);
 			chat.orphans.answers.delete(item.req.id);
+		}
+		if (item.kind === 'permission' && chat.orphans.votes.has(item.req.id)) {
+			item.votes = { ...item.votes, ...chat.orphans.votes.get(item.req.id) };
+			chat.orphans.votes.delete(item.req.id);
 		}
 	}
 	// A permission card made before its call was loaded points at the call now.

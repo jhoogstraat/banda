@@ -204,6 +204,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: repeated string permission_tools = 32;
    */
   permissionTools: string[];
+
+  /**
+   * Tools and rules the agent uses without asking, e.g. "Bash" or
+   * "Bash(npm test:*)" (see PermissionAnswerRequest.rule).
+   *
+   * @generated from field: repeated string allowed_tools = 33;
+   */
+  allowedTools: string[];
 };
 
 /**
@@ -494,7 +502,8 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "lineageUpdate";
   } | {
     /**
-     * The owner changed the permission mode; actor is the owner.
+     * The permission mode changed: by the owner, or by the agent entering
+     * plan mode itself (EnterPlanMode; actor "agent").
      *
      * @generated from field: banda.v1.PermissionModeChanged permission_mode_changed = 34;
      */
@@ -509,6 +518,20 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: Overlap;
     case: "overlap";
+  } | {
+    /**
+     * @generated from field: banda.v1.PermissionVoted permission_voted = 36;
+     */
+    value: PermissionVoted;
+    case: "permissionVoted";
+  } | {
+    /**
+     * Someone removed an "always allow" tool or rule.
+     *
+     * @generated from field: banda.v1.PermissionRevoked permission_revoked = 37;
+     */
+    value: PermissionRevoked;
+    case: "permissionRevoked";
   } | { case: undefined; value?: undefined };
 };
 
@@ -2749,6 +2772,27 @@ export declare type PermissionResolved = Message$1<"banda.v1.PermissionResolved"
    * @generated from field: banda.v1.PermissionMode mode = 4;
    */
   mode: PermissionMode;
+
+  /**
+   * The input the tool ran with, if the answer changed it (redacted).
+   *
+   * @generated from field: string updated_input_json = 5;
+   */
+  updatedInputJson: string;
+
+  /**
+   * The answers to a question (AskUserQuestion): question text -> answer.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * What ALLOW_ALWAYS allowed: the tool, or a narrower rule.
+   *
+   * @generated from field: string rule = 7;
+   */
+  rule: string;
 };
 
 /**
@@ -2791,6 +2835,32 @@ export declare type PermissionAnswerRequest = Message$1<"banda.v1.PermissionAnsw
    * @generated from field: banda.v1.PermissionMode mode = 5;
    */
   mode: PermissionMode;
+
+  /**
+   * Required to answer a question (AskUserQuestion) with ALLOW: question
+   * text -> the chosen option's label, several joined by ", ", or free text.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * Optional, owner only, for ALLOW and ALLOW_ALWAYS: the tool input to run
+   * instead, as a JSON object.
+   *
+   * @generated from field: string updated_input_json = 7;
+   */
+  updatedInputJson: string;
+
+  /**
+   * Optional, for ALLOW_ALWAYS: a narrower rule than the whole tool, in
+   * Claude Code's syntax: "Bash(<command prefix>:*)" for Bash, or
+   * "Edit(<directory>/**)" for the edit tools (Edit, Write, MultiEdit,
+   * NotebookEdit), the directory relative to the checkout.
+   *
+   * @generated from field: string rule = 8;
+   */
+  rule: string;
 };
 
 /**
@@ -2810,6 +2880,120 @@ export declare type PermissionAnswerResponse = Message$1<"banda.v1.PermissionAns
  * Use `create(PermissionAnswerResponseSchema)` to create a new message.
  */
 export declare const PermissionAnswerResponseSchema: GenMessage<PermissionAnswerResponse>;
+
+/**
+ * @generated from message banda.v1.PermissionVoteRequest
+ */
+export declare type PermissionVoteRequest = Message$1<"banda.v1.PermissionVoteRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+
+  /**
+   * As PermissionAnswerRequest.answers. Empty withdraws the vote.
+   *
+   * @generated from field: map<string, string> answers = 3;
+   */
+  answers: { [key: string]: string };
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoteRequest.
+ * Use `create(PermissionVoteRequestSchema)` to create a new message.
+ */
+export declare const PermissionVoteRequestSchema: GenMessage<PermissionVoteRequest>;
+
+/**
+ * @generated from message banda.v1.PermissionVoteResponse
+ */
+export declare type PermissionVoteResponse = Message$1<"banda.v1.PermissionVoteResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoteResponse.
+ * Use `create(PermissionVoteResponseSchema)` to create a new message.
+ */
+export declare const PermissionVoteResponseSchema: GenMessage<PermissionVoteResponse>;
+
+/**
+ * The actor's vote on a pending question; replaces their previous one.
+ *
+ * @generated from message banda.v1.PermissionVoted
+ */
+export declare type PermissionVoted = Message$1<"banda.v1.PermissionVoted"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: map<string, string> answers = 2;
+   */
+  answers: { [key: string]: string };
+};
+
+/**
+ * Describes the message banda.v1.PermissionVoted.
+ * Use `create(PermissionVotedSchema)` to create a new message.
+ */
+export declare const PermissionVotedSchema: GenMessage<PermissionVoted>;
+
+/**
+ * @generated from message banda.v1.PermissionRevokeRequest
+ */
+export declare type PermissionRevokeRequest = Message$1<"banda.v1.PermissionRevokeRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * A tool or rule from Thread.allowed_tools.
+   *
+   * @generated from field: string rule = 2;
+   */
+  rule: string;
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevokeRequest.
+ * Use `create(PermissionRevokeRequestSchema)` to create a new message.
+ */
+export declare const PermissionRevokeRequestSchema: GenMessage<PermissionRevokeRequest>;
+
+/**
+ * @generated from message banda.v1.PermissionRevokeResponse
+ */
+export declare type PermissionRevokeResponse = Message$1<"banda.v1.PermissionRevokeResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevokeResponse.
+ * Use `create(PermissionRevokeResponseSchema)` to create a new message.
+ */
+export declare const PermissionRevokeResponseSchema: GenMessage<PermissionRevokeResponse>;
+
+/**
+ * @generated from message banda.v1.PermissionRevoked
+ */
+export declare type PermissionRevoked = Message$1<"banda.v1.PermissionRevoked"> & {
+  /**
+   * @generated from field: string rule = 1;
+   */
+  rule: string;
+};
+
+/**
+ * Describes the message banda.v1.PermissionRevoked.
+ * Use `create(PermissionRevokedSchema)` to create a new message.
+ */
+export declare const PermissionRevokedSchema: GenMessage<PermissionRevoked>;
 
 /**
  * @generated from message banda.v1.PermissionSetModeRequest
@@ -3270,11 +3454,26 @@ export declare type PermissionCommand = Message$1<"banda.v1.PermissionCommand"> 
   mode: PermissionMode;
 
   /**
-   * Tools the runner allows without asking.
+   * Tools and rules the runner allows without asking.
    *
    * @generated from field: repeated string allowed_tools = 5;
    */
   allowedTools: string[];
+
+  /**
+   * With an allow: the answers to a question (AskUserQuestion), which the
+   * runner adds to its input.
+   *
+   * @generated from field: map<string, string> answers = 6;
+   */
+  answers: { [key: string]: string };
+
+  /**
+   * With an allow: the input to run instead.
+   *
+   * @generated from field: string updated_input_json = 7;
+   */
+  updatedInputJson: string;
 };
 
 /**
@@ -4658,6 +4857,29 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof PermissionSetModeRequestSchema;
     output: typeof PermissionSetModeResponseSchema;
+  },
+  /**
+   * Votes for answers to the agent's pending question (AskUserQuestion):
+   * anyone, shown on the card for whoever answers. A new vote replaces the
+   * caller's last one.
+   *
+   * @generated from rpc banda.v1.ThreadService.PermissionVote
+   */
+  permissionVote: {
+    methodKind: "unary";
+    input: typeof PermissionVoteRequestSchema;
+    output: typeof PermissionVoteResponseSchema;
+  },
+  /**
+   * Removes a tool or rule from the thread's "always allow" list: the owner,
+   * or anyone in a trusted thread.
+   *
+   * @generated from rpc banda.v1.ThreadService.PermissionRevoke
+   */
+  permissionRevoke: {
+    methodKind: "unary";
+    input: typeof PermissionRevokeRequestSchema;
+    output: typeof PermissionRevokeResponseSchema;
   },
   /**
    * Starts threads (one per try) from another thread's current changes and
