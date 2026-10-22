@@ -33,6 +33,7 @@
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import LoadState from '#lib/components/load-state.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
+	import Overlaps from '#lib/components/overlaps.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import SpawnDialog from '#lib/components/spawn-dialog.svelte';
 	import SubThreads from '#lib/components/sub-threads.svelte';
@@ -148,6 +149,15 @@
 		const hash = page.url.hash;
 		if (/^#\d+$/.test(hash)) target = BigInt(hash.slice(1));
 	});
+	// /t/<id>?file=<path> (from an overlap) opens the diff at that file once the thread is loaded.
+	let shownFile = '';
+	$effect(() => {
+		const path = page.url.searchParams.get('file') ?? '';
+		if (!path || !thread || path === shownFile) return;
+		shownFile = path;
+		show('diff');
+		focus = { path, body: '', startLine: 0, endLine: 0, old: false, code: '' }; // no line: the file itself
+	});
 	$effect(() => {
 		if (target === undefined || !oldest) return;
 		if (target < oldest) {
@@ -183,7 +193,7 @@
 					apply(chat, event);
 					if (event.kind.case === 'lineageUpdate') lineage++;
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'autoPush'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'autoPush', 'overlap'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -346,6 +356,7 @@
 	{:else}
 		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {push} bind:forkOpen bind:spawnOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
+		<Overlaps overlaps={thread?.overlaps ?? []} />
 
 		<Conversation class="min-h-0 flex-1">
 			<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">

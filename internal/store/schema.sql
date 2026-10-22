@@ -159,3 +159,18 @@ CREATE OR REPLACE FUNCTION event_kind(body jsonb) RETURNS text IMMUTABLE LANGUAG
   AS $$ SELECT k FROM jsonb_object_keys(body) k WHERE k NOT IN ('seq', 'threadId', 'time', 'actor', 'context', 'truncated') LIMIT 1 $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS kind text GENERATED ALWAYS AS (event_kind(body)) STORED;
 CREATE INDEX IF NOT EXISTS events_kind ON events (thread_id, kind, seq);
+-- The files each thread's latest diff changes, so overlaps between threads are
+-- an indexed join (see Overlaps), never a parse of every diff.
+CREATE TABLE IF NOT EXISTS thread_paths (
+  thread_id text NOT NULL REFERENCES threads (id) ON DELETE CASCADE,
+  path      text NOT NULL,
+  PRIMARY KEY (thread_id, path)
+);
+CREATE INDEX IF NOT EXISTS thread_paths_path ON thread_paths (path);
+-- The shared files each pair of threads (a < b) was told about.
+CREATE TABLE IF NOT EXISTS overlap_notices (
+  a     text NOT NULL REFERENCES threads (id) ON DELETE CASCADE,
+  b     text NOT NULL REFERENCES threads (id) ON DELETE CASCADE,
+  paths text[] NOT NULL,
+  PRIMARY KEY (a, b)
+);

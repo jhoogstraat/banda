@@ -215,17 +215,23 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			s.mu.Unlock()
 		case *bandav1.ConnectRequest_Diff:
 			// The runner sends it after every turn: only a change makes viewers fetch it again.
-			_, events, err := s.store.Update(bg, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+			_, events, err := s.store.Update(bg, id, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 				if t.Diff == k.Diff.Diff {
 					return nil, errUnchanged
 				}
 				t.Diff = k.Diff.Diff
+				if err := tx.SetPaths(bg, id, store.DiffPaths(t.Diff)); err != nil {
+					return nil, err
+				}
 				return []*bandav1.Event{{Actor: "system", Kind: &bandav1.Event_DiffChanged{DiffChanged: &bandav1.DiffChanged{}}}}, nil
 			})
 			if err != nil && err != errUnchanged {
 				slog.Error("store diff", "thread", id, "err", err)
 			}
 			s.broadcast(id, events)
+			if events != nil {
+				s.noticeOverlaps(bg, id)
+			}
 		}
 	}
 }

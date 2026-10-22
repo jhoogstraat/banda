@@ -188,6 +188,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string pull_request_url = 30;
    */
   pullRequestUrl: string;
+
+  /**
+   * Other recent, unsettled threads on the same repository and base branch
+   * whose diffs change some of the same files. Set by GetThread and TeamWatch.
+   *
+   * @generated from field: repeated banda.v1.Overlap overlaps = 31;
+   */
+  overlaps: Overlap[];
 };
 
 /**
@@ -195,6 +203,48 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
  * Use `create(ThreadSchema)` to create a new message.
  */
 export declare const ThreadSchema: GenMessage<Thread>;
+
+/**
+ * Another thread that changes some of the same files (see Thread.overlaps).
+ *
+ * @generated from message banda.v1.Overlap
+ */
+export declare type Overlap = Message$1<"banda.v1.Overlap"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string owner_id = 3;
+   */
+  ownerId: string;
+
+  /**
+   * Not set in an Event.
+   *
+   * @generated from field: banda.v1.Status status = 4;
+   */
+  status: Status;
+
+  /**
+   * The files both diffs change, sorted.
+   *
+   * @generated from field: repeated string paths = 5;
+   */
+  paths: string[];
+};
+
+/**
+ * Describes the message banda.v1.Overlap.
+ * Use `create(OverlapSchema)` to create a new message.
+ */
+export declare const OverlapSchema: GenMessage<Overlap>;
 
 /**
  * @generated from message banda.v1.ForkOrigin
@@ -442,6 +492,15 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: PermissionModeChanged;
     case: "permissionModeChanged";
+  } | {
+    /**
+     * The thread now changes files that another one changes too, or more of
+     * them than it was told before.
+     *
+     * @generated from field: banda.v1.Overlap overlap = 35;
+     */
+    value: Overlap;
+    case: "overlap";
   } | { case: undefined; value?: undefined };
 };
 

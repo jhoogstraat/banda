@@ -74,6 +74,9 @@ func main() {
 	if svc.MaxAgentThreads, err = strconv.Atoi(env("MAX_AGENT_THREADS", "8")); err != nil {
 		log.Fatalf("MAX_AGENT_THREADS: %v", err)
 	}
+	if svc.OverlapWindow, err = time.ParseDuration(env("OVERLAP_WINDOW", "168h")); err != nil {
+		log.Fatalf("OVERLAP_WINDOW: %v", err)
+	}
 	if svc.WatchBuffer, err = strconv.Atoi(env("WATCH_BUFFER", "256")); err != nil {
 		log.Fatalf("WATCH_BUFFER: %v", err)
 	}

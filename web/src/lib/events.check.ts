@@ -205,4 +205,8 @@ const parent = newChat();
 apply(parent, ev({ case: 'lineageUpdate', value: { threadId: 'c1', title: 'parser', status: Status.AWAITING_INPUT, text: 'Fixed it.' } }));
 const sub = parent.items[0];
 if (sub?.kind !== 'lineage' || sub.update.threadId !== 'c1' || sub.update.text !== 'Fixed it.') throw new Error('a lineage update should become a chat item');
+const overlapped = newChat();
+apply(overlapped, ev({ case: 'overlap', value: { threadId: 'o1', title: 'auth', ownerId: 'bob', paths: ['src/a.ts'] } }));
+const ov = overlapped.items[0];
+if (ov?.kind !== 'overlap' || ov.overlap.threadId !== 'o1' || ov.overlap.paths[0] !== 'src/a.ts') throw new Error('an overlap should become a chat item');
 console.log('ok');

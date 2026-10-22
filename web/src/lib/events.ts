@@ -8,6 +8,7 @@ import {
 	type ForkNote,
 	type LineageUpdate,
 	type Mode,
+	type Overlap,
 	type PermissionMode,
 	type PermissionRequested,
 	type PermissionResolved,
@@ -38,6 +39,8 @@ export type Item = { key: number } & (
 	| { kind: 'turn'; turn: TurnEnded }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
+	// The thread now changes files another one changes too.
+	| { kind: 'overlap'; overlap: Overlap }
 	| { kind: 'mode'; mode: Mode }
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
@@ -144,6 +147,9 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'lineageUpdate':
 			chat.items.push({ key, kind: 'lineage', actor: e.actor, update: k.value });
+			break;
+		case 'overlap':
+			chat.items.push({ key, kind: 'overlap', overlap: k.value });
 			break;
 		case 'turnRequest':
 			delete chat.typing[e.actor];

@@ -59,10 +59,19 @@ func (s *Service) TeamWatch(ctx context.Context, _ *bandav1.TeamWatchRequest, st
 		if err != nil {
 			return nil, nil, err
 		}
+		var ids []string
+		for _, t := range threads {
+			ids = append(ids, t.ID)
+		}
+		overlaps, err := s.overlaps(ctx, ids...)
+		if err != nil {
+			return nil, nil, err
+		}
 		res := &bandav1.TeamWatchResponse{}
 		s.mu.Lock()
 		for _, t := range threads {
 			p := toProto(t)
+			p.Overlaps = overlaps[t.ID]
 			p.PresentUserIds = slices.Sorted(maps.Keys(s.present[t.ID]))
 			res.Threads = append(res.Threads, p)
 		}
