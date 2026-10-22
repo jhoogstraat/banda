@@ -23,7 +23,8 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 
 - [ ] `mise run up`, sign in as alice, create a thread on a real repo.
 - [ ] Log in to Claude Code with your own subscription (Settings or the thread's terminal); check the login survives a suspend and resume, and is shared by a second thread.
-- [ ] Add a `GIT_TOKEN` secret; check a real turn auto-pushes the branch and the Push button turns into "Open a pull request".
+- [ ] Add a `GIT_TOKEN` secret; check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
+- [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in README's table are enough and no more.
 - [ ] Verify against the real CLI what is only sourced from docs (PLAN.md, "Verified only partly" and "Not yet"):
   - [ ] a real turn streams correctly (tool calls, thinking, subagents, the TodoWrite plan);
   - [ ] `queued_turn_count` when a prompt is folded into a running turn;
@@ -62,7 +63,8 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 ## Later (not needed to run fully)
 
 - [ ] Several API replicas: Postgres `LISTEN/NOTIFY` fan-out; the in-memory "suspend after the turn" moves to the database.
-- [ ] A GitHub App for per-user repo access and opening PRs through the API.
+- [ ] A GitHub App (per-user OAuth) instead of personal tokens; webhooks as an add-on to polling for installs that can receive them.
+- [ ] Pull requests: search on the forge in the repo picker; reviewers and labels from lists; resolving review threads; spotting a pull request the agent opened itself.
 - [ ] New threads with attachments; "Spawn sub-thread" with a profile chip; agents handing off through MCP.
 - [ ] Files tab ignore rules without git; adding a repository to a repo-less thread.
 - [ ] Per-thread preview origins (needs wildcard DNS).

@@ -160,6 +160,7 @@ func (s *Service) GetThread(ctx context.Context, req *bandav1.GetThreadRequest) 
 	}
 	p := toProto(t)
 	p.Overlaps = overlaps[t.ID]
+	p.ForgeReady = p.Forge != "" && s.forgeReady(ctx, t)
 	return &bandav1.GetThreadResponse{Thread: p}, nil
 }
 

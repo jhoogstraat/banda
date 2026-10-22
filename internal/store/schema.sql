@@ -198,5 +198,12 @@ ALTER TABLE threads ADD COLUMN IF NOT EXISTS woke_parent_at timestamptz;
 -- turn finished without an error, and when each user last read the brief.
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS summary text NOT NULL DEFAULT '';
 ALTER TABLE threads ADD COLUMN IF NOT EXISTS finished_at timestamptz;
+-- Each thread's linked pull request (GitLab: merge request) as last fetched
+-- from its forge (protojson of banda.v1.PullRequest), and when it was polled.
+CREATE TABLE IF NOT EXISTS pull_requests (
+  thread_id text PRIMARY KEY REFERENCES threads (id) ON DELETE CASCADE,
+  data      jsonb NOT NULL,
+  polled_at timestamptz NOT NULL DEFAULT now()
+);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS brief_seen_at timestamptz;
 CREATE INDEX IF NOT EXISTS thread_views_settled ON thread_views (settled_at) WHERE settled_at IS NOT NULL;

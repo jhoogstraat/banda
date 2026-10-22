@@ -229,6 +229,29 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: string handoff_to = 35;
    */
   handoffTo: string;
+
+  /**
+   * The linked pull request (GitLab: merge request), as last fetched.
+   *
+   * @generated from field: banda.v1.PullRequestSummary pull_request = 36;
+   */
+  pullRequest?: PullRequestSummary | undefined;
+
+  /**
+   * The forge of the repository: "github", "gitlab", or empty when Banda
+   * doesn't know it (see FORGE_HOSTS).
+   *
+   * @generated from field: string forge = 37;
+   */
+  forge: string;
+
+  /**
+   * The owner has a token for the forge, so Banda can open and manage the
+   * pull request. Set by GetThread only.
+   *
+   * @generated from field: bool forge_ready = 38;
+   */
+  forgeReady: boolean;
 };
 
 /**
@@ -576,6 +599,16 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: PreviewPort;
     case: "portOpened";
+  } | {
+    /**
+     * The pull request was opened or linked, or changed notably (checks
+     * failed or passed, a review, merged, closed). Ephemeral (seq 0, change
+     * empty) for any other change, so open pages refetch it.
+     *
+     * @generated from field: banda.v1.PullRequestChanged pull_request_changed = 41;
+     */
+    value: PullRequestChanged;
+    case: "pullRequestChanged";
   } | { case: undefined; value?: undefined };
 };
 
@@ -4662,6 +4695,688 @@ export declare type SearchResponse = Message$1<"banda.v1.SearchResponse"> & {
 export declare const SearchResponseSchema: GenMessage<SearchResponse>;
 
 /**
+ * What lists, the header and the chat show of a pull request.
+ *
+ * @generated from message banda.v1.PullRequestSummary
+ */
+export declare type PullRequestSummary = Message$1<"banda.v1.PullRequestSummary"> & {
+  /**
+   * "github" or "gitlab".
+   *
+   * @generated from field: string forge = 1;
+   */
+  forge: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+
+  /**
+   * @generated from field: string url = 3;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string title = 4;
+   */
+  title: string;
+
+  /**
+   * @generated from field: banda.v1.PullState state = 5;
+   */
+  state: PullState;
+
+  /**
+   * @generated from field: banda.v1.ChecksState checks = 6;
+   */
+  checks: ChecksState;
+
+  /**
+   * @generated from field: banda.v1.ReviewState review = 7;
+   */
+  review: ReviewState;
+
+  /**
+   * @generated from field: banda.v1.Mergeable mergeable = 8;
+   */
+  mergeable: Mergeable;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestSummary.
+ * Use `create(PullRequestSummarySchema)` to create a new message.
+ */
+export declare const PullRequestSummarySchema: GenMessage<PullRequestSummary>;
+
+/**
+ * @generated from message banda.v1.PullRequestCheck
+ */
+export declare type PullRequestCheck = Message$1<"banda.v1.PullRequestCheck"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: banda.v1.ChecksState state = 2;
+   */
+  state: ChecksState;
+
+  /**
+   * The forge's word for it, e.g. "success", "failure", "in_progress".
+   *
+   * @generated from field: string status = 3;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string url = 4;
+   */
+  url: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 5;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp completed_at = 6;
+   */
+  completedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestCheck.
+ * Use `create(PullRequestCheckSchema)` to create a new message.
+ */
+export declare const PullRequestCheckSchema: GenMessage<PullRequestCheck>;
+
+/**
+ * @generated from message banda.v1.PullRequestReviewer
+ */
+export declare type PullRequestReviewer = Message$1<"banda.v1.PullRequestReviewer"> & {
+  /**
+   * @generated from field: string login = 1;
+   */
+  login: string;
+
+  /**
+   * REQUESTED until they review.
+   *
+   * @generated from field: banda.v1.ReviewState state = 2;
+   */
+  state: ReviewState;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestReviewer.
+ * Use `create(PullRequestReviewerSchema)` to create a new message.
+ */
+export declare const PullRequestReviewerSchema: GenMessage<PullRequestReviewer>;
+
+/**
+ * A comment on the pull request, a review (its verdict and summary), or a
+ * review comment on a line (path set). Oldest first.
+ *
+ * @generated from message banda.v1.PullRequestComment
+ */
+export declare type PullRequestComment = Message$1<"banda.v1.PullRequestComment"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string author = 2;
+   */
+  author: string;
+
+  /**
+   * @generated from field: string body = 3;
+   */
+  body: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 4;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string url = 5;
+   */
+  url: string;
+
+  /**
+   * Review comments: the file, the line in the head (0: the file or an
+   * outdated line), the diff around it, and the first comment of the thread
+   * it replies in.
+   *
+   * @generated from field: string path = 6;
+   */
+  path: string;
+
+  /**
+   * @generated from field: int32 line = 7;
+   */
+  line: number;
+
+  /**
+   * @generated from field: string diff_hunk = 8;
+   */
+  diffHunk: string;
+
+  /**
+   * @generated from field: string reply_to = 9;
+   */
+  replyTo: string;
+
+  /**
+   * A review: its verdict.
+   *
+   * @generated from field: banda.v1.ReviewState review = 10;
+   */
+  review: ReviewState;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestComment.
+ * Use `create(PullRequestCommentSchema)` to create a new message.
+ */
+export declare const PullRequestCommentSchema: GenMessage<PullRequestComment>;
+
+/**
+ * @generated from message banda.v1.PullRequest
+ */
+export declare type PullRequest = Message$1<"banda.v1.PullRequest"> & {
+  /**
+   * @generated from field: banda.v1.PullRequestSummary summary = 1;
+   */
+  summary?: PullRequestSummary | undefined;
+
+  /**
+   * @generated from field: string body = 2;
+   */
+  body: string;
+
+  /**
+   * @generated from field: string author = 3;
+   */
+  author: string;
+
+  /**
+   * @generated from field: string head_branch = 4;
+   */
+  headBranch: string;
+
+  /**
+   * @generated from field: string base_branch = 5;
+   */
+  baseBranch: string;
+
+  /**
+   * @generated from field: repeated string labels = 6;
+   */
+  labels: string[];
+
+  /**
+   * @generated from field: repeated banda.v1.PullRequestReviewer reviewers = 7;
+   */
+  reviewers: PullRequestReviewer[];
+
+  /**
+   * @generated from field: repeated banda.v1.PullRequestCheck checks = 8;
+   */
+  checks: PullRequestCheck[];
+
+  /**
+   * @generated from field: repeated banda.v1.PullRequestComment comments = 9;
+   */
+  comments: PullRequestComment[];
+
+  /**
+   * How it may be merged: "merge", "squash", "rebase".
+   *
+   * @generated from field: repeated string merge_methods = 10;
+   */
+  mergeMethods: string[];
+
+  /**
+   * Why it can't be merged, when it is blocked.
+   *
+   * @generated from field: string merge_detail = 11;
+   */
+  mergeDetail: string;
+
+  /**
+   * @generated from field: int32 additions = 12;
+   */
+  additions: number;
+
+  /**
+   * @generated from field: int32 deletions = 13;
+   */
+  deletions: number;
+
+  /**
+   * @generated from field: int32 changed_files = 14;
+   */
+  changedFiles: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 15;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp merged_at = 16;
+   */
+  mergedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string merged_by = 17;
+   */
+  mergedBy: string;
+
+  /**
+   * When Banda last fetched it, and why the latest refresh failed if it did.
+   *
+   * @generated from field: google.protobuf.Timestamp fetched_at = 18;
+   */
+  fetchedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string error = 19;
+   */
+  error: string;
+
+  /**
+   * @generated from field: string head_sha = 20;
+   */
+  headSha: string;
+
+  /**
+   * The forge's GraphQL id (drafts are toggled there); GitLab: empty.
+   *
+   * @generated from field: string node_id = 21;
+   */
+  nodeId: string;
+};
+
+/**
+ * Describes the message banda.v1.PullRequest.
+ * Use `create(PullRequestSchema)` to create a new message.
+ */
+export declare const PullRequestSchema: GenMessage<PullRequest>;
+
+/**
+ * See Event.pull_request_changed. The actor is who opened or linked it, or
+ * "system" for what the forge reported.
+ *
+ * @generated from message banda.v1.PullRequestChanged
+ */
+export declare type PullRequestChanged = Message$1<"banda.v1.PullRequestChanged"> & {
+  /**
+   * @generated from field: banda.v1.PullRequestSummary pull_request = 1;
+   */
+  pullRequest?: PullRequestSummary | undefined;
+
+  /**
+   * "opened", "linked", "ready", "draft", "checks_failed", "checks_passed",
+   * "approved", "changes_requested", "merged", "closed", "reopened"; empty
+   * in an ephemeral refresh.
+   *
+   * @generated from field: string change = 2;
+   */
+  change: string;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestChanged.
+ * Use `create(PullRequestChangedSchema)` to create a new message.
+ */
+export declare const PullRequestChangedSchema: GenMessage<PullRequestChanged>;
+
+/**
+ * @generated from message banda.v1.PullRequestGetRequest
+ */
+export declare type PullRequestGetRequest = Message$1<"banda.v1.PullRequestGetRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * Fetch it from the forge now instead of returning the last snapshot.
+   *
+   * @generated from field: bool refresh = 2;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestGetRequest.
+ * Use `create(PullRequestGetRequestSchema)` to create a new message.
+ */
+export declare const PullRequestGetRequestSchema: GenMessage<PullRequestGetRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestGetResponse
+ */
+export declare type PullRequestGetResponse = Message$1<"banda.v1.PullRequestGetResponse"> & {
+  /**
+   * Unset when none is linked.
+   *
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+
+  /**
+   * The caller has a token for the forge, so they may comment.
+   *
+   * @generated from field: bool can_comment = 2;
+   */
+  canComment: boolean;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestGetResponse.
+ * Use `create(PullRequestGetResponseSchema)` to create a new message.
+ */
+export declare const PullRequestGetResponseSchema: GenMessage<PullRequestGetResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestCreateRequest
+ */
+export declare type PullRequestCreateRequest = Message$1<"banda.v1.PullRequestCreateRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string body = 3;
+   */
+  body: string;
+
+  /**
+   * @generated from field: bool draft = 4;
+   */
+  draft: boolean;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestCreateRequest.
+ * Use `create(PullRequestCreateRequestSchema)` to create a new message.
+ */
+export declare const PullRequestCreateRequestSchema: GenMessage<PullRequestCreateRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestCreateResponse
+ */
+export declare type PullRequestCreateResponse = Message$1<"banda.v1.PullRequestCreateResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestCreateResponse.
+ * Use `create(PullRequestCreateResponseSchema)` to create a new message.
+ */
+export declare const PullRequestCreateResponseSchema: GenMessage<PullRequestCreateResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestLinkRequest
+ */
+export declare type PullRequestLinkRequest = Message$1<"banda.v1.PullRequestLinkRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * 0: the open one whose head is the thread's branch.
+   *
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestLinkRequest.
+ * Use `create(PullRequestLinkRequestSchema)` to create a new message.
+ */
+export declare const PullRequestLinkRequestSchema: GenMessage<PullRequestLinkRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestLinkResponse
+ */
+export declare type PullRequestLinkResponse = Message$1<"banda.v1.PullRequestLinkResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestLinkResponse.
+ * Use `create(PullRequestLinkResponseSchema)` to create a new message.
+ */
+export declare const PullRequestLinkResponseSchema: GenMessage<PullRequestLinkResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestUpdateRequest
+ */
+export declare type PullRequestUpdateRequest = Message$1<"banda.v1.PullRequestUpdateRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: optional string title = 2;
+   */
+  title?: string | undefined;
+
+  /**
+   * @generated from field: optional string body = 3;
+   */
+  body?: string | undefined;
+
+  /**
+   * @generated from field: optional bool draft = 4;
+   */
+  draft?: boolean | undefined;
+
+  /**
+   * Logins (GitLab: usernames) to ask for a review.
+   *
+   * @generated from field: repeated string add_reviewers = 5;
+   */
+  addReviewers: string[];
+};
+
+/**
+ * Describes the message banda.v1.PullRequestUpdateRequest.
+ * Use `create(PullRequestUpdateRequestSchema)` to create a new message.
+ */
+export declare const PullRequestUpdateRequestSchema: GenMessage<PullRequestUpdateRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestUpdateResponse
+ */
+export declare type PullRequestUpdateResponse = Message$1<"banda.v1.PullRequestUpdateResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestUpdateResponse.
+ * Use `create(PullRequestUpdateResponseSchema)` to create a new message.
+ */
+export declare const PullRequestUpdateResponseSchema: GenMessage<PullRequestUpdateResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestMergeRequest
+ */
+export declare type PullRequestMergeRequest = Message$1<"banda.v1.PullRequestMergeRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * One of PullRequest.merge_methods.
+   *
+   * @generated from field: string method = 2;
+   */
+  method: string;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestMergeRequest.
+ * Use `create(PullRequestMergeRequestSchema)` to create a new message.
+ */
+export declare const PullRequestMergeRequestSchema: GenMessage<PullRequestMergeRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestMergeResponse
+ */
+export declare type PullRequestMergeResponse = Message$1<"banda.v1.PullRequestMergeResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestMergeResponse.
+ * Use `create(PullRequestMergeResponseSchema)` to create a new message.
+ */
+export declare const PullRequestMergeResponseSchema: GenMessage<PullRequestMergeResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestCommentRequest
+ */
+export declare type PullRequestCommentRequest = Message$1<"banda.v1.PullRequestCommentRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string body = 2;
+   */
+  body: string;
+
+  /**
+   * Reply in the thread of this review comment (PullRequestComment.id).
+   *
+   * @generated from field: string reply_to = 3;
+   */
+  replyTo: string;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestCommentRequest.
+ * Use `create(PullRequestCommentRequestSchema)` to create a new message.
+ */
+export declare const PullRequestCommentRequestSchema: GenMessage<PullRequestCommentRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestCommentResponse
+ */
+export declare type PullRequestCommentResponse = Message$1<"banda.v1.PullRequestCommentResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestCommentResponse.
+ * Use `create(PullRequestCommentResponseSchema)` to create a new message.
+ */
+export declare const PullRequestCommentResponseSchema: GenMessage<PullRequestCommentResponse>;
+
+/**
+ * @generated from message banda.v1.ListForgeReposRequest
+ */
+export declare type ListForgeReposRequest = Message$1<"banda.v1.ListForgeReposRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.ListForgeReposRequest.
+ * Use `create(ListForgeReposRequestSchema)` to create a new message.
+ */
+export declare const ListForgeReposRequestSchema: GenMessage<ListForgeReposRequest>;
+
+/**
+ * @generated from message banda.v1.ListForgeReposResponse
+ */
+export declare type ListForgeReposResponse = Message$1<"banda.v1.ListForgeReposResponse"> & {
+  /**
+   * The caller's most recently pushed repositories on each forge they have a
+   * token for, newest first; a forge that fails is left out.
+   *
+   * @generated from field: repeated banda.v1.ForgeRepo repos = 1;
+   */
+  repos: ForgeRepo[];
+};
+
+/**
+ * Describes the message banda.v1.ListForgeReposResponse.
+ * Use `create(ListForgeReposResponseSchema)` to create a new message.
+ */
+export declare const ListForgeReposResponseSchema: GenMessage<ListForgeReposResponse>;
+
+/**
+ * @generated from message banda.v1.ForgeRepo
+ */
+export declare type ForgeRepo = Message$1<"banda.v1.ForgeRepo"> & {
+  /**
+   * The https URL to clone.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * owner/name, or GitLab's group/name.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * "github" or "gitlab".
+   *
+   * @generated from field: string forge = 4;
+   */
+  forge: string;
+};
+
+/**
+ * Describes the message banda.v1.ForgeRepo.
+ * Use `create(ForgeRepoSchema)` to create a new message.
+ */
+export declare const ForgeRepoSchema: GenMessage<ForgeRepo>;
+
+/**
  * @generated from enum banda.v1.Status
  */
 export enum Status {
@@ -5022,6 +5737,155 @@ export enum SearchKind {
  * Describes the enum banda.v1.SearchKind.
  */
 export declare const SearchKindSchema: GenEnum<SearchKind>;
+
+/**
+ * @generated from enum banda.v1.PullState
+ */
+export enum PullState {
+  /**
+   * @generated from enum value: PULL_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: PULL_STATE_OPEN = 1;
+   */
+  OPEN = 1,
+
+  /**
+   * @generated from enum value: PULL_STATE_DRAFT = 2;
+   */
+  DRAFT = 2,
+
+  /**
+   * @generated from enum value: PULL_STATE_MERGED = 3;
+   */
+  MERGED = 3,
+
+  /**
+   * @generated from enum value: PULL_STATE_CLOSED = 4;
+   */
+  CLOSED = 4,
+}
+
+/**
+ * Describes the enum banda.v1.PullState.
+ */
+export declare const PullStateSchema: GenEnum<PullState>;
+
+/**
+ * A rollup of checks (GitLab: pipeline jobs), or the state of one check.
+ *
+ * @generated from enum banda.v1.ChecksState
+ */
+export enum ChecksState {
+  /**
+   * None reported.
+   *
+   * @generated from enum value: CHECKS_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: CHECKS_STATE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: CHECKS_STATE_PASSING = 2;
+   */
+  PASSING = 2,
+
+  /**
+   * @generated from enum value: CHECKS_STATE_FAILING = 3;
+   */
+  FAILING = 3,
+
+  /**
+   * One check skipped, neutral or cancelled: neither passing nor failing.
+   *
+   * @generated from enum value: CHECKS_STATE_SKIPPED = 4;
+   */
+  SKIPPED = 4,
+}
+
+/**
+ * Describes the enum banda.v1.ChecksState.
+ */
+export declare const ChecksStateSchema: GenEnum<ChecksState>;
+
+/**
+ * @generated from enum banda.v1.ReviewState
+ */
+export enum ReviewState {
+  /**
+   * No review, none requested.
+   *
+   * @generated from enum value: REVIEW_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Reviewers are requested and nobody approved or asked for changes yet.
+   *
+   * @generated from enum value: REVIEW_STATE_REQUESTED = 1;
+   */
+  REQUESTED = 1,
+
+  /**
+   * @generated from enum value: REVIEW_STATE_APPROVED = 2;
+   */
+  APPROVED = 2,
+
+  /**
+   * @generated from enum value: REVIEW_STATE_CHANGES_REQUESTED = 3;
+   */
+  CHANGES_REQUESTED = 3,
+
+  /**
+   * @generated from enum value: REVIEW_STATE_COMMENTED = 4;
+   */
+  COMMENTED = 4,
+}
+
+/**
+ * Describes the enum banda.v1.ReviewState.
+ */
+export declare const ReviewStateSchema: GenEnum<ReviewState>;
+
+/**
+ * @generated from enum banda.v1.Mergeable
+ */
+export enum Mergeable {
+  /**
+   * Not known: the forge is still computing it, or it is merged or closed.
+   *
+   * @generated from enum value: MERGEABLE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MERGEABLE_CLEAN = 1;
+   */
+  CLEAN = 1,
+
+  /**
+   * @generated from enum value: MERGEABLE_CONFLICTS = 2;
+   */
+  CONFLICTS = 2,
+
+  /**
+   * No conflicts, but the forge's rules block it (checks, reviews, draft).
+   *
+   * @generated from enum value: MERGEABLE_BLOCKED = 3;
+   */
+  BLOCKED = 3,
+}
+
+/**
+ * Describes the enum banda.v1.Mergeable.
+ */
+export declare const MergeableSchema: GenEnum<Mergeable>;
 
 /**
  * ThreadService is the API the web client talks to.
@@ -5500,6 +6364,82 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof HandoffDeclineRequestSchema;
     output: typeof HandoffDeclineResponseSchema;
+  },
+  /**
+   * The thread's pull request (GitLab: merge request) as last fetched from
+   * its forge with the owner's token, for everyone; refresh fetches it now.
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestGet
+   */
+  pullRequestGet: {
+    methodKind: "unary";
+    input: typeof PullRequestGetRequestSchema;
+    output: typeof PullRequestGetResponseSchema;
+  },
+  /**
+   * Opens a pull request for the thread's pushed branch against its base
+   * (owner only, with the owner's token).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestCreate
+   */
+  pullRequestCreate: {
+    methodKind: "unary";
+    input: typeof PullRequestCreateRequestSchema;
+    output: typeof PullRequestCreateResponseSchema;
+  },
+  /**
+   * Links an existing pull request: by number, or the open one whose head is
+   * the thread's branch (owner only).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestLink
+   */
+  pullRequestLink: {
+    methodKind: "unary";
+    input: typeof PullRequestLinkRequestSchema;
+    output: typeof PullRequestLinkResponseSchema;
+  },
+  /**
+   * Edits the title or description, marks it draft or ready, requests
+   * reviewers (owner only).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestUpdate
+   */
+  pullRequestUpdate: {
+    methodKind: "unary";
+    input: typeof PullRequestUpdateRequestSchema;
+    output: typeof PullRequestUpdateResponseSchema;
+  },
+  /**
+   * Merges it (owner only).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestMerge
+   */
+  pullRequestMerge: {
+    methodKind: "unary";
+    input: typeof PullRequestMergeRequestSchema;
+    output: typeof PullRequestMergeResponseSchema;
+  },
+  /**
+   * Comments on it, or replies to a review comment, with the caller's own
+   * token (refused without one).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestComment
+   */
+  pullRequestComment: {
+    methodKind: "unary";
+    input: typeof PullRequestCommentRequestSchema;
+    output: typeof PullRequestCommentResponseSchema;
+  },
+  /**
+   * The caller's repositories on the forges they have a token for, for the
+   * new-thread composer.
+   *
+   * @generated from rpc banda.v1.ThreadService.ListForgeRepos
+   */
+  listForgeRepos: {
+    methodKind: "unary";
+    input: typeof ListForgeReposRequestSchema;
+    output: typeof ListForgeReposResponseSchema;
   },
 }>;
 

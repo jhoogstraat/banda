@@ -135,6 +135,27 @@ const (
 	// ThreadServiceHandoffDeclineProcedure is the procedure name of the ThreadService's HandoffDecline
 	// RPC.
 	ThreadServiceHandoffDeclineProcedure = "/banda.v1.ThreadService/HandoffDecline"
+	// ThreadServicePullRequestGetProcedure is the procedure name of the ThreadService's PullRequestGet
+	// RPC.
+	ThreadServicePullRequestGetProcedure = "/banda.v1.ThreadService/PullRequestGet"
+	// ThreadServicePullRequestCreateProcedure is the procedure name of the ThreadService's
+	// PullRequestCreate RPC.
+	ThreadServicePullRequestCreateProcedure = "/banda.v1.ThreadService/PullRequestCreate"
+	// ThreadServicePullRequestLinkProcedure is the procedure name of the ThreadService's
+	// PullRequestLink RPC.
+	ThreadServicePullRequestLinkProcedure = "/banda.v1.ThreadService/PullRequestLink"
+	// ThreadServicePullRequestUpdateProcedure is the procedure name of the ThreadService's
+	// PullRequestUpdate RPC.
+	ThreadServicePullRequestUpdateProcedure = "/banda.v1.ThreadService/PullRequestUpdate"
+	// ThreadServicePullRequestMergeProcedure is the procedure name of the ThreadService's
+	// PullRequestMerge RPC.
+	ThreadServicePullRequestMergeProcedure = "/banda.v1.ThreadService/PullRequestMerge"
+	// ThreadServicePullRequestCommentProcedure is the procedure name of the ThreadService's
+	// PullRequestComment RPC.
+	ThreadServicePullRequestCommentProcedure = "/banda.v1.ThreadService/PullRequestComment"
+	// ThreadServiceListForgeReposProcedure is the procedure name of the ThreadService's ListForgeRepos
+	// RPC.
+	ThreadServiceListForgeReposProcedure = "/banda.v1.ThreadService/ListForgeRepos"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -500,6 +521,55 @@ var (
 			Procedure:  ThreadServiceHandoffDeclineProcedure,
 		}
 	})
+	threadServicePullRequestGetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestGet"),
+			Procedure:  ThreadServicePullRequestGetProcedure,
+		}
+	})
+	threadServicePullRequestCreateSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestCreate"),
+			Procedure:  ThreadServicePullRequestCreateProcedure,
+		}
+	})
+	threadServicePullRequestLinkSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestLink"),
+			Procedure:  ThreadServicePullRequestLinkProcedure,
+		}
+	})
+	threadServicePullRequestUpdateSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestUpdate"),
+			Procedure:  ThreadServicePullRequestUpdateProcedure,
+		}
+	})
+	threadServicePullRequestMergeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestMerge"),
+			Procedure:  ThreadServicePullRequestMergeProcedure,
+		}
+	})
+	threadServicePullRequestCommentSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestComment"),
+			Procedure:  ThreadServicePullRequestCommentProcedure,
+		}
+	})
+	threadServiceListForgeReposSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("ListForgeRepos"),
+			Procedure:  ThreadServiceListForgeReposProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -619,6 +689,26 @@ type ThreadServiceClient interface {
 	// Withdraws the pending offer: declined by the recipient, or cancelled by
 	// the owner.
 	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
+	// The thread's pull request (GitLab: merge request) as last fetched from
+	// its forge with the owner's token, for everyone; refresh fetches it now.
+	PullRequestGet(context.Context, *v1.PullRequestGetRequest) (*v1.PullRequestGetResponse, error)
+	// Opens a pull request for the thread's pushed branch against its base
+	// (owner only, with the owner's token).
+	PullRequestCreate(context.Context, *v1.PullRequestCreateRequest) (*v1.PullRequestCreateResponse, error)
+	// Links an existing pull request: by number, or the open one whose head is
+	// the thread's branch (owner only).
+	PullRequestLink(context.Context, *v1.PullRequestLinkRequest) (*v1.PullRequestLinkResponse, error)
+	// Edits the title or description, marks it draft or ready, requests
+	// reviewers (owner only).
+	PullRequestUpdate(context.Context, *v1.PullRequestUpdateRequest) (*v1.PullRequestUpdateResponse, error)
+	// Merges it (owner only).
+	PullRequestMerge(context.Context, *v1.PullRequestMergeRequest) (*v1.PullRequestMergeResponse, error)
+	// Comments on it, or replies to a review comment, with the caller's own
+	// token (refused without one).
+	PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error)
+	// The caller's repositories on the forges they have a token for, for the
+	// new-thread composer.
+	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -847,6 +937,26 @@ type ThreadServiceHandler interface {
 	// Withdraws the pending offer: declined by the recipient, or cancelled by
 	// the owner.
 	HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error)
+	// The thread's pull request (GitLab: merge request) as last fetched from
+	// its forge with the owner's token, for everyone; refresh fetches it now.
+	PullRequestGet(context.Context, *v1.PullRequestGetRequest) (*v1.PullRequestGetResponse, error)
+	// Opens a pull request for the thread's pushed branch against its base
+	// (owner only, with the owner's token).
+	PullRequestCreate(context.Context, *v1.PullRequestCreateRequest) (*v1.PullRequestCreateResponse, error)
+	// Links an existing pull request: by number, or the open one whose head is
+	// the thread's branch (owner only).
+	PullRequestLink(context.Context, *v1.PullRequestLinkRequest) (*v1.PullRequestLinkResponse, error)
+	// Edits the title or description, marks it draft or ready, requests
+	// reviewers (owner only).
+	PullRequestUpdate(context.Context, *v1.PullRequestUpdateRequest) (*v1.PullRequestUpdateResponse, error)
+	// Merges it (owner only).
+	PullRequestMerge(context.Context, *v1.PullRequestMergeRequest) (*v1.PullRequestMergeResponse, error)
+	// Comments on it, or replies to a review comment, with the caller's own
+	// token (refused without one).
+	PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error)
+	// The caller's repositories on the forges they have a token for, for the
+	// new-thread composer.
+	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -900,6 +1010,13 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceHandoffOfferSpec(), Handler: adapter.handoffOffer},
 		connect.Method{Spec: threadServiceHandoffAcceptSpec(), Handler: adapter.handoffAccept},
 		connect.Method{Spec: threadServiceHandoffDeclineSpec(), Handler: adapter.handoffDecline},
+		connect.Method{Spec: threadServicePullRequestGetSpec(), Handler: adapter.pullRequestGet},
+		connect.Method{Spec: threadServicePullRequestCreateSpec(), Handler: adapter.pullRequestCreate},
+		connect.Method{Spec: threadServicePullRequestLinkSpec(), Handler: adapter.pullRequestLink},
+		connect.Method{Spec: threadServicePullRequestUpdateSpec(), Handler: adapter.pullRequestUpdate},
+		connect.Method{Spec: threadServicePullRequestMergeSpec(), Handler: adapter.pullRequestMerge},
+		connect.Method{Spec: threadServicePullRequestCommentSpec(), Handler: adapter.pullRequestComment},
+		connect.Method{Spec: threadServiceListForgeReposSpec(), Handler: adapter.listForgeRepos},
 	)
 }
 
@@ -1166,6 +1283,34 @@ func (UnimplementedThreadServiceHandler) HandoffAccept(context.Context, *v1.Hand
 
 func (UnimplementedThreadServiceHandler) HandoffDecline(context.Context, *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.HandoffDecline is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestGet(context.Context, *v1.PullRequestGetRequest) (*v1.PullRequestGetResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestGet is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestCreate(context.Context, *v1.PullRequestCreateRequest) (*v1.PullRequestCreateResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestCreate is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestLink(context.Context, *v1.PullRequestLinkRequest) (*v1.PullRequestLinkResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestLink is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestUpdate(context.Context, *v1.PullRequestUpdateRequest) (*v1.PullRequestUpdateResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestUpdate is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestMerge(context.Context, *v1.PullRequestMergeRequest) (*v1.PullRequestMergeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestMerge is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestComment(context.Context, *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestComment is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ListForgeRepos is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1535,6 +1680,62 @@ func (c *threadServiceClient) HandoffAccept(ctx context.Context, req *v1.Handoff
 func (c *threadServiceClient) HandoffDecline(ctx context.Context, req *v1.HandoffDeclineRequest) (*v1.HandoffDeclineResponse, error) {
 	var res v1.HandoffDeclineResponse
 	if err := c.client.CallUnary(ctx, threadServiceHandoffDeclineSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestGet(ctx context.Context, req *v1.PullRequestGetRequest) (*v1.PullRequestGetResponse, error) {
+	var res v1.PullRequestGetResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestGetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestCreate(ctx context.Context, req *v1.PullRequestCreateRequest) (*v1.PullRequestCreateResponse, error) {
+	var res v1.PullRequestCreateResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestCreateSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestLink(ctx context.Context, req *v1.PullRequestLinkRequest) (*v1.PullRequestLinkResponse, error) {
+	var res v1.PullRequestLinkResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestLinkSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestUpdate(ctx context.Context, req *v1.PullRequestUpdateRequest) (*v1.PullRequestUpdateResponse, error) {
+	var res v1.PullRequestUpdateResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestUpdateSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestMerge(ctx context.Context, req *v1.PullRequestMergeRequest) (*v1.PullRequestMergeResponse, error) {
+	var res v1.PullRequestMergeResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestMergeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestComment(ctx context.Context, req *v1.PullRequestCommentRequest) (*v1.PullRequestCommentResponse, error) {
+	var res v1.PullRequestCommentResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestCommentSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) ListForgeRepos(ctx context.Context, req *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
+	var res v1.ListForgeReposResponse
+	if err := c.client.CallUnary(ctx, threadServiceListForgeReposSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2068,6 +2269,90 @@ func (h threadServiceHandler) handoffDecline(ctx context.Context, _ connect.Spec
 		return err
 	}
 	res, err := h.svc.HandoffDecline(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestGet(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestGetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestGet(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestCreate(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestCreateRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestCreate(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestLink(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestLinkRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestLink(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestUpdate(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestUpdateRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestUpdate(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestMerge(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestMergeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestMerge(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestComment(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestCommentRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestComment(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) listForgeRepos(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListForgeReposRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListForgeRepos(ctx, &req)
 	if err != nil {
 		return err
 	}

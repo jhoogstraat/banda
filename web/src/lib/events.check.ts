@@ -242,4 +242,9 @@ const overlapped = newChat();
 apply(overlapped, ev({ case: 'overlap', value: { threadId: 'o1', title: 'auth', ownerId: 'bob', paths: ['src/a.ts'] } }));
 const ov = overlapped.items[0];
 if (ov?.kind !== 'overlap' || ov.overlap.threadId !== 'o1' || ov.overlap.paths[0] !== 'src/a.ts') throw new Error('an overlap should become a chat item');
+const prChat = newChat();
+apply(prChat, ev({ case: 'pullRequestChanged', value: { change: '', pullRequest: { number: 3 } } }, 0n)); // a refresh: no line
+apply(prChat, ev({ case: 'pullRequestChanged', value: { change: 'checks_failed', pullRequest: { number: 3 } } }, 2n));
+const prLine = prChat.items;
+if (prLine.length !== 1 || prLine[0].kind !== 'pullRequest' || prLine[0].changed.change !== 'checks_failed') throw new Error('only a notable pull request change should become a chat item');
 console.log('ok');
