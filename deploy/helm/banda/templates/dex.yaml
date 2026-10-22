@@ -1,0 +1,89 @@
+{{- if .Values.dex.enabled }}
+{{- $public := include "banda.publicUrl" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex
+  labels: {{- include "banda.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    # Browsers reach Dex at the API's /dex (DEX_URL), in dev at the web server's.
+    issuer: {{ $public }}/dex
+    storage:
+      type: memory
+    web:
+      http: 0.0.0.0:5556
+    oauth2:
+      skipApprovalScreen: true
+    enablePasswordDB: true
+    staticClients:
+      - id: {{ .Values.oidc.clientId }}
+        secretEnv: OIDC_CLIENT_SECRET
+        name: Banda
+        redirectURIs: [{{ $public }}/auth/callback]
+    staticPasswords: {{- toYaml .Values.dex.users | nindent 6 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dex}
+  template:
+    metadata:
+      labels: {app: dex}
+      annotations:
+        checksum/config: {{ list .Values.dex .Values.oidc.clientId $public (include (print $.Template.BasePath "/secret.yaml") .) | toJson | sha256sum }}
+    spec:
+      containers:
+        - name: dex
+          image: {{ .Values.dex.image }}
+          args: [dex, serve, /etc/dex/config.yaml]
+          env:
+            - name: OIDC_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: OIDC_CLIENT_SECRET}}
+          ports:
+            - containerPort: 5556
+          readinessProbe:
+            httpGet: {path: /dex/healthz, port: 5556}
+          volumeMounts:
+            - {name: config, mountPath: /etc/dex}
+      volumes:
+        - name: config
+          configMap: {name: dex}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  type: {{ ternary "NodePort" "ClusterIP" (not (empty .Values.dex.nodePort)) }}
+  selector: {app: dex}
+  ports:
+    - port: 5556
+      {{- with .Values.dex.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+---
+# Like Postgres's: the API and browsers (through the API's proxy, a NodePort
+# or a port-forward) reach Dex, sandboxes don't, even when an allowed range
+# (SANDBOX_EGRESS_ALLOW) covers it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dex
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app: dex}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: banda-api}}
+        - ipBlock: {cidr: 0.0.0.0/0, except: [{{ .Values.podCIDR }}]}
+      ports:
+        - port: 5556
+{{- end }}

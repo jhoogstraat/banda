@@ -1,0 +1,30 @@
+# Local dev in kind: images loaded by `mise run image` and `mise run deploy`,
+# Postgres on localhost:5432 and Dex on localhost:5556 (deploy/kind.yaml's
+# port mappings), fixed dev secrets. Also the values of `mise run dex`,
+# `mise run deploy` and the e2e world (deploy/dev.sh).
+image:
+  api: {repository: localhost/banda-api, tag: dev}
+  sandbox: {repository: localhost/banda-sandbox, tag: dev}
+sessionSecret: banda-local-dev-session-secret
+oidc:
+  clientSecret: banda-dev-secret
+postgres:
+  password: banda
+  nodePort: 30432
+dex:
+  enabled: true
+  nodePort: 30556
+  # Sign in as alice, bob or carol (@example.com) with the password "password".
+  users:
+    - email: alice@example.com
+      username: alice
+      userID: 92a688f8-23fa-4a67-81c6-a24893fece99
+      hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"
+    - email: bob@example.com
+      username: bob
+      userID: 76646764-9798-4536-8fe3-81421ef48909
+      hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"
+    - email: carol@example.com
+      username: carol
+      userID: ded8cfbc-82fe-4dc4-8809-362ef8c108fa
+      hash: "$2a$10$WKDiP970p3YSPBUu34nuF.9ysUfm0Be3tCU.2OOHPe4aFVn0ZNe0S"

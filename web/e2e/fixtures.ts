@@ -31,6 +31,8 @@ export const NAMESPACE = env('E2E_NAMESPACE');
 export const DB = env('E2E_DB');
 export const API_LOG = env('E2E_LOG');
 const DIR = env('E2E_DIR');
+/** The host as sandboxes see it, where the run's APIs listen (host_ip in deploy/dev.sh). */
+export const HOST = env('E2E_HOST');
 
 function env(name: string): string {
 	const v = process.env[name];
@@ -424,7 +426,7 @@ export class Api {
 
 	async start() {
 		const port = Number(new URL(this.url || 'http://x').port) || (await freePort());
-		await run('../deploy/dev.sh', ['host-api', this.namespace, String(port)]); // its sandboxes may reach it (deploy/sandbox-policy.yaml)
+		await run('../deploy/dev.sh', ['host-api', this.namespace, String(port)]); // its sandboxes may reach it (the chart's policies)
 		this.url = `http://localhost:${port}`;
 		this.log = `${DIR}/api-${port}.log`;
 		const out = openSync(this.log, 'a');
@@ -435,7 +437,7 @@ export class Api {
 				DEV_AUTH: '1',
 				ADDR: `:${port}`,
 				PREVIEW_ADDR: `:${await freePort()}`,
-				RUNNER_API_URL: `http://host.containers.internal:${port}`,
+				RUNNER_API_URL: `http://${HOST}:${port}`,
 				...this.env
 			},
 			stdio: ['ignore', out, out]
@@ -498,7 +500,7 @@ export const test = base.extend<Fixtures>({
 				namespaces.push(ns);
 				await kubeIn(ns, 'create', 'namespace', ns);
 				await kubeIn(ns, 'label', 'namespace', ns, `banda.dev/e2e-run=${NAMESPACE}`); // deploy/dev.sh deletes leftovers
-				await kubeIn(ns, 'apply', '-f', '../deploy/sandbox-policy.yaml');
+				await run('../deploy/dev.sh', ['policies', ns]);
 				env = { SANDBOX_NAMESPACE: ns, ...env };
 			}
 			const api = new Api(env, db);

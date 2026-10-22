@@ -1,0 +1,122 @@
+{{- if .Values.api.enabled }}
+# Without OIDC (oidc.issuer or dex.enabled) the API refuses to start unless api.devAuth.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [agents.x-k8s.io]
+    resources: [sandboxes]
+    verbs: [get, create, patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, delete]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [secrets] # users' banda-env-* and banda-auth-*, the team's banda-env-team, banda-git
+    verbs: [get, create, patch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies] # sandboxes-allow, from SANDBOX_EGRESS_ALLOW
+    verbs: [create, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: banda-api
+subjects:
+  - kind: ServiceAccount
+    name: banda-api
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  # One API per database: events fan out in memory (PLAN.md, "Not yet"), so a
+  # rollout stops the old pod before it starts the new one.
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: banda-api}
+  template:
+    metadata:
+      labels: {app: banda-api}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: banda-api
+      containers:
+        - name: api
+          image: {{ include "banda.image" (dict "image" .Values.image.api "root" .) }}
+          imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          ports:
+            - {name: api, containerPort: 8787}
+            - {name: preview, containerPort: 8788} # the Browser tab's origin
+          env:
+            {{- if .Values.postgres.enabled }}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "banda.secret" . }}, key: POSTGRES_PASSWORD}}
+            - {name: DATABASE_URL, value: "postgres://banda:$(POSTGRES_PASSWORD)@postgres:5432/banda"}
+            {{- end }}
+            - {name: SANDBOX_NAMESPACE, value: {{ .Release.Namespace }}}
+            - {name: SANDBOX_IMAGE, value: {{ include "banda.image" (dict "image" .Values.image.sandbox "root" .) | quote }}}
+            - {name: RUNNER_API_URL, value: "http://banda-api.{{ .Release.Namespace }}.svc:8787"}
+            - {name: PUBLIC_URL, value: {{ include "banda.publicUrl" . | quote }}}
+            {{- with include "banda.previewUrl" . }}
+            - {name: PREVIEW_URL, value: {{ . | quote }}}
+            {{- end }}
+            {{- with include "banda.issuer" . }}
+            - {name: OIDC_ISSUER, value: {{ . | quote }}}
+            - {name: OIDC_CLIENT_ID, value: {{ $.Values.oidc.clientId | quote }}}
+            {{- end }}
+            {{- if and .Values.dex.enabled (not .Values.oidc.issuer) }}
+            - {name: DEX_URL, value: "http://dex.{{ .Release.Namespace }}.svc:5556"}
+            {{- end }}
+            {{- if .Values.api.devAuth }}
+            - {name: DEV_AUTH, value: "1"}
+            {{- end }}
+            {{- with .Values.egressAllow }}
+            - {name: SANDBOX_EGRESS_ALLOW, value: {{ . | quote }}}
+            {{- end }}
+            {{- range $k, $v := .Values.api.env }}
+            - {name: {{ $k }}, value: {{ $v | toString | quote }}}
+            {{- end }}
+          envFrom:
+            - secretRef: {name: {{ include "banda.secret" . }}}
+          readinessProbe:
+            httpGet: {path: /, port: api}
+          livenessProbe:
+            httpGet: {path: /, port: api}
+            periodSeconds: 20
+            failureThreshold: 3
+          {{- with .Values.api.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banda-api
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  selector: {app: banda-api}
+  ports:
+    - {name: api, port: 8787, targetPort: api}
+    - {name: preview, port: 8788, targetPort: preview}
+{{- end }}

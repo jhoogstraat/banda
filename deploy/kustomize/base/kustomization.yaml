@@ -1,0 +1,14 @@
+# The chart with the defaults of a real cluster: bundled Postgres, no Dex, no
+# ingress, settings from the Secret banda-api (created by you or an overlay;
+# see deploy/kustomize/example). Overlays patch what comes out:
+#   kubectl kustomize --enable-helm <overlay> | kubectl apply -f -
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: banda
+helmGlobals:
+  chartHome: ../../helm
+helmCharts:
+  - name: banda
+    releaseName: banda
+    namespace: banda
+    valuesFile: values.yaml

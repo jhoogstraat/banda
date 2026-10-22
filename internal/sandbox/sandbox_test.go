@@ -62,7 +62,7 @@ func TestParseCIDRs(t *testing.T) {
 	}
 }
 
-// The policy adds the ranges to deploy/sandbox-policy.yaml for every sandbox
+// The policy adds the ranges to the chart's policies.yaml for every sandbox
 // pod, egress only: policies add up, so nothing there is loosened.
 func TestEgressPolicy(t *testing.T) {
 	b, err := json.Marshal(egressPolicy([]netip.Prefix{netip.MustParsePrefix("10.20.0.0/16"), netip.MustParsePrefix("192.0.2.7/32")}))

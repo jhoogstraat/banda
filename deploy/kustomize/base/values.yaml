@@ -1,0 +1,2 @@
+# Generated secrets would change on every render: bring them in a Secret.
+api: {existingSecret: banda-api}

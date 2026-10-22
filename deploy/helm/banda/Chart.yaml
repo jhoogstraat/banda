@@ -1,0 +1,9 @@
+apiVersion: v2
+name: banda
+description: A team builds software together with coding agents, each thread in a Kubernetes sandbox of its own.
+type: application
+home: https://github.com/jhoogstraat/banda
+sources: [https://github.com/jhoogstraat/banda]
+# The release workflow sets both from the tag.
+version: 0.0.0
+appVersion: "0.0.0"
