@@ -142,6 +142,12 @@ service ThreadService {
   // The caller's repositories on the forges they have a token for, for the
   // new-thread composer.
   rpc ListForgeRepos(ListForgeReposRequest) returns (ListForgeReposResponse);
+  // Who may be asked for a review and which labels exist on the thread's
+  // repository, from its forge with the owner's token (owner only).
+  rpc PullRequestChoices(PullRequestChoicesRequest) returns (PullRequestChoicesResponse);
+  // Resolves or reopens a review thread, with the caller's own token
+  // (refused without one).
+  rpc PullRequestResolve(PullRequestResolveRequest) returns (PullRequestResolveResponse);
 }
 
 service UserService {
@@ -1545,6 +1551,11 @@ message PullRequestComment {
   string reply_to = 9;
   // A review: its verdict.
   ReviewState review = 10;
+  // The first comment of a review thread that can be resolved: the forge's
+  // id of the thread (GitHub's node id, GitLab's discussion id) and whether
+  // it is resolved.
+  string thread_id = 11;
+  bool resolved = 12;
 }
 
 message PullRequest {
@@ -1626,6 +1637,9 @@ message PullRequestUpdateRequest {
   optional bool draft = 4;
   // Logins (GitLab: usernames) to ask for a review.
   repeated string add_reviewers = 5;
+  // Labels to add and to remove.
+  repeated string add_labels = 6;
+  repeated string remove_labels = 7;
 }
 
 message PullRequestUpdateResponse {
@@ -1653,7 +1667,11 @@ message PullRequestCommentResponse {
   PullRequest pull_request = 1;
 }
 
-message ListForgeReposRequest {}
+message ListForgeReposRequest {
+  // Searches each forge for the caller's repositories whose name matches;
+  // empty lists the most recently pushed.
+  string query = 1;
+}
 
 message ListForgeReposResponse {
   // The caller's most recently pushed repositories on each forge they have a
@@ -1669,4 +1687,26 @@ message ForgeRepo {
   string description = 3;
   // "github" or "gitlab".
   string forge = 4;
+}
+
+message PullRequestChoicesRequest {
+  string thread_id = 1;
+}
+
+message PullRequestChoicesResponse {
+  // Logins (GitLab: usernames) of the repository's collaborators (GitLab:
+  // project members).
+  repeated string reviewers = 1;
+  repeated string labels = 2;
+}
+
+message PullRequestResolveRequest {
+  string thread_id = 1;
+  // PullRequestComment.thread_id.
+  string review_thread = 2;
+  bool resolved = 3;
+}
+
+message PullRequestResolveResponse {
+  PullRequest pull_request = 1;
 }

@@ -86,7 +86,7 @@ export function changeText(c: PullRequestChanged, by = ''): string {
 		case 'opened':
 			return `${by || 'Someone'} opened ${it}`;
 		case 'linked':
-			return `${by || 'Someone'} linked ${it}`;
+			return by ? `${by} linked ${it}` : `${It} on this branch was linked`;
 		case 'ready':
 			return `${It} was marked ready for review${byWhom}`;
 		case 'draft':

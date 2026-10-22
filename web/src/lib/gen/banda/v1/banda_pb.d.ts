@@ -4899,6 +4899,20 @@ export declare type PullRequestComment = Message$1<"banda.v1.PullRequestComment"
    * @generated from field: banda.v1.ReviewState review = 10;
    */
   review: ReviewState;
+
+  /**
+   * The first comment of a review thread that can be resolved: the forge's
+   * id of the thread (GitHub's node id, GitLab's discussion id) and whether
+   * it is resolved.
+   *
+   * @generated from field: string thread_id = 11;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: bool resolved = 12;
+   */
+  resolved: boolean;
 };
 
 /**
@@ -5223,6 +5237,18 @@ export declare type PullRequestUpdateRequest = Message$1<"banda.v1.PullRequestUp
    * @generated from field: repeated string add_reviewers = 5;
    */
   addReviewers: string[];
+
+  /**
+   * Labels to add and to remove.
+   *
+   * @generated from field: repeated string add_labels = 6;
+   */
+  addLabels: string[];
+
+  /**
+   * @generated from field: repeated string remove_labels = 7;
+   */
+  removeLabels: string[];
 };
 
 /**
@@ -5334,6 +5360,13 @@ export declare const PullRequestCommentResponseSchema: GenMessage<PullRequestCom
  * @generated from message banda.v1.ListForgeReposRequest
  */
 export declare type ListForgeReposRequest = Message$1<"banda.v1.ListForgeReposRequest"> & {
+  /**
+   * Searches each forge for the caller's repositories whose name matches;
+   * empty lists the most recently pushed.
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
 };
 
 /**
@@ -5397,6 +5430,90 @@ export declare type ForgeRepo = Message$1<"banda.v1.ForgeRepo"> & {
  * Use `create(ForgeRepoSchema)` to create a new message.
  */
 export declare const ForgeRepoSchema: GenMessage<ForgeRepo>;
+
+/**
+ * @generated from message banda.v1.PullRequestChoicesRequest
+ */
+export declare type PullRequestChoicesRequest = Message$1<"banda.v1.PullRequestChoicesRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestChoicesRequest.
+ * Use `create(PullRequestChoicesRequestSchema)` to create a new message.
+ */
+export declare const PullRequestChoicesRequestSchema: GenMessage<PullRequestChoicesRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestChoicesResponse
+ */
+export declare type PullRequestChoicesResponse = Message$1<"banda.v1.PullRequestChoicesResponse"> & {
+  /**
+   * Logins (GitLab: usernames) of the repository's collaborators (GitLab:
+   * project members).
+   *
+   * @generated from field: repeated string reviewers = 1;
+   */
+  reviewers: string[];
+
+  /**
+   * @generated from field: repeated string labels = 2;
+   */
+  labels: string[];
+};
+
+/**
+ * Describes the message banda.v1.PullRequestChoicesResponse.
+ * Use `create(PullRequestChoicesResponseSchema)` to create a new message.
+ */
+export declare const PullRequestChoicesResponseSchema: GenMessage<PullRequestChoicesResponse>;
+
+/**
+ * @generated from message banda.v1.PullRequestResolveRequest
+ */
+export declare type PullRequestResolveRequest = Message$1<"banda.v1.PullRequestResolveRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * PullRequestComment.thread_id.
+   *
+   * @generated from field: string review_thread = 2;
+   */
+  reviewThread: string;
+
+  /**
+   * @generated from field: bool resolved = 3;
+   */
+  resolved: boolean;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestResolveRequest.
+ * Use `create(PullRequestResolveRequestSchema)` to create a new message.
+ */
+export declare const PullRequestResolveRequestSchema: GenMessage<PullRequestResolveRequest>;
+
+/**
+ * @generated from message banda.v1.PullRequestResolveResponse
+ */
+export declare type PullRequestResolveResponse = Message$1<"banda.v1.PullRequestResolveResponse"> & {
+  /**
+   * @generated from field: banda.v1.PullRequest pull_request = 1;
+   */
+  pullRequest?: PullRequest | undefined;
+};
+
+/**
+ * Describes the message banda.v1.PullRequestResolveResponse.
+ * Use `create(PullRequestResolveResponseSchema)` to create a new message.
+ */
+export declare const PullRequestResolveResponseSchema: GenMessage<PullRequestResolveResponse>;
 
 /**
  * @generated from enum banda.v1.Status
@@ -6462,6 +6579,28 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof ListForgeReposRequestSchema;
     output: typeof ListForgeReposResponseSchema;
+  },
+  /**
+   * Who may be asked for a review and which labels exist on the thread's
+   * repository, from its forge with the owner's token (owner only).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestChoices
+   */
+  pullRequestChoices: {
+    methodKind: "unary";
+    input: typeof PullRequestChoicesRequestSchema;
+    output: typeof PullRequestChoicesResponseSchema;
+  },
+  /**
+   * Resolves or reopens a review thread, with the caller's own token
+   * (refused without one).
+   *
+   * @generated from rpc banda.v1.ThreadService.PullRequestResolve
+   */
+  pullRequestResolve: {
+    methodKind: "unary";
+    input: typeof PullRequestResolveRequestSchema;
+    output: typeof PullRequestResolveResponseSchema;
   },
 }>;
 

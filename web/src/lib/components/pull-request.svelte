@@ -15,7 +15,16 @@
 	import { NativeSelect, NativeSelectOption } from '#lib/components/ui/native-select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
-	import { Mergeable, PullState, ReviewState, type PullRequest, type PullRequestComment, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import XIcon from '@lucide/svelte/icons/x';
+	import {
+		Mergeable,
+		PullState,
+		ReviewState,
+		type PullRequest,
+		type PullRequestChoicesResponse,
+		type PullRequestComment,
+		type Thread
+	} from '#lib/gen/banda/v1/banda_pb.js';
 	import { checkStates, checksSummary, duration, live, noun, pullStates, ref, reviewLabels } from '#lib/pullrequests.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
 	import { ago } from '#lib/utils.js';
@@ -40,6 +49,17 @@
 	let title = $state('');
 	let body = $state('');
 	let reviewers = $state('');
+	// Who may review and the repository's labels, asked once when the owner first sees a live one; without them
+	// reviewers are typed and labels can't be added.
+	let choices = $state<PullRequestChoicesResponse>();
+	let askedChoices = false;
+	$effect(() => {
+		if (!owner || !pr?.summary || !live(pr.summary) || askedChoices) return;
+		askedChoices = true;
+		api.pullRequestChoices({ threadId: thread.id }).then((c) => (choices = c)).catch(() => {});
+	});
+	const reviewerChoices = $derived((choices?.reviewers ?? []).filter((l) => l !== pr?.author && !pr?.reviewers.some((r) => r.login === l)));
+	const labelChoices = $derived((choices?.labels ?? []).filter((l) => !pr?.labels.includes(l)));
 
 	async function load(refresh = false) {
 		try {
@@ -84,6 +104,12 @@
 		const logins = reviewers.split(/[\s,]+/).map((l) => l.replace(/^@/, '')).filter(Boolean);
 		if (logins.length && (await act(api.pullRequestUpdate({ threadId, addReviewers: logins })))) reviewers = '';
 	}
+	const addLabel = (e: Event & { currentTarget: HTMLSelectElement }) => {
+		const label = e.currentTarget.value;
+		e.currentTarget.value = '';
+		if (label) act(api.pullRequestUpdate({ threadId, addLabels: [label] }));
+	};
+	const resolve = (c: PullRequestComment) => act(api.pullRequestResolve({ threadId, reviewThread: c.threadId, resolved: !c.resolved }));
 	async function send(e: SubmitEvent) {
 		e.preventDefault();
 		if (await act(api.pullRequestComment({ threadId, body: comment }))) comment = '';
@@ -129,6 +155,7 @@
 			{:else if c.path && !nested}
 				<span class="text-muted-foreground">commented on</span>
 			{/if}
+			{#if c.resolved}<span class="rounded-full border px-1.5 text-[10px] text-muted-foreground">resolved</span>{/if}
 			{@render when(c)}
 			{#if c.url}<a href={c.url} target="_blank" rel="noreferrer" class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Open on the forge"><ExternalLinkIcon class="size-3" /></a>{/if}
 		</header>
@@ -221,9 +248,24 @@
 			{/if}
 		</section>
 
-		{#if pr.labels.length}
-			<section class="flex flex-wrap gap-1" aria-label="Labels">
-				{#each pr.labels as l (l)}<span class="rounded-full border px-2 py-0.5 text-xs">{l}</span>{/each}
+		{#if pr.labels.length || (owner && live(s) && labelChoices.length)}
+			<section class="flex flex-wrap items-center gap-1" aria-label="Labels">
+				{#each pr.labels as l (l)}
+					<span class="flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-xs">
+						{l}
+						{#if owner && live(s)}
+							<button class="text-muted-foreground hover:text-foreground" aria-label="Remove label {l}" disabled={busy} onclick={() => act(api.pullRequestUpdate({ threadId, removeLabels: [l] }))}>
+								<XIcon class="size-3" />
+							</button>
+						{/if}
+					</span>
+				{/each}
+				{#if owner && live(s) && labelChoices.length}
+					<NativeSelect size="sm" aria-label="Add label" disabled={busy} onchange={addLabel}>
+						<NativeSelectOption value="">Add label…</NativeSelectOption>
+						{#each labelChoices as l (l)}<NativeSelectOption value={l}>{l}</NativeSelectOption>{/each}
+					</NativeSelect>
+				{/if}
 			</section>
 		{/if}
 
@@ -236,7 +278,10 @@
 			{/each}
 			{#if owner && live(s)}
 				<form class="flex gap-2" onsubmit={(e) => (e.preventDefault(), requestReview())}>
-					<Input bind:value={reviewers} placeholder="Logins, comma-separated" aria-label="Reviewers to ask" class="h-7 text-xs" />
+					<Input bind:value={reviewers} list="pr-reviewer-choices" placeholder={reviewerChoices.length ? 'Pick or type logins' : 'Logins, comma-separated'} aria-label="Reviewers to ask" class="h-7 text-xs" />
+					<datalist id="pr-reviewer-choices">
+						{#each reviewerChoices as l (l)}<option value={l}></option>{/each}
+					</datalist>
 					<Button type="submit" size="sm" variant="outline" disabled={busy || !reviewers.trim()}>Ask for review</Button>
 				</form>
 			{/if}
@@ -279,7 +324,12 @@
 								</div>
 							</div>
 						{:else}
-							<button class="pl-3 text-xs text-muted-foreground hover:text-foreground hover:underline" onclick={() => ([replying, reply] = [c.id, ''])}>Reply</button>
+							<div class="flex gap-3 pl-3 text-xs text-muted-foreground">
+								<button class="hover:text-foreground hover:underline" onclick={() => ([replying, reply] = [c.id, ''])}>Reply</button>
+								{#if c.threadId}
+									<button class="hover:text-foreground hover:underline" disabled={busy} onclick={() => resolve(c)}>{c.resolved ? 'Unresolve' : 'Resolve'}</button>
+								{/if}
+							</div>
 						{/if}
 					{/if}
 				</div>

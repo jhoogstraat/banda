@@ -3,6 +3,7 @@ package forge
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
@@ -237,11 +238,19 @@ func (g *gitHub) conversation(ctx context.Context, number int, pr *github.PullRe
 	if err != nil {
 		return ghError(err)
 	}
+	var threads map[int64]reviewThread
+	if len(lines) > 0 {
+		if threads, err = g.reviewThreads(ctx, number); err != nil {
+			return err
+		}
+	}
 	for _, c := range lines {
 		pc := &bandav1.PullRequestComment{Id: strconv.FormatInt(c.GetID(), 10), Author: c.GetUser().GetLogin(), Body: c.GetBody(),
 			CreatedAt: ts(c.CreatedAt), Url: c.GetHTMLURL(), Path: c.GetPath(), Line: int32(c.GetLine()), DiffHunk: c.GetDiffHunk()}
 		if c.InReplyTo != nil {
 			pc.ReplyTo = strconv.FormatInt(*c.InReplyTo, 10)
+		} else if t, ok := threads[c.GetID()]; ok {
+			pc.ThreadId, pc.Resolved = t.id, t.resolved
 		}
 		out.Comments = append(out.Comments, pc)
 	}
@@ -263,7 +272,7 @@ func (g *gitHub) Update(ctx context.Context, pr *bandav1.PullRequest, e Edit) er
 		if *e.Draft {
 			mutation = "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }"
 		}
-		if err := g.graphQL(ctx, mutation, map[string]any{"id": pr.NodeId}); err != nil {
+		if err := g.graphQL(ctx, mutation, map[string]any{"id": pr.NodeId}, nil); err != nil {
 			return err
 		}
 	}
@@ -272,16 +281,89 @@ func (g *gitHub) Update(ctx context.Context, pr *bandav1.PullRequest, e Edit) er
 			return ghError(err)
 		}
 	}
+	if len(e.AddLabels) > 0 {
+		if _, _, err := g.c.Issues.AddLabelsToIssue(ctx, g.owner, g.name, n, e.AddLabels); err != nil {
+			return ghError(err)
+		}
+	}
+	for _, l := range e.RemoveLabels {
+		if _, err := g.c.Issues.RemoveLabelForIssue(ctx, g.owner, g.name, n, l); err != nil {
+			return ghError(err)
+		}
+	}
 	return nil
 }
 
-// graphQL runs a mutation; GraphQL reports failures in the body with a 200.
-func (g *gitHub) graphQL(ctx context.Context, query string, vars map[string]any) error {
+// ponytail: the first 100 collaborators and labels.
+func (g *gitHub) Choices(ctx context.Context) (*bandav1.PullRequestChoicesResponse, error) {
+	out := &bandav1.PullRequestChoicesResponse{}
+	users, _, err := g.c.Repositories.ListCollaborators(ctx, g.owner, g.name, &github.ListCollaboratorsOptions{ListOptions: github.ListOptions{PerPage: 100}})
+	if err != nil {
+		return nil, ghError(err)
+	}
+	for _, u := range users {
+		out.Reviewers = append(out.Reviewers, u.GetLogin())
+	}
+	labels, _, err := g.c.Issues.ListLabels(ctx, g.owner, g.name, &github.ListOptions{PerPage: 100})
+	if err != nil {
+		return nil, ghError(err)
+	}
+	for _, l := range labels {
+		out.Labels = append(out.Labels, l.GetName())
+	}
+	return out, nil
+}
+
+func (g *gitHub) Resolve(ctx context.Context, _ int, thread string, resolved bool) error {
+	mutation := "mutation($id: ID!) { unresolveReviewThread(input: {threadId: $id}) { clientMutationId } }"
+	if resolved {
+		mutation = "mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { clientMutationId } }"
+	}
+	return g.graphQL(ctx, mutation, map[string]any{"id": thread}, nil)
+}
+
+// repos lists the user's most recently pushed repositories, or searches theirs
+// and those of the owners among the 100 most recently pushed by name.
+// ponytail: owners not among those 100 aren't searched; listing the user's
+// organizations would need read:org.
+func (g *gitHub) repos(ctx context.Context, query string) ([]*github.Repository, error) {
+	recent, _, err := g.c.Repositories.ListByAuthenticatedUser(ctx, &github.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: github.ListOptions{PerPage: 100}})
+	if err != nil || query == "" {
+		return recent, ghError(err)
+	}
+	me, _, err := g.c.Users.Get(ctx, "")
+	if err != nil {
+		return nil, ghError(err)
+	}
+	owners := []string{me.GetLogin()}
+	for _, r := range recent {
+		if o := r.GetOwner().GetLogin(); o != "" && !slices.Contains(owners, o) {
+			owners = append(owners, o)
+		}
+	}
+	q := query + " in:name fork:true"
+	for _, o := range owners {
+		if len(q)+len(o)+6 > 256 { // GitHub's limit for a query
+			break
+		}
+		q += " user:" + o
+	}
+	res, _, err := g.c.Search.Repositories(ctx, q, &github.SearchOptions{ListOptions: github.ListOptions{PerPage: 100}})
+	if err != nil {
+		return nil, ghError(err)
+	}
+	return res.Repositories, nil
+}
+
+// graphQL runs a query or mutation and decodes its data into out (if not
+// nil); GraphQL reports failures in the body with a 200.
+func (g *gitHub) graphQL(ctx context.Context, query string, vars map[string]any, out any) error {
 	req, err := g.c.NewRequest(ctx, http.MethodPost, g.graphql, map[string]any{"query": query, "variables": vars})
 	if err != nil {
 		return err
 	}
 	var res struct {
+		Data   json.RawMessage            `json:"data"`
 		Errors []struct{ Message string } `json:"errors"`
 	}
 	if _, err := g.c.Do(req, &res); err != nil {
@@ -290,7 +372,46 @@ func (g *gitHub) graphQL(ctx context.Context, query string, vars map[string]any)
 	if len(res.Errors) > 0 {
 		return &Error{Refused, "GitHub: " + res.Errors[0].Message}
 	}
+	if out != nil && len(res.Data) > 0 {
+		return json.Unmarshal(res.Data, out)
+	}
 	return nil
+}
+
+// reviewThreads maps the first comment of each review thread to the thread:
+// REST knows neither threads nor whether they are resolved.
+// ponytail: the first 100 threads.
+func (g *gitHub) reviewThreads(ctx context.Context, number int) (map[int64]reviewThread, error) {
+	var data struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewThreads struct {
+					Nodes []struct {
+						ID         string
+						IsResolved bool
+						Comments   struct{ Nodes []struct{ DatabaseID int64 } }
+					}
+				}
+			}
+		}
+	}
+	const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) {
+		reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { databaseId } } } } } } }`
+	if err := g.graphQL(ctx, query, map[string]any{"owner": g.owner, "name": g.name, "number": number}, &data); err != nil {
+		return nil, err
+	}
+	out := map[int64]reviewThread{}
+	for _, t := range data.Repository.PullRequest.ReviewThreads.Nodes {
+		if len(t.Comments.Nodes) > 0 {
+			out[t.Comments.Nodes[0].DatabaseID] = reviewThread{t.ID, t.IsResolved}
+		}
+	}
+	return out, nil
+}
+
+type reviewThread struct {
+	id       string
+	resolved bool
 }
 
 func (g *gitHub) Merge(ctx context.Context, number int, method string) error {

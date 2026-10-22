@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { kexec } from './fixtures';
 
 export type Check = { name: string; status: 'queued' | 'in_progress' | 'completed'; conclusion?: 'success' | 'failure' | 'skipped' };
-export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string };
+export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string; resolved?: boolean };
 
 export type Pull = {
 	number: number;
@@ -31,6 +31,9 @@ export class FakeForge {
 	pulls: Pull[] = [];
 	/** Tokens and whose they are: anything else is refused with a 401. */
 	tokens: Record<string, string> = {};
+	/** Who may review and the labels a repository has. */
+	collaborators = ['alice', 'bob', 'carol', 'dave'];
+	labels = ['e2e', 'bug', 'ui'];
 	/** "METHOD path" of each request, for what tests can't see otherwise. */
 	calls: string[] = [];
 	private nextId = 100;
@@ -102,18 +105,43 @@ export class FakeForge {
 			labels: p.labels.map((name) => ({ name })), requested_reviewers: p.reviewers.map((login) => ({ login }))
 		});
 		if (path === '/api/graphql') {
+			const query = String(body.query);
+			const roots = (p: Pull) => p.comments.filter((c) => c.path && !c.inReplyTo);
+			if (query.includes('reviewThreads')) {
+				const p = this.pull(body.variables.number);
+				const nodes = roots(p).map((c) => ({ id: `RT_${c.id}`, isResolved: !!c.resolved, comments: { nodes: [{ databaseId: c.id }] } }));
+				return send(res, 200, { data: { repository: { pullRequest: { reviewThreads: { nodes } } } } });
+			}
+			if (query.includes('ReviewThread')) {
+				const c = this.pulls.flatMap(roots).find((c) => `RT_${c.id}` === body.variables?.id);
+				if (!c) return send(res, 200, { errors: [{ message: 'Could not resolve to a node' }] });
+				c.resolved = !query.includes('unresolveReviewThread');
+				return send(res, 200, { data: {} });
+			}
 			const p = this.pulls.find((p) => `PR_${p.number}` === body.variables?.id);
 			if (!p) return send(res, 200, { errors: [{ message: 'Could not resolve to a node' }] });
-			p.draft = String(body.query).includes('convertPullRequestToDraft');
+			p.draft = query.includes('convertPullRequestToDraft');
 			return send(res, 200, { data: {} });
 		}
-		if (method === 'GET' && path === '/api/v3/user/repos')
-			return send(res, 200, [{ full_name: 'e2e/plain', description: 'The fixture repository' }, { full_name: 'e2e/profiles' }]);
+		const listed = (full_name: string, description = '') => ({ full_name, description, owner: { login: full_name.split('/')[0] } });
+		if (method === 'GET' && path === '/api/v3/user') return send(res, 200, { login });
+		if (method === 'GET' && path === '/api/v3/user/repos') return send(res, 200, [listed('e2e/plain', 'The fixture repository'), listed('e2e/profiles')]);
+		// Only searching finds e2e/archive-2019 (as if beyond the first page), and only within the owners asked for.
+		if (method === 'GET' && path === '/api/v3/search/repositories') {
+			const q = url.searchParams.get('q') ?? '';
+			const words = q.split(' ').filter((w) => !w.includes(':'));
+			const owners = [...q.matchAll(/user:(\S+)/g)].map((m) => m[1]);
+			const items = [listed('e2e/plain'), listed('e2e/profiles'), listed('e2e/archive-2019', 'Old work'), listed('elsewhere/archive')]
+				.filter((r) => owners.includes(r.owner.login) && words.every((w) => r.full_name.split('/')[1].includes(w)));
+			return send(res, 200, { total_count: items.length, items });
+		}
 		const m = path.match(/^\/api\/v3\/repos\/e2e\/(\w+)(\/.*)?$/);
 		if (!m) return send(res, 404, { message: 'Not Found' });
 		const [, repo, rest = ''] = m;
 		let r: RegExpMatchArray | null;
 		if (method === 'GET' && rest === '') return send(res, 200, { name: repo, allow_merge_commit: true, allow_squash_merge: true, allow_rebase_merge: false });
+		if (method === 'GET' && rest === '/collaborators') return send(res, 200, this.collaborators.map((login) => ({ login })));
+		if (method === 'GET' && rest === '/labels') return send(res, 200, this.labels.map((name) => ({ name })));
 		if (method === 'GET' && rest === '/pulls') {
 			const head = url.searchParams.get('head')?.split(':')[1];
 			return send(res, 200, this.pulls.filter((p) => p.state === 'open' && (!head || p.head === head)).map(json));
@@ -144,6 +172,14 @@ export class FakeForge {
 			return send(res, 201, { id: this.nextId });
 		}
 		if (method === 'GET' && sub === '') return send(res, 200, json(p));
+		if (kind === 'issues' && sub === '/labels' && method === 'POST') {
+			p.labels.push(...(body as unknown as string[]).filter((l) => !p.labels.includes(l)));
+			return send(res, 200, p.labels.map((name) => ({ name })));
+		}
+		if (kind === 'issues' && sub.startsWith('/labels/') && method === 'DELETE') {
+			p.labels = p.labels.filter((l) => l !== sub.slice('/labels/'.length));
+			return send(res, 200, []);
+		}
 		if (method === 'PATCH' && sub === '') {
 			Object.assign(p, body.title !== undefined && { title: body.title }, body.body !== undefined && { body: body.body });
 			return send(res, 200, json(p));
@@ -176,6 +212,8 @@ export class FakeForge {
 			return send(res, 200, name ? [{ id: this.idOf(name), username: name }] : []);
 		}
 		if (method === 'GET' && path === '/api/v4/projects') return send(res, 200, []); // github.com's repositories are the ones listed
+		if (method === 'GET' && /^\/api\/v4\/projects\/e2e\/\w+\/members\/all$/.test(path)) return send(res, 200, this.collaborators.map((username) => ({ username })));
+		if (method === 'GET' && /^\/api\/v4\/projects\/e2e\/\w+\/labels$/.test(path)) return send(res, 200, this.labels.map((name) => ({ name })));
 		const m = path.match(/^\/api\/v4\/projects\/e2e\/(\w+)(\/.*)$/);
 		if (!m) return send(res, 404, { message: '404 Not Found' });
 		const [, repo, rest] = m;
@@ -207,12 +245,15 @@ export class FakeForge {
 		const p = this.pulls.find((p) => p.number === Number(r![1]));
 		if (!p) return send(res, 404, { message: '404 Not Found' });
 		const sub = r[2] ?? '';
-		const note = (c: Comment) => ({ id: c.id, body: c.body, author: { username: c.login }, created_at: c.at, position: c.path ? { new_path: c.path, new_line: c.line } : null });
+		const note = (c: Comment) => ({ id: c.id, body: c.body, author: { username: c.login }, created_at: c.at, position: c.path ? { new_path: c.path, new_line: c.line } : null,
+			resolvable: !!c.path, resolved: !!c.resolved });
 		if (method === 'GET' && sub === '') return send(res, 200, json(p));
 		if (method === 'PUT' && sub === '') {
 			if (body.title !== undefined) [p.draft, p.title] = [/^draft:\s*/i.test(body.title), body.title.replace(/^draft:\s*/i, '')];
 			if (body.description !== undefined) p.body = body.description;
 			if (body.reviewer_ids) p.reviewers = body.reviewer_ids.map((id: number) => this.users[id - 1]);
+			if (body.add_labels) p.labels.push(...body.add_labels.split(','));
+			if (body.remove_labels) p.labels = p.labels.filter((l) => !body.remove_labels.split(',').includes(l));
 			return send(res, 200, json(p));
 		}
 		if (method === 'GET' && sub === '/approvals')
@@ -224,6 +265,11 @@ export class FakeForge {
 		if (method === 'POST' && sub === '/discussions') {
 			this.comment(p.number, { login, body: body.body });
 			return send(res, 201, { id: `d${this.nextId}` });
+		}
+		if (method === 'PUT' && (r = sub.match(/^\/discussions\/d(\d+)$/))) {
+			const root = p.comments.find((c) => c.id === Number(r![1]))!;
+			root.resolved = body.resolved;
+			return send(res, 200, { id: `d${root.id}` });
 		}
 		if (method === 'POST' && (r = sub.match(/^\/discussions\/d(\d+)\/notes$/))) {
 			const parent = p.comments.find((c) => c.id === Number(r![1]))!;

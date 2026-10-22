@@ -19,7 +19,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v93/github"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -43,6 +42,10 @@ type Forge interface {
 	// Comment comments on the pull request, or replies in the thread of the
 	// review comment replyTo.
 	Comment(ctx context.Context, number int, body, replyTo string) error
+	// Choices lists who may be asked for a review and the repository's labels.
+	Choices(ctx context.Context) (*bandav1.PullRequestChoicesResponse, error)
+	// Resolve resolves or reopens the review thread (PullRequestComment.thread_id).
+	Resolve(ctx context.Context, number int, thread string, resolved bool) error
 }
 
 type New struct {
@@ -54,6 +57,8 @@ type Edit struct {
 	Title, Body *string
 	Draft       *bool
 	Reviewers   []string
+	// Labels to add and to remove.
+	AddLabels, RemoveLabels []string
 }
 
 // Repo is a repository on a known forge.
@@ -130,8 +135,9 @@ func (c Config) Known() map[string]string {
 	return hosts
 }
 
-// Repos lists the token's user's 100 most recently pushed repositories on the host.
-func (c Config) Repos(ctx context.Context, kind, host, token string) ([]*bandav1.ForgeRepo, error) {
+// Repos lists the token's user's 100 most recently pushed repositories on the
+// host, or with a query the first 100 of theirs whose name matches.
+func (c Config) Repos(ctx context.Context, kind, host, token, query string) ([]*bandav1.ForgeRepo, error) {
 	r := Repo{Kind: kind, Host: host}
 	f, err := c.Open(r, token)
 	if err != nil {
@@ -140,16 +146,19 @@ func (c Config) Repos(ctx context.Context, kind, host, token string) ([]*bandav1
 	var out []*bandav1.ForgeRepo
 	switch f := f.(type) {
 	case *gitHub:
-		repos, _, err := f.c.Repositories.ListByAuthenticatedUser(ctx, &github.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: github.ListOptions{PerPage: 100}})
+		repos, err := f.repos(ctx, query)
 		if err != nil {
-			return nil, ghError(err)
+			return nil, err
 		}
 		for _, p := range repos {
 			out = append(out, &bandav1.ForgeRepo{Url: "https://" + host + "/" + p.GetFullName() + ".git", Name: p.GetFullName(), Description: p.GetDescription(), Forge: kind})
 		}
 	case *gitLab:
-		projects, _, err := f.c.Projects.ListProjects(&gitlab.ListProjectsOptions{Membership: gitlab.Ptr(true), OrderBy: gitlab.Ptr("last_activity_at"),
-			ListOptions: gitlab.ListOptions{PerPage: 100}}, gitlab.WithContext(ctx))
+		opt := &gitlab.ListProjectsOptions{Membership: gitlab.Ptr(true), OrderBy: gitlab.Ptr("last_activity_at"), ListOptions: gitlab.ListOptions{PerPage: 100}}
+		if query != "" {
+			opt.Search = &query
+		}
+		projects, _, err := f.c.Projects.ListProjects(opt, gitlab.WithContext(ctx))
 		if err != nil {
 			return nil, glError(err)
 		}

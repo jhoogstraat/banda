@@ -11779,7 +11779,12 @@ type PullRequestComment struct {
 	DiffHunk string `protobuf:"bytes,8,opt,name=diff_hunk,json=diffHunk,proto3" json:"diff_hunk,omitempty"`
 	ReplyTo  string `protobuf:"bytes,9,opt,name=reply_to,json=replyTo,proto3" json:"reply_to,omitempty"`
 	// A review: its verdict.
-	Review        ReviewState `protobuf:"varint,10,opt,name=review,proto3,enum=banda.v1.ReviewState" json:"review,omitempty"`
+	Review ReviewState `protobuf:"varint,10,opt,name=review,proto3,enum=banda.v1.ReviewState" json:"review,omitempty"`
+	// The first comment of a review thread that can be resolved: the forge's
+	// id of the thread (GitHub's node id, GitLab's discussion id) and whether
+	// it is resolved.
+	ThreadId      string `protobuf:"bytes,11,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Resolved      bool   `protobuf:"varint,12,opt,name=resolved,proto3" json:"resolved,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11882,6 +11887,20 @@ func (x *PullRequestComment) GetReview() ReviewState {
 		return x.Review
 	}
 	return ReviewState_REVIEW_STATE_UNSPECIFIED
+}
+
+func (x *PullRequestComment) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *PullRequestComment) GetResolved() bool {
+	if x != nil {
+		return x.Resolved
+	}
+	return false
 }
 
 type PullRequest struct {
@@ -12472,7 +12491,10 @@ type PullRequestUpdateRequest struct {
 	Body     *string                `protobuf:"bytes,3,opt,name=body,proto3,oneof" json:"body,omitempty"`
 	Draft    *bool                  `protobuf:"varint,4,opt,name=draft,proto3,oneof" json:"draft,omitempty"`
 	// Logins (GitLab: usernames) to ask for a review.
-	AddReviewers  []string `protobuf:"bytes,5,rep,name=add_reviewers,json=addReviewers,proto3" json:"add_reviewers,omitempty"`
+	AddReviewers []string `protobuf:"bytes,5,rep,name=add_reviewers,json=addReviewers,proto3" json:"add_reviewers,omitempty"`
+	// Labels to add and to remove.
+	AddLabels     []string `protobuf:"bytes,6,rep,name=add_labels,json=addLabels,proto3" json:"add_labels,omitempty"`
+	RemoveLabels  []string `protobuf:"bytes,7,rep,name=remove_labels,json=removeLabels,proto3" json:"remove_labels,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12538,6 +12560,20 @@ func (x *PullRequestUpdateRequest) GetDraft() bool {
 func (x *PullRequestUpdateRequest) GetAddReviewers() []string {
 	if x != nil {
 		return x.AddReviewers
+	}
+	return nil
+}
+
+func (x *PullRequestUpdateRequest) GetAddLabels() []string {
+	if x != nil {
+		return x.AddLabels
+	}
+	return nil
+}
+
+func (x *PullRequestUpdateRequest) GetRemoveLabels() []string {
+	if x != nil {
+		return x.RemoveLabels
 	}
 	return nil
 }
@@ -12789,7 +12825,10 @@ func (x *PullRequestCommentResponse) GetPullRequest() *PullRequest {
 }
 
 type ListForgeReposRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Searches each forge for the caller's repositories whose name matches;
+	// empty lists the most recently pushed.
+	Query         string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12822,6 +12861,13 @@ func (x *ListForgeReposRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListForgeReposRequest.ProtoReflect.Descriptor instead.
 func (*ListForgeReposRequest) Descriptor() ([]byte, []int) {
 	return file_banda_v1_banda_proto_rawDescGZIP(), []int{200}
+}
+
+func (x *ListForgeReposRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
 }
 
 type ListForgeReposResponse struct {
@@ -12939,6 +12985,209 @@ func (x *ForgeRepo) GetForge() string {
 		return x.Forge
 	}
 	return ""
+}
+
+type PullRequestChoicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullRequestChoicesRequest) Reset() {
+	*x = PullRequestChoicesRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[203]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequestChoicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequestChoicesRequest) ProtoMessage() {}
+
+func (x *PullRequestChoicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[203]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequestChoicesRequest.ProtoReflect.Descriptor instead.
+func (*PullRequestChoicesRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{203}
+}
+
+func (x *PullRequestChoicesRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+type PullRequestChoicesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Logins (GitLab: usernames) of the repository's collaborators (GitLab:
+	// project members).
+	Reviewers     []string `protobuf:"bytes,1,rep,name=reviewers,proto3" json:"reviewers,omitempty"`
+	Labels        []string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullRequestChoicesResponse) Reset() {
+	*x = PullRequestChoicesResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[204]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequestChoicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequestChoicesResponse) ProtoMessage() {}
+
+func (x *PullRequestChoicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[204]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequestChoicesResponse.ProtoReflect.Descriptor instead.
+func (*PullRequestChoicesResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{204}
+}
+
+func (x *PullRequestChoicesResponse) GetReviewers() []string {
+	if x != nil {
+		return x.Reviewers
+	}
+	return nil
+}
+
+func (x *PullRequestChoicesResponse) GetLabels() []string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+type PullRequestResolveRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// PullRequestComment.thread_id.
+	ReviewThread  string `protobuf:"bytes,2,opt,name=review_thread,json=reviewThread,proto3" json:"review_thread,omitempty"`
+	Resolved      bool   `protobuf:"varint,3,opt,name=resolved,proto3" json:"resolved,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullRequestResolveRequest) Reset() {
+	*x = PullRequestResolveRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[205]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequestResolveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequestResolveRequest) ProtoMessage() {}
+
+func (x *PullRequestResolveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[205]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequestResolveRequest.ProtoReflect.Descriptor instead.
+func (*PullRequestResolveRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{205}
+}
+
+func (x *PullRequestResolveRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *PullRequestResolveRequest) GetReviewThread() string {
+	if x != nil {
+		return x.ReviewThread
+	}
+	return ""
+}
+
+func (x *PullRequestResolveRequest) GetResolved() bool {
+	if x != nil {
+		return x.Resolved
+	}
+	return false
+}
+
+type PullRequestResolveResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PullRequest   *PullRequest           `protobuf:"bytes,1,opt,name=pull_request,json=pullRequest,proto3" json:"pull_request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullRequestResolveResponse) Reset() {
+	*x = PullRequestResolveResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[206]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequestResolveResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequestResolveResponse) ProtoMessage() {}
+
+func (x *PullRequestResolveResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[206]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequestResolveResponse.ProtoReflect.Descriptor instead.
+func (*PullRequestResolveResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{206}
+}
+
+func (x *PullRequestResolveResponse) GetPullRequest() *PullRequest {
+	if x != nil {
+		return x.PullRequest
+	}
+	return nil
 }
 
 var File_banda_v1_banda_proto protoreflect.FileDescriptor
@@ -13654,7 +13903,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\"X\n" +
 	"\x13PullRequestReviewer\x12\x14\n" +
 	"\x05login\x18\x01 \x01(\tR\x05login\x12+\n" +
-	"\x05state\x18\x02 \x01(\x0e2\x15.banda.v1.ReviewStateR\x05state\"\xac\x02\n" +
+	"\x05state\x18\x02 \x01(\x0e2\x15.banda.v1.ReviewStateR\x05state\"\xe5\x02\n" +
 	"\x12PullRequestComment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06author\x18\x02 \x01(\tR\x06author\x12\x12\n" +
@@ -13667,7 +13916,9 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\tdiff_hunk\x18\b \x01(\tR\bdiffHunk\x12\x19\n" +
 	"\breply_to\x18\t \x01(\tR\areplyTo\x12-\n" +
 	"\x06review\x18\n" +
-	" \x01(\x0e2\x15.banda.v1.ReviewStateR\x06review\"\xb5\x06\n" +
+	" \x01(\x0e2\x15.banda.v1.ReviewStateR\x06review\x12\x1b\n" +
+	"\tthread_id\x18\v \x01(\tR\bthreadId\x12\x1a\n" +
+	"\bresolved\x18\f \x01(\bR\bresolved\"\xb5\x06\n" +
 	"\vPullRequest\x126\n" +
 	"\asummary\x18\x01 \x01(\v2\x1c.banda.v1.PullRequestSummaryR\asummary\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x12\x16\n" +
@@ -13716,13 +13967,16 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\"S\n" +
 	"\x17PullRequestLinkResponse\x128\n" +
-	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest\"\xc8\x01\n" +
+	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest\"\x8c\x02\n" +
 	"\x18PullRequestUpdateRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x19\n" +
 	"\x05title\x18\x02 \x01(\tH\x00R\x05title\x88\x01\x01\x12\x17\n" +
 	"\x04body\x18\x03 \x01(\tH\x01R\x04body\x88\x01\x01\x12\x19\n" +
 	"\x05draft\x18\x04 \x01(\bH\x02R\x05draft\x88\x01\x01\x12#\n" +
-	"\radd_reviewers\x18\x05 \x03(\tR\faddReviewersB\b\n" +
+	"\radd_reviewers\x18\x05 \x03(\tR\faddReviewers\x12\x1d\n" +
+	"\n" +
+	"add_labels\x18\x06 \x03(\tR\taddLabels\x12#\n" +
+	"\rremove_labels\x18\a \x03(\tR\fremoveLabelsB\b\n" +
 	"\x06_titleB\a\n" +
 	"\x05_bodyB\b\n" +
 	"\x06_draft\"U\n" +
@@ -13738,15 +13992,27 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x12\x19\n" +
 	"\breply_to\x18\x03 \x01(\tR\areplyTo\"V\n" +
 	"\x1aPullRequestCommentResponse\x128\n" +
-	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest\"\x17\n" +
-	"\x15ListForgeReposRequest\"C\n" +
+	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest\"-\n" +
+	"\x15ListForgeReposRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"C\n" +
 	"\x16ListForgeReposResponse\x12)\n" +
 	"\x05repos\x18\x01 \x03(\v2\x13.banda.v1.ForgeRepoR\x05repos\"i\n" +
 	"\tForgeRepo\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x14\n" +
-	"\x05forge\x18\x04 \x01(\tR\x05forge*\x8e\x01\n" +
+	"\x05forge\x18\x04 \x01(\tR\x05forge\"8\n" +
+	"\x19PullRequestChoicesRequest\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"R\n" +
+	"\x1aPullRequestChoicesResponse\x12\x1c\n" +
+	"\treviewers\x18\x01 \x03(\tR\treviewers\x12\x16\n" +
+	"\x06labels\x18\x02 \x03(\tR\x06labels\"y\n" +
+	"\x19PullRequestResolveRequest\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12#\n" +
+	"\rreview_thread\x18\x02 \x01(\tR\freviewThread\x12\x1a\n" +
+	"\bresolved\x18\x03 \x01(\bR\bresolved\"V\n" +
+	"\x1aPullRequestResolveResponse\x128\n" +
+	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest*\x8e\x01\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTATUS_STARTING\x10\x01\x12\x12\n" +
@@ -13827,7 +14093,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x15MERGEABLE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fMERGEABLE_CLEAN\x10\x01\x12\x17\n" +
 	"\x13MERGEABLE_CONFLICTS\x10\x02\x12\x15\n" +
-	"\x11MERGEABLE_BLOCKED\x10\x032\xdc\x1f\n" +
+	"\x11MERGEABLE_BLOCKED\x10\x032\x9e!\n" +
 	"\rThreadService\x12M\n" +
 	"\fCreateThread\x12\x1d.banda.v1.CreateThreadRequest\x1a\x1e.banda.v1.CreateThreadResponse\x12J\n" +
 	"\vListThreads\x12\x1c.banda.v1.ListThreadsRequest\x1a\x1d.banda.v1.ListThreadsResponse\x12D\n" +
@@ -13883,7 +14149,9 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x11PullRequestUpdate\x12\".banda.v1.PullRequestUpdateRequest\x1a#.banda.v1.PullRequestUpdateResponse\x12Y\n" +
 	"\x10PullRequestMerge\x12!.banda.v1.PullRequestMergeRequest\x1a\".banda.v1.PullRequestMergeResponse\x12_\n" +
 	"\x12PullRequestComment\x12#.banda.v1.PullRequestCommentRequest\x1a$.banda.v1.PullRequestCommentResponse\x12S\n" +
-	"\x0eListForgeRepos\x12\x1f.banda.v1.ListForgeReposRequest\x1a .banda.v1.ListForgeReposResponse2\x84\x01\n" +
+	"\x0eListForgeRepos\x12\x1f.banda.v1.ListForgeReposRequest\x1a .banda.v1.ListForgeReposResponse\x12_\n" +
+	"\x12PullRequestChoices\x12#.banda.v1.PullRequestChoicesRequest\x1a$.banda.v1.PullRequestChoicesResponse\x12_\n" +
+	"\x12PullRequestResolve\x12#.banda.v1.PullRequestResolveRequest\x1a$.banda.v1.PullRequestResolveResponse2\x84\x01\n" +
 	"\vUserService\x12/\n" +
 	"\x02Me\x12\x13.banda.v1.MeRequest\x1a\x14.banda.v1.MeResponse\x12D\n" +
 	"\tListUsers\x12\x1a.banda.v1.ListUsersRequest\x1a\x1b.banda.v1.ListUsersResponse2\xbd\a\n" +
@@ -13918,7 +14186,7 @@ func file_banda_v1_banda_proto_rawDescGZIP() []byte {
 }
 
 var file_banda_v1_banda_proto_enumTypes = make([]protoimpl.EnumInfo, 14)
-var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 208)
+var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 212)
 var file_banda_v1_banda_proto_goTypes = []any{
 	(Status)(0),                         // 0: banda.v1.Status
 	(Mode)(0),                           // 1: banda.v1.Mode
@@ -14137,19 +14405,23 @@ var file_banda_v1_banda_proto_goTypes = []any{
 	(*ListForgeReposRequest)(nil),       // 214: banda.v1.ListForgeReposRequest
 	(*ListForgeReposResponse)(nil),      // 215: banda.v1.ListForgeReposResponse
 	(*ForgeRepo)(nil),                   // 216: banda.v1.ForgeRepo
-	nil,                                 // 217: banda.v1.PermissionResolved.AnswersEntry
-	nil,                                 // 218: banda.v1.PermissionAnswerRequest.AnswersEntry
-	nil,                                 // 219: banda.v1.PermissionVoteRequest.AnswersEntry
-	nil,                                 // 220: banda.v1.PermissionVoted.AnswersEntry
-	nil,                                 // 221: banda.v1.PermissionCommand.AnswersEntry
-	(*timestamppb.Timestamp)(nil),       // 222: google.protobuf.Timestamp
+	(*PullRequestChoicesRequest)(nil),   // 217: banda.v1.PullRequestChoicesRequest
+	(*PullRequestChoicesResponse)(nil),  // 218: banda.v1.PullRequestChoicesResponse
+	(*PullRequestResolveRequest)(nil),   // 219: banda.v1.PullRequestResolveRequest
+	(*PullRequestResolveResponse)(nil),  // 220: banda.v1.PullRequestResolveResponse
+	nil,                                 // 221: banda.v1.PermissionResolved.AnswersEntry
+	nil,                                 // 222: banda.v1.PermissionAnswerRequest.AnswersEntry
+	nil,                                 // 223: banda.v1.PermissionVoteRequest.AnswersEntry
+	nil,                                 // 224: banda.v1.PermissionVoted.AnswersEntry
+	nil,                                 // 225: banda.v1.PermissionCommand.AnswersEntry
+	(*timestamppb.Timestamp)(nil),       // 226: google.protobuf.Timestamp
 }
 var file_banda_v1_banda_proto_depIdxs = []int32{
 	0,   // 0: banda.v1.Thread.status:type_name -> banda.v1.Status
 	1,   // 1: banda.v1.Thread.mode:type_name -> banda.v1.Mode
-	222, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	222, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	222, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
+	226, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	226, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	226, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
 	125, // 5: banda.v1.Thread.activity:type_name -> banda.v1.TeamActivity
 	5,   // 6: banda.v1.Thread.auto_push:type_name -> banda.v1.AutoPushState
 	2,   // 7: banda.v1.Thread.permission_mode:type_name -> banda.v1.PermissionMode
@@ -14157,7 +14429,7 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	15,  // 9: banda.v1.Thread.overlaps:type_name -> banda.v1.Overlap
 	196, // 10: banda.v1.Thread.pull_request:type_name -> banda.v1.PullRequestSummary
 	0,   // 11: banda.v1.Overlap.status:type_name -> banda.v1.Status
-	222, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
+	226, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
 	20,  // 13: banda.v1.Event.message:type_name -> banda.v1.Message
 	26,  // 14: banda.v1.Event.agent_text:type_name -> banda.v1.AgentText
 	27,  // 15: banda.v1.Event.agent_text_delta:type_name -> banda.v1.AgentTextDelta
@@ -14205,30 +14477,30 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	14,  // 57: banda.v1.SpawnThreadResponse.thread:type_name -> banda.v1.Thread
 	14,  // 58: banda.v1.LineageChildrenResponse.threads:type_name -> banda.v1.Thread
 	14,  // 59: banda.v1.ListMentionedResponse.threads:type_name -> banda.v1.Thread
-	222, // 60: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
+	226, // 60: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
 	5,   // 61: banda.v1.AutoPush.state:type_name -> banda.v1.AutoPushState
 	97,  // 62: banda.v1.PreviewWatchResponse.ports:type_name -> banda.v1.PreviewPort
 	17,  // 63: banda.v1.MeResponse.user:type_name -> banda.v1.User
 	17,  // 64: banda.v1.ListUsersResponse.users:type_name -> banda.v1.User
 	6,   // 65: banda.v1.HarnessAccount.auth_method:type_name -> banda.v1.AuthMethod
 	7,   // 66: banda.v1.HarnessAccount.login_state:type_name -> banda.v1.LoginState
-	222, // 67: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
-	222, // 68: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
+	226, // 67: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
+	226, // 68: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
 	104, // 69: banda.v1.GetSettingsResponse.accounts:type_name -> banda.v1.HarnessAccount
 	105, // 70: banda.v1.GetSettingsResponse.secrets:type_name -> banda.v1.SecretInfo
 	6,   // 71: banda.v1.SetAuthMethodRequest.auth_method:type_name -> banda.v1.AuthMethod
 	105, // 72: banda.v1.ListTeamSecretsResponse.secrets:type_name -> banda.v1.SecretInfo
 	8,   // 73: banda.v1.OpenLoginTerminalRequest.action:type_name -> banda.v1.LoginAction
-	222, // 74: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
+	226, // 74: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
 	14,  // 75: banda.v1.TeamWatchResponse.threads:type_name -> banda.v1.Thread
-	222, // 76: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
-	222, // 77: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
+	226, // 76: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
+	226, // 77: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
 	130, // 78: banda.v1.BriefResponse.finished:type_name -> banda.v1.BriefItem
 	130, // 79: banda.v1.BriefResponse.waiting:type_name -> banda.v1.BriefItem
 	130, // 80: banda.v1.BriefResponse.spawned:type_name -> banda.v1.BriefItem
 	130, // 81: banda.v1.BriefResponse.settled:type_name -> banda.v1.BriefItem
-	222, // 82: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
-	222, // 83: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
+	226, // 82: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
+	226, // 83: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
 	14,  // 84: banda.v1.InboxWatchResponse.threads:type_name -> banda.v1.Thread
 	14,  // 85: banda.v1.InboxWatchResponse.mentioned:type_name -> banda.v1.Thread
 	135, // 86: banda.v1.InboxWatchResponse.decisions:type_name -> banda.v1.Decision
@@ -14237,12 +14509,12 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	18,  // 89: banda.v1.HistoryResponse.events:type_name -> banda.v1.Event
 	3,   // 90: banda.v1.PermissionResolved.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 91: banda.v1.PermissionResolved.mode:type_name -> banda.v1.PermissionMode
-	217, // 92: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
+	221, // 92: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
 	3,   // 93: banda.v1.PermissionAnswerRequest.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 94: banda.v1.PermissionAnswerRequest.mode:type_name -> banda.v1.PermissionMode
-	218, // 95: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
-	219, // 96: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
-	220, // 97: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
+	222, // 95: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
+	223, // 96: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
+	224, // 97: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
 	2,   // 98: banda.v1.PermissionSetModeRequest.mode:type_name -> banda.v1.PermissionMode
 	2,   // 99: banda.v1.PermissionModeChanged.mode:type_name -> banda.v1.PermissionMode
 	18,  // 100: banda.v1.WatchThreadResponse.event:type_name -> banda.v1.Event
@@ -14271,7 +14543,7 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	158, // 123: banda.v1.ConnectResponse.ping:type_name -> banda.v1.Ping
 	3,   // 124: banda.v1.PermissionCommand.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 125: banda.v1.PermissionCommand.mode:type_name -> banda.v1.PermissionMode
-	221, // 126: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
+	225, // 126: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
 	169, // 127: banda.v1.Prompt.images:type_name -> banda.v1.AttachmentImage
 	97,  // 128: banda.v1.PreviewPorts.ports:type_name -> banda.v1.PreviewPort
 	179, // 129: banda.v1.ForkRequest.tries:type_name -> banda.v1.RaceTry
@@ -14284,9 +14556,9 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	14,  // 136: banda.v1.RaceEntry.thread:type_name -> banda.v1.Thread
 	14,  // 137: banda.v1.RaceListResponse.threads:type_name -> banda.v1.Thread
 	9,   // 138: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
-	222, // 139: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
-	222, // 140: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
-	222, // 141: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
+	226, // 139: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
+	226, // 140: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
+	226, // 141: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
 	9,   // 142: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
 	194, // 143: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
 	10,  // 144: banda.v1.PullRequestSummary.state:type_name -> banda.v1.PullState
@@ -14294,18 +14566,18 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	12,  // 146: banda.v1.PullRequestSummary.review:type_name -> banda.v1.ReviewState
 	13,  // 147: banda.v1.PullRequestSummary.mergeable:type_name -> banda.v1.Mergeable
 	11,  // 148: banda.v1.PullRequestCheck.state:type_name -> banda.v1.ChecksState
-	222, // 149: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
-	222, // 150: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
+	226, // 149: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
+	226, // 150: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
 	12,  // 151: banda.v1.PullRequestReviewer.state:type_name -> banda.v1.ReviewState
-	222, // 152: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	226, // 152: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
 	12,  // 153: banda.v1.PullRequestComment.review:type_name -> banda.v1.ReviewState
 	196, // 154: banda.v1.PullRequest.summary:type_name -> banda.v1.PullRequestSummary
 	198, // 155: banda.v1.PullRequest.reviewers:type_name -> banda.v1.PullRequestReviewer
 	197, // 156: banda.v1.PullRequest.checks:type_name -> banda.v1.PullRequestCheck
 	199, // 157: banda.v1.PullRequest.comments:type_name -> banda.v1.PullRequestComment
-	222, // 158: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	222, // 159: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
-	222, // 160: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	226, // 158: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	226, // 159: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
+	226, // 160: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
 	196, // 161: banda.v1.PullRequestChanged.pull_request:type_name -> banda.v1.PullRequestSummary
 	200, // 162: banda.v1.PullRequestGetResponse.pull_request:type_name -> banda.v1.PullRequest
 	200, // 163: banda.v1.PullRequestCreateResponse.pull_request:type_name -> banda.v1.PullRequest
@@ -14314,147 +14586,152 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	200, // 166: banda.v1.PullRequestMergeResponse.pull_request:type_name -> banda.v1.PullRequest
 	200, // 167: banda.v1.PullRequestCommentResponse.pull_request:type_name -> banda.v1.PullRequest
 	216, // 168: banda.v1.ListForgeReposResponse.repos:type_name -> banda.v1.ForgeRepo
-	41,  // 169: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
-	43,  // 170: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
-	45,  // 171: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
-	47,  // 172: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
-	49,  // 173: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
-	51,  // 174: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
-	54,  // 175: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
-	56,  // 176: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
-	58,  // 177: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
-	60,  // 178: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
-	62,  // 179: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
-	70,  // 180: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
-	72,  // 181: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
-	138, // 182: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
-	139, // 183: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
-	74,  // 184: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
-	76,  // 185: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
-	78,  // 186: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
-	80,  // 187: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
-	82,  // 188: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
-	85,  // 189: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
-	87,  // 190: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
-	89,  // 191: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
-	91,  // 192: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
-	93,  // 193: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
-	95,  // 194: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
-	98,  // 195: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
-	133, // 196: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
-	136, // 197: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
-	39,  // 198: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
-	126, // 199: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
-	128, // 200: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
-	131, // 201: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
-	143, // 202: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
-	151, // 203: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
-	145, // 204: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
-	148, // 205: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
-	180, // 206: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
-	182, // 207: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
-	184, // 208: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
-	187, // 209: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
-	189, // 210: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
-	193, // 211: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
-	64,  // 212: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
-	66,  // 213: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
-	68,  // 214: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
-	202, // 215: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
-	204, // 216: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
-	206, // 217: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
-	208, // 218: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
-	210, // 219: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
-	212, // 220: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
-	214, // 221: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
-	100, // 222: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
-	102, // 223: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
-	106, // 224: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
-	108, // 225: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
-	110, // 226: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
-	112, // 227: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
-	114, // 228: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
-	116, // 229: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
-	118, // 230: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
-	120, // 231: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
-	122, // 232: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
-	123, // 233: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
-	124, // 234: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
-	157, // 235: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
-	191, // 236: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
-	42,  // 237: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
-	44,  // 238: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
-	46,  // 239: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
-	48,  // 240: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
-	50,  // 241: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
-	52,  // 242: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
-	55,  // 243: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
-	57,  // 244: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
-	59,  // 245: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
-	61,  // 246: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
-	63,  // 247: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
-	71,  // 248: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
-	73,  // 249: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
-	156, // 250: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
-	140, // 251: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
-	75,  // 252: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
-	77,  // 253: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
-	79,  // 254: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
-	81,  // 255: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
-	83,  // 256: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
-	86,  // 257: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
-	88,  // 258: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
-	90,  // 259: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	92,  // 260: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
-	94,  // 261: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
-	96,  // 262: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
-	99,  // 263: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
-	134, // 264: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
-	137, // 265: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
-	40,  // 266: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
-	127, // 267: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
-	129, // 268: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
-	132, // 269: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
-	144, // 270: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
-	152, // 271: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
-	146, // 272: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
-	149, // 273: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
-	181, // 274: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
-	183, // 275: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
-	185, // 276: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
-	188, // 277: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
-	190, // 278: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
-	195, // 279: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
-	65,  // 280: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
-	67,  // 281: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
-	69,  // 282: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
-	203, // 283: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
-	205, // 284: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
-	207, // 285: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
-	209, // 286: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
-	211, // 287: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
-	213, // 288: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
-	215, // 289: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
-	101, // 290: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
-	103, // 291: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
-	107, // 292: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
-	109, // 293: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
-	111, // 294: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
-	113, // 295: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
-	115, // 296: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
-	117, // 297: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
-	119, // 298: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
-	121, // 299: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
-	86,  // 300: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
-	88,  // 301: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
-	90,  // 302: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	166, // 303: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
-	192, // 304: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
-	237, // [237:305] is the sub-list for method output_type
-	169, // [169:237] is the sub-list for method input_type
-	169, // [169:169] is the sub-list for extension type_name
-	169, // [169:169] is the sub-list for extension extendee
-	0,   // [0:169] is the sub-list for field type_name
+	200, // 169: banda.v1.PullRequestResolveResponse.pull_request:type_name -> banda.v1.PullRequest
+	41,  // 170: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
+	43,  // 171: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
+	45,  // 172: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
+	47,  // 173: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
+	49,  // 174: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
+	51,  // 175: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
+	54,  // 176: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
+	56,  // 177: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
+	58,  // 178: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
+	60,  // 179: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
+	62,  // 180: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
+	70,  // 181: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
+	72,  // 182: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
+	138, // 183: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
+	139, // 184: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
+	74,  // 185: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
+	76,  // 186: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
+	78,  // 187: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
+	80,  // 188: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
+	82,  // 189: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
+	85,  // 190: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
+	87,  // 191: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
+	89,  // 192: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
+	91,  // 193: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
+	93,  // 194: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
+	95,  // 195: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
+	98,  // 196: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
+	133, // 197: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
+	136, // 198: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
+	39,  // 199: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
+	126, // 200: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
+	128, // 201: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
+	131, // 202: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
+	143, // 203: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
+	151, // 204: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
+	145, // 205: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
+	148, // 206: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
+	180, // 207: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
+	182, // 208: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
+	184, // 209: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
+	187, // 210: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
+	189, // 211: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
+	193, // 212: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
+	64,  // 213: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
+	66,  // 214: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
+	68,  // 215: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
+	202, // 216: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
+	204, // 217: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
+	206, // 218: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
+	208, // 219: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
+	210, // 220: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
+	212, // 221: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
+	214, // 222: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
+	217, // 223: banda.v1.ThreadService.PullRequestChoices:input_type -> banda.v1.PullRequestChoicesRequest
+	219, // 224: banda.v1.ThreadService.PullRequestResolve:input_type -> banda.v1.PullRequestResolveRequest
+	100, // 225: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
+	102, // 226: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
+	106, // 227: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
+	108, // 228: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
+	110, // 229: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
+	112, // 230: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
+	114, // 231: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
+	116, // 232: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
+	118, // 233: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
+	120, // 234: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
+	122, // 235: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
+	123, // 236: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
+	124, // 237: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
+	157, // 238: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
+	191, // 239: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
+	42,  // 240: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
+	44,  // 241: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
+	46,  // 242: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
+	48,  // 243: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
+	50,  // 244: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
+	52,  // 245: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
+	55,  // 246: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
+	57,  // 247: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
+	59,  // 248: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
+	61,  // 249: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
+	63,  // 250: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
+	71,  // 251: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
+	73,  // 252: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
+	156, // 253: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
+	140, // 254: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
+	75,  // 255: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
+	77,  // 256: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
+	79,  // 257: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
+	81,  // 258: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
+	83,  // 259: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
+	86,  // 260: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
+	88,  // 261: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
+	90,  // 262: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	92,  // 263: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
+	94,  // 264: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
+	96,  // 265: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
+	99,  // 266: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
+	134, // 267: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
+	137, // 268: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
+	40,  // 269: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
+	127, // 270: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
+	129, // 271: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
+	132, // 272: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
+	144, // 273: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
+	152, // 274: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
+	146, // 275: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
+	149, // 276: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
+	181, // 277: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
+	183, // 278: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
+	185, // 279: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
+	188, // 280: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
+	190, // 281: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
+	195, // 282: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
+	65,  // 283: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
+	67,  // 284: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
+	69,  // 285: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
+	203, // 286: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
+	205, // 287: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
+	207, // 288: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
+	209, // 289: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
+	211, // 290: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
+	213, // 291: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
+	215, // 292: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
+	218, // 293: banda.v1.ThreadService.PullRequestChoices:output_type -> banda.v1.PullRequestChoicesResponse
+	220, // 294: banda.v1.ThreadService.PullRequestResolve:output_type -> banda.v1.PullRequestResolveResponse
+	101, // 295: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
+	103, // 296: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
+	107, // 297: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
+	109, // 298: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
+	111, // 299: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
+	113, // 300: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
+	115, // 301: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
+	117, // 302: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
+	119, // 303: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
+	121, // 304: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
+	86,  // 305: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
+	88,  // 306: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
+	90,  // 307: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	166, // 308: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
+	192, // 309: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
+	240, // [240:310] is the sub-list for method output_type
+	170, // [170:240] is the sub-list for method input_type
+	170, // [170:170] is the sub-list for extension type_name
+	170, // [170:170] is the sub-list for extension extendee
+	0,   // [0:170] is the sub-list for field type_name
 }
 
 func init() { file_banda_v1_banda_proto_init() }
@@ -14529,7 +14806,7 @@ func file_banda_v1_banda_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_banda_v1_banda_proto_rawDesc), len(file_banda_v1_banda_proto_rawDesc)),
 			NumEnums:      14,
-			NumMessages:   208,
+			NumMessages:   212,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

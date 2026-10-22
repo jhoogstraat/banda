@@ -138,12 +138,23 @@ test('a self-hosted GitLab (FORGE_HOSTS): link the open merge request of the bra
 	await expect(pane(page).getByRole('region', { name: 'Reviewers' })).toContainText('carolApproved');
 	await expect(pane(page).getByText('Checks · 1 of 1 running')).toBeVisible();
 
+	// Members and labels to pick from, labels changed, a review thread resolved: GitLab's own calls.
+	expect(await alice.threads.pullRequestChoices({ threadId: t.id })).toMatchObject({ reviewers: forge.collaborators, labels: forge.labels });
+	await alice.threads.pullRequestUpdate({ threadId: t.id, addLabels: ['bug'], removeLabels: ['e2e'] });
+	expect(forge.pull(1).labels).toEqual(['bug']);
+	forge.comment(1, { login: 'carol', body: 'Rename it?', path: 'hello1.txt', line: 1 });
+	const { pullRequest: fresh } = await alice.threads.pullRequestGet({ threadId: t.id, refresh: true });
+	const root = fresh!.comments.find((c) => c.path)!;
+	expect(root).toMatchObject({ threadId: `d${root.id}`, resolved: false });
+	const { pullRequest: resolved } = await alice.threads.pullRequestResolve({ threadId: t.id, reviewThread: root.threadId, resolved: true });
+	expect(resolved!.comments.find((c) => c.path)?.resolved).toBe(true);
+
 	await alice.threads.pullRequestMerge({ threadId: t.id, method: 'squash' });
 	expect(forge.pull(1)).toMatchObject({ state: 'merged', mergeMethod: 'squash' });
 	await expect(page.getByRole('button', { name: 'MR !1 · Merged' })).toBeVisible();
 });
 
-test('the new-thread composer lists my repositories from the forge, filtered as I type', async ({ as, startApi, forge }) => {
+test('the new-thread composer lists my repositories from the forge, filtered as I type and searched on the forge', async ({ as, startApi, forge }) => {
 	const api = await startApi({ TEST_FORGE_URL: forge.url });
 	const alice = as('alice', api);
 	forge.tokens = { 'alice-token': 'alice' };
@@ -152,6 +163,11 @@ test('the new-thread composer lists my repositories from the forge, filtered as 
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Choose repository' }).click();
 	await expect(page.getByRole('menuitemradio', { name: 'e2e/profiles' })).toBeVisible();
+	// Beyond the listed ones, the forge is searched within my repositories' owners.
+	await page.getByLabel('Repository URL').fill('archive');
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/archive-2019' })).toBeVisible();
+	await expect(page.getByRole('menuitemradio', { name: 'elsewhere/archive' })).toHaveCount(0);
+	expect(forge.calls).toContain('GET /api/v3/search/repositories');
 	await page.getByLabel('Repository URL').fill('pla');
 	await expect(page.getByRole('menuitemradio', { name: 'e2e/profiles' })).toBeHidden();
 	await page.getByRole('menuitemradio', { name: 'e2e/plain' }).click();
@@ -174,4 +190,48 @@ test('without a token for the forge, the header keeps the link to its compare pa
 	await page.reload();
 	await expect(page.getByRole('link', { name: 'Open a pull request' })).toHaveAttribute('href', /^https:\/\/github\.com\/e2e\/plain\/compare\/main\.\.\./);
 	expect((await t.get()).forgeReady).toBe(false);
+});
+
+test('a pull request the agent opened itself on the forge is linked when its turn ends, with a quiet line that reaches the agent', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge);
+	const { branch } = await t.get();
+	expect((await alice.threads.pullRequestGet({ threadId: t.id })).pullRequest).toBeUndefined(); // nothing to spot after the first push
+	await forge.open(branch, 'Opened with gh'); // as `gh pr create` in the sandbox would
+	await t.turn(() => t.send('e2e-echo e2e-noop'));
+	const page = await open(alice, t.id);
+	await expect(page.getByText('Pull request #1 on this branch was linked')).toBeVisible({ timeout: 15_000 });
+	await expect(page.getByRole('button', { name: /^PR #1 · Open/ })).toBeVisible();
+	await t.turn(() => t.send('e2e-echo e2e-noop'));
+	expect((await t.prompts()).at(-1)).toContain(`[Pull request #1 "Opened with gh" was linked to this thread: ${forge.url}/e2e/plain/pull/1]`);
+});
+
+test('the owner picks reviewers and labels from the forge’s lists and anyone with a token resolves review threads', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge);
+	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: '' });
+	forge.comment(1, { login: 'carol', body: 'Why this name?', path: 'hello1.txt', line: 1 });
+	const page = await open(alice, t.id);
+	await page.getByRole('button', { name: /^PR #1/ }).click();
+	const p = pane(page);
+
+	// alice opened it: the others are offered.
+	await expect(p.locator('#pr-reviewer-choices option')).toHaveCount(3);
+	expect(await p.locator('#pr-reviewer-choices option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value))).toEqual(['bob', 'carol', 'dave']);
+	await p.getByLabel('Reviewers to ask').fill('bob');
+	await p.getByRole('button', { name: 'Ask for review' }).click();
+	await expect(p.getByRole('region', { name: 'Reviewers' })).toContainText('bobReview requested');
+	expect(forge.pull(1).reviewers).toEqual(['bob']);
+	await expect(p.locator('#pr-reviewer-choices option')).toHaveCount(2);
+
+	await p.getByLabel('Add label').selectOption('bug');
+	await expect(p.getByRole('button', { name: 'Remove label bug' })).toBeVisible();
+	await p.getByRole('button', { name: 'Remove label e2e' }).click();
+	await expect(p.getByRole('button', { name: 'Remove label e2e' })).toHaveCount(0);
+	expect(forge.pull(1).labels).toEqual(['bug']);
+
+	await p.getByRole('button', { name: 'Resolve', exact: true }).click();
+	await expect(p.getByRole('article', { name: 'Comment by carol' })).toContainText('resolved');
+	expect(forge.pull(1).comments[0].resolved).toBe(true);
+	await p.getByRole('button', { name: 'Unresolve' }).click();
+	await expect(p.getByRole('article', { name: 'Comment by carol' })).not.toContainText('resolved');
+	expect(forge.pull(1).comments[0].resolved).toBe(false);
 });

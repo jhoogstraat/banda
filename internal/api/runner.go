@@ -173,6 +173,9 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if _, err := s.applyBecause(bg, id, action, reason, e); err != nil {
 				slog.Error("store agent event", "thread", id, "err", err)
 			}
+			if e.GetTurnEnded() != nil || e.GetAutoPush().GetBranchPushed() { // the agent may have opened a pull request itself
+				go s.spot(bg, id)
+			}
 			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
 				s.settlePermissions(bg, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
 				go s.park(bg, id) // not here: suspending waits for this stream

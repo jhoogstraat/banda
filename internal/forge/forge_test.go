@@ -247,10 +247,14 @@ func TestGitLab(t *testing.T) {
 		"GET " + gl + "/merge_requests/5/discussions": []any{
 			map[string]any{"id": "d1", "individual_note": true, "notes": []any{map[string]any{"id": 1, "body": "hi", "author": map[string]any{"username": "dan"}}}},
 			map[string]any{"id": "d2", "individual_note": false, "notes": []any{
-				map[string]any{"id": 2, "body": "here", "author": map[string]any{"username": "bob"}, "position": map[string]any{"new_path": "a.go", "new_line": 3}},
+				map[string]any{"id": 2, "body": "here", "author": map[string]any{"username": "bob"}, "position": map[string]any{"new_path": "a.go", "new_line": 3},
+					"resolvable": true, "resolved": true},
 				map[string]any{"id": 3, "body": "ok", "author": map[string]any{"username": "alice"}},
 				map[string]any{"id": 4, "body": "changed the description", "system": true}}}},
 		"PUT " + gl + "/merge_requests/5":                       map[string]any{"iid": 5},
+		"PUT " + gl + "/merge_requests/5/discussions/d2":        map[string]any{"id": "d2"},
+		"GET " + gl + "/members/all":                            []any{map[string]any{"username": "bob"}},
+		"GET " + gl + "/labels":                                 []any{map[string]any{"name": "ui"}},
 		"GET /api/v4/users":                                     []any{map[string]any{"id": 9, "username": "erin"}},
 		"POST " + gl + "/merge_requests/5/discussions":          map[string]any{"id": "d3"},
 		"POST " + gl + "/merge_requests/5/discussions/d2/notes": map[string]any{"id": 5},
@@ -284,11 +288,20 @@ func TestGitLab(t *testing.T) {
 	if len(pr.Comments) != 3 || pr.Comments[1].Path != "a.go" || pr.Comments[2].ReplyTo != "2" || pr.Comments[0].ReplyTo != "" {
 		t.Errorf("comments %v", pr.Comments)
 	}
-	if err := g.Update(ctx, pr, Edit{Draft: ptr(false), Reviewers: []string{"erin"}}); err != nil {
+	if c := pr.Comments[1]; c.ThreadId != "d2" || !c.Resolved || pr.Comments[2].ThreadId != "" {
+		t.Errorf("review thread %v", pr.Comments)
+	}
+	if err := g.Update(ctx, pr, Edit{Draft: ptr(false), Reviewers: []string{"erin"}, AddLabels: []string{"a", "b"}, RemoveLabels: []string{"ui"}}); err != nil {
 		t.Fatal(err)
 	}
-	if p := f.posted["PUT "+gl+"/merge_requests/5"]; p["title"] != "T" || len(p["reviewer_ids"].([]any)) != 3 {
+	if p := f.posted["PUT "+gl+"/merge_requests/5"]; p["title"] != "T" || len(p["reviewer_ids"].([]any)) != 3 || p["add_labels"] != "a,b" || p["remove_labels"] != "ui" {
 		t.Errorf("update posted %v", p)
+	}
+	if err := g.Resolve(ctx, 5, "d2", false); err != nil || f.posted["PUT "+gl+"/merge_requests/5/discussions/d2"]["resolved"] != false {
+		t.Errorf("resolve: %v %v", err, f.posted)
+	}
+	if c, err := g.Choices(ctx); err != nil || c.Reviewers[0] != "bob" || c.Labels[0] != "ui" {
+		t.Errorf("choices %v, %v", c, err)
 	}
 	if err := g.Comment(ctx, 5, "reply", "2"); err != nil || f.posted["POST "+gl+"/merge_requests/5/discussions/d2/notes"]["body"] != "reply" {
 		t.Fatalf("reply: %v", err)
@@ -309,16 +322,32 @@ func TestGitLab(t *testing.T) {
 }
 
 func TestRepos(t *testing.T) {
+	var searched, glSearch string
 	_, base := newFake(t, map[string]any{
-		"GET /api/v3/user/repos": []any{map[string]any{"full_name": "o/r", "description": "d"}},
-		"GET /api/v4/projects":   []any{map[string]any{"path_with_namespace": "g/sub/p"}},
+		"GET /api/v3/user/repos": []any{map[string]any{"full_name": "o/r", "description": "d", "owner": map[string]any{"login": "o"}}},
+		"GET /api/v3/user":       map[string]any{"login": "me"},
+		"GET /api/v3/search/repositories": func(r *http.Request) (int, any) {
+			searched = r.URL.Query().Get("q")
+			return 200, map[string]any{"items": []any{map[string]any{"full_name": "o/old"}}}
+		},
+		"GET /api/v4/projects": func(r *http.Request) (int, any) {
+			glSearch = r.URL.Query().Get("search")
+			return 200, []any{map[string]any{"path_with_namespace": "g/sub/p"}}
+		},
 	})
 	c := Config{TestURL: base}
-	gh, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok")
+	found, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok", "old")
+	if err != nil || len(found) != 1 || found[0].Name != "o/old" || searched != "old in:name fork:true user:me user:o" {
+		t.Errorf("GitHub search %v, %v, q %q", found, err, searched)
+	}
+	if _, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok", "p"); err != nil || glSearch != "p" {
+		t.Errorf("GitLab search %q, %v", glSearch, err)
+	}
+	gh, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok", "")
 	if err != nil || len(gh) != 1 || gh[0].Url != "https://ghe.corp/o/r.git" || gh[0].Description != "d" {
 		t.Errorf("GitHub repos %v, %v", gh, err)
 	}
-	gl, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok")
+	gl, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok", "")
 	if err != nil || len(gl) != 1 || gl[0].Url != "https://gitlab.com/g/sub/p.git" || gl[0].Forge != GitLab {
 		t.Errorf("GitLab repos %v, %v", gl, err)
 	}

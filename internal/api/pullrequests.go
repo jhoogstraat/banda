@@ -363,7 +363,8 @@ func (s *Service) PullRequestUpdate(ctx context.Context, req *bandav1.PullReques
 	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "a title is required")
 	}
-	if err := f.Update(ctx, pr, forge.Edit{Title: req.Title, Body: req.Body, Draft: req.Draft, Reviewers: req.AddReviewers}); err != nil {
+	if err := f.Update(ctx, pr, forge.Edit{Title: req.Title, Body: req.Body, Draft: req.Draft, Reviewers: req.AddReviewers,
+		AddLabels: req.AddLabels, RemoveLabels: req.RemoveLabels}); err != nil {
 		return nil, forgeError(err)
 	}
 	pr, err = s.refresh(ctx, t, pr, user(ctx))
@@ -386,7 +387,22 @@ func (s *Service) PullRequestComment(ctx context.Context, req *bandav1.PullReque
 	if strings.TrimSpace(req.Body) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "the comment is empty")
 	}
-	t, err := s.store.Get(ctx, req.ThreadId)
+	pr, err := s.asCaller(ctx, req.ThreadId, func(f forge.Forge, n int) error { return f.Comment(ctx, n, req.Body, req.ReplyTo) })
+	return &bandav1.PullRequestCommentResponse{PullRequest: pr}, err
+}
+
+func (s *Service) PullRequestResolve(ctx context.Context, req *bandav1.PullRequestResolveRequest) (*bandav1.PullRequestResolveResponse, error) {
+	if req.ReviewThread == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "which review thread?")
+	}
+	pr, err := s.asCaller(ctx, req.ThreadId, func(f forge.Forge, n int) error { return f.Resolve(ctx, n, req.ReviewThread, req.Resolved) })
+	return &bandav1.PullRequestResolveResponse{PullRequest: pr}, err
+}
+
+// asCaller does something on the thread's pull request with the caller's own
+// token, so it is theirs on the forge (comments, resolving), and refreshes it.
+func (s *Service) asCaller(ctx context.Context, id string, do func(f forge.Forge, number int) error) (*bandav1.PullRequest, error) {
+	t, err := s.store.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -397,21 +413,69 @@ func (s *Service) PullRequestComment(ctx context.Context, req *bandav1.PullReque
 	if pr == nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, "this thread has no pull request")
 	}
-	f, err := s.openForge(ctx, t, user(ctx)) // the commenter's own token: it posts as them
+	f, err := s.openForge(ctx, t, user(ctx))
 	if err != nil {
 		return nil, err
 	}
-	if err := f.Comment(ctx, int(pr.Summary.Number), req.Body, req.ReplyTo); err != nil {
+	if err := do(f, int(pr.Summary.Number)); err != nil {
 		return nil, forgeError(err)
 	}
-	pr, _ = s.refresh(ctx, t, pr, "system") // a failure is in pr.Error; the comment is posted
-	return &bandav1.PullRequestCommentResponse{PullRequest: pr}, nil
+	pr, _ = s.refresh(ctx, t, pr, "system") // a failure is in pr.Error; it is done
+	return pr, nil
+}
+
+func (s *Service) PullRequestChoices(ctx context.Context, req *bandav1.PullRequestChoicesRequest) (*bandav1.PullRequestChoicesResponse, error) {
+	_, _, f, err := s.ownerForge(ctx, req.ThreadId)
+	if err != nil {
+		return nil, err
+	}
+	res, err := f.Choices(ctx)
+	return res, forgeError(err)
+}
+
+var spotting sync.Map // thread ids
+
+// spot links the open pull request of the thread's branch when the thread has
+// none: one the agent opened itself (gh, glab) or someone on the forge. It
+// says so like a link, by nobody. Quiet when the forge or the owner's token is
+// unknown.
+// ponytail: asks the forge at every turn's end and push while nothing is linked; a webhook would say when.
+func (s *Service) spot(ctx context.Context, id string) {
+	if _, busy := spotting.LoadOrStore(id, true); busy { // a turn's end and its push come together
+		return
+	}
+	defer spotting.Delete(id)
+	t, err := s.store.Get(ctx, id)
+	if err != nil || t.RepoURL == "" || t.Branch == "" || !s.forgeReady(ctx, t) {
+		return
+	}
+	if pr, err := s.store.PullRequest(ctx, id); err != nil || pr != nil {
+		return
+	}
+	f, err := s.openForge(ctx, t, t.OwnerID)
+	var n int
+	if err == nil {
+		n, err = f.Find(ctx, t.Branch)
+	}
+	var pr *bandav1.PullRequest
+	if err == nil && n != 0 {
+		pr, err = f.Get(ctx, n)
+	}
+	if err == nil && pr != nil {
+		if cur, _ := s.store.PullRequest(ctx, id); cur == nil { // the owner may have linked one meanwhile
+			err = s.storePullRequest(ctx, t, nil, pr, "system", "linked")
+		}
+	}
+	if err != nil {
+		slog.Info("spot pull request", "thread", id, "err", err)
+	}
 }
 
 // ListForgeRepos asks every known forge the caller has a token for, at once;
 // one that fails or takes over 10 s is left out (the URL field still works).
-// ponytail: the 100 most recently pushed per forge, filtered in the browser; search on the forge if that isn't enough.
-func (s *Service) ListForgeRepos(ctx context.Context, _ *bandav1.ListForgeReposRequest) (*bandav1.ListForgeReposResponse, error) {
+// Without a query, the 100 most recently pushed per forge, filtered in the browser; with one, the forges search.
+func (s *Service) ListForgeRepos(ctx context.Context, req *bandav1.ListForgeReposRequest) (*bandav1.ListForgeReposResponse, error) {
+	query := strings.TrimSpace(req.Query)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	var mu sync.Mutex
@@ -426,7 +490,7 @@ func (s *Service) ListForgeRepos(ctx context.Context, _ *bandav1.ListForgeReposR
 			continue
 		}
 		wg.Go(func() {
-			repos, err := Forges.Repos(ctx, kind, host, token)
+			repos, err := Forges.Repos(ctx, kind, host, token, query)
 			if err != nil {
 				slog.Info("list forge repos", "host", host, "user", user(ctx), "err", err)
 			}

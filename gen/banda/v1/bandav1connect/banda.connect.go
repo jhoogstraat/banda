@@ -156,6 +156,12 @@ const (
 	// ThreadServiceListForgeReposProcedure is the procedure name of the ThreadService's ListForgeRepos
 	// RPC.
 	ThreadServiceListForgeReposProcedure = "/banda.v1.ThreadService/ListForgeRepos"
+	// ThreadServicePullRequestChoicesProcedure is the procedure name of the ThreadService's
+	// PullRequestChoices RPC.
+	ThreadServicePullRequestChoicesProcedure = "/banda.v1.ThreadService/PullRequestChoices"
+	// ThreadServicePullRequestResolveProcedure is the procedure name of the ThreadService's
+	// PullRequestResolve RPC.
+	ThreadServicePullRequestResolveProcedure = "/banda.v1.ThreadService/PullRequestResolve"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -570,6 +576,20 @@ var (
 			Procedure:  ThreadServiceListForgeReposProcedure,
 		}
 	})
+	threadServicePullRequestChoicesSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestChoices"),
+			Procedure:  ThreadServicePullRequestChoicesProcedure,
+		}
+	})
+	threadServicePullRequestResolveSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("PullRequestResolve"),
+			Procedure:  ThreadServicePullRequestResolveProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -709,6 +729,12 @@ type ThreadServiceClient interface {
 	// The caller's repositories on the forges they have a token for, for the
 	// new-thread composer.
 	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
+	// Who may be asked for a review and which labels exist on the thread's
+	// repository, from its forge with the owner's token (owner only).
+	PullRequestChoices(context.Context, *v1.PullRequestChoicesRequest) (*v1.PullRequestChoicesResponse, error)
+	// Resolves or reopens a review thread, with the caller's own token
+	// (refused without one).
+	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -957,6 +983,12 @@ type ThreadServiceHandler interface {
 	// The caller's repositories on the forges they have a token for, for the
 	// new-thread composer.
 	ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error)
+	// Who may be asked for a review and which labels exist on the thread's
+	// repository, from its forge with the owner's token (owner only).
+	PullRequestChoices(context.Context, *v1.PullRequestChoicesRequest) (*v1.PullRequestChoicesResponse, error)
+	// Resolves or reopens a review thread, with the caller's own token
+	// (refused without one).
+	PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -1017,6 +1049,8 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServicePullRequestMergeSpec(), Handler: adapter.pullRequestMerge},
 		connect.Method{Spec: threadServicePullRequestCommentSpec(), Handler: adapter.pullRequestComment},
 		connect.Method{Spec: threadServiceListForgeReposSpec(), Handler: adapter.listForgeRepos},
+		connect.Method{Spec: threadServicePullRequestChoicesSpec(), Handler: adapter.pullRequestChoices},
+		connect.Method{Spec: threadServicePullRequestResolveSpec(), Handler: adapter.pullRequestResolve},
 	)
 }
 
@@ -1311,6 +1345,14 @@ func (UnimplementedThreadServiceHandler) PullRequestComment(context.Context, *v1
 
 func (UnimplementedThreadServiceHandler) ListForgeRepos(context.Context, *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.ListForgeRepos is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestChoices(context.Context, *v1.PullRequestChoicesRequest) (*v1.PullRequestChoicesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestChoices is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) PullRequestResolve(context.Context, *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.PullRequestResolve is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1736,6 +1778,22 @@ func (c *threadServiceClient) PullRequestComment(ctx context.Context, req *v1.Pu
 func (c *threadServiceClient) ListForgeRepos(ctx context.Context, req *v1.ListForgeReposRequest) (*v1.ListForgeReposResponse, error) {
 	var res v1.ListForgeReposResponse
 	if err := c.client.CallUnary(ctx, threadServiceListForgeReposSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestChoices(ctx context.Context, req *v1.PullRequestChoicesRequest) (*v1.PullRequestChoicesResponse, error) {
+	var res v1.PullRequestChoicesResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestChoicesSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) PullRequestResolve(ctx context.Context, req *v1.PullRequestResolveRequest) (*v1.PullRequestResolveResponse, error) {
+	var res v1.PullRequestResolveResponse
+	if err := c.client.CallUnary(ctx, threadServicePullRequestResolveSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2353,6 +2411,30 @@ func (h threadServiceHandler) listForgeRepos(ctx context.Context, _ connect.Spec
 		return err
 	}
 	res, err := h.svc.ListForgeRepos(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestChoices(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestChoicesRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestChoices(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) pullRequestResolve(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PullRequestResolveRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PullRequestResolve(ctx, &req)
 	if err != nil {
 		return err
 	}

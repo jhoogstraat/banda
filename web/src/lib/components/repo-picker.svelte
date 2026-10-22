@@ -16,16 +16,28 @@
 	let open = $state(false);
 	let custom = $state('');
 	const known = $derived([...new Set([repoUrl, ...projects()].filter((url) => url && url !== noRepo))]);
-	// The caller's repositories on the forges they have a token for, loaded when the menu first opens; the URL field filters them.
+	// The caller's repositories on the forges they have a token for, loaded when the menu first opens; the URL field
+	// filters them, and what is typed is searched on the forges too (debounced), for those beyond the first page.
 	let mine = $state<ForgeRepo[]>([]);
+	let found = $state<ForgeRepo[]>([]);
 	let asked = false;
 	$effect(() => {
 		if (!open || asked) return;
 		asked = true;
 		api.listForgeRepos({}).then((r) => (mine = r.repos)).catch(() => {}); // without them the field still takes a URL
 	});
+	$effect(() => {
+		const query = custom.trim();
+		if (!open || !query || /[:/@]/.test(query)) return; // a URL isn't searched
+		const timer = setTimeout(() => {
+			api.listForgeRepos({ query }).then((r) => custom.trim() === query && (found = r.repos)).catch(() => {});
+		}, 300);
+		return () => clearTimeout(timer);
+	});
 	const matches = $derived(
-		mine.filter((r) => !known.includes(r.url) && r.name.toLowerCase().includes(custom.trim().toLowerCase())).slice(0, 8)
+		[...mine, ...found.filter((f) => !mine.some((r) => r.url === f.url))]
+			.filter((r) => !known.includes(r.url) && r.name.toLowerCase().includes(custom.trim().toLowerCase()))
+			.slice(0, 8)
 	);
 	const Icon = $derived(repoUrl === noRepo ? FolderIcon : FolderGit2Icon);
 

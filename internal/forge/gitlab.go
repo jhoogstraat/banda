@@ -190,6 +190,9 @@ func (g *gitLab) Get(ctx context.Context, number int) (*bandav1.PullRequest, err
 			}
 			if first == "" && !d.IndividualNote {
 				first = c.Id
+				if n.Resolvable {
+					c.ThreadId, c.Resolved = d.ID, n.Resolved
+				}
 			}
 			out.Comments = append(out.Comments, c)
 		}
@@ -228,6 +231,12 @@ func (g *gitLab) Update(ctx context.Context, pr *bandav1.PullRequest, e Edit) er
 		}
 		opt.ReviewerIDs = &ids
 	}
+	if len(e.AddLabels) > 0 {
+		opt.AddLabels = (*gitlab.LabelOptions)(&e.AddLabels)
+	}
+	if len(e.RemoveLabels) > 0 {
+		opt.RemoveLabels = (*gitlab.LabelOptions)(&e.RemoveLabels)
+	}
 	_, _, err := g.c.MergeRequests.UpdateMergeRequest(g.path, int64(pr.Summary.Number), opt, gitlab.WithContext(ctx))
 	return glError(err)
 }
@@ -257,4 +266,30 @@ func (g *gitLab) Comment(ctx context.Context, number int, body, replyTo string) 
 		}
 	}
 	return &Error{NotFound, "GitLab has no such discussion"}
+}
+
+// ponytail: the first 100 members and labels.
+func (g *gitLab) Choices(ctx context.Context) (*bandav1.PullRequestChoicesResponse, error) {
+	out := &bandav1.PullRequestChoicesResponse{}
+	members, _, err := g.c.ProjectMembers.ListAllProjectMembers(g.path, &gitlab.ListProjectMembersOptions{ListOptions: gitlab.ListOptions{PerPage: 100}}, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, glError(err)
+	}
+	for _, m := range members {
+		out.Reviewers = append(out.Reviewers, m.Username)
+	}
+	labels, _, err := g.c.Labels.ListLabels(g.path, &gitlab.ListLabelsOptions{ListOptions: gitlab.ListOptions{PerPage: 100}}, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, glError(err)
+	}
+	for _, l := range labels {
+		out.Labels = append(out.Labels, l.Name)
+	}
+	return out, nil
+}
+
+func (g *gitLab) Resolve(ctx context.Context, number int, thread string, resolved bool) error {
+	_, _, err := g.c.Discussions.ResolveMergeRequestDiscussion(g.path, int64(number), thread,
+		&gitlab.ResolveMergeRequestDiscussionOptions{Resolved: &resolved}, gitlab.WithContext(ctx))
+	return glError(err)
 }
