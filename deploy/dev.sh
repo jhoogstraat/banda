@@ -159,7 +159,7 @@ EOF
 	DEV_AUTH=1 ADDR=:$p PREVIEW_ADDR=:$pp RUNNER_API_URL=http://$E2E_HOST:$p start api "$LOG/api"; PIDS+=("$PID")
 	local api_pid=$PID
 	# It shares the database but leaves sweeps to the main API, whose watchers see what they change.
-	IDLE_SWEEP_EVERY=24h OIDC_ISSUER=http://localhost:$op/dex DEX_URL=http://localhost:$dp OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret \
+	IDLE_SWEEP_EVERY=24h OIDC_ISSUER=http://localhost:$op/dex OIDC_PROVIDER_NAME=Dex DEX_URL=http://localhost:$dp OIDC_CLIENT_ID=banda OIDC_CLIENT_SECRET=banda-dev-secret \
 		PUBLIC_URL=http://localhost:$op ADDR=:$op PREVIEW_ADDR=:$opp RUNNER_API_URL=http://$E2E_HOST:$op start oidc-api "$LOG/api"; PIDS+=("$PID")
 	until_ok oidc-api listening "$op"
 	PID=$api_pid until_ok api listening "$p"

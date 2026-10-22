@@ -84,6 +84,9 @@ spec:
             {{- with include "banda.issuer" . }}
             - {name: OIDC_ISSUER, value: {{ . | quote }}}
             - {name: OIDC_CLIENT_ID, value: {{ $.Values.oidc.clientId | quote }}}
+            {{- with $.Values.oidc.providerName }}
+            - {name: OIDC_PROVIDER_NAME, value: {{ . | quote }}}
+            {{- end }}
             {{- end }}
             {{- if and .Values.dex.enabled (not .Values.oidc.issuer) }}
             - {name: DEX_URL, value: "http://dex.{{ .Release.Namespace }}.svc:5556"}

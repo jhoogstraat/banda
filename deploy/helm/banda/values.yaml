@@ -44,6 +44,8 @@ oidc:
   clientId: banda
   # Empty: generated on install and kept on upgrades (for Dex), else required.
   clientSecret: ""
+  # The sign-in page's "Sign in with <providerName>". Empty: SSO.
+  providerName: ""
 
 # Signs session cookies. Empty: generated on install and kept on upgrades.
 sessionSecret: ""

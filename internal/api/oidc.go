@@ -28,12 +28,13 @@ const (
 	sessionTTL    = 7 * 24 * time.Hour
 )
 
-// OIDCConfig configures single sign-on. SessionSecret may be empty. DexURL
-// (e.g. http://dex.banda.svc:5556) is a bundled Dex whose issuer is
+// OIDCConfig configures single sign-on. SessionSecret may be empty. Provider
+// names the provider on Banda's sign-in page ("Sign in with SSO" if empty).
+// DexURL (e.g. http://dex.banda.svc:5556) is a bundled Dex whose issuer is
 // $PUBLIC_URL/dex, as in dev behind Vite: the API proxies /dex/ to it for
 // browsers and reaches it directly itself.
 type OIDCConfig struct {
-	Issuer, ClientID, ClientSecret, PublicURL, SessionSecret, DexURL string
+	Issuer, ClientID, ClientSecret, PublicURL, SessionSecret, DexURL, Provider string
 }
 
 // OIDC signs users in through any OIDC provider (authorization code flow
@@ -43,9 +44,10 @@ type OIDC struct {
 	oauth    oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	signer
-	secure bool
-	client *http.Client // to the provider: discovery, keys, token exchange
-	dex    *url.URL
+	secure   bool
+	client   *http.Client // to the provider: discovery, keys, token exchange
+	dex      *url.URL
+	provider string
 }
 
 func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) {
@@ -77,6 +79,7 @@ func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) 
 		secure:   strings.HasPrefix(c.PublicURL, "https://"),
 		client:   client,
 		dex:      dex,
+		provider: cmp.Or(c.Provider, "SSO"),
 		oauth: oauth2.Config{
 			ClientID:     c.ClientID,
 			ClientSecret: c.ClientSecret,
@@ -88,7 +91,11 @@ func NewOIDC(ctx context.Context, st *store.Store, c OIDCConfig) (*OIDC, error) 
 }
 
 // Mount adds the browser routes of the login flow, and the bundled Dex's.
+// The sign-in page is the web app's /signin: it reads the provider's name
+// from /auth/provider, and the flow returns to it when it fails
+// (?error=state|denied|failed) and after signing out (?signed-out).
 func (o *OIDC) Mount(mux *http.ServeMux) {
+	mux.HandleFunc("GET /auth/provider", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(o.provider)) })
 	mux.HandleFunc("GET /auth/login", o.login)
 	mux.HandleFunc("GET /auth/callback", o.callback)
 	mux.HandleFunc("GET /auth/logout", o.logout)
@@ -132,13 +139,21 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	if err != nil || q.Get("state") == "" || q.Get("state") != flow.Get("state") {
-		http.Error(w, "invalid login state, try again", http.StatusBadRequest)
+		http.Redirect(w, r, "/signin?error=state", http.StatusFound)
 		return
 	}
 	http.SetCookie(w, o.cookie(flowCookie, "", -1))
+	back := func(reason string) {
+		http.Redirect(w, r, "/signin?"+url.Values{"error": {reason}, "next": {localPath(flow.Get("next"))}}.Encode(), http.StatusFound)
+	}
+	if e := q.Get("error"); e != "" { // e.g. access_denied
+		log.Printf("login: the provider refused: %s %s", e, q.Get("error_description"))
+		back("denied")
+		return
+	}
 	fail := func(err error) {
 		log.Printf("login: %v", err)
-		http.Error(w, "login failed", http.StatusUnauthorized)
+		back("failed")
 	}
 	tok, err := o.oauth.Exchange(context.WithValue(r.Context(), oauth2.HTTPClient, o.client), q.Get("code"), oauth2.VerifierOption(flow.Get("verifier")))
 	if err != nil {
@@ -183,7 +198,7 @@ func localPath(next string) string {
 
 func (o *OIDC) logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, o.cookie(sessionCookie, "", -1))
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, "/signin?signed-out", http.StatusFound)
 }
 
 // name prefixes cookies with __Host- over https, so that no other host of the

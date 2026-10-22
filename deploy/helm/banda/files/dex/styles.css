@@ -1,0 +1,195 @@
+/* Banda's look for its bundled Dex: the dark tokens of web/src/routes/layout.css
+ * and the layout of the web app's sign-in page (web/src/routes/signin). */
+
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(inter.woff2) format('woff2');
+}
+
+.theme-body {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --accent: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --radius: 0.625rem;
+  /* What main.css reads for the home page. */
+  --dex-fg: var(--foreground);
+  --dex-fg-muted: var(--muted-foreground);
+  --dex-border: var(--border);
+  --dex-accent: var(--foreground);
+
+  background-color: var(--background);
+  color: var(--foreground);
+  color-scheme: dark;
+  display: grid;
+  font-family: 'Inter Variable', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100dvh;
+  place-items: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+.dex-container {
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin: 0;
+  max-width: none;
+  min-width: 0;
+  padding: 24px;
+  text-align: left;
+  width: min(100%, calc(24rem + 48px));
+}
+
+.theme-wordmark {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.theme-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.theme-heading {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.theme-panel p,
+.dex-subtle-text,
+.dex-list {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  margin: 0;
+}
+
+.theme-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.theme-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.theme-form-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.theme-form-input {
+  background-color: oklch(1 0 0 / 4.5%);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 0.8);
+  color: var(--foreground);
+  font: inherit;
+  height: 36px;
+  outline: none;
+  padding: 4px 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.theme-form-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.theme-form-input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px oklch(0.556 0 0 / 50%);
+}
+
+.dex-btn {
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dex-btn:focus-visible {
+  outline: 3px solid oklch(0.556 0 0 / 50%);
+  outline-offset: 0;
+}
+
+.dex-btn:active {
+  transform: translateY(1px);
+}
+
+.theme-btn--primary,
+.theme-btn--success {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  height: 36px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.theme-btn--primary:hover,
+.theme-btn--success:hover {
+  background-color: oklch(0.922 0 0 / 80%);
+}
+
+.theme-btn-provider {
+  background-color: oklch(1 0 0 / 4.5%);
+  border: 1px solid var(--input);
+  color: var(--foreground);
+  width: 100%;
+}
+
+.theme-btn-provider:hover {
+  background-color: var(--accent);
+}
+
+.dex-btn-text {
+  font-weight: 500;
+}
+
+.dex-error-box {
+  background: none;
+  color: var(--destructive);
+  margin: 0;
+  max-width: none;
+  padding: 0;
+}
+
+.dex-separator {
+  border: 0;
+  border-top: 1px solid var(--border);
+  width: 100%;
+}
+
+.theme-remember-me {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+}
+
+.theme-link-back a {
+  color: var(--muted-foreground);
+}
+
+.theme-link-back a:hover {
+  color: var(--foreground);
+}

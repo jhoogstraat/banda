@@ -3,14 +3,14 @@ import { createConnectTransport } from '@connectrpc/connect-web';
 import { fromJson } from '@bufbuild/protobuf';
 import { AttachmentSchema, SettingsService, ThreadService, UserService, type Attachment } from './gen/banda/v1/banda_pb.js';
 
-// Signed out (or session expired): sign in again and come back to this page.
+// Signed out (or session expired): Banda's sign-in page, which comes back to this page.
 // ponytail: unary calls only. Streams report errors while iterating, but every page makes a unary call first.
 const signIn: Interceptor = (next) => async (req) => {
 	try {
 		return await next(req);
 	} catch (e) {
 		if (ConnectError.from(e).code === Code.Unauthenticated) {
-			location.href = `/auth/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+			location.href = `/signin?next=${encodeURIComponent(location.pathname + location.search)}`;
 		}
 		throw e;
 	}

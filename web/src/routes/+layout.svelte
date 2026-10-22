@@ -15,7 +15,11 @@
 	// Dark by default. ModeWatcher's defaultMode only applies to a server-rendered head script.
 	setMode('dark');
 
+	// The sign-in page shows without a session: no sidebar, no calls that need one.
+	const bare = $derived(page.url.pathname === '/signin');
+
 	$effect(() => {
+		if (bare) return;
 		const ctrl = new AbortController();
 		// Until it loads, the app doesn't know who is signed in (and so who owns what): retry.
 		let retry: ReturnType<typeof setTimeout>;
@@ -40,15 +44,19 @@
 
 <ModeWatcher />
 
-<TooltipProvider>
-	<!-- The only place that knows about screen sizes: the sidebar is a column on desktop and a drawer on phones. -->
-	<Sidebar.Provider class="h-dvh">
-		<AppSidebar />
-		<Sidebar.Inset class="min-w-0 flex-row overflow-hidden">
-			{#key page.url.pathname}
-				{@render children()}
-			{/key}
-		</Sidebar.Inset>
-	</Sidebar.Provider>
-	<CommandPalette />
-</TooltipProvider>
+{#if bare}
+	{@render children()}
+{:else}
+	<TooltipProvider>
+		<!-- The only place that knows about screen sizes: the sidebar is a column on desktop and a drawer on phones. -->
+		<Sidebar.Provider class="h-dvh">
+			<AppSidebar />
+			<Sidebar.Inset class="min-w-0 flex-row overflow-hidden">
+				{#key page.url.pathname}
+					{@render children()}
+				{/key}
+			</Sidebar.Inset>
+		</Sidebar.Provider>
+		<CommandPalette />
+	</TooltipProvider>
+{/if}
