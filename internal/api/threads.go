@@ -127,7 +127,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
-		s.apply(context.WithoutCancel(ctx), t.ID, thread.EnvLost{})
+		s.applyBecause(context.WithoutCancel(ctx), t.ID, thread.EnvLost{}, reasonProvision)
 	}
 }
 

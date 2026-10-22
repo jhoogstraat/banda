@@ -10,14 +10,18 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
+	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
+	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
 	import MessageAttachments from '#lib/components/message-attachments.svelte';
 	import PermissionCard from '#lib/components/permission-card.svelte';
@@ -27,6 +31,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
 	import { api } from '#lib/api.js';
 	import { permissionLabel } from '#lib/permissions.js';
 	import { tone, where, type Comment } from '#lib/diff.js';
@@ -40,6 +45,7 @@
 		thread,
 		owner,
 		act,
+		waiting = [],
 		onreveal,
 		onlogin
 	}: {
@@ -48,12 +54,19 @@
 		thread?: Thread;
 		owner: boolean;
 		act: (call: Promise<unknown>) => Promise<boolean>;
+		// The turn requests still waiting for the owner, oldest first.
+		waiting?: Item[];
 		onreveal: (c: Comment) => void;
 		onlogin: () => void;
 	} = $props();
 
-	// The owner's optional note when declining a turn request.
+	// The owner's optional note when declining a turn request, behind its note button.
 	let note = $state('');
+	let noting = $state(false);
+	// Approves the waiting requests in the order they were posted; stops at the first that fails.
+	async function approveAll() {
+		for (const r of waiting) if (r.kind !== 'request' || !(await act(api.approveTurn({ threadId, requestSeq: r.seq })))) return;
+	}
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	const lineageVerb = { [Status.STARTING]: 'was spawned', [Status.AWAITING_INPUT]: 'finished', [Status.ERRORED]: 'failed' } as Partial<Record<Status, string>>;
 	const clock = (t?: Timestamp) =>
@@ -112,30 +125,43 @@
 {:else if item.kind === 'request'}
 	{@const name = userName(item.actor)}
 	{@const ownerName = userName(thread?.ownerId ?? '')}
-	<div class="space-y-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-		<div class="flex items-center gap-2">
+	<div class="space-y-1.5 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 			<UserAvatar {name} class="size-5" />
-			<span><span class="font-medium">{name}</span> asks the agent:</span>
+			<span class="font-medium">{name}</span>
+			<span class="text-muted-foreground">asks the agent</span>
 			<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+			{#if item.resolved}
+				<span class="ml-auto text-xs text-muted-foreground">
+					{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
+				</span>
+			{:else if owner}
+				<div class="ml-auto flex items-center gap-1">
+					<Tooltip>
+						<TooltipTrigger>
+							{#snippet child({ props })}
+								<button {...props} type="button" aria-label="Runs on your Claude subscription" class="rounded p-1 text-muted-foreground hover:text-foreground"><InfoIcon class="size-3.5" /></button>
+							{/snippet}
+						</TooltipTrigger>
+						<TooltipContent>Runs on your Claude subscription, in this thread's environment.</TooltipContent>
+					</Tooltip>
+					{#if waiting.length > 1 && item === waiting.at(-1)}
+						<Button size="xs" variant="outline" onclick={approveAll}>Approve all ({waiting.length})</Button>
+					{/if}
+					<Button size="xs" onclick={() => act(api.approveTurn({ threadId, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
+					<Button size="xs" variant="ghost" onclick={() => act(api.declineTurn({ threadId, requestSeq: item.seq, note }))}><XIcon /> Decline</Button>
+					<IconButton icon={MessageSquareTextIcon} label="Add a note to the decline" size="icon-xs" aria-pressed={noting} variant={noting ? 'secondary' : 'ghost'} onclick={() => (noting = !noting)} />
+				</div>
+			{:else}
+				<span class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</span>
+			{/if}
 		</div>
 		{#if item.text}<p class="whitespace-pre-wrap"><MentionText text={item.text} /></p>{/if}
 		{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}
 		{@render reviewCards(item.review)}
-		{#if item.resolved}
-			<p class="text-xs text-muted-foreground">
-				{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
-			</p>
-		{:else if owner}
-						<div class="flex flex-wrap items-center gap-2">
-				<Button size="sm" onclick={() => act(api.approveTurn({ threadId, requestSeq: item.seq }))}><CheckIcon /> Approve</Button>
-				<Input bind:value={note} placeholder="Note (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Decline note" />
-				<Button size="sm" variant="outline" onclick={() => act(api.declineTurn({ threadId, requestSeq: item.seq, note }))}>
-					<XIcon /> Decline
-				</Button>
-			</div>
-			<p class="text-xs text-muted-foreground">It runs on your Claude subscription, in this thread's environment.</p>
-		{:else}
-			<p class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> Waiting for {ownerName} to approve</p>
+		{#if noting && owner && !item.resolved}
+			<!-- svelte-ignore a11y_autofocus -->
+			<Input bind:value={note} autofocus placeholder="Why not? Sent with the decline." class="h-8 text-xs" aria-label="Decline note" />
 		{/if}
 	</div>
 {:else if item.kind === 'permission'}
@@ -198,6 +224,19 @@
 			</Tool>
 		{/each}
 	</div>
+{:else if item.kind === 'push' && item.unavailable}
+	<!-- Only the owner can fix it, so only the owner is told, once (see events.ts). -->
+	{#if owner}
+		<div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+			<CloudOffIcon class="size-3.5 shrink-0" />
+			{#if item.text.includes('GIT_TOKEN')}
+				<span class="min-w-0 flex-1">This thread's work only lives in its environment: pushing to origin needs a GIT_TOKEN.</span>
+				<Button size="xs" variant="outline" href="/settings?secret=GIT_TOKEN#secrets">Add GIT_TOKEN in Settings</Button>
+			{:else}
+				<span class="min-w-0 flex-1">{item.text.replaceAll('`', '')}</span>
+			{/if}
+		</div>
+	{/if}
 {:else if item.kind === 'push'}
 	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
 {:else if item.kind === 'mode'}

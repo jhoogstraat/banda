@@ -92,7 +92,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		if mine && !login {
 			s.settlePermissions(context.WithoutCancel(ctx), id, bandav1.PermissionDecision_PERMISSION_DECISION_LOST)
 			_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
-				return envLost(t, 0), nil
+				return envLost(t, 0, reasonDisconnected), nil
 			})
 			if err != nil {
 				slog.Error("store lost environment", "thread", id, "err", err)
@@ -302,14 +302,27 @@ func lostTurns(st thread.State, kept int) []*bandav1.Event {
 	}
 }
 
-// envLost applies EnvLost to t (kept: see lostTurns) and returns the events to store.
-func envLost(t *store.Thread, kept int) []*bandav1.Event {
+// envLost applies EnvLost to t (kept: see lostTurns) and returns the events to
+// store; reason says why on the status change.
+func envLost(t *store.Thread, kept int, reason string) []*bandav1.Event {
 	events := lostTurns(t.State, kept)
 	next, _, _ := thread.Apply(t.State, thread.EnvLost{})
-	events = append(events, stateEvents(t.State, next)...)
+	for _, e := range stateEvents(t.State, next) {
+		if sc := e.GetStatusChanged(); sc != nil {
+			sc.Reason = reason
+		}
+		events = append(events, e)
+	}
 	t.State = next
 	return events
 }
+
+// Why an environment was lost, on its status change and the team board.
+const (
+	reasonDisconnected = "Lost the environment: its runner disconnected (the pod crashed, restarted or was deleted)"
+	reasonUnreachable  = "Lost the environment: its runner was gone when a prompt was sent"
+	reasonProvision    = "Couldn't create the environment"
+)
 
 // sendRunner reports false if no runner is connected for the thread, or it
 // stops taking commands.
