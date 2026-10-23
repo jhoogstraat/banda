@@ -50,6 +50,28 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
+  # The runner against the real pinned claude (mise run contract), offline in the sandbox image the images job
+  # built (its layer cache): a CLAUDE_VERSION bump runs it.
+  contract:
+    needs: images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/sandbox.Dockerfile
+          target: sandbox
+          tags: localhost/banda-sandbox:contract
+          load: true
+          cache-from: type=gha,scope=sandbox
+      - run: mise run contract
+        env:
+          CONTAINER: docker
+          CONTRACT_IMAGE: localhost/banda-sandbox:contract
+
   # deploy/dev.sh e2e on kind with Docker: the API runs on the runner, sandboxes reach it at the
   # gateway of kind's network (host_ip in deploy/dev.sh). On main only: changes are tested locally before they land,
   # and a red main is fixed forward. Only the tests tagged @key (the main journeys and the security guarantees, about

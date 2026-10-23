@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -39,33 +40,13 @@ func TestTranslate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		events, ended, auth := translate([]byte(tt.line))
-		got := ""
 		if len(events) > 1 {
 			t.Errorf("%s: %d events", tt.line, len(events))
 			continue
 		}
+		got := ""
 		if len(events) == 1 {
-			switch e := events[0]; {
-			case e.GetAgentTextDelta() != nil:
-				got = "agent_text_delta:" + e.GetAgentTextDelta().Text
-			case e.GetAgentText() != nil:
-				got = "agent_text:" + e.GetAgentText().Text
-			case e.GetAgentThinking() != nil:
-				got = "agent_thinking:" + e.GetAgentThinking().Text
-			case e.GetToolCall() != nil:
-				got = "tool_call:" + e.GetToolCall().Name + " " + e.GetToolCall().InputJson
-				if p := e.GetToolCall().ParentToolCallId; p != "" {
-					got += " parent=" + p
-				}
-			case e.GetToolResult() != nil:
-				got = "tool_result:" + e.GetToolResult().ToolCallId + " " + e.GetToolResult().Output
-			case e.GetTurnEnded() != nil:
-				te := e.GetTurnEnded()
-				got = "turn_ended:false"
-				if te.IsError {
-					got = "turn_ended:true " + te.Error
-				}
-			}
+			got = describe(events[0])
 		}
 		if got != tt.want || ended != tt.ended || auth != tt.auth {
 			t.Errorf("%s:\n got %q ended=%v auth=%v\nwant %q ended=%v auth=%v", tt.line, got, ended, auth, tt.want, tt.ended, tt.auth)
@@ -74,11 +55,18 @@ func TestTranslate(t *testing.T) {
 }
 
 func TestUserMessage(t *testing.T) {
-	plain, _ := json.Marshal(userMessage(&bandav1.Prompt{Text: "hi"}))
+	m := userMessage(&bandav1.Prompt{Text: "hi"})
+	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(m["uuid"].(string)) || m["uuid"] == userMessage(&bandav1.Prompt{})["uuid"] {
+		t.Errorf("uuid %q", m["uuid"])
+	}
+	delete(m, "uuid")
+	plain, _ := json.Marshal(m)
 	if string(plain) != `{"message":{"content":"hi","role":"user"},"type":"user"}` {
 		t.Errorf("plain: %s", plain)
 	}
-	img, _ := json.Marshal(userMessage(&bandav1.Prompt{Text: "look", Images: []*bandav1.AttachmentImage{{MediaType: "image/png", Data: []byte("png")}}}))
+	m = userMessage(&bandav1.Prompt{Text: "look", Images: []*bandav1.AttachmentImage{{MediaType: "image/png", Data: []byte("png")}}})
+	delete(m, "uuid")
+	img, _ := json.Marshal(m)
 	want := `{"message":{"content":[{"text":"look","type":"text"},{"source":{"data":"cG5n","media_type":"image/png","type":"base64"},"type":"image"}],"role":"user"},"type":"user"}`
 	if string(img) != want {
 		t.Errorf("with an image:\n%s\nwant\n%s", img, want)
@@ -114,4 +102,37 @@ func TestProfileText(t *testing.T) {
 			t.Errorf("%s: got %q, want %q", name, got, want)
 		}
 	}
+}
+
+// describe is an event as a short line, for comparing.
+func describe(e *bandav1.Event) string {
+	switch {
+	case e.GetAgentTextDelta() != nil:
+		return "agent_text_delta:" + e.GetAgentTextDelta().Text
+	case e.GetAgentText() != nil:
+		return "agent_text:" + e.GetAgentText().Text
+	case e.GetAgentThinking() != nil:
+		return "agent_thinking:" + e.GetAgentThinking().Text
+	case e.GetToolCall() != nil:
+		s := "tool_call:" + e.GetToolCall().Name + " " + e.GetToolCall().InputJson
+		if p := e.GetToolCall().ParentToolCallId; p != "" {
+			s += " parent=" + p
+		}
+		return s
+	case e.GetToolResult() != nil:
+		return "tool_result:" + e.GetToolResult().ToolCallId + " " + e.GetToolResult().Output
+	case e.GetTurnEnded() != nil:
+		if te := e.GetTurnEnded(); te.IsError {
+			return "turn_ended:true " + te.Error
+		}
+		return "turn_ended:false"
+	case e.GetPermissionRequested() != nil:
+		r := e.GetPermissionRequested()
+		return "permission_requested:" + r.ToolName + " " + r.InputJson
+	case e.GetPermissionResolved() != nil:
+		return "permission_resolved:" + e.GetPermissionResolved().Decision.String()
+	case e.GetPermissionModeChanged() != nil:
+		return "permission_mode_changed:" + e.GetPermissionModeChanged().Mode.String()
+	}
+	return ""
 }

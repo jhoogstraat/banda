@@ -10,6 +10,7 @@ COPY gen gen
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /runner ./cmd/runner
 
 FROM debian:trixie-slim AS sandbox
+# Bumping it runs `mise run contract` against the new CLI in CI.
 ARG CLAUDE_VERSION=2.1.301
 ENV DISABLE_AUTOUPDATER=1
 RUN apt-get update \

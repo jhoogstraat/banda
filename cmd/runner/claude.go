@@ -41,8 +41,8 @@ type line struct {
 	Result       string  `json:"result"`
 	DurationMS   int64   `json:"duration_ms"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
-	// The prompts still queued: all others written so far ran in this turn or before.
-	QueuedTurnCount int `json:"queued_turn_count"`
+	// The prompts this turn ended (their uuid): its own and those folded into it.
+	UserMessageUUIDs []string `json:"user_message_uuids"`
 	// system/api_retry
 	Error string `json:"error"`
 	// control_request (can_use_tool) and control_cancel_request
@@ -137,11 +137,12 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 	return events, false, false
 }
 
-// queuedTurns is how many prompts the CLI still queues after a result.
-func queuedTurns(raw []byte) int {
+// endedPrompts is how many prompts a result ended. The result's
+// queued_turn_count stays 0 while a prompt waits for its own turn.
+func endedPrompts(raw []byte) int {
 	var l line
 	json.Unmarshal(raw, &l)
-	return l.QueuedTurnCount
+	return len(l.UserMessageUUIDs)
 }
 
 // unsupportedRequest reports the id of a control request from the CLI that
@@ -155,7 +156,8 @@ func unsupportedRequest(raw []byte) (string, bool) {
 }
 
 // userMessage is the stream-json user message for a prompt: plain text, or a
-// text block followed by base64 image blocks (Messages API content).
+// text block followed by base64 image blocks (Messages API content). Its uuid
+// comes back in the user_message_uuids of the result that ends it.
 func userMessage(p *bandav1.Prompt) map[string]any {
 	var content any = p.Text
 	if len(p.Images) > 0 {
@@ -166,7 +168,7 @@ func userMessage(p *bandav1.Prompt) map[string]any {
 		}
 		content = blocks
 	}
-	return map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": content}}
+	return map[string]any{"type": "user", "uuid": sessionID(rand.Text()), "message": map[string]any{"role": "user", "content": content}}
 }
 
 // text flattens tool_result content, which is a string or a list of blocks.
@@ -238,6 +240,10 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	}
 
 	cmd := claudeCmd(ctx, args...)
+	// Subagents and Bash default to the background otherwise: one then ends after its
+	// turn and starts a turn of its own, which no prompt asked for and an idle suspend
+	// cuts short. See docs/research/claude-headless.md §3.
+	cmd.Env = append(os.Environ(), "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1")
 	cmd.Dir = work
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()

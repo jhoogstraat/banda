@@ -288,9 +288,8 @@ func run(ctx context.Context) error {
 				}
 				for _, e := range events {
 					if te := e.GetTurnEnded(); te != nil {
-						// The CLI folds prompts into a running turn, so a result can end
-						// several: all written but those it still queues.
-						ended := max(pending-queuedTurns(raw), 0)
+						// The CLI folds prompts into a running turn, so a result can end several.
+						ended := min(endedPrompts(raw), pending)
 						te.Prompts, pending = int32(ended), pending-ended
 					}
 					if r := e.GetPermissionRequested(); r != nil {

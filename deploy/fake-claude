@@ -1,7 +1,8 @@
 #!/bin/bash
 # Fake Claude Code for tests: logged in unless `auth logout` ran, and emits
-# stream-json turns like the real CLI, creating one file per prompt (holding
-# the prompt's stream-json line). Replies name the --model and --effort it was
+# stream-json turns like the real CLI (`mise run contract` checks the runner
+# against the real one; docs/development.md lists where this fake still
+# differs), creating one file per prompt (holding the prompt's stream-json line). Replies name the --model and --effort it was
 # started with, and the first line of the profile text in --append-system-prompt
 # (what follows Banda's own paragraph), if there is one. A prompt that mentions "preview" starts a web server on :5173
 # instead (the Browser tab). One that says "commit" also commits. "e2e-ask"
@@ -39,7 +40,8 @@
 #                     would, and says "MCP <tool>: <result text>".
 # An interrupt gets a result only while a turn runs (a hold), like the real CLI.
 # Before each result it reads what was sent meanwhile, as the real CLI reads stdin
-# during a turn, and reports the prompts still waiting as queued_turn_count.
+# during a turn. Each result lists the uuids of the prompts it ended
+# (user_message_uuids): its own and those folded into it.
 if [ "$1" = auth ]; then
   out="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.fake-logged-out"
   case "$2" in
@@ -91,13 +93,15 @@ tool() {
 say() {
   echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"$1\"}]},\"parent_tool_use_id\":null}"
   queued
-  echo '{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"queued_turn_count":'$nq'}'
+  echo '{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"user_message_uuids":['$uuids']}'
 }
 # ack <control_request line>: a success control_response to it.
 ack() { echo "{\"type\":\"control_response\",\"response\":{\"subtype\":\"success\",\"request_id\":\"$(sed -n 's/.*"request_id":"\([^"]*\)".*/\1/p' <<<"$1")\"}}"; }
-interrupted() { queued; echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1,"queued_turn_count":'$nq'}'; }
+interrupted() { queued; echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"interrupted","duration_ms":1,"terminal_reason":"aborted_tools","user_message_uuids":['$uuids']}'; }
 text() { jq -cn --arg t "$1" '{type:"assistant",message:{content:[{type:"text",text:$t}]},parent_tool_use_id:null}'; }
-result() { queued; echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":10,\"total_cost_usd\":$cost,\"queued_turn_count\":$nq}"; }
+result() { queued; echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":10,\"total_cost_usd\":$cost,\"user_message_uuids\":[$uuids]}"; }
+# uuid <user line>: its uuid, quoted for a JSON list.
+uuid() { jq -c '.uuid // empty' <<<"$1"; }
 # prompt <user line>: its text.
 prompt() { jq -r '.message.content | if type == "string" then . else map(select(.type == "text").text) | join("\n") end' <<<"$1"; }
 queue=()
@@ -105,8 +109,7 @@ queue=()
 next() {
   if [ ${#queue[@]} -gt 0 ]; then line=${queue[0]}; queue=("${queue[@]:1}"); else IFS= read -r line; fi
 }
-# queued: moves the lines sent so far into the queue and sets $nq to the
-# prompts among them, a result's queued_turn_count.
+# queued: moves the lines sent so far into the queue.
 queued() {
   local l rest s
   while :; do
@@ -115,8 +118,6 @@ queued() {
     elif [ $s -gt 128 ] && [ -n "$l" ] && IFS= read -r rest; then queue+=("$l$rest") # a line cut by the timeout
     else break; fi
   done
-  nq=0
-  for l in "${queue[@]}"; do [[ $l == *'"type":"user"'* ]] && nq=$((nq + 1)); done
 }
 # hold <name> [fold]: see e2e-hold and e2e-fold above. Fails if interrupted.
 hold() {
@@ -150,6 +151,7 @@ hold() {
     if [[ $q == *'"type":"user"'* ]]; then
       [[ $q == *e2e-echo* ]] && text "Received: $(prompt "$q")"
       text "Folded a message into this turn"
+      uuids+=",$(uuid "$q")"
     else
       kept+=("$q")
     fi
@@ -171,6 +173,7 @@ mcp() {
 while next; do
   cost=0.01
   if [[ $line == *'"type":"user"'* ]]; then
+    uuids=$(uuid "$line")
     [[ $line =~ e2e-cost:([0-9.]+) ]] && cost=${BASH_REMATCH[1]}
     if [[ $line == *e2e-echo* ]]; then
       text "Received: $(prompt "$line")"
@@ -221,7 +224,8 @@ while next; do
       ;;
     *e2e-plan*'"type":"user"'*)
       if [ "$mode" != plan ]; then say "Not in plan mode ($mode)"; continue; fi
-      tool "toolu_plan$RANDOM" ExitPlanMode '{"plan":"1. Write plan.txt\n2. Done"}' "User approved the plan"
+      # The model calls it with {}; the CLI adds the plan file's text and path.
+      tool "toolu_plan$RANDOM" ExitPlanMode '{"plan":"1. Write plan.txt\n2. Done","planFilePath":"/home/banda/.claude/plans/e2e-plan.md"}' "User has approved your plan."
       if [ -n "$ok" ]; then say "Plan approved"; else say "Keep planning: $out"; fi
       ;;
     *preview*'"type":"user"'*) # keys are sorted: the prompt comes first
@@ -232,7 +236,7 @@ while next; do
       queued
       cat <<JSON
 {"type":"assistant","message":{"content":[{"type":"text","text":"Serving on :5173"}]},"parent_tool_use_id":null}
-{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"queued_turn_count":$nq}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":10,"total_cost_usd":0,"user_message_uuids":[$uuids]}
 JSON
       ;;
     *'"type":"user"'*)
@@ -254,12 +258,12 @@ JSON
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_a$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"in_progress","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"pending","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_a$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
-{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_task$n","name":"Task","input":{"description":"Look around","prompt":"List the files","subagent_type":"Explore"}}]},"parent_tool_use_id":null}
-{"type":"user","message":{"role":"user","content":[{"type":"text","text":"List the files"}]},"parent_tool_use_id":"toolu_task$n"}
-{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_sub$n","name":"Glob","input":{"pattern":"*"}}]},"parent_tool_use_id":"toolu_task$n"}
-{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_sub$n","type":"tool_result","content":"README\nhello$n.txt","is_error":false}]},"parent_tool_use_id":"toolu_task$n"}
-{"type":"assistant","message":{"content":[{"type":"text","text":"Two files."}]},"parent_tool_use_id":"toolu_task$n"}
-{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_task$n","type":"tool_result","content":[{"type":"text","text":"There are two files: README and hello$n.txt."}]}]},"parent_tool_use_id":null}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_agent$n","name":"Agent","input":{"description":"Look around","prompt":"List the files","subagent_type":"Explore"}}]},"parent_tool_use_id":null}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"List the files"}]},"parent_tool_use_id":"toolu_agent$n"}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_sub$n","name":"Bash","input":{"command":"ls","description":"List files"}}]},"parent_tool_use_id":"toolu_agent$n"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_sub$n","type":"tool_result","content":"README\nhello$n.txt","is_error":false}]},"parent_tool_use_id":"toolu_agent$n"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Two files."}]},"parent_tool_use_id":"toolu_agent$n"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_agent$n","type":"tool_result","content":[{"type":"text","text":"There are two files: README and hello$n.txt."}]}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_bash$n","name":"Bash","input":{"command":"cat hello$n.txt","description":"Show the file"}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_bash$n","type":"tool_result","content":"hello $n","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_$n","name":"Write","input":{"file_path":"hello$n.txt","content":"hello $n\n"}}]},"parent_tool_use_id":null}
@@ -267,7 +271,7 @@ JSON
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
 $reply
-{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost,"queued_turn_count":$nq}
+{"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost,"user_message_uuids":[$uuids]}
 JSON
       ;;
   esac

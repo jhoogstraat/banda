@@ -12,12 +12,12 @@ test('a thread starts its sandbox, runs the first turn and has its file in the d
 	expect(await steps(t, 'setup', SetupState.SKIPPED)).toHaveLength(1); // the plain repo has no .banda/setup.sh
 });
 
-test('plans (TodoWrite) are stored; a subagent’s tool calls carry their Task call, its text is dropped', async ({ as }) => {
+test('plans (TodoWrite) are stored; a subagent’s tool calls carry their Agent call, its text is dropped', async ({ as }) => {
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const calls = await t.of('toolCall');
 	expect(calls.filter((c) => c.name === 'TodoWrite')).toHaveLength(2);
-	expect(calls.filter((c) => c.parentToolCallId === 'toolu_task1').map((c) => c.name)).toEqual(['Glob']);
+	expect(calls.filter((c) => c.parentToolCallId === 'toolu_agent1').map((c) => c.name)).toEqual(['Bash']);
 	expect((await t.of('agentText')).map((a) => a.text)).not.toContain('Two files.');
 });
 

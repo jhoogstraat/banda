@@ -21,7 +21,7 @@ What isn't proven is **real use**: no real Claude Code turn has run through Band
 
 Every risk left is the same one: the real thing behaves differently from the fake (agent, forge, cluster, terms). So no new features until real use asks for one. The milestones swap a fake for the real thing, cheapest first. Agents do the work marked for them; the rest needs Joshua.
 
-1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them.
+1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them. Built 2026-10-24: `mise run contract` and its CI job; left: a green CI run and the TodoWrite decision below.
 2. **Dogfood on this Mac** (Joshua; agents fix). The Phase 1 steps that need a person: your own Claude login, the GitHub App on github.com, bob on the LAN, a week of real work, ideally Banda building Banda. Each annoyance becomes a failing e2e test and a fix within a day.
 3. **Cold install** (agents rehearse it, Joshua runs it on the team cluster). Follow docs/deployment.md "Install" word for word on a fresh kind cluster, as a stranger would, and fix every gap in the page; an opt-in ServiceMonitor and alert rules for internal errors and full volumes; a recommendation on multi-node volumes (pin a user's pods to one node, or RWX). Done when one page takes an empty cluster to a signed-in team (vision goal 6).
 4. **Terms, then launch** (Joshua asks). The wording and a draft message are in docs/research/claude-terms.md: send it before the Usage Policy line takes effect on 2026-11-12. Decided meanwhile: on a subscription only the owner starts turns; teammate turns and trust need an API key (agents, now). The open-source launch waits for the answer.
@@ -47,11 +47,12 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Set up the GitHub App from Settings and connect (or add a `GIT_TOKEN` secret); check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
 - [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in docs/usage.md are enough and no more.
 - [ ] Verify against the real CLI what is only sourced from docs (PLAN.md, "Verified only partly" and "Not yet"):
-  - [ ] a real turn streams correctly (tool calls, thinking, subagents, the TodoWrite plan);
-  - [ ] `queued_turn_count` when a prompt is folded into a running turn;
-  - [ ] permission modes: `ask`, `accept edits`, `plan` with a real `ExitPlanMode`, `AskUserQuestion` answers, `EnterPlanMode`;
-  - [ ] switching profile, model and effort mid-thread with `--resume` and `--system-prompt-snapshot off`;
-  - [ ] the Banda MCP tools from a real agent (`list_threads`, `create_thread` with `wake_parent`).
+  - [x] a real turn streams correctly (tool calls, thinking, subagents): `mise run contract`. The subagent tool is `Agent`; background tasks are now off, or a subagent would start a turn of its own after the turn.
+  - [ ] the TodoWrite plan: the pinned CLI offers no `TodoWrite` in `-p`, so the plan never shows. Decide: map `TaskCreate`/`TaskUpdate` (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`) to the plan, or drop it.
+  - [x] folding a prompt into a running turn: `queued_turn_count` stays 0 even with a prompt queued, so the runner counts by `user_message_uuids` (a thread showed `awaiting_input` during a queued turn).
+  - [x] permission modes: `ask`, `accept edits`, `plan` with a real `ExitPlanMode`, `AskUserQuestion` answers, `EnterPlanMode` (contract).
+  - [x] switching profile, model and effort mid-thread with `--resume` and `--system-prompt-snapshot off` (contract: the resumed CLI sends them).
+  - [x] the Banda MCP tools reached from the real CLI through the runner's `--mcp-config` (contract, a stub server with their names); the real server with a real model still comes with dogfooding.
 - [ ] A second person on the LAN (bob) posts, mentions, requests a turn, forks; a handoff to bob with bob's own Claude login.
 - [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR.
 - [ ] Use it for a week; write down what's annoying.

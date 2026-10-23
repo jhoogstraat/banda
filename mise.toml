@@ -128,3 +128,18 @@ helm template banda deploy/helm/banda -n banda --set dex.enabled=true,ingress.en
 helm template banda deploy/helm/banda -n banda --set monitoring.serviceMonitor.enabled=true,monitoring.prometheusRule.enabled=true | grep -q 'kind: PrometheusRule'
 for k in base kind example; do kubectl kustomize --enable-helm deploy/kustomize/$k >/dev/null; done
 """
+
+[tasks.contract]
+description = "Contract tests (cmd/runner/contract_test.go): the runner against the real pinned claude in the sandbox image, offline, against a fake Messages API; args go to the test binary"
+run = """
+set -e
+c=${CONTAINER:-podman}
+i=${CONTRACT_IMAGE:-localhost/banda-sandbox:contract}
+# CONTRACT_IMAGE is built already (CI).
+[ -n "${CONTRACT_IMAGE:-}" ] || $c build -q -f deploy/sandbox.Dockerfile --target sandbox -t "$i" . >/dev/null
+d=$(mktemp -d)
+trap 'rm -rf "$d"' EXIT
+CGO_ENABLED=0 GOOS=linux GOARCH=$($c image inspect "$i" | jq -r '.[0].Architecture') go test -c -tags contract -o "$d/runner.test" ./cmd/runner
+# No network: claude reaches only the fake API inside the container. No login: a throwaway key, an empty config dir.
+$c run --rm --network none -e BANDA_CONTRACT=1 -v "$d:/contract:ro" --entrypoint /contract/runner.test "$i" -test.run Contract -test.v "$@"
+"""
