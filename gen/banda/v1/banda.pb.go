@@ -9703,6 +9703,7 @@ type ConnectResponse struct {
 	//	*ConnectResponse_HttpTunnel
 	//	*ConnectResponse_Permission
 	//	*ConnectResponse_Ping
+	//	*ConnectResponse_IdTokensChanged
 	Kind          isConnectResponse_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -9853,6 +9854,15 @@ func (x *ConnectResponse) GetPing() *Ping {
 	return nil
 }
 
+func (x *ConnectResponse) GetIdTokensChanged() *IdTokensChanged {
+	if x != nil {
+		if x, ok := x.Kind.(*ConnectResponse_IdTokensChanged); ok {
+			return x.IdTokensChanged
+		}
+	}
+	return nil
+}
+
 type isConnectResponse_Kind interface {
 	isConnectResponse_Kind()
 }
@@ -9907,6 +9917,11 @@ type ConnectResponse_Ping struct {
 	Ping *Ping `protobuf:"bytes,15,opt,name=ping,proto3,oneof"`
 }
 
+type ConnectResponse_IdTokensChanged struct {
+	// Sent on connect and when the team's audiences change: fetch IdTokens.
+	IdTokensChanged *IdTokensChanged `protobuf:"bytes,16,opt,name=id_tokens_changed,json=idTokensChanged,proto3,oneof"`
+}
+
 func (*ConnectResponse_Prompt) isConnectResponse_Kind() {}
 
 func (*ConnectResponse_Stop) isConnectResponse_Kind() {}
@@ -9930,6 +9945,8 @@ func (*ConnectResponse_HttpTunnel) isConnectResponse_Kind() {}
 func (*ConnectResponse_Permission) isConnectResponse_Kind() {}
 
 func (*ConnectResponse_Ping) isConnectResponse_Kind() {}
+
+func (*ConnectResponse_IdTokensChanged) isConnectResponse_Kind() {}
 
 // Answers a pending permission request (request_id set), or else configures
 // the agent: sent when the runner is ready and whenever the owner changes
@@ -12964,7 +12981,11 @@ type ListForgeReposResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The caller's most recently pushed repositories on each forge they have a
 	// token for, newest first; a forge that fails is left out.
-	Repos         []*ForgeRepo `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	Repos []*ForgeRepo `protobuf:"bytes,1,rep,name=repos,proto3" json:"repos,omitempty"`
+	// A host whose repositories aren't listed until the caller connects it.
+	ConnectHost string `protobuf:"bytes,2,opt,name=connect_host,json=connectHost,proto3" json:"connect_host,omitempty"`
+	// Its forge: "github" or "gitlab".
+	ConnectForge  string `protobuf:"bytes,3,opt,name=connect_forge,json=connectForge,proto3" json:"connect_forge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -13004,6 +13025,20 @@ func (x *ListForgeReposResponse) GetRepos() []*ForgeRepo {
 		return x.Repos
 	}
 	return nil
+}
+
+func (x *ListForgeReposResponse) GetConnectHost() string {
+	if x != nil {
+		return x.ConnectHost
+	}
+	return ""
+}
+
+func (x *ListForgeReposResponse) GetConnectForge() string {
+	if x != nil {
+		return x.ConnectForge
+	}
+	return ""
 }
 
 type ForgeRepo struct {
@@ -13728,6 +13763,2214 @@ func (*AddRepositoryResponse) Descriptor() ([]byte, []int) {
 	return file_banda_v1_banda_proto_rawDescGZIP(), []int{215}
 }
 
+type IdTokensChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdTokensChanged) Reset() {
+	*x = IdTokensChanged{}
+	mi := &file_banda_v1_banda_proto_msgTypes[216]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdTokensChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdTokensChanged) ProtoMessage() {}
+
+func (x *IdTokensChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[216]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdTokensChanged.ProtoReflect.Descriptor instead.
+func (*IdTokensChanged) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{216}
+}
+
+type IdTokensRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdTokensRequest) Reset() {
+	*x = IdTokensRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[217]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdTokensRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdTokensRequest) ProtoMessage() {}
+
+func (x *IdTokensRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[217]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdTokensRequest.ProtoReflect.Descriptor instead.
+func (*IdTokensRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{217}
+}
+
+func (x *IdTokensRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *IdTokensRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type IdTokensResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every audience's; files of audiences not listed go.
+	Tokens []*IdToken `protobuf:"bytes,1,rep,name=tokens,proto3" json:"tokens,omitempty"`
+	// When to fetch again.
+	RefreshSeconds int32 `protobuf:"varint,2,opt,name=refresh_seconds,json=refreshSeconds,proto3" json:"refresh_seconds,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *IdTokensResponse) Reset() {
+	*x = IdTokensResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[218]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdTokensResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdTokensResponse) ProtoMessage() {}
+
+func (x *IdTokensResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[218]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdTokensResponse.ProtoReflect.Descriptor instead.
+func (*IdTokensResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{218}
+}
+
+func (x *IdTokensResponse) GetTokens() []*IdToken {
+	if x != nil {
+		return x.Tokens
+	}
+	return nil
+}
+
+func (x *IdTokensResponse) GetRefreshSeconds() int32 {
+	if x != nil {
+		return x.RefreshSeconds
+	}
+	return 0
+}
+
+type IdToken struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Audience string                 `protobuf:"bytes,1,opt,name=audience,proto3" json:"audience,omitempty"`
+	// The file name in BANDA_ID_TOKEN_DIR.
+	File string `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
+	// A JWT signed by the issuer (internal/identity).
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdToken) Reset() {
+	*x = IdToken{}
+	mi := &file_banda_v1_banda_proto_msgTypes[219]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdToken) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdToken) ProtoMessage() {}
+
+func (x *IdToken) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[219]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdToken.ProtoReflect.Descriptor instead.
+func (*IdToken) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{219}
+}
+
+func (x *IdToken) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+func (x *IdToken) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *IdToken) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *IdToken) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type GetWorkloadIdentityRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWorkloadIdentityRequest) Reset() {
+	*x = GetWorkloadIdentityRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[220]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWorkloadIdentityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWorkloadIdentityRequest) ProtoMessage() {}
+
+func (x *GetWorkloadIdentityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[220]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWorkloadIdentityRequest.ProtoReflect.Descriptor instead.
+func (*GetWorkloadIdentityRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{220}
+}
+
+type GetWorkloadIdentityResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// PUBLIC_URL: the iss claim and where discovery is.
+	Issuer    string             `protobuf:"bytes,1,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	JwksUrl   string             `protobuf:"bytes,2,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
+	Audiences []*IdTokenAudience `protobuf:"bytes,3,rep,name=audiences,proto3" json:"audiences,omitempty"`
+	// The repositories of the team's threads as the repo claim names them,
+	// most recently used first, for the recipes.
+	Repos []string `protobuf:"bytes,4,rep,name=repos,proto3" json:"repos,omitempty"`
+	// The caller's sign-in email: their tokens' sub is user:<email>.
+	Email         string `protobuf:"bytes,5,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWorkloadIdentityResponse) Reset() {
+	*x = GetWorkloadIdentityResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[221]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWorkloadIdentityResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWorkloadIdentityResponse) ProtoMessage() {}
+
+func (x *GetWorkloadIdentityResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[221]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWorkloadIdentityResponse.ProtoReflect.Descriptor instead.
+func (*GetWorkloadIdentityResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{221}
+}
+
+func (x *GetWorkloadIdentityResponse) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *GetWorkloadIdentityResponse) GetJwksUrl() string {
+	if x != nil {
+		return x.JwksUrl
+	}
+	return ""
+}
+
+func (x *GetWorkloadIdentityResponse) GetAudiences() []*IdTokenAudience {
+	if x != nil {
+		return x.Audiences
+	}
+	return nil
+}
+
+func (x *GetWorkloadIdentityResponse) GetRepos() []string {
+	if x != nil {
+		return x.Repos
+	}
+	return nil
+}
+
+func (x *GetWorkloadIdentityResponse) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type IdTokenAudience struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Audience string                 `protobuf:"bytes,1,opt,name=audience,proto3" json:"audience,omitempty"`
+	// Where thread pods find its token.
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	AddedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
+	AddedBy       string                 `protobuf:"bytes,4,opt,name=added_by,json=addedBy,proto3" json:"added_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdTokenAudience) Reset() {
+	*x = IdTokenAudience{}
+	mi := &file_banda_v1_banda_proto_msgTypes[222]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdTokenAudience) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdTokenAudience) ProtoMessage() {}
+
+func (x *IdTokenAudience) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[222]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdTokenAudience.ProtoReflect.Descriptor instead.
+func (*IdTokenAudience) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{222}
+}
+
+func (x *IdTokenAudience) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+func (x *IdTokenAudience) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *IdTokenAudience) GetAddedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AddedAt
+	}
+	return nil
+}
+
+func (x *IdTokenAudience) GetAddedBy() string {
+	if x != nil {
+		return x.AddedBy
+	}
+	return ""
+}
+
+type AddIdTokenAudienceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Audience      string                 `protobuf:"bytes,1,opt,name=audience,proto3" json:"audience,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddIdTokenAudienceRequest) Reset() {
+	*x = AddIdTokenAudienceRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[223]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddIdTokenAudienceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddIdTokenAudienceRequest) ProtoMessage() {}
+
+func (x *AddIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[223]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddIdTokenAudienceRequest.ProtoReflect.Descriptor instead.
+func (*AddIdTokenAudienceRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{223}
+}
+
+func (x *AddIdTokenAudienceRequest) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+type AddIdTokenAudienceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddIdTokenAudienceResponse) Reset() {
+	*x = AddIdTokenAudienceResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[224]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddIdTokenAudienceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddIdTokenAudienceResponse) ProtoMessage() {}
+
+func (x *AddIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[224]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddIdTokenAudienceResponse.ProtoReflect.Descriptor instead.
+func (*AddIdTokenAudienceResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{224}
+}
+
+type RemoveIdTokenAudienceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Audience      string                 `protobuf:"bytes,1,opt,name=audience,proto3" json:"audience,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveIdTokenAudienceRequest) Reset() {
+	*x = RemoveIdTokenAudienceRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[225]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveIdTokenAudienceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveIdTokenAudienceRequest) ProtoMessage() {}
+
+func (x *RemoveIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[225]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveIdTokenAudienceRequest.ProtoReflect.Descriptor instead.
+func (*RemoveIdTokenAudienceRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{225}
+}
+
+func (x *RemoveIdTokenAudienceRequest) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+type RemoveIdTokenAudienceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveIdTokenAudienceResponse) Reset() {
+	*x = RemoveIdTokenAudienceResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[226]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveIdTokenAudienceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveIdTokenAudienceResponse) ProtoMessage() {}
+
+func (x *RemoveIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[226]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveIdTokenAudienceResponse.ProtoReflect.Descriptor instead.
+func (*RemoveIdTokenAudienceResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{226}
+}
+
+type GetGitHubRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGitHubRequest) Reset() {
+	*x = GetGitHubRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[227]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGitHubRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGitHubRequest) ProtoMessage() {}
+
+func (x *GetGitHubRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[227]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGitHubRequest.ProtoReflect.Descriptor instead.
+func (*GetGitHubRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{227}
+}
+
+type GetGitHubResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset: no GitHub App yet.
+	App *GitHubApp `protobuf:"bytes,1,opt,name=app,proto3" json:"app,omitempty"`
+	// The caller's, unset: not connected.
+	Connection *ForgeConnection `protobuf:"bytes,2,opt,name=connection,proto3" json:"connection,omitempty"`
+	// GitHub hosts the app can be created on: github.com and FORGE_HOSTS'.
+	Hosts []string `protobuf:"bytes,3,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	// The caller has a GIT_TOKEN secret (deprecated for the app's host).
+	LegacyToken bool `protobuf:"varint,4,opt,name=legacy_token,json=legacyToken,proto3" json:"legacy_token,omitempty"`
+	// The latest time someone created, replaced or removed the app; unset if never.
+	LastChange *GitHubAppChange `protobuf:"bytes,5,opt,name=last_change,json=lastChange,proto3" json:"last_change,omitempty"`
+	// The app the caller just created on the forge wasn't what Banda asked for, so Banda didn't keep it.
+	Refusal       *GitHubAppRefusal `protobuf:"bytes,6,opt,name=refusal,proto3" json:"refusal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGitHubResponse) Reset() {
+	*x = GetGitHubResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[228]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGitHubResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGitHubResponse) ProtoMessage() {}
+
+func (x *GetGitHubResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[228]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGitHubResponse.ProtoReflect.Descriptor instead.
+func (*GetGitHubResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{228}
+}
+
+func (x *GetGitHubResponse) GetApp() *GitHubApp {
+	if x != nil {
+		return x.App
+	}
+	return nil
+}
+
+func (x *GetGitHubResponse) GetConnection() *ForgeConnection {
+	if x != nil {
+		return x.Connection
+	}
+	return nil
+}
+
+func (x *GetGitHubResponse) GetHosts() []string {
+	if x != nil {
+		return x.Hosts
+	}
+	return nil
+}
+
+func (x *GetGitHubResponse) GetLegacyToken() bool {
+	if x != nil {
+		return x.LegacyToken
+	}
+	return false
+}
+
+func (x *GetGitHubResponse) GetLastChange() *GitHubAppChange {
+	if x != nil {
+		return x.LastChange
+	}
+	return nil
+}
+
+func (x *GetGitHubResponse) GetRefusal() *GitHubAppRefusal {
+	if x != nil {
+		return x.Refusal
+	}
+	return nil
+}
+
+type GitHubAppChange struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "created", "replaced" or "removed"
+	Action string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+	By     string                 `protobuf:"bytes,2,opt,name=by,proto3" json:"by,omitempty"`
+	At     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	Host   string                 `protobuf:"bytes,4,opt,name=host,proto3" json:"host,omitempty"`
+	// The app it put in place; empty on remove.
+	Slug  string `protobuf:"bytes,5,opt,name=slug,proto3" json:"slug,omitempty"`
+	Owner string `protobuf:"bytes,6,opt,name=owner,proto3" json:"owner,omitempty"`
+	// The app it replaced or removed; empty on create.
+	WasSlug       string `protobuf:"bytes,7,opt,name=was_slug,json=wasSlug,proto3" json:"was_slug,omitempty"`
+	WasOwner      string `protobuf:"bytes,8,opt,name=was_owner,json=wasOwner,proto3" json:"was_owner,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubAppChange) Reset() {
+	*x = GitHubAppChange{}
+	mi := &file_banda_v1_banda_proto_msgTypes[229]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAppChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAppChange) ProtoMessage() {}
+
+func (x *GitHubAppChange) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[229]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAppChange.ProtoReflect.Descriptor instead.
+func (*GitHubAppChange) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{229}
+}
+
+func (x *GitHubAppChange) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetBy() string {
+	if x != nil {
+		return x.By
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+func (x *GitHubAppChange) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetWasSlug() string {
+	if x != nil {
+		return x.WasSlug
+	}
+	return ""
+}
+
+func (x *GitHubAppChange) GetWasOwner() string {
+	if x != nil {
+		return x.WasOwner
+	}
+	return ""
+}
+
+type GitHubAppRefusal struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How it differs, e.g. "public, other permissions".
+	Reason string `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Where its owner deletes it on the forge.
+	DeleteUrl     string `protobuf:"bytes,2,opt,name=delete_url,json=deleteUrl,proto3" json:"delete_url,omitempty"`
+	Slug          string `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubAppRefusal) Reset() {
+	*x = GitHubAppRefusal{}
+	mi := &file_banda_v1_banda_proto_msgTypes[230]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAppRefusal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAppRefusal) ProtoMessage() {}
+
+func (x *GitHubAppRefusal) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[230]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAppRefusal.ProtoReflect.Descriptor instead.
+func (*GitHubAppRefusal) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{230}
+}
+
+func (x *GitHubAppRefusal) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *GitHubAppRefusal) GetDeleteUrl() string {
+	if x != nil {
+		return x.DeleteUrl
+	}
+	return ""
+}
+
+func (x *GitHubAppRefusal) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+type GitHubApp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Host  string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Slug  string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	// The app's page and where it is installed, on the forge.
+	Url        string `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	InstallUrl string `protobuf:"bytes,4,opt,name=install_url,json=installUrl,proto3" json:"install_url,omitempty"`
+	// Who created it from Settings, and when; empty when it was made by hand (a Secret from Helm or GitOps).
+	CreatedBy string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// The account that owns it.
+	Owner string `protobuf:"bytes,7,opt,name=owner,proto3" json:"owner,omitempty"`
+	// Its Secret is there but unusable, and why.
+	Error string `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	// A user account owns it: whoever that is reaches every repository it is installed on.
+	Personal      bool `protobuf:"varint,9,opt,name=personal,proto3" json:"personal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubApp) Reset() {
+	*x = GitHubApp{}
+	mi := &file_banda_v1_banda_proto_msgTypes[231]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubApp) ProtoMessage() {}
+
+func (x *GitHubApp) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[231]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubApp.ProtoReflect.Descriptor instead.
+func (*GitHubApp) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{231}
+}
+
+func (x *GitHubApp) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetInstallUrl() string {
+	if x != nil {
+		return x.InstallUrl
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *GitHubApp) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitHubApp) GetPersonal() bool {
+	if x != nil {
+		return x.Personal
+	}
+	return false
+}
+
+// A user's OAuth connection to a forge host.
+type ForgeConnection struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Host  string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// "github" or "gitlab"
+	Forge       string                 `protobuf:"bytes,2,opt,name=forge,proto3" json:"forge,omitempty"`
+	Login       string                 `protobuf:"bytes,3,opt,name=login,proto3" json:"login,omitempty"`
+	AvatarUrl   string                 `protobuf:"bytes,4,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	ConnectedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"`
+	// The forge no longer accepts it (revoked, expired): connect again.
+	Broken        bool `protobuf:"varint,6,opt,name=broken,proto3" json:"broken,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForgeConnection) Reset() {
+	*x = ForgeConnection{}
+	mi := &file_banda_v1_banda_proto_msgTypes[232]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForgeConnection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForgeConnection) ProtoMessage() {}
+
+func (x *ForgeConnection) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[232]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForgeConnection.ProtoReflect.Descriptor instead.
+func (*ForgeConnection) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{232}
+}
+
+func (x *ForgeConnection) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *ForgeConnection) GetForge() string {
+	if x != nil {
+		return x.Forge
+	}
+	return ""
+}
+
+func (x *ForgeConnection) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *ForgeConnection) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *ForgeConnection) GetConnectedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ConnectedAt
+	}
+	return nil
+}
+
+func (x *ForgeConnection) GetBroken() bool {
+	if x != nil {
+		return x.Broken
+	}
+	return false
+}
+
+type GitHubAppManifestRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty is github.com.
+	Host string `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// Empty: the caller's own account.
+	Organization string `protobuf:"bytes,2,opt,name=organization,proto3" json:"organization,omitempty"`
+	// Replace the team's app, which ends everyone's connection to it. Without
+	// it, creating one while there is an app is refused.
+	Replace       bool `protobuf:"varint,3,opt,name=replace,proto3" json:"replace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubAppManifestRequest) Reset() {
+	*x = GitHubAppManifestRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[233]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAppManifestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAppManifestRequest) ProtoMessage() {}
+
+func (x *GitHubAppManifestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[233]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAppManifestRequest.ProtoReflect.Descriptor instead.
+func (*GitHubAppManifestRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{233}
+}
+
+func (x *GitHubAppManifestRequest) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *GitHubAppManifestRequest) GetOrganization() string {
+	if x != nil {
+		return x.Organization
+	}
+	return ""
+}
+
+func (x *GitHubAppManifestRequest) GetReplace() bool {
+	if x != nil {
+		return x.Replace
+	}
+	return false
+}
+
+type GitHubAppManifestResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Where the browser posts the form, with the manifest field.
+	Url           string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Manifest      string `protobuf:"bytes,2,opt,name=manifest,proto3" json:"manifest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitHubAppManifestResponse) Reset() {
+	*x = GitHubAppManifestResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[234]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubAppManifestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubAppManifestResponse) ProtoMessage() {}
+
+func (x *GitHubAppManifestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[234]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubAppManifestResponse.ProtoReflect.Descriptor instead.
+func (*GitHubAppManifestResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{234}
+}
+
+func (x *GitHubAppManifestResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *GitHubAppManifestResponse) GetManifest() string {
+	if x != nil {
+		return x.Manifest
+	}
+	return ""
+}
+
+type ListGitHubInstallationsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ask the forge now: the browser is back from installing.
+	Fresh         bool `protobuf:"varint,1,opt,name=fresh,proto3" json:"fresh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGitHubInstallationsRequest) Reset() {
+	*x = ListGitHubInstallationsRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[235]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGitHubInstallationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGitHubInstallationsRequest) ProtoMessage() {}
+
+func (x *ListGitHubInstallationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[235]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGitHubInstallationsRequest.ProtoReflect.Descriptor instead.
+func (*ListGitHubInstallationsRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{235}
+}
+
+func (x *ListGitHubInstallationsRequest) GetFresh() bool {
+	if x != nil {
+		return x.Fresh
+	}
+	return false
+}
+
+type ListGitHubInstallationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Installations []*GitHubInstallation  `protobuf:"bytes,1,rep,name=installations,proto3" json:"installations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGitHubInstallationsResponse) Reset() {
+	*x = ListGitHubInstallationsResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[236]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGitHubInstallationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGitHubInstallationsResponse) ProtoMessage() {}
+
+func (x *ListGitHubInstallationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[236]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGitHubInstallationsResponse.ProtoReflect.Descriptor instead.
+func (*ListGitHubInstallationsResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{236}
+}
+
+func (x *ListGitHubInstallationsResponse) GetInstallations() []*GitHubInstallation {
+	if x != nil {
+		return x.Installations
+	}
+	return nil
+}
+
+type GitHubInstallation struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Account   string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	AvatarUrl string                 `protobuf:"bytes,2,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	// All the account's repositories, or repositories of them.
+	AllRepositories bool   `protobuf:"varint,3,opt,name=all_repositories,json=allRepositories,proto3" json:"all_repositories,omitempty"`
+	Repositories    int32  `protobuf:"varint,4,opt,name=repositories,proto3" json:"repositories,omitempty"`
+	ManageUrl       string `protobuf:"bytes,5,opt,name=manage_url,json=manageUrl,proto3" json:"manage_url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GitHubInstallation) Reset() {
+	*x = GitHubInstallation{}
+	mi := &file_banda_v1_banda_proto_msgTypes[237]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitHubInstallation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubInstallation) ProtoMessage() {}
+
+func (x *GitHubInstallation) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[237]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubInstallation.ProtoReflect.Descriptor instead.
+func (*GitHubInstallation) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{237}
+}
+
+func (x *GitHubInstallation) GetAccount() string {
+	if x != nil {
+		return x.Account
+	}
+	return ""
+}
+
+func (x *GitHubInstallation) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *GitHubInstallation) GetAllRepositories() bool {
+	if x != nil {
+		return x.AllRepositories
+	}
+	return false
+}
+
+func (x *GitHubInstallation) GetRepositories() int32 {
+	if x != nil {
+		return x.Repositories
+	}
+	return 0
+}
+
+func (x *GitHubInstallation) GetManageUrl() string {
+	if x != nil {
+		return x.ManageUrl
+	}
+	return ""
+}
+
+type RemoveGitHubAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveGitHubAppRequest) Reset() {
+	*x = RemoveGitHubAppRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[238]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveGitHubAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveGitHubAppRequest) ProtoMessage() {}
+
+func (x *RemoveGitHubAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[238]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveGitHubAppRequest.ProtoReflect.Descriptor instead.
+func (*RemoveGitHubAppRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{238}
+}
+
+type RemoveGitHubAppResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveGitHubAppResponse) Reset() {
+	*x = RemoveGitHubAppResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[239]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveGitHubAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveGitHubAppResponse) ProtoMessage() {}
+
+func (x *RemoveGitHubAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[239]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveGitHubAppResponse.ProtoReflect.Descriptor instead.
+func (*RemoveGitHubAppResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{239}
+}
+
+type DisconnectGitHubRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectGitHubRequest) Reset() {
+	*x = DisconnectGitHubRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[240]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectGitHubRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectGitHubRequest) ProtoMessage() {}
+
+func (x *DisconnectGitHubRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[240]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectGitHubRequest.ProtoReflect.Descriptor instead.
+func (*DisconnectGitHubRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{240}
+}
+
+type DisconnectGitHubResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectGitHubResponse) Reset() {
+	*x = DisconnectGitHubResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[241]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectGitHubResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectGitHubResponse) ProtoMessage() {}
+
+func (x *DisconnectGitHubResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[241]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectGitHubResponse.ProtoReflect.Descriptor instead.
+func (*DisconnectGitHubResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{241}
+}
+
+type GitCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitCredentialRequest) Reset() {
+	*x = GitCredentialRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[242]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitCredentialRequest) ProtoMessage() {}
+
+func (x *GitCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[242]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitCredentialRequest.ProtoReflect.Descriptor instead.
+func (*GitCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{242}
+}
+
+func (x *GitCredentialRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *GitCredentialRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type GitCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitCredentialResponse) Reset() {
+	*x = GitCredentialResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[243]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitCredentialResponse) ProtoMessage() {}
+
+func (x *GitCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[243]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitCredentialResponse.ProtoReflect.Descriptor instead.
+func (*GitCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{243}
+}
+
+func (x *GitCredentialResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *GitCredentialResponse) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *GitCredentialResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type GetGitLabRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGitLabRequest) Reset() {
+	*x = GetGitLabRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[244]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGitLabRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGitLabRequest) ProtoMessage() {}
+
+func (x *GetGitLabRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[244]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGitLabRequest.ProtoReflect.Descriptor instead.
+func (*GetGitLabRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{244}
+}
+
+type GetGitLabResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// GitLab hosts: gitlab.com and FORGE_HOSTS', gitlab.com first.
+	Hosts []*GitLabHost `protobuf:"bytes,1,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	// Where GitLab sends browsers back: the application's Redirect URI.
+	RedirectUri string `protobuf:"bytes,2,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
+	// The scopes the application needs: Banda's and git's.
+	Scopes []string `protobuf:"bytes,3,rep,name=scopes,proto3" json:"scopes,omitempty"`
+	// The caller has a GITLAB_TOKEN or GIT_TOKEN secret (deprecated where an application is).
+	LegacyToken   bool `protobuf:"varint,4,opt,name=legacy_token,json=legacyToken,proto3" json:"legacy_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGitLabResponse) Reset() {
+	*x = GetGitLabResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[245]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGitLabResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGitLabResponse) ProtoMessage() {}
+
+func (x *GetGitLabResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[245]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGitLabResponse.ProtoReflect.Descriptor instead.
+func (*GetGitLabResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{245}
+}
+
+func (x *GetGitLabResponse) GetHosts() []*GitLabHost {
+	if x != nil {
+		return x.Hosts
+	}
+	return nil
+}
+
+func (x *GetGitLabResponse) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
+	}
+	return ""
+}
+
+func (x *GetGitLabResponse) GetScopes() []string {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
+func (x *GetGitLabResponse) GetLegacyToken() bool {
+	if x != nil {
+		return x.LegacyToken
+	}
+	return false
+}
+
+type GitLabHost struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Host  string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// Unset: no application on this host yet.
+	App *GitLabApp `protobuf:"bytes,2,opt,name=app,proto3" json:"app,omitempty"`
+	// The caller's, unset: not connected.
+	Connection   *ForgeConnection `protobuf:"bytes,3,opt,name=connection,proto3" json:"connection,omitempty"`
+	AdminAppsUrl string           `protobuf:"bytes,5,opt,name=admin_apps_url,json=adminAppsUrl,proto3" json:"admin_apps_url,omitempty"`
+	GroupAppsUrl string           `protobuf:"bytes,6,opt,name=group_apps_url,json=groupAppsUrl,proto3" json:"group_apps_url,omitempty"`
+	// The latest time someone set up, replaced or removed its application; unset if never.
+	LastChange    *GitLabAppChange `protobuf:"bytes,7,opt,name=last_change,json=lastChange,proto3" json:"last_change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitLabHost) Reset() {
+	*x = GitLabHost{}
+	mi := &file_banda_v1_banda_proto_msgTypes[246]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitLabHost) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitLabHost) ProtoMessage() {}
+
+func (x *GitLabHost) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[246]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitLabHost.ProtoReflect.Descriptor instead.
+func (*GitLabHost) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{246}
+}
+
+func (x *GitLabHost) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *GitLabHost) GetApp() *GitLabApp {
+	if x != nil {
+		return x.App
+	}
+	return nil
+}
+
+func (x *GitLabHost) GetConnection() *ForgeConnection {
+	if x != nil {
+		return x.Connection
+	}
+	return nil
+}
+
+func (x *GitLabHost) GetAdminAppsUrl() string {
+	if x != nil {
+		return x.AdminAppsUrl
+	}
+	return ""
+}
+
+func (x *GitLabHost) GetGroupAppsUrl() string {
+	if x != nil {
+		return x.GroupAppsUrl
+	}
+	return ""
+}
+
+func (x *GitLabHost) GetLastChange() *GitLabAppChange {
+	if x != nil {
+		return x.LastChange
+	}
+	return nil
+}
+
+type GitLabAppChange struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "created", "replaced" or "removed"
+	Action string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+	By     string                 `protobuf:"bytes,2,opt,name=by,proto3" json:"by,omitempty"`
+	At     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	// The application it put in place; empty on remove.
+	ApplicationId string `protobuf:"bytes,4,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	// The one it replaced or removed; empty on create.
+	WasApplicationId string `protobuf:"bytes,5,opt,name=was_application_id,json=wasApplicationId,proto3" json:"was_application_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *GitLabAppChange) Reset() {
+	*x = GitLabAppChange{}
+	mi := &file_banda_v1_banda_proto_msgTypes[247]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitLabAppChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitLabAppChange) ProtoMessage() {}
+
+func (x *GitLabAppChange) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[247]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitLabAppChange.ProtoReflect.Descriptor instead.
+func (*GitLabAppChange) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{247}
+}
+
+func (x *GitLabAppChange) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *GitLabAppChange) GetBy() string {
+	if x != nil {
+		return x.By
+	}
+	return ""
+}
+
+func (x *GitLabAppChange) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+func (x *GitLabAppChange) GetApplicationId() string {
+	if x != nil {
+		return x.ApplicationId
+	}
+	return ""
+}
+
+func (x *GitLabAppChange) GetWasApplicationId() string {
+	if x != nil {
+		return x.WasApplicationId
+	}
+	return ""
+}
+
+type GitLabApp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Public: GitLab shows it in every authorize URL. The secret is never returned.
+	ApplicationId string `protobuf:"bytes,1,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	// Who set it up from Settings, and when; empty when made by hand (a Secret from Helm or GitOps).
+	CreatedBy string                 `protobuf:"bytes,2,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Its Secret is there but unusable, and why.
+	Error string `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	// GitLab refused its ID or secret when renewing a connection: someone
+	// changed or deleted it on GitLab. Connections keep their tokens meanwhile.
+	NeedsAttention bool `protobuf:"varint,5,opt,name=needs_attention,json=needsAttention,proto3" json:"needs_attention,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GitLabApp) Reset() {
+	*x = GitLabApp{}
+	mi := &file_banda_v1_banda_proto_msgTypes[248]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitLabApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitLabApp) ProtoMessage() {}
+
+func (x *GitLabApp) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[248]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitLabApp.ProtoReflect.Descriptor instead.
+func (*GitLabApp) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{248}
+}
+
+func (x *GitLabApp) GetApplicationId() string {
+	if x != nil {
+		return x.ApplicationId
+	}
+	return ""
+}
+
+func (x *GitLabApp) GetCreatedBy() string {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return ""
+}
+
+func (x *GitLabApp) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *GitLabApp) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *GitLabApp) GetNeedsAttention() bool {
+	if x != nil {
+		return x.NeedsAttention
+	}
+	return false
+}
+
+type SetGitLabAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	ApplicationId string                 `protobuf:"bytes,2,opt,name=application_id,json=applicationId,proto3" json:"application_id,omitempty"`
+	Secret        string                 `protobuf:"bytes,3,opt,name=secret,proto3" json:"secret,omitempty"`
+	// Replace the host's application, which ends everyone's connection through
+	// it. Without it, setting one up while there is one is refused.
+	Replace       bool `protobuf:"varint,4,opt,name=replace,proto3" json:"replace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetGitLabAppRequest) Reset() {
+	*x = SetGitLabAppRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[249]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetGitLabAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetGitLabAppRequest) ProtoMessage() {}
+
+func (x *SetGitLabAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[249]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetGitLabAppRequest.ProtoReflect.Descriptor instead.
+func (*SetGitLabAppRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{249}
+}
+
+func (x *SetGitLabAppRequest) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *SetGitLabAppRequest) GetApplicationId() string {
+	if x != nil {
+		return x.ApplicationId
+	}
+	return ""
+}
+
+func (x *SetGitLabAppRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *SetGitLabAppRequest) GetReplace() bool {
+	if x != nil {
+		return x.Replace
+	}
+	return false
+}
+
+type SetGitLabAppResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetGitLabAppResponse) Reset() {
+	*x = SetGitLabAppResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[250]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetGitLabAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetGitLabAppResponse) ProtoMessage() {}
+
+func (x *SetGitLabAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[250]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetGitLabAppResponse.ProtoReflect.Descriptor instead.
+func (*SetGitLabAppResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{250}
+}
+
+type RemoveGitLabAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveGitLabAppRequest) Reset() {
+	*x = RemoveGitLabAppRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[251]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveGitLabAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveGitLabAppRequest) ProtoMessage() {}
+
+func (x *RemoveGitLabAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[251]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveGitLabAppRequest.ProtoReflect.Descriptor instead.
+func (*RemoveGitLabAppRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{251}
+}
+
+func (x *RemoveGitLabAppRequest) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+type RemoveGitLabAppResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveGitLabAppResponse) Reset() {
+	*x = RemoveGitLabAppResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[252]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveGitLabAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveGitLabAppResponse) ProtoMessage() {}
+
+func (x *RemoveGitLabAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[252]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveGitLabAppResponse.ProtoReflect.Descriptor instead.
+func (*RemoveGitLabAppResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{252}
+}
+
+type DisconnectGitLabRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectGitLabRequest) Reset() {
+	*x = DisconnectGitLabRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[253]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectGitLabRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectGitLabRequest) ProtoMessage() {}
+
+func (x *DisconnectGitLabRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[253]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectGitLabRequest.ProtoReflect.Descriptor instead.
+func (*DisconnectGitLabRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{253}
+}
+
+func (x *DisconnectGitLabRequest) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+type DisconnectGitLabResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectGitLabResponse) Reset() {
+	*x = DisconnectGitLabResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[254]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectGitLabResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectGitLabResponse) ProtoMessage() {}
+
+func (x *DisconnectGitLabResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[254]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectGitLabResponse.ProtoReflect.Descriptor instead.
+func (*DisconnectGitLabResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{254}
+}
+
 var File_banda_v1_banda_proto protoreflect.FileDescriptor
 
 const file_banda_v1_banda_proto_rawDesc = "" +
@@ -14300,7 +16543,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\ttruncated\x18\x03 \x01(\bR\ttruncated\x12\x18\n" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12\x16\n" +
 	"\x06binary\x18\x05 \x01(\bR\x06binary\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05error\"\xb5\x05\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\"\xfe\x05\n" +
 	"\x0fConnectResponse\x12*\n" +
 	"\x06prompt\x18\x01 \x01(\v2\x10.banda.v1.PromptH\x00R\x06prompt\x12$\n" +
 	"\x04stop\x18\x02 \x01(\v2\x0e.banda.v1.StopH\x00R\x04stop\x12$\n" +
@@ -14316,7 +16559,8 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
 	"permission\x18\x0e \x01(\v2\x1b.banda.v1.PermissionCommandH\x00R\n" +
 	"permission\x12$\n" +
-	"\x04ping\x18\x0f \x01(\v2\x0e.banda.v1.PingH\x00R\x04pingB\x06\n" +
+	"\x04ping\x18\x0f \x01(\v2\x0e.banda.v1.PingH\x00R\x04ping\x12G\n" +
+	"\x11id_tokens_changed\x18\x10 \x01(\v2\x19.banda.v1.IdTokensChangedH\x00R\x0fidTokensChangedB\x06\n" +
 	"\x04kind\"\x87\x03\n" +
 	"\x11PermissionCommand\x12\x1d\n" +
 	"\n" +
@@ -14542,9 +16786,11 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x1aPullRequestCommentResponse\x128\n" +
 	"\fpull_request\x18\x01 \x01(\v2\x15.banda.v1.PullRequestR\vpullRequest\"-\n" +
 	"\x15ListForgeReposRequest\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\"C\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"\x8b\x01\n" +
 	"\x16ListForgeReposResponse\x12)\n" +
-	"\x05repos\x18\x01 \x03(\v2\x13.banda.v1.ForgeRepoR\x05repos\"i\n" +
+	"\x05repos\x18\x01 \x03(\v2\x13.banda.v1.ForgeRepoR\x05repos\x12!\n" +
+	"\fconnect_host\x18\x02 \x01(\tR\vconnectHost\x12#\n" +
+	"\rconnect_forge\x18\x03 \x01(\tR\fconnectForge\"i\n" +
 	"\tForgeRepo\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -14587,7 +16833,158 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\brepo_url\x18\x02 \x01(\tR\arepoUrl\x12\x1f\n" +
 	"\vbase_branch\x18\x03 \x01(\tR\n" +
 	"baseBranch\"\x17\n" +
-	"\x15AddRepositoryResponse*\x8e\x01\n" +
+	"\x15AddRepositoryResponse\"\x11\n" +
+	"\x0fIdTokensChanged\"D\n" +
+	"\x0fIdTokensRequest\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"f\n" +
+	"\x10IdTokensResponse\x12)\n" +
+	"\x06tokens\x18\x01 \x03(\v2\x11.banda.v1.IdTokenR\x06tokens\x12'\n" +
+	"\x0frefresh_seconds\x18\x02 \x01(\x05R\x0erefreshSeconds\"\x8a\x01\n" +
+	"\aIdToken\x12\x1a\n" +
+	"\baudience\x18\x01 \x01(\tR\baudience\x12\x12\n" +
+	"\x04file\x18\x02 \x01(\tR\x04file\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x1c\n" +
+	"\x1aGetWorkloadIdentityRequest\"\xb5\x01\n" +
+	"\x1bGetWorkloadIdentityResponse\x12\x16\n" +
+	"\x06issuer\x18\x01 \x01(\tR\x06issuer\x12\x19\n" +
+	"\bjwks_url\x18\x02 \x01(\tR\ajwksUrl\x127\n" +
+	"\taudiences\x18\x03 \x03(\v2\x19.banda.v1.IdTokenAudienceR\taudiences\x12\x14\n" +
+	"\x05repos\x18\x04 \x03(\tR\x05repos\x12\x14\n" +
+	"\x05email\x18\x05 \x01(\tR\x05email\"\x93\x01\n" +
+	"\x0fIdTokenAudience\x12\x1a\n" +
+	"\baudience\x18\x01 \x01(\tR\baudience\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x125\n" +
+	"\badded_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aaddedAt\x12\x19\n" +
+	"\badded_by\x18\x04 \x01(\tR\aaddedBy\"7\n" +
+	"\x19AddIdTokenAudienceRequest\x12\x1a\n" +
+	"\baudience\x18\x01 \x01(\tR\baudience\"\x1c\n" +
+	"\x1aAddIdTokenAudienceResponse\":\n" +
+	"\x1cRemoveIdTokenAudienceRequest\x12\x1a\n" +
+	"\baudience\x18\x01 \x01(\tR\baudience\"\x1f\n" +
+	"\x1dRemoveIdTokenAudienceResponse\"\x12\n" +
+	"\x10GetGitHubRequest\"\xa0\x02\n" +
+	"\x11GetGitHubResponse\x12%\n" +
+	"\x03app\x18\x01 \x01(\v2\x13.banda.v1.GitHubAppR\x03app\x129\n" +
+	"\n" +
+	"connection\x18\x02 \x01(\v2\x19.banda.v1.ForgeConnectionR\n" +
+	"connection\x12\x14\n" +
+	"\x05hosts\x18\x03 \x03(\tR\x05hosts\x12!\n" +
+	"\flegacy_token\x18\x04 \x01(\bR\vlegacyToken\x12:\n" +
+	"\vlast_change\x18\x05 \x01(\v2\x19.banda.v1.GitHubAppChangeR\n" +
+	"lastChange\x124\n" +
+	"\arefusal\x18\x06 \x01(\v2\x1a.banda.v1.GitHubAppRefusalR\arefusal\"\xdb\x01\n" +
+	"\x0fGitHubAppChange\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x0e\n" +
+	"\x02by\x18\x02 \x01(\tR\x02by\x12*\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x12\n" +
+	"\x04host\x18\x04 \x01(\tR\x04host\x12\x12\n" +
+	"\x04slug\x18\x05 \x01(\tR\x04slug\x12\x14\n" +
+	"\x05owner\x18\x06 \x01(\tR\x05owner\x12\x19\n" +
+	"\bwas_slug\x18\a \x01(\tR\awasSlug\x12\x1b\n" +
+	"\twas_owner\x18\b \x01(\tR\bwasOwner\"]\n" +
+	"\x10GitHubAppRefusal\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"delete_url\x18\x02 \x01(\tR\tdeleteUrl\x12\x12\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slug\"\x88\x02\n" +
+	"\tGitHubApp\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04slug\x18\x02 \x01(\tR\x04slug\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x1f\n" +
+	"\vinstall_url\x18\x04 \x01(\tR\n" +
+	"installUrl\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\x05 \x01(\tR\tcreatedBy\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x14\n" +
+	"\x05owner\x18\a \x01(\tR\x05owner\x12\x14\n" +
+	"\x05error\x18\b \x01(\tR\x05error\x12\x1a\n" +
+	"\bpersonal\x18\t \x01(\bR\bpersonal\"\xc7\x01\n" +
+	"\x0fForgeConnection\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x14\n" +
+	"\x05forge\x18\x02 \x01(\tR\x05forge\x12\x14\n" +
+	"\x05login\x18\x03 \x01(\tR\x05login\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\x12=\n" +
+	"\fconnected_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vconnectedAt\x12\x16\n" +
+	"\x06broken\x18\x06 \x01(\bR\x06broken\"l\n" +
+	"\x18GitHubAppManifestRequest\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\"\n" +
+	"\forganization\x18\x02 \x01(\tR\forganization\x12\x18\n" +
+	"\areplace\x18\x03 \x01(\bR\areplace\"I\n" +
+	"\x19GitHubAppManifestResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1a\n" +
+	"\bmanifest\x18\x02 \x01(\tR\bmanifest\"6\n" +
+	"\x1eListGitHubInstallationsRequest\x12\x14\n" +
+	"\x05fresh\x18\x01 \x01(\bR\x05fresh\"e\n" +
+	"\x1fListGitHubInstallationsResponse\x12B\n" +
+	"\rinstallations\x18\x01 \x03(\v2\x1c.banda.v1.GitHubInstallationR\rinstallations\"\xbb\x01\n" +
+	"\x12GitHubInstallation\x12\x18\n" +
+	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x02 \x01(\tR\tavatarUrl\x12)\n" +
+	"\x10all_repositories\x18\x03 \x01(\bR\x0fallRepositories\x12\"\n" +
+	"\frepositories\x18\x04 \x01(\x05R\frepositories\x12\x1d\n" +
+	"\n" +
+	"manage_url\x18\x05 \x01(\tR\tmanageUrl\"\x18\n" +
+	"\x16RemoveGitHubAppRequest\"\x19\n" +
+	"\x17RemoveGitHubAppResponse\"\x19\n" +
+	"\x17DisconnectGitHubRequest\"\x1a\n" +
+	"\x18DisconnectGitHubResponse\"I\n" +
+	"\x14GitCredentialRequest\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"\x8a\x01\n" +
+	"\x15GitCredentialResponse\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x129\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x12\n" +
+	"\x10GetGitLabRequest\"\x9d\x01\n" +
+	"\x11GetGitLabResponse\x12*\n" +
+	"\x05hosts\x18\x01 \x03(\v2\x14.banda.v1.GitLabHostR\x05hosts\x12!\n" +
+	"\fredirect_uri\x18\x02 \x01(\tR\vredirectUri\x12\x16\n" +
+	"\x06scopes\x18\x03 \x03(\tR\x06scopes\x12!\n" +
+	"\flegacy_token\x18\x04 \x01(\bR\vlegacyToken\"\x90\x02\n" +
+	"\n" +
+	"GitLabHost\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12%\n" +
+	"\x03app\x18\x02 \x01(\v2\x13.banda.v1.GitLabAppR\x03app\x129\n" +
+	"\n" +
+	"connection\x18\x03 \x01(\v2\x19.banda.v1.ForgeConnectionR\n" +
+	"connection\x12$\n" +
+	"\x0eadmin_apps_url\x18\x05 \x01(\tR\fadminAppsUrl\x12$\n" +
+	"\x0egroup_apps_url\x18\x06 \x01(\tR\fgroupAppsUrl\x12:\n" +
+	"\vlast_change\x18\a \x01(\v2\x19.banda.v1.GitLabAppChangeR\n" +
+	"lastChangeJ\x04\b\x04\x10\x05\"\xba\x01\n" +
+	"\x0fGitLabAppChange\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x0e\n" +
+	"\x02by\x18\x02 \x01(\tR\x02by\x12*\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
+	"\x0eapplication_id\x18\x04 \x01(\tR\rapplicationId\x12,\n" +
+	"\x12was_application_id\x18\x05 \x01(\tR\x10wasApplicationId\"\xcb\x01\n" +
+	"\tGitLabApp\x12%\n" +
+	"\x0eapplication_id\x18\x01 \x01(\tR\rapplicationId\x12\x1d\n" +
+	"\n" +
+	"created_by\x18\x02 \x01(\tR\tcreatedBy\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\x12'\n" +
+	"\x0fneeds_attention\x18\x05 \x01(\bR\x0eneedsAttention\"\x82\x01\n" +
+	"\x13SetGitLabAppRequest\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12%\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId\x12\x16\n" +
+	"\x06secret\x18\x03 \x01(\tR\x06secret\x12\x18\n" +
+	"\areplace\x18\x04 \x01(\bR\areplace\"\x16\n" +
+	"\x14SetGitLabAppResponse\",\n" +
+	"\x16RemoveGitLabAppRequest\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\"\x19\n" +
+	"\x17RemoveGitLabAppResponse\"-\n" +
+	"\x17DisconnectGitLabRequest\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\"\x1a\n" +
+	"\x18DisconnectGitLabResponse*\x8e\x01\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTATUS_STARTING\x10\x01\x12\x12\n" +
@@ -14730,7 +17127,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\rAddRepository\x12\x1e.banda.v1.AddRepositoryRequest\x1a\x1f.banda.v1.AddRepositoryResponse2\x84\x01\n" +
 	"\vUserService\x12/\n" +
 	"\x02Me\x12\x13.banda.v1.MeRequest\x1a\x14.banda.v1.MeResponse\x12D\n" +
-	"\tListUsers\x12\x1a.banda.v1.ListUsersRequest\x1a\x1b.banda.v1.ListUsersResponse2\xf0\b\n" +
+	"\tListUsers\x12\x1a.banda.v1.ListUsersRequest\x1a\x1b.banda.v1.ListUsersResponse2\xae\x11\n" +
 	"\x0fSettingsService\x12J\n" +
 	"\vGetSettings\x12\x1c.banda.v1.GetSettingsRequest\x1a\x1d.banda.v1.GetSettingsResponse\x12P\n" +
 	"\rSetAuthMethod\x12\x1e.banda.v1.SetAuthMethodRequest\x1a\x1f.banda.v1.SetAuthMethodResponse\x12D\n" +
@@ -14744,10 +17141,24 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x12WriteLoginTerminal\x12#.banda.v1.WriteLoginTerminalRequest\x1a\x1f.banda.v1.WriteTerminalResponse\x12]\n" +
 	"\x13ResizeLoginTerminal\x12$.banda.v1.ResizeLoginTerminalRequest\x1a .banda.v1.ResizeTerminalResponse\x12S\n" +
 	"\x0eSetGitIdentity\x12\x1f.banda.v1.SetGitIdentityRequest\x1a .banda.v1.SetGitIdentityResponse\x12\\\n" +
-	"\x11SetThreadDefaults\x12\".banda.v1.SetThreadDefaultsRequest\x1a#.banda.v1.SetThreadDefaultsResponse2\x99\x01\n" +
+	"\x11SetThreadDefaults\x12\".banda.v1.SetThreadDefaultsRequest\x1a#.banda.v1.SetThreadDefaultsResponse\x12b\n" +
+	"\x13GetWorkloadIdentity\x12$.banda.v1.GetWorkloadIdentityRequest\x1a%.banda.v1.GetWorkloadIdentityResponse\x12_\n" +
+	"\x12AddIdTokenAudience\x12#.banda.v1.AddIdTokenAudienceRequest\x1a$.banda.v1.AddIdTokenAudienceResponse\x12h\n" +
+	"\x15RemoveIdTokenAudience\x12&.banda.v1.RemoveIdTokenAudienceRequest\x1a'.banda.v1.RemoveIdTokenAudienceResponse\x12D\n" +
+	"\tGetGitHub\x12\x1a.banda.v1.GetGitHubRequest\x1a\x1b.banda.v1.GetGitHubResponse\x12\\\n" +
+	"\x11GitHubAppManifest\x12\".banda.v1.GitHubAppManifestRequest\x1a#.banda.v1.GitHubAppManifestResponse\x12n\n" +
+	"\x17ListGitHubInstallations\x12(.banda.v1.ListGitHubInstallationsRequest\x1a).banda.v1.ListGitHubInstallationsResponse\x12V\n" +
+	"\x0fRemoveGitHubApp\x12 .banda.v1.RemoveGitHubAppRequest\x1a!.banda.v1.RemoveGitHubAppResponse\x12Y\n" +
+	"\x10DisconnectGitHub\x12!.banda.v1.DisconnectGitHubRequest\x1a\".banda.v1.DisconnectGitHubResponse\x12D\n" +
+	"\tGetGitLab\x12\x1a.banda.v1.GetGitLabRequest\x1a\x1b.banda.v1.GetGitLabResponse\x12M\n" +
+	"\fSetGitLabApp\x12\x1d.banda.v1.SetGitLabAppRequest\x1a\x1e.banda.v1.SetGitLabAppResponse\x12V\n" +
+	"\x0fRemoveGitLabApp\x12 .banda.v1.RemoveGitLabAppRequest\x1a!.banda.v1.RemoveGitLabAppResponse\x12Y\n" +
+	"\x10DisconnectGitLab\x12!.banda.v1.DisconnectGitLabRequest\x1a\".banda.v1.DisconnectGitLabResponse2\xae\x02\n" +
 	"\rRunnerService\x12B\n" +
 	"\aConnect\x12\x18.banda.v1.ConnectRequest\x1a\x19.banda.v1.ConnectResponse(\x010\x01\x12D\n" +
-	"\tForkPatch\x12\x1a.banda.v1.ForkPatchRequest\x1a\x1b.banda.v1.ForkPatchResponseB\x8e\x01\n" +
+	"\tForkPatch\x12\x1a.banda.v1.ForkPatchRequest\x1a\x1b.banda.v1.ForkPatchResponse\x12A\n" +
+	"\bIdTokens\x12\x19.banda.v1.IdTokensRequest\x1a\x1a.banda.v1.IdTokensResponse\x12P\n" +
+	"\rGitCredential\x12\x1e.banda.v1.GitCredentialRequest\x1a\x1f.banda.v1.GitCredentialResponseB\x8e\x01\n" +
 	"\fcom.banda.v1B\n" +
 	"BandaProtoP\x01Z1github.com/jhoogstraat/banda/gen/banda/v1;bandav1\xa2\x02\x03BXX\xaa\x02\bBanda.V1\xca\x02\bBanda\\V1\xe2\x02\x14Banda\\V1\\GPBMetadata\xea\x02\tBanda::V1b\x06proto3"
 
@@ -14764,251 +17175,290 @@ func file_banda_v1_banda_proto_rawDescGZIP() []byte {
 }
 
 var file_banda_v1_banda_proto_enumTypes = make([]protoimpl.EnumInfo, 14)
-var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 221)
+var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 260)
 var file_banda_v1_banda_proto_goTypes = []any{
-	(Status)(0),                         // 0: banda.v1.Status
-	(Mode)(0),                           // 1: banda.v1.Mode
-	(PermissionMode)(0),                 // 2: banda.v1.PermissionMode
-	(PermissionDecision)(0),             // 3: banda.v1.PermissionDecision
-	(SetupState)(0),                     // 4: banda.v1.SetupState
-	(AutoPushState)(0),                  // 5: banda.v1.AutoPushState
-	(AuthMethod)(0),                     // 6: banda.v1.AuthMethod
-	(LoginState)(0),                     // 7: banda.v1.LoginState
-	(LoginAction)(0),                    // 8: banda.v1.LoginAction
-	(SearchKind)(0),                     // 9: banda.v1.SearchKind
-	(PullState)(0),                      // 10: banda.v1.PullState
-	(ChecksState)(0),                    // 11: banda.v1.ChecksState
-	(ReviewState)(0),                    // 12: banda.v1.ReviewState
-	(Mergeable)(0),                      // 13: banda.v1.Mergeable
-	(*Thread)(nil),                      // 14: banda.v1.Thread
-	(*Overlap)(nil),                     // 15: banda.v1.Overlap
-	(*ForkOrigin)(nil),                  // 16: banda.v1.ForkOrigin
-	(*User)(nil),                        // 17: banda.v1.User
-	(*Event)(nil),                       // 18: banda.v1.Event
-	(*ForkNote)(nil),                    // 19: banda.v1.ForkNote
-	(*Message)(nil),                     // 20: banda.v1.Message
-	(*ReviewComment)(nil),               // 21: banda.v1.ReviewComment
-	(*Attachment)(nil),                  // 22: banda.v1.Attachment
-	(*TurnRequest)(nil),                 // 23: banda.v1.TurnRequest
-	(*TurnRequestResolved)(nil),         // 24: banda.v1.TurnRequestResolved
-	(*LineageUpdate)(nil),               // 25: banda.v1.LineageUpdate
-	(*AgentText)(nil),                   // 26: banda.v1.AgentText
-	(*AgentTextDelta)(nil),              // 27: banda.v1.AgentTextDelta
-	(*AgentThinking)(nil),               // 28: banda.v1.AgentThinking
-	(*ToolCall)(nil),                    // 29: banda.v1.ToolCall
-	(*ToolResult)(nil),                  // 30: banda.v1.ToolResult
-	(*TurnEnded)(nil),                   // 31: banda.v1.TurnEnded
-	(*StatusChanged)(nil),               // 32: banda.v1.StatusChanged
-	(*ModeChanged)(nil),                 // 33: banda.v1.ModeChanged
-	(*DiffChanged)(nil),                 // 34: banda.v1.DiffChanged
-	(*Notice)(nil),                      // 35: banda.v1.Notice
-	(*SetupStep)(nil),                   // 36: banda.v1.SetupStep
-	(*PresenceChanged)(nil),             // 37: banda.v1.PresenceChanged
-	(*Typing)(nil),                      // 38: banda.v1.Typing
-	(*TypingRequest)(nil),               // 39: banda.v1.TypingRequest
-	(*TypingResponse)(nil),              // 40: banda.v1.TypingResponse
-	(*CreateThreadRequest)(nil),         // 41: banda.v1.CreateThreadRequest
-	(*CreateThreadResponse)(nil),        // 42: banda.v1.CreateThreadResponse
-	(*ListThreadsRequest)(nil),          // 43: banda.v1.ListThreadsRequest
-	(*ListThreadsResponse)(nil),         // 44: banda.v1.ListThreadsResponse
-	(*GetThreadRequest)(nil),            // 45: banda.v1.GetThreadRequest
-	(*GetThreadResponse)(nil),           // 46: banda.v1.GetThreadResponse
-	(*SendMessageRequest)(nil),          // 47: banda.v1.SendMessageRequest
-	(*SendMessageResponse)(nil),         // 48: banda.v1.SendMessageResponse
-	(*InterruptRequest)(nil),            // 49: banda.v1.InterruptRequest
-	(*InterruptResponse)(nil),           // 50: banda.v1.InterruptResponse
-	(*SetModeRequest)(nil),              // 51: banda.v1.SetModeRequest
-	(*SetModeResponse)(nil),             // 52: banda.v1.SetModeResponse
-	(*AgentSettings)(nil),               // 53: banda.v1.AgentSettings
-	(*SetAgentSettingsRequest)(nil),     // 54: banda.v1.SetAgentSettingsRequest
-	(*SetAgentSettingsResponse)(nil),    // 55: banda.v1.SetAgentSettingsResponse
-	(*RetryRequest)(nil),                // 56: banda.v1.RetryRequest
-	(*RetryResponse)(nil),               // 57: banda.v1.RetryResponse
-	(*ApproveTurnRequest)(nil),          // 58: banda.v1.ApproveTurnRequest
-	(*ApproveTurnResponse)(nil),         // 59: banda.v1.ApproveTurnResponse
-	(*DeclineTurnRequest)(nil),          // 60: banda.v1.DeclineTurnRequest
-	(*DeclineTurnResponse)(nil),         // 61: banda.v1.DeclineTurnResponse
-	(*TrustRequest)(nil),                // 62: banda.v1.TrustRequest
-	(*TrustResponse)(nil),               // 63: banda.v1.TrustResponse
-	(*HandoffOfferRequest)(nil),         // 64: banda.v1.HandoffOfferRequest
-	(*HandoffOfferResponse)(nil),        // 65: banda.v1.HandoffOfferResponse
-	(*HandoffAcceptRequest)(nil),        // 66: banda.v1.HandoffAcceptRequest
-	(*HandoffAcceptResponse)(nil),       // 67: banda.v1.HandoffAcceptResponse
-	(*HandoffDeclineRequest)(nil),       // 68: banda.v1.HandoffDeclineRequest
-	(*HandoffDeclineResponse)(nil),      // 69: banda.v1.HandoffDeclineResponse
-	(*SpawnThreadRequest)(nil),          // 70: banda.v1.SpawnThreadRequest
-	(*SpawnThreadResponse)(nil),         // 71: banda.v1.SpawnThreadResponse
-	(*LineageChildrenRequest)(nil),      // 72: banda.v1.LineageChildrenRequest
-	(*LineageChildrenResponse)(nil),     // 73: banda.v1.LineageChildrenResponse
-	(*ListMentionedRequest)(nil),        // 74: banda.v1.ListMentionedRequest
-	(*ListMentionedResponse)(nil),       // 75: banda.v1.ListMentionedResponse
-	(*SnoozeRequest)(nil),               // 76: banda.v1.SnoozeRequest
-	(*SnoozeResponse)(nil),              // 77: banda.v1.SnoozeResponse
-	(*SettleRequest)(nil),               // 78: banda.v1.SettleRequest
-	(*SettleResponse)(nil),              // 79: banda.v1.SettleResponse
-	(*PushRequest)(nil),                 // 80: banda.v1.PushRequest
-	(*PushResponse)(nil),                // 81: banda.v1.PushResponse
-	(*EnvironmentRecreateRequest)(nil),  // 82: banda.v1.EnvironmentRecreateRequest
-	(*EnvironmentRecreateResponse)(nil), // 83: banda.v1.EnvironmentRecreateResponse
-	(*AutoPush)(nil),                    // 84: banda.v1.AutoPush
-	(*OpenTerminalRequest)(nil),         // 85: banda.v1.OpenTerminalRequest
-	(*OpenTerminalResponse)(nil),        // 86: banda.v1.OpenTerminalResponse
-	(*WriteTerminalRequest)(nil),        // 87: banda.v1.WriteTerminalRequest
-	(*WriteTerminalResponse)(nil),       // 88: banda.v1.WriteTerminalResponse
-	(*ResizeTerminalRequest)(nil),       // 89: banda.v1.ResizeTerminalRequest
-	(*ResizeTerminalResponse)(nil),      // 90: banda.v1.ResizeTerminalResponse
-	(*ListFilesRequest)(nil),            // 91: banda.v1.ListFilesRequest
-	(*ListFilesResponse)(nil),           // 92: banda.v1.ListFilesResponse
-	(*ReadFileRequest)(nil),             // 93: banda.v1.ReadFileRequest
-	(*ReadFileResponse)(nil),            // 94: banda.v1.ReadFileResponse
-	(*PreviewWatchRequest)(nil),         // 95: banda.v1.PreviewWatchRequest
-	(*PreviewWatchResponse)(nil),        // 96: banda.v1.PreviewWatchResponse
-	(*PreviewPort)(nil),                 // 97: banda.v1.PreviewPort
-	(*PreviewOpenRequest)(nil),          // 98: banda.v1.PreviewOpenRequest
-	(*PreviewOpenResponse)(nil),         // 99: banda.v1.PreviewOpenResponse
-	(*MeRequest)(nil),                   // 100: banda.v1.MeRequest
-	(*MeResponse)(nil),                  // 101: banda.v1.MeResponse
-	(*ListUsersRequest)(nil),            // 102: banda.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),           // 103: banda.v1.ListUsersResponse
-	(*HarnessAccount)(nil),              // 104: banda.v1.HarnessAccount
-	(*SecretInfo)(nil),                  // 105: banda.v1.SecretInfo
-	(*GetSettingsRequest)(nil),          // 106: banda.v1.GetSettingsRequest
-	(*GetSettingsResponse)(nil),         // 107: banda.v1.GetSettingsResponse
-	(*SetAuthMethodRequest)(nil),        // 108: banda.v1.SetAuthMethodRequest
-	(*SetAuthMethodResponse)(nil),       // 109: banda.v1.SetAuthMethodResponse
-	(*SetSecretRequest)(nil),            // 110: banda.v1.SetSecretRequest
-	(*SetSecretResponse)(nil),           // 111: banda.v1.SetSecretResponse
-	(*DeleteSecretRequest)(nil),         // 112: banda.v1.DeleteSecretRequest
-	(*DeleteSecretResponse)(nil),        // 113: banda.v1.DeleteSecretResponse
-	(*SetDefaultProfileRequest)(nil),    // 114: banda.v1.SetDefaultProfileRequest
-	(*SetDefaultProfileResponse)(nil),   // 115: banda.v1.SetDefaultProfileResponse
-	(*ListTeamSecretsRequest)(nil),      // 116: banda.v1.ListTeamSecretsRequest
-	(*ListTeamSecretsResponse)(nil),     // 117: banda.v1.ListTeamSecretsResponse
-	(*SetTeamSecretRequest)(nil),        // 118: banda.v1.SetTeamSecretRequest
-	(*SetTeamSecretResponse)(nil),       // 119: banda.v1.SetTeamSecretResponse
-	(*DeleteTeamSecretRequest)(nil),     // 120: banda.v1.DeleteTeamSecretRequest
-	(*DeleteTeamSecretResponse)(nil),    // 121: banda.v1.DeleteTeamSecretResponse
-	(*OpenLoginTerminalRequest)(nil),    // 122: banda.v1.OpenLoginTerminalRequest
-	(*WriteLoginTerminalRequest)(nil),   // 123: banda.v1.WriteLoginTerminalRequest
-	(*ResizeLoginTerminalRequest)(nil),  // 124: banda.v1.ResizeLoginTerminalRequest
-	(*TeamActivity)(nil),                // 125: banda.v1.TeamActivity
-	(*TeamWatchRequest)(nil),            // 126: banda.v1.TeamWatchRequest
-	(*TeamWatchResponse)(nil),           // 127: banda.v1.TeamWatchResponse
-	(*BriefRequest)(nil),                // 128: banda.v1.BriefRequest
-	(*BriefResponse)(nil),               // 129: banda.v1.BriefResponse
-	(*BriefItem)(nil),                   // 130: banda.v1.BriefItem
-	(*BriefSeenRequest)(nil),            // 131: banda.v1.BriefSeenRequest
-	(*BriefSeenResponse)(nil),           // 132: banda.v1.BriefSeenResponse
-	(*InboxWatchRequest)(nil),           // 133: banda.v1.InboxWatchRequest
-	(*InboxWatchResponse)(nil),          // 134: banda.v1.InboxWatchResponse
-	(*Decision)(nil),                    // 135: banda.v1.Decision
-	(*InboxMarkReadRequest)(nil),        // 136: banda.v1.InboxMarkReadRequest
-	(*InboxMarkReadResponse)(nil),       // 137: banda.v1.InboxMarkReadResponse
-	(*WatchThreadRequest)(nil),          // 138: banda.v1.WatchThreadRequest
-	(*HistoryRequest)(nil),              // 139: banda.v1.HistoryRequest
-	(*HistoryResponse)(nil),             // 140: banda.v1.HistoryResponse
-	(*PermissionRequested)(nil),         // 141: banda.v1.PermissionRequested
-	(*PermissionResolved)(nil),          // 142: banda.v1.PermissionResolved
-	(*PermissionAnswerRequest)(nil),     // 143: banda.v1.PermissionAnswerRequest
-	(*PermissionAnswerResponse)(nil),    // 144: banda.v1.PermissionAnswerResponse
-	(*PermissionVoteRequest)(nil),       // 145: banda.v1.PermissionVoteRequest
-	(*PermissionVoteResponse)(nil),      // 146: banda.v1.PermissionVoteResponse
-	(*PermissionVoted)(nil),             // 147: banda.v1.PermissionVoted
-	(*PermissionRevokeRequest)(nil),     // 148: banda.v1.PermissionRevokeRequest
-	(*PermissionRevokeResponse)(nil),    // 149: banda.v1.PermissionRevokeResponse
-	(*PermissionRevoked)(nil),           // 150: banda.v1.PermissionRevoked
-	(*PermissionSetModeRequest)(nil),    // 151: banda.v1.PermissionSetModeRequest
-	(*PermissionSetModeResponse)(nil),   // 152: banda.v1.PermissionSetModeResponse
-	(*PermissionModeChanged)(nil),       // 153: banda.v1.PermissionModeChanged
-	(*HandoffOffered)(nil),              // 154: banda.v1.HandoffOffered
-	(*HandoffResolved)(nil),             // 155: banda.v1.HandoffResolved
-	(*WatchThreadResponse)(nil),         // 156: banda.v1.WatchThreadResponse
-	(*ConnectRequest)(nil),              // 157: banda.v1.ConnectRequest
-	(*Ping)(nil),                        // 158: banda.v1.Ping
-	(*Pong)(nil),                        // 159: banda.v1.Pong
-	(*Hello)(nil),                       // 160: banda.v1.Hello
-	(*LoginStatus)(nil),                 // 161: banda.v1.LoginStatus
-	(*Ready)(nil),                       // 162: banda.v1.Ready
-	(*TerminalOutput)(nil),              // 163: banda.v1.TerminalOutput
-	(*Diff)(nil),                        // 164: banda.v1.Diff
-	(*FileResponse)(nil),                // 165: banda.v1.FileResponse
-	(*ConnectResponse)(nil),             // 166: banda.v1.ConnectResponse
-	(*PermissionCommand)(nil),           // 167: banda.v1.PermissionCommand
-	(*Prompt)(nil),                      // 168: banda.v1.Prompt
-	(*AttachmentImage)(nil),             // 169: banda.v1.AttachmentImage
-	(*Stop)(nil),                        // 170: banda.v1.Stop
-	(*Push)(nil),                        // 171: banda.v1.Push
-	(*TerminalOpen)(nil),                // 172: banda.v1.TerminalOpen
-	(*TerminalInput)(nil),               // 173: banda.v1.TerminalInput
-	(*TerminalResize)(nil),              // 174: banda.v1.TerminalResize
-	(*TerminalClose)(nil),               // 175: banda.v1.TerminalClose
-	(*FileRequest)(nil),                 // 176: banda.v1.FileRequest
-	(*HttpTunnel)(nil),                  // 177: banda.v1.HttpTunnel
-	(*PreviewPorts)(nil),                // 178: banda.v1.PreviewPorts
-	(*RaceTry)(nil),                     // 179: banda.v1.RaceTry
-	(*ForkRequest)(nil),                 // 180: banda.v1.ForkRequest
-	(*ForkResponse)(nil),                // 181: banda.v1.ForkResponse
-	(*RaceRequest)(nil),                 // 182: banda.v1.RaceRequest
-	(*RaceResponse)(nil),                // 183: banda.v1.RaceResponse
-	(*RaceCompareRequest)(nil),          // 184: banda.v1.RaceCompareRequest
-	(*RaceCompareResponse)(nil),         // 185: banda.v1.RaceCompareResponse
-	(*RaceEntry)(nil),                   // 186: banda.v1.RaceEntry
-	(*RaceListRequest)(nil),             // 187: banda.v1.RaceListRequest
-	(*RaceListResponse)(nil),            // 188: banda.v1.RaceListResponse
-	(*RacePickRequest)(nil),             // 189: banda.v1.RacePickRequest
-	(*RacePickResponse)(nil),            // 190: banda.v1.RacePickResponse
-	(*ForkPatchRequest)(nil),            // 191: banda.v1.ForkPatchRequest
-	(*ForkPatchResponse)(nil),           // 192: banda.v1.ForkPatchResponse
-	(*SearchRequest)(nil),               // 193: banda.v1.SearchRequest
-	(*SearchResult)(nil),                // 194: banda.v1.SearchResult
-	(*SearchResponse)(nil),              // 195: banda.v1.SearchResponse
-	(*PullRequestSummary)(nil),          // 196: banda.v1.PullRequestSummary
-	(*PullRequestCheck)(nil),            // 197: banda.v1.PullRequestCheck
-	(*PullRequestReviewer)(nil),         // 198: banda.v1.PullRequestReviewer
-	(*PullRequestComment)(nil),          // 199: banda.v1.PullRequestComment
-	(*PullRequest)(nil),                 // 200: banda.v1.PullRequest
-	(*PullRequestChanged)(nil),          // 201: banda.v1.PullRequestChanged
-	(*PullRequestGetRequest)(nil),       // 202: banda.v1.PullRequestGetRequest
-	(*PullRequestGetResponse)(nil),      // 203: banda.v1.PullRequestGetResponse
-	(*PullRequestCreateRequest)(nil),    // 204: banda.v1.PullRequestCreateRequest
-	(*PullRequestCreateResponse)(nil),   // 205: banda.v1.PullRequestCreateResponse
-	(*PullRequestLinkRequest)(nil),      // 206: banda.v1.PullRequestLinkRequest
-	(*PullRequestLinkResponse)(nil),     // 207: banda.v1.PullRequestLinkResponse
-	(*PullRequestUpdateRequest)(nil),    // 208: banda.v1.PullRequestUpdateRequest
-	(*PullRequestUpdateResponse)(nil),   // 209: banda.v1.PullRequestUpdateResponse
-	(*PullRequestMergeRequest)(nil),     // 210: banda.v1.PullRequestMergeRequest
-	(*PullRequestMergeResponse)(nil),    // 211: banda.v1.PullRequestMergeResponse
-	(*PullRequestCommentRequest)(nil),   // 212: banda.v1.PullRequestCommentRequest
-	(*PullRequestCommentResponse)(nil),  // 213: banda.v1.PullRequestCommentResponse
-	(*ListForgeReposRequest)(nil),       // 214: banda.v1.ListForgeReposRequest
-	(*ListForgeReposResponse)(nil),      // 215: banda.v1.ListForgeReposResponse
-	(*ForgeRepo)(nil),                   // 216: banda.v1.ForgeRepo
-	(*PullRequestChoicesRequest)(nil),   // 217: banda.v1.PullRequestChoicesRequest
-	(*PullRequestChoicesResponse)(nil),  // 218: banda.v1.PullRequestChoicesResponse
-	(*PullRequestResolveRequest)(nil),   // 219: banda.v1.PullRequestResolveRequest
-	(*PullRequestResolveResponse)(nil),  // 220: banda.v1.PullRequestResolveResponse
-	(*GitIdentity)(nil),                 // 221: banda.v1.GitIdentity
-	(*SetGitIdentityRequest)(nil),       // 222: banda.v1.SetGitIdentityRequest
-	(*SetGitIdentityResponse)(nil),      // 223: banda.v1.SetGitIdentityResponse
-	(*ThreadDefaults)(nil),              // 224: banda.v1.ThreadDefaults
-	(*SetThreadDefaultsRequest)(nil),    // 225: banda.v1.SetThreadDefaultsRequest
-	(*SetThreadDefaultsResponse)(nil),   // 226: banda.v1.SetThreadDefaultsResponse
-	(*RepoAdded)(nil),                   // 227: banda.v1.RepoAdded
-	(*AddRepositoryRequest)(nil),        // 228: banda.v1.AddRepositoryRequest
-	(*AddRepositoryResponse)(nil),       // 229: banda.v1.AddRepositoryResponse
-	nil,                                 // 230: banda.v1.PermissionResolved.AnswersEntry
-	nil,                                 // 231: banda.v1.PermissionAnswerRequest.AnswersEntry
-	nil,                                 // 232: banda.v1.PermissionVoteRequest.AnswersEntry
-	nil,                                 // 233: banda.v1.PermissionVoted.AnswersEntry
-	nil,                                 // 234: banda.v1.PermissionCommand.AnswersEntry
-	(*timestamppb.Timestamp)(nil),       // 235: google.protobuf.Timestamp
+	(Status)(0),                             // 0: banda.v1.Status
+	(Mode)(0),                               // 1: banda.v1.Mode
+	(PermissionMode)(0),                     // 2: banda.v1.PermissionMode
+	(PermissionDecision)(0),                 // 3: banda.v1.PermissionDecision
+	(SetupState)(0),                         // 4: banda.v1.SetupState
+	(AutoPushState)(0),                      // 5: banda.v1.AutoPushState
+	(AuthMethod)(0),                         // 6: banda.v1.AuthMethod
+	(LoginState)(0),                         // 7: banda.v1.LoginState
+	(LoginAction)(0),                        // 8: banda.v1.LoginAction
+	(SearchKind)(0),                         // 9: banda.v1.SearchKind
+	(PullState)(0),                          // 10: banda.v1.PullState
+	(ChecksState)(0),                        // 11: banda.v1.ChecksState
+	(ReviewState)(0),                        // 12: banda.v1.ReviewState
+	(Mergeable)(0),                          // 13: banda.v1.Mergeable
+	(*Thread)(nil),                          // 14: banda.v1.Thread
+	(*Overlap)(nil),                         // 15: banda.v1.Overlap
+	(*ForkOrigin)(nil),                      // 16: banda.v1.ForkOrigin
+	(*User)(nil),                            // 17: banda.v1.User
+	(*Event)(nil),                           // 18: banda.v1.Event
+	(*ForkNote)(nil),                        // 19: banda.v1.ForkNote
+	(*Message)(nil),                         // 20: banda.v1.Message
+	(*ReviewComment)(nil),                   // 21: banda.v1.ReviewComment
+	(*Attachment)(nil),                      // 22: banda.v1.Attachment
+	(*TurnRequest)(nil),                     // 23: banda.v1.TurnRequest
+	(*TurnRequestResolved)(nil),             // 24: banda.v1.TurnRequestResolved
+	(*LineageUpdate)(nil),                   // 25: banda.v1.LineageUpdate
+	(*AgentText)(nil),                       // 26: banda.v1.AgentText
+	(*AgentTextDelta)(nil),                  // 27: banda.v1.AgentTextDelta
+	(*AgentThinking)(nil),                   // 28: banda.v1.AgentThinking
+	(*ToolCall)(nil),                        // 29: banda.v1.ToolCall
+	(*ToolResult)(nil),                      // 30: banda.v1.ToolResult
+	(*TurnEnded)(nil),                       // 31: banda.v1.TurnEnded
+	(*StatusChanged)(nil),                   // 32: banda.v1.StatusChanged
+	(*ModeChanged)(nil),                     // 33: banda.v1.ModeChanged
+	(*DiffChanged)(nil),                     // 34: banda.v1.DiffChanged
+	(*Notice)(nil),                          // 35: banda.v1.Notice
+	(*SetupStep)(nil),                       // 36: banda.v1.SetupStep
+	(*PresenceChanged)(nil),                 // 37: banda.v1.PresenceChanged
+	(*Typing)(nil),                          // 38: banda.v1.Typing
+	(*TypingRequest)(nil),                   // 39: banda.v1.TypingRequest
+	(*TypingResponse)(nil),                  // 40: banda.v1.TypingResponse
+	(*CreateThreadRequest)(nil),             // 41: banda.v1.CreateThreadRequest
+	(*CreateThreadResponse)(nil),            // 42: banda.v1.CreateThreadResponse
+	(*ListThreadsRequest)(nil),              // 43: banda.v1.ListThreadsRequest
+	(*ListThreadsResponse)(nil),             // 44: banda.v1.ListThreadsResponse
+	(*GetThreadRequest)(nil),                // 45: banda.v1.GetThreadRequest
+	(*GetThreadResponse)(nil),               // 46: banda.v1.GetThreadResponse
+	(*SendMessageRequest)(nil),              // 47: banda.v1.SendMessageRequest
+	(*SendMessageResponse)(nil),             // 48: banda.v1.SendMessageResponse
+	(*InterruptRequest)(nil),                // 49: banda.v1.InterruptRequest
+	(*InterruptResponse)(nil),               // 50: banda.v1.InterruptResponse
+	(*SetModeRequest)(nil),                  // 51: banda.v1.SetModeRequest
+	(*SetModeResponse)(nil),                 // 52: banda.v1.SetModeResponse
+	(*AgentSettings)(nil),                   // 53: banda.v1.AgentSettings
+	(*SetAgentSettingsRequest)(nil),         // 54: banda.v1.SetAgentSettingsRequest
+	(*SetAgentSettingsResponse)(nil),        // 55: banda.v1.SetAgentSettingsResponse
+	(*RetryRequest)(nil),                    // 56: banda.v1.RetryRequest
+	(*RetryResponse)(nil),                   // 57: banda.v1.RetryResponse
+	(*ApproveTurnRequest)(nil),              // 58: banda.v1.ApproveTurnRequest
+	(*ApproveTurnResponse)(nil),             // 59: banda.v1.ApproveTurnResponse
+	(*DeclineTurnRequest)(nil),              // 60: banda.v1.DeclineTurnRequest
+	(*DeclineTurnResponse)(nil),             // 61: banda.v1.DeclineTurnResponse
+	(*TrustRequest)(nil),                    // 62: banda.v1.TrustRequest
+	(*TrustResponse)(nil),                   // 63: banda.v1.TrustResponse
+	(*HandoffOfferRequest)(nil),             // 64: banda.v1.HandoffOfferRequest
+	(*HandoffOfferResponse)(nil),            // 65: banda.v1.HandoffOfferResponse
+	(*HandoffAcceptRequest)(nil),            // 66: banda.v1.HandoffAcceptRequest
+	(*HandoffAcceptResponse)(nil),           // 67: banda.v1.HandoffAcceptResponse
+	(*HandoffDeclineRequest)(nil),           // 68: banda.v1.HandoffDeclineRequest
+	(*HandoffDeclineResponse)(nil),          // 69: banda.v1.HandoffDeclineResponse
+	(*SpawnThreadRequest)(nil),              // 70: banda.v1.SpawnThreadRequest
+	(*SpawnThreadResponse)(nil),             // 71: banda.v1.SpawnThreadResponse
+	(*LineageChildrenRequest)(nil),          // 72: banda.v1.LineageChildrenRequest
+	(*LineageChildrenResponse)(nil),         // 73: banda.v1.LineageChildrenResponse
+	(*ListMentionedRequest)(nil),            // 74: banda.v1.ListMentionedRequest
+	(*ListMentionedResponse)(nil),           // 75: banda.v1.ListMentionedResponse
+	(*SnoozeRequest)(nil),                   // 76: banda.v1.SnoozeRequest
+	(*SnoozeResponse)(nil),                  // 77: banda.v1.SnoozeResponse
+	(*SettleRequest)(nil),                   // 78: banda.v1.SettleRequest
+	(*SettleResponse)(nil),                  // 79: banda.v1.SettleResponse
+	(*PushRequest)(nil),                     // 80: banda.v1.PushRequest
+	(*PushResponse)(nil),                    // 81: banda.v1.PushResponse
+	(*EnvironmentRecreateRequest)(nil),      // 82: banda.v1.EnvironmentRecreateRequest
+	(*EnvironmentRecreateResponse)(nil),     // 83: banda.v1.EnvironmentRecreateResponse
+	(*AutoPush)(nil),                        // 84: banda.v1.AutoPush
+	(*OpenTerminalRequest)(nil),             // 85: banda.v1.OpenTerminalRequest
+	(*OpenTerminalResponse)(nil),            // 86: banda.v1.OpenTerminalResponse
+	(*WriteTerminalRequest)(nil),            // 87: banda.v1.WriteTerminalRequest
+	(*WriteTerminalResponse)(nil),           // 88: banda.v1.WriteTerminalResponse
+	(*ResizeTerminalRequest)(nil),           // 89: banda.v1.ResizeTerminalRequest
+	(*ResizeTerminalResponse)(nil),          // 90: banda.v1.ResizeTerminalResponse
+	(*ListFilesRequest)(nil),                // 91: banda.v1.ListFilesRequest
+	(*ListFilesResponse)(nil),               // 92: banda.v1.ListFilesResponse
+	(*ReadFileRequest)(nil),                 // 93: banda.v1.ReadFileRequest
+	(*ReadFileResponse)(nil),                // 94: banda.v1.ReadFileResponse
+	(*PreviewWatchRequest)(nil),             // 95: banda.v1.PreviewWatchRequest
+	(*PreviewWatchResponse)(nil),            // 96: banda.v1.PreviewWatchResponse
+	(*PreviewPort)(nil),                     // 97: banda.v1.PreviewPort
+	(*PreviewOpenRequest)(nil),              // 98: banda.v1.PreviewOpenRequest
+	(*PreviewOpenResponse)(nil),             // 99: banda.v1.PreviewOpenResponse
+	(*MeRequest)(nil),                       // 100: banda.v1.MeRequest
+	(*MeResponse)(nil),                      // 101: banda.v1.MeResponse
+	(*ListUsersRequest)(nil),                // 102: banda.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),               // 103: banda.v1.ListUsersResponse
+	(*HarnessAccount)(nil),                  // 104: banda.v1.HarnessAccount
+	(*SecretInfo)(nil),                      // 105: banda.v1.SecretInfo
+	(*GetSettingsRequest)(nil),              // 106: banda.v1.GetSettingsRequest
+	(*GetSettingsResponse)(nil),             // 107: banda.v1.GetSettingsResponse
+	(*SetAuthMethodRequest)(nil),            // 108: banda.v1.SetAuthMethodRequest
+	(*SetAuthMethodResponse)(nil),           // 109: banda.v1.SetAuthMethodResponse
+	(*SetSecretRequest)(nil),                // 110: banda.v1.SetSecretRequest
+	(*SetSecretResponse)(nil),               // 111: banda.v1.SetSecretResponse
+	(*DeleteSecretRequest)(nil),             // 112: banda.v1.DeleteSecretRequest
+	(*DeleteSecretResponse)(nil),            // 113: banda.v1.DeleteSecretResponse
+	(*SetDefaultProfileRequest)(nil),        // 114: banda.v1.SetDefaultProfileRequest
+	(*SetDefaultProfileResponse)(nil),       // 115: banda.v1.SetDefaultProfileResponse
+	(*ListTeamSecretsRequest)(nil),          // 116: banda.v1.ListTeamSecretsRequest
+	(*ListTeamSecretsResponse)(nil),         // 117: banda.v1.ListTeamSecretsResponse
+	(*SetTeamSecretRequest)(nil),            // 118: banda.v1.SetTeamSecretRequest
+	(*SetTeamSecretResponse)(nil),           // 119: banda.v1.SetTeamSecretResponse
+	(*DeleteTeamSecretRequest)(nil),         // 120: banda.v1.DeleteTeamSecretRequest
+	(*DeleteTeamSecretResponse)(nil),        // 121: banda.v1.DeleteTeamSecretResponse
+	(*OpenLoginTerminalRequest)(nil),        // 122: banda.v1.OpenLoginTerminalRequest
+	(*WriteLoginTerminalRequest)(nil),       // 123: banda.v1.WriteLoginTerminalRequest
+	(*ResizeLoginTerminalRequest)(nil),      // 124: banda.v1.ResizeLoginTerminalRequest
+	(*TeamActivity)(nil),                    // 125: banda.v1.TeamActivity
+	(*TeamWatchRequest)(nil),                // 126: banda.v1.TeamWatchRequest
+	(*TeamWatchResponse)(nil),               // 127: banda.v1.TeamWatchResponse
+	(*BriefRequest)(nil),                    // 128: banda.v1.BriefRequest
+	(*BriefResponse)(nil),                   // 129: banda.v1.BriefResponse
+	(*BriefItem)(nil),                       // 130: banda.v1.BriefItem
+	(*BriefSeenRequest)(nil),                // 131: banda.v1.BriefSeenRequest
+	(*BriefSeenResponse)(nil),               // 132: banda.v1.BriefSeenResponse
+	(*InboxWatchRequest)(nil),               // 133: banda.v1.InboxWatchRequest
+	(*InboxWatchResponse)(nil),              // 134: banda.v1.InboxWatchResponse
+	(*Decision)(nil),                        // 135: banda.v1.Decision
+	(*InboxMarkReadRequest)(nil),            // 136: banda.v1.InboxMarkReadRequest
+	(*InboxMarkReadResponse)(nil),           // 137: banda.v1.InboxMarkReadResponse
+	(*WatchThreadRequest)(nil),              // 138: banda.v1.WatchThreadRequest
+	(*HistoryRequest)(nil),                  // 139: banda.v1.HistoryRequest
+	(*HistoryResponse)(nil),                 // 140: banda.v1.HistoryResponse
+	(*PermissionRequested)(nil),             // 141: banda.v1.PermissionRequested
+	(*PermissionResolved)(nil),              // 142: banda.v1.PermissionResolved
+	(*PermissionAnswerRequest)(nil),         // 143: banda.v1.PermissionAnswerRequest
+	(*PermissionAnswerResponse)(nil),        // 144: banda.v1.PermissionAnswerResponse
+	(*PermissionVoteRequest)(nil),           // 145: banda.v1.PermissionVoteRequest
+	(*PermissionVoteResponse)(nil),          // 146: banda.v1.PermissionVoteResponse
+	(*PermissionVoted)(nil),                 // 147: banda.v1.PermissionVoted
+	(*PermissionRevokeRequest)(nil),         // 148: banda.v1.PermissionRevokeRequest
+	(*PermissionRevokeResponse)(nil),        // 149: banda.v1.PermissionRevokeResponse
+	(*PermissionRevoked)(nil),               // 150: banda.v1.PermissionRevoked
+	(*PermissionSetModeRequest)(nil),        // 151: banda.v1.PermissionSetModeRequest
+	(*PermissionSetModeResponse)(nil),       // 152: banda.v1.PermissionSetModeResponse
+	(*PermissionModeChanged)(nil),           // 153: banda.v1.PermissionModeChanged
+	(*HandoffOffered)(nil),                  // 154: banda.v1.HandoffOffered
+	(*HandoffResolved)(nil),                 // 155: banda.v1.HandoffResolved
+	(*WatchThreadResponse)(nil),             // 156: banda.v1.WatchThreadResponse
+	(*ConnectRequest)(nil),                  // 157: banda.v1.ConnectRequest
+	(*Ping)(nil),                            // 158: banda.v1.Ping
+	(*Pong)(nil),                            // 159: banda.v1.Pong
+	(*Hello)(nil),                           // 160: banda.v1.Hello
+	(*LoginStatus)(nil),                     // 161: banda.v1.LoginStatus
+	(*Ready)(nil),                           // 162: banda.v1.Ready
+	(*TerminalOutput)(nil),                  // 163: banda.v1.TerminalOutput
+	(*Diff)(nil),                            // 164: banda.v1.Diff
+	(*FileResponse)(nil),                    // 165: banda.v1.FileResponse
+	(*ConnectResponse)(nil),                 // 166: banda.v1.ConnectResponse
+	(*PermissionCommand)(nil),               // 167: banda.v1.PermissionCommand
+	(*Prompt)(nil),                          // 168: banda.v1.Prompt
+	(*AttachmentImage)(nil),                 // 169: banda.v1.AttachmentImage
+	(*Stop)(nil),                            // 170: banda.v1.Stop
+	(*Push)(nil),                            // 171: banda.v1.Push
+	(*TerminalOpen)(nil),                    // 172: banda.v1.TerminalOpen
+	(*TerminalInput)(nil),                   // 173: banda.v1.TerminalInput
+	(*TerminalResize)(nil),                  // 174: banda.v1.TerminalResize
+	(*TerminalClose)(nil),                   // 175: banda.v1.TerminalClose
+	(*FileRequest)(nil),                     // 176: banda.v1.FileRequest
+	(*HttpTunnel)(nil),                      // 177: banda.v1.HttpTunnel
+	(*PreviewPorts)(nil),                    // 178: banda.v1.PreviewPorts
+	(*RaceTry)(nil),                         // 179: banda.v1.RaceTry
+	(*ForkRequest)(nil),                     // 180: banda.v1.ForkRequest
+	(*ForkResponse)(nil),                    // 181: banda.v1.ForkResponse
+	(*RaceRequest)(nil),                     // 182: banda.v1.RaceRequest
+	(*RaceResponse)(nil),                    // 183: banda.v1.RaceResponse
+	(*RaceCompareRequest)(nil),              // 184: banda.v1.RaceCompareRequest
+	(*RaceCompareResponse)(nil),             // 185: banda.v1.RaceCompareResponse
+	(*RaceEntry)(nil),                       // 186: banda.v1.RaceEntry
+	(*RaceListRequest)(nil),                 // 187: banda.v1.RaceListRequest
+	(*RaceListResponse)(nil),                // 188: banda.v1.RaceListResponse
+	(*RacePickRequest)(nil),                 // 189: banda.v1.RacePickRequest
+	(*RacePickResponse)(nil),                // 190: banda.v1.RacePickResponse
+	(*ForkPatchRequest)(nil),                // 191: banda.v1.ForkPatchRequest
+	(*ForkPatchResponse)(nil),               // 192: banda.v1.ForkPatchResponse
+	(*SearchRequest)(nil),                   // 193: banda.v1.SearchRequest
+	(*SearchResult)(nil),                    // 194: banda.v1.SearchResult
+	(*SearchResponse)(nil),                  // 195: banda.v1.SearchResponse
+	(*PullRequestSummary)(nil),              // 196: banda.v1.PullRequestSummary
+	(*PullRequestCheck)(nil),                // 197: banda.v1.PullRequestCheck
+	(*PullRequestReviewer)(nil),             // 198: banda.v1.PullRequestReviewer
+	(*PullRequestComment)(nil),              // 199: banda.v1.PullRequestComment
+	(*PullRequest)(nil),                     // 200: banda.v1.PullRequest
+	(*PullRequestChanged)(nil),              // 201: banda.v1.PullRequestChanged
+	(*PullRequestGetRequest)(nil),           // 202: banda.v1.PullRequestGetRequest
+	(*PullRequestGetResponse)(nil),          // 203: banda.v1.PullRequestGetResponse
+	(*PullRequestCreateRequest)(nil),        // 204: banda.v1.PullRequestCreateRequest
+	(*PullRequestCreateResponse)(nil),       // 205: banda.v1.PullRequestCreateResponse
+	(*PullRequestLinkRequest)(nil),          // 206: banda.v1.PullRequestLinkRequest
+	(*PullRequestLinkResponse)(nil),         // 207: banda.v1.PullRequestLinkResponse
+	(*PullRequestUpdateRequest)(nil),        // 208: banda.v1.PullRequestUpdateRequest
+	(*PullRequestUpdateResponse)(nil),       // 209: banda.v1.PullRequestUpdateResponse
+	(*PullRequestMergeRequest)(nil),         // 210: banda.v1.PullRequestMergeRequest
+	(*PullRequestMergeResponse)(nil),        // 211: banda.v1.PullRequestMergeResponse
+	(*PullRequestCommentRequest)(nil),       // 212: banda.v1.PullRequestCommentRequest
+	(*PullRequestCommentResponse)(nil),      // 213: banda.v1.PullRequestCommentResponse
+	(*ListForgeReposRequest)(nil),           // 214: banda.v1.ListForgeReposRequest
+	(*ListForgeReposResponse)(nil),          // 215: banda.v1.ListForgeReposResponse
+	(*ForgeRepo)(nil),                       // 216: banda.v1.ForgeRepo
+	(*PullRequestChoicesRequest)(nil),       // 217: banda.v1.PullRequestChoicesRequest
+	(*PullRequestChoicesResponse)(nil),      // 218: banda.v1.PullRequestChoicesResponse
+	(*PullRequestResolveRequest)(nil),       // 219: banda.v1.PullRequestResolveRequest
+	(*PullRequestResolveResponse)(nil),      // 220: banda.v1.PullRequestResolveResponse
+	(*GitIdentity)(nil),                     // 221: banda.v1.GitIdentity
+	(*SetGitIdentityRequest)(nil),           // 222: banda.v1.SetGitIdentityRequest
+	(*SetGitIdentityResponse)(nil),          // 223: banda.v1.SetGitIdentityResponse
+	(*ThreadDefaults)(nil),                  // 224: banda.v1.ThreadDefaults
+	(*SetThreadDefaultsRequest)(nil),        // 225: banda.v1.SetThreadDefaultsRequest
+	(*SetThreadDefaultsResponse)(nil),       // 226: banda.v1.SetThreadDefaultsResponse
+	(*RepoAdded)(nil),                       // 227: banda.v1.RepoAdded
+	(*AddRepositoryRequest)(nil),            // 228: banda.v1.AddRepositoryRequest
+	(*AddRepositoryResponse)(nil),           // 229: banda.v1.AddRepositoryResponse
+	(*IdTokensChanged)(nil),                 // 230: banda.v1.IdTokensChanged
+	(*IdTokensRequest)(nil),                 // 231: banda.v1.IdTokensRequest
+	(*IdTokensResponse)(nil),                // 232: banda.v1.IdTokensResponse
+	(*IdToken)(nil),                         // 233: banda.v1.IdToken
+	(*GetWorkloadIdentityRequest)(nil),      // 234: banda.v1.GetWorkloadIdentityRequest
+	(*GetWorkloadIdentityResponse)(nil),     // 235: banda.v1.GetWorkloadIdentityResponse
+	(*IdTokenAudience)(nil),                 // 236: banda.v1.IdTokenAudience
+	(*AddIdTokenAudienceRequest)(nil),       // 237: banda.v1.AddIdTokenAudienceRequest
+	(*AddIdTokenAudienceResponse)(nil),      // 238: banda.v1.AddIdTokenAudienceResponse
+	(*RemoveIdTokenAudienceRequest)(nil),    // 239: banda.v1.RemoveIdTokenAudienceRequest
+	(*RemoveIdTokenAudienceResponse)(nil),   // 240: banda.v1.RemoveIdTokenAudienceResponse
+	(*GetGitHubRequest)(nil),                // 241: banda.v1.GetGitHubRequest
+	(*GetGitHubResponse)(nil),               // 242: banda.v1.GetGitHubResponse
+	(*GitHubAppChange)(nil),                 // 243: banda.v1.GitHubAppChange
+	(*GitHubAppRefusal)(nil),                // 244: banda.v1.GitHubAppRefusal
+	(*GitHubApp)(nil),                       // 245: banda.v1.GitHubApp
+	(*ForgeConnection)(nil),                 // 246: banda.v1.ForgeConnection
+	(*GitHubAppManifestRequest)(nil),        // 247: banda.v1.GitHubAppManifestRequest
+	(*GitHubAppManifestResponse)(nil),       // 248: banda.v1.GitHubAppManifestResponse
+	(*ListGitHubInstallationsRequest)(nil),  // 249: banda.v1.ListGitHubInstallationsRequest
+	(*ListGitHubInstallationsResponse)(nil), // 250: banda.v1.ListGitHubInstallationsResponse
+	(*GitHubInstallation)(nil),              // 251: banda.v1.GitHubInstallation
+	(*RemoveGitHubAppRequest)(nil),          // 252: banda.v1.RemoveGitHubAppRequest
+	(*RemoveGitHubAppResponse)(nil),         // 253: banda.v1.RemoveGitHubAppResponse
+	(*DisconnectGitHubRequest)(nil),         // 254: banda.v1.DisconnectGitHubRequest
+	(*DisconnectGitHubResponse)(nil),        // 255: banda.v1.DisconnectGitHubResponse
+	(*GitCredentialRequest)(nil),            // 256: banda.v1.GitCredentialRequest
+	(*GitCredentialResponse)(nil),           // 257: banda.v1.GitCredentialResponse
+	(*GetGitLabRequest)(nil),                // 258: banda.v1.GetGitLabRequest
+	(*GetGitLabResponse)(nil),               // 259: banda.v1.GetGitLabResponse
+	(*GitLabHost)(nil),                      // 260: banda.v1.GitLabHost
+	(*GitLabAppChange)(nil),                 // 261: banda.v1.GitLabAppChange
+	(*GitLabApp)(nil),                       // 262: banda.v1.GitLabApp
+	(*SetGitLabAppRequest)(nil),             // 263: banda.v1.SetGitLabAppRequest
+	(*SetGitLabAppResponse)(nil),            // 264: banda.v1.SetGitLabAppResponse
+	(*RemoveGitLabAppRequest)(nil),          // 265: banda.v1.RemoveGitLabAppRequest
+	(*RemoveGitLabAppResponse)(nil),         // 266: banda.v1.RemoveGitLabAppResponse
+	(*DisconnectGitLabRequest)(nil),         // 267: banda.v1.DisconnectGitLabRequest
+	(*DisconnectGitLabResponse)(nil),        // 268: banda.v1.DisconnectGitLabResponse
+	nil,                                     // 269: banda.v1.PermissionResolved.AnswersEntry
+	nil,                                     // 270: banda.v1.PermissionAnswerRequest.AnswersEntry
+	nil,                                     // 271: banda.v1.PermissionVoteRequest.AnswersEntry
+	nil,                                     // 272: banda.v1.PermissionVoted.AnswersEntry
+	nil,                                     // 273: banda.v1.PermissionCommand.AnswersEntry
+	(*timestamppb.Timestamp)(nil),           // 274: google.protobuf.Timestamp
 }
 var file_banda_v1_banda_proto_depIdxs = []int32{
 	0,   // 0: banda.v1.Thread.status:type_name -> banda.v1.Status
 	1,   // 1: banda.v1.Thread.mode:type_name -> banda.v1.Mode
-	235, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	235, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	235, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
+	274, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	274, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	274, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
 	125, // 5: banda.v1.Thread.activity:type_name -> banda.v1.TeamActivity
 	5,   // 6: banda.v1.Thread.auto_push:type_name -> banda.v1.AutoPushState
 	2,   // 7: banda.v1.Thread.permission_mode:type_name -> banda.v1.PermissionMode
@@ -15016,7 +17466,7 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	15,  // 9: banda.v1.Thread.overlaps:type_name -> banda.v1.Overlap
 	196, // 10: banda.v1.Thread.pull_request:type_name -> banda.v1.PullRequestSummary
 	0,   // 11: banda.v1.Overlap.status:type_name -> banda.v1.Status
-	235, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
+	274, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
 	20,  // 13: banda.v1.Event.message:type_name -> banda.v1.Message
 	26,  // 14: banda.v1.Event.agent_text:type_name -> banda.v1.AgentText
 	27,  // 15: banda.v1.Event.agent_text_delta:type_name -> banda.v1.AgentTextDelta
@@ -15066,15 +17516,15 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	14,  // 59: banda.v1.SpawnThreadResponse.thread:type_name -> banda.v1.Thread
 	14,  // 60: banda.v1.LineageChildrenResponse.threads:type_name -> banda.v1.Thread
 	14,  // 61: banda.v1.ListMentionedResponse.threads:type_name -> banda.v1.Thread
-	235, // 62: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
+	274, // 62: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
 	5,   // 63: banda.v1.AutoPush.state:type_name -> banda.v1.AutoPushState
 	97,  // 64: banda.v1.PreviewWatchResponse.ports:type_name -> banda.v1.PreviewPort
 	17,  // 65: banda.v1.MeResponse.user:type_name -> banda.v1.User
 	17,  // 66: banda.v1.ListUsersResponse.users:type_name -> banda.v1.User
 	6,   // 67: banda.v1.HarnessAccount.auth_method:type_name -> banda.v1.AuthMethod
 	7,   // 68: banda.v1.HarnessAccount.login_state:type_name -> banda.v1.LoginState
-	235, // 69: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
-	235, // 70: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
+	274, // 69: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
+	274, // 70: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
 	104, // 71: banda.v1.GetSettingsResponse.accounts:type_name -> banda.v1.HarnessAccount
 	105, // 72: banda.v1.GetSettingsResponse.secrets:type_name -> banda.v1.SecretInfo
 	221, // 73: banda.v1.GetSettingsResponse.git_identity:type_name -> banda.v1.GitIdentity
@@ -15082,16 +17532,16 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	6,   // 75: banda.v1.SetAuthMethodRequest.auth_method:type_name -> banda.v1.AuthMethod
 	105, // 76: banda.v1.ListTeamSecretsResponse.secrets:type_name -> banda.v1.SecretInfo
 	8,   // 77: banda.v1.OpenLoginTerminalRequest.action:type_name -> banda.v1.LoginAction
-	235, // 78: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
+	274, // 78: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
 	14,  // 79: banda.v1.TeamWatchResponse.threads:type_name -> banda.v1.Thread
-	235, // 80: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
-	235, // 81: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
+	274, // 80: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
+	274, // 81: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
 	130, // 82: banda.v1.BriefResponse.finished:type_name -> banda.v1.BriefItem
 	130, // 83: banda.v1.BriefResponse.waiting:type_name -> banda.v1.BriefItem
 	130, // 84: banda.v1.BriefResponse.spawned:type_name -> banda.v1.BriefItem
 	130, // 85: banda.v1.BriefResponse.settled:type_name -> banda.v1.BriefItem
-	235, // 86: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
-	235, // 87: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
+	274, // 86: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
+	274, // 87: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
 	14,  // 88: banda.v1.InboxWatchResponse.threads:type_name -> banda.v1.Thread
 	14,  // 89: banda.v1.InboxWatchResponse.mentioned:type_name -> banda.v1.Thread
 	135, // 90: banda.v1.InboxWatchResponse.decisions:type_name -> banda.v1.Decision
@@ -15100,12 +17550,12 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	18,  // 93: banda.v1.HistoryResponse.events:type_name -> banda.v1.Event
 	3,   // 94: banda.v1.PermissionResolved.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 95: banda.v1.PermissionResolved.mode:type_name -> banda.v1.PermissionMode
-	230, // 96: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
+	269, // 96: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
 	3,   // 97: banda.v1.PermissionAnswerRequest.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 98: banda.v1.PermissionAnswerRequest.mode:type_name -> banda.v1.PermissionMode
-	231, // 99: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
-	232, // 100: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
-	233, // 101: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
+	270, // 99: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
+	271, // 100: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
+	272, // 101: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
 	2,   // 102: banda.v1.PermissionSetModeRequest.mode:type_name -> banda.v1.PermissionMode
 	2,   // 103: banda.v1.PermissionModeChanged.mode:type_name -> banda.v1.PermissionMode
 	18,  // 104: banda.v1.WatchThreadResponse.event:type_name -> banda.v1.Event
@@ -15132,205 +17582,253 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	177, // 125: banda.v1.ConnectResponse.http_tunnel:type_name -> banda.v1.HttpTunnel
 	167, // 126: banda.v1.ConnectResponse.permission:type_name -> banda.v1.PermissionCommand
 	158, // 127: banda.v1.ConnectResponse.ping:type_name -> banda.v1.Ping
-	3,   // 128: banda.v1.PermissionCommand.decision:type_name -> banda.v1.PermissionDecision
-	2,   // 129: banda.v1.PermissionCommand.mode:type_name -> banda.v1.PermissionMode
-	234, // 130: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
-	169, // 131: banda.v1.Prompt.images:type_name -> banda.v1.AttachmentImage
-	97,  // 132: banda.v1.PreviewPorts.ports:type_name -> banda.v1.PreviewPort
-	179, // 133: banda.v1.ForkRequest.tries:type_name -> banda.v1.RaceTry
-	14,  // 134: banda.v1.ForkResponse.threads:type_name -> banda.v1.Thread
-	179, // 135: banda.v1.RaceRequest.tries:type_name -> banda.v1.RaceTry
-	2,   // 136: banda.v1.RaceRequest.permission_mode:type_name -> banda.v1.PermissionMode
-	22,  // 137: banda.v1.RaceRequest.attachments:type_name -> banda.v1.Attachment
-	14,  // 138: banda.v1.RaceResponse.threads:type_name -> banda.v1.Thread
-	186, // 139: banda.v1.RaceCompareResponse.entries:type_name -> banda.v1.RaceEntry
-	14,  // 140: banda.v1.RaceEntry.thread:type_name -> banda.v1.Thread
-	14,  // 141: banda.v1.RaceListResponse.threads:type_name -> banda.v1.Thread
-	9,   // 142: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
-	235, // 143: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
-	235, // 144: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
-	235, // 145: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
-	9,   // 146: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
-	194, // 147: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
-	10,  // 148: banda.v1.PullRequestSummary.state:type_name -> banda.v1.PullState
-	11,  // 149: banda.v1.PullRequestSummary.checks:type_name -> banda.v1.ChecksState
-	12,  // 150: banda.v1.PullRequestSummary.review:type_name -> banda.v1.ReviewState
-	13,  // 151: banda.v1.PullRequestSummary.mergeable:type_name -> banda.v1.Mergeable
-	11,  // 152: banda.v1.PullRequestCheck.state:type_name -> banda.v1.ChecksState
-	235, // 153: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
-	235, // 154: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
-	12,  // 155: banda.v1.PullRequestReviewer.state:type_name -> banda.v1.ReviewState
-	235, // 156: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
-	12,  // 157: banda.v1.PullRequestComment.review:type_name -> banda.v1.ReviewState
-	196, // 158: banda.v1.PullRequest.summary:type_name -> banda.v1.PullRequestSummary
-	198, // 159: banda.v1.PullRequest.reviewers:type_name -> banda.v1.PullRequestReviewer
-	197, // 160: banda.v1.PullRequest.checks:type_name -> banda.v1.PullRequestCheck
-	199, // 161: banda.v1.PullRequest.comments:type_name -> banda.v1.PullRequestComment
-	235, // 162: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	235, // 163: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
-	235, // 164: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	196, // 165: banda.v1.PullRequestChanged.pull_request:type_name -> banda.v1.PullRequestSummary
-	200, // 166: banda.v1.PullRequestGetResponse.pull_request:type_name -> banda.v1.PullRequest
-	200, // 167: banda.v1.PullRequestCreateResponse.pull_request:type_name -> banda.v1.PullRequest
-	200, // 168: banda.v1.PullRequestLinkResponse.pull_request:type_name -> banda.v1.PullRequest
-	200, // 169: banda.v1.PullRequestUpdateResponse.pull_request:type_name -> banda.v1.PullRequest
-	200, // 170: banda.v1.PullRequestMergeResponse.pull_request:type_name -> banda.v1.PullRequest
-	200, // 171: banda.v1.PullRequestCommentResponse.pull_request:type_name -> banda.v1.PullRequest
-	216, // 172: banda.v1.ListForgeReposResponse.repos:type_name -> banda.v1.ForgeRepo
-	200, // 173: banda.v1.PullRequestResolveResponse.pull_request:type_name -> banda.v1.PullRequest
-	2,   // 174: banda.v1.ThreadDefaults.permission_mode:type_name -> banda.v1.PermissionMode
-	224, // 175: banda.v1.SetThreadDefaultsRequest.defaults:type_name -> banda.v1.ThreadDefaults
-	41,  // 176: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
-	43,  // 177: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
-	45,  // 178: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
-	47,  // 179: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
-	49,  // 180: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
-	51,  // 181: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
-	54,  // 182: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
-	56,  // 183: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
-	58,  // 184: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
-	60,  // 185: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
-	62,  // 186: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
-	70,  // 187: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
-	72,  // 188: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
-	138, // 189: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
-	139, // 190: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
-	74,  // 191: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
-	76,  // 192: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
-	78,  // 193: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
-	80,  // 194: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
-	82,  // 195: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
-	85,  // 196: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
-	87,  // 197: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
-	89,  // 198: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
-	91,  // 199: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
-	93,  // 200: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
-	95,  // 201: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
-	98,  // 202: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
-	133, // 203: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
-	136, // 204: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
-	39,  // 205: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
-	126, // 206: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
-	128, // 207: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
-	131, // 208: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
-	143, // 209: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
-	151, // 210: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
-	145, // 211: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
-	148, // 212: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
-	180, // 213: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
-	182, // 214: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
-	184, // 215: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
-	187, // 216: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
-	189, // 217: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
-	193, // 218: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
-	64,  // 219: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
-	66,  // 220: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
-	68,  // 221: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
-	202, // 222: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
-	204, // 223: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
-	206, // 224: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
-	208, // 225: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
-	210, // 226: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
-	212, // 227: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
-	214, // 228: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
-	217, // 229: banda.v1.ThreadService.PullRequestChoices:input_type -> banda.v1.PullRequestChoicesRequest
-	219, // 230: banda.v1.ThreadService.PullRequestResolve:input_type -> banda.v1.PullRequestResolveRequest
-	228, // 231: banda.v1.ThreadService.AddRepository:input_type -> banda.v1.AddRepositoryRequest
-	100, // 232: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
-	102, // 233: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
-	106, // 234: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
-	108, // 235: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
-	110, // 236: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
-	112, // 237: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
-	114, // 238: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
-	116, // 239: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
-	118, // 240: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
-	120, // 241: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
-	122, // 242: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
-	123, // 243: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
-	124, // 244: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
-	222, // 245: banda.v1.SettingsService.SetGitIdentity:input_type -> banda.v1.SetGitIdentityRequest
-	225, // 246: banda.v1.SettingsService.SetThreadDefaults:input_type -> banda.v1.SetThreadDefaultsRequest
-	157, // 247: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
-	191, // 248: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
-	42,  // 249: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
-	44,  // 250: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
-	46,  // 251: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
-	48,  // 252: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
-	50,  // 253: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
-	52,  // 254: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
-	55,  // 255: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
-	57,  // 256: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
-	59,  // 257: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
-	61,  // 258: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
-	63,  // 259: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
-	71,  // 260: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
-	73,  // 261: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
-	156, // 262: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
-	140, // 263: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
-	75,  // 264: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
-	77,  // 265: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
-	79,  // 266: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
-	81,  // 267: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
-	83,  // 268: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
-	86,  // 269: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
-	88,  // 270: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
-	90,  // 271: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	92,  // 272: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
-	94,  // 273: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
-	96,  // 274: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
-	99,  // 275: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
-	134, // 276: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
-	137, // 277: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
-	40,  // 278: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
-	127, // 279: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
-	129, // 280: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
-	132, // 281: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
-	144, // 282: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
-	152, // 283: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
-	146, // 284: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
-	149, // 285: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
-	181, // 286: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
-	183, // 287: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
-	185, // 288: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
-	188, // 289: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
-	190, // 290: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
-	195, // 291: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
-	65,  // 292: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
-	67,  // 293: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
-	69,  // 294: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
-	203, // 295: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
-	205, // 296: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
-	207, // 297: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
-	209, // 298: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
-	211, // 299: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
-	213, // 300: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
-	215, // 301: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
-	218, // 302: banda.v1.ThreadService.PullRequestChoices:output_type -> banda.v1.PullRequestChoicesResponse
-	220, // 303: banda.v1.ThreadService.PullRequestResolve:output_type -> banda.v1.PullRequestResolveResponse
-	229, // 304: banda.v1.ThreadService.AddRepository:output_type -> banda.v1.AddRepositoryResponse
-	101, // 305: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
-	103, // 306: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
-	107, // 307: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
-	109, // 308: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
-	111, // 309: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
-	113, // 310: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
-	115, // 311: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
-	117, // 312: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
-	119, // 313: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
-	121, // 314: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
-	86,  // 315: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
-	88,  // 316: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
-	90,  // 317: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	223, // 318: banda.v1.SettingsService.SetGitIdentity:output_type -> banda.v1.SetGitIdentityResponse
-	226, // 319: banda.v1.SettingsService.SetThreadDefaults:output_type -> banda.v1.SetThreadDefaultsResponse
-	166, // 320: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
-	192, // 321: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
-	249, // [249:322] is the sub-list for method output_type
-	176, // [176:249] is the sub-list for method input_type
-	176, // [176:176] is the sub-list for extension type_name
-	176, // [176:176] is the sub-list for extension extendee
-	0,   // [0:176] is the sub-list for field type_name
+	230, // 128: banda.v1.ConnectResponse.id_tokens_changed:type_name -> banda.v1.IdTokensChanged
+	3,   // 129: banda.v1.PermissionCommand.decision:type_name -> banda.v1.PermissionDecision
+	2,   // 130: banda.v1.PermissionCommand.mode:type_name -> banda.v1.PermissionMode
+	273, // 131: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
+	169, // 132: banda.v1.Prompt.images:type_name -> banda.v1.AttachmentImage
+	97,  // 133: banda.v1.PreviewPorts.ports:type_name -> banda.v1.PreviewPort
+	179, // 134: banda.v1.ForkRequest.tries:type_name -> banda.v1.RaceTry
+	14,  // 135: banda.v1.ForkResponse.threads:type_name -> banda.v1.Thread
+	179, // 136: banda.v1.RaceRequest.tries:type_name -> banda.v1.RaceTry
+	2,   // 137: banda.v1.RaceRequest.permission_mode:type_name -> banda.v1.PermissionMode
+	22,  // 138: banda.v1.RaceRequest.attachments:type_name -> banda.v1.Attachment
+	14,  // 139: banda.v1.RaceResponse.threads:type_name -> banda.v1.Thread
+	186, // 140: banda.v1.RaceCompareResponse.entries:type_name -> banda.v1.RaceEntry
+	14,  // 141: banda.v1.RaceEntry.thread:type_name -> banda.v1.Thread
+	14,  // 142: banda.v1.RaceListResponse.threads:type_name -> banda.v1.Thread
+	9,   // 143: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
+	274, // 144: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
+	274, // 145: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
+	274, // 146: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
+	9,   // 147: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
+	194, // 148: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
+	10,  // 149: banda.v1.PullRequestSummary.state:type_name -> banda.v1.PullState
+	11,  // 150: banda.v1.PullRequestSummary.checks:type_name -> banda.v1.ChecksState
+	12,  // 151: banda.v1.PullRequestSummary.review:type_name -> banda.v1.ReviewState
+	13,  // 152: banda.v1.PullRequestSummary.mergeable:type_name -> banda.v1.Mergeable
+	11,  // 153: banda.v1.PullRequestCheck.state:type_name -> banda.v1.ChecksState
+	274, // 154: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
+	274, // 155: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
+	12,  // 156: banda.v1.PullRequestReviewer.state:type_name -> banda.v1.ReviewState
+	274, // 157: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	12,  // 158: banda.v1.PullRequestComment.review:type_name -> banda.v1.ReviewState
+	196, // 159: banda.v1.PullRequest.summary:type_name -> banda.v1.PullRequestSummary
+	198, // 160: banda.v1.PullRequest.reviewers:type_name -> banda.v1.PullRequestReviewer
+	197, // 161: banda.v1.PullRequest.checks:type_name -> banda.v1.PullRequestCheck
+	199, // 162: banda.v1.PullRequest.comments:type_name -> banda.v1.PullRequestComment
+	274, // 163: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	274, // 164: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
+	274, // 165: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	196, // 166: banda.v1.PullRequestChanged.pull_request:type_name -> banda.v1.PullRequestSummary
+	200, // 167: banda.v1.PullRequestGetResponse.pull_request:type_name -> banda.v1.PullRequest
+	200, // 168: banda.v1.PullRequestCreateResponse.pull_request:type_name -> banda.v1.PullRequest
+	200, // 169: banda.v1.PullRequestLinkResponse.pull_request:type_name -> banda.v1.PullRequest
+	200, // 170: banda.v1.PullRequestUpdateResponse.pull_request:type_name -> banda.v1.PullRequest
+	200, // 171: banda.v1.PullRequestMergeResponse.pull_request:type_name -> banda.v1.PullRequest
+	200, // 172: banda.v1.PullRequestCommentResponse.pull_request:type_name -> banda.v1.PullRequest
+	216, // 173: banda.v1.ListForgeReposResponse.repos:type_name -> banda.v1.ForgeRepo
+	200, // 174: banda.v1.PullRequestResolveResponse.pull_request:type_name -> banda.v1.PullRequest
+	2,   // 175: banda.v1.ThreadDefaults.permission_mode:type_name -> banda.v1.PermissionMode
+	224, // 176: banda.v1.SetThreadDefaultsRequest.defaults:type_name -> banda.v1.ThreadDefaults
+	233, // 177: banda.v1.IdTokensResponse.tokens:type_name -> banda.v1.IdToken
+	274, // 178: banda.v1.IdToken.expires_at:type_name -> google.protobuf.Timestamp
+	236, // 179: banda.v1.GetWorkloadIdentityResponse.audiences:type_name -> banda.v1.IdTokenAudience
+	274, // 180: banda.v1.IdTokenAudience.added_at:type_name -> google.protobuf.Timestamp
+	245, // 181: banda.v1.GetGitHubResponse.app:type_name -> banda.v1.GitHubApp
+	246, // 182: banda.v1.GetGitHubResponse.connection:type_name -> banda.v1.ForgeConnection
+	243, // 183: banda.v1.GetGitHubResponse.last_change:type_name -> banda.v1.GitHubAppChange
+	244, // 184: banda.v1.GetGitHubResponse.refusal:type_name -> banda.v1.GitHubAppRefusal
+	274, // 185: banda.v1.GitHubAppChange.at:type_name -> google.protobuf.Timestamp
+	274, // 186: banda.v1.GitHubApp.created_at:type_name -> google.protobuf.Timestamp
+	274, // 187: banda.v1.ForgeConnection.connected_at:type_name -> google.protobuf.Timestamp
+	251, // 188: banda.v1.ListGitHubInstallationsResponse.installations:type_name -> banda.v1.GitHubInstallation
+	274, // 189: banda.v1.GitCredentialResponse.expires_at:type_name -> google.protobuf.Timestamp
+	260, // 190: banda.v1.GetGitLabResponse.hosts:type_name -> banda.v1.GitLabHost
+	262, // 191: banda.v1.GitLabHost.app:type_name -> banda.v1.GitLabApp
+	246, // 192: banda.v1.GitLabHost.connection:type_name -> banda.v1.ForgeConnection
+	261, // 193: banda.v1.GitLabHost.last_change:type_name -> banda.v1.GitLabAppChange
+	274, // 194: banda.v1.GitLabAppChange.at:type_name -> google.protobuf.Timestamp
+	274, // 195: banda.v1.GitLabApp.created_at:type_name -> google.protobuf.Timestamp
+	41,  // 196: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
+	43,  // 197: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
+	45,  // 198: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
+	47,  // 199: banda.v1.ThreadService.SendMessage:input_type -> banda.v1.SendMessageRequest
+	49,  // 200: banda.v1.ThreadService.Interrupt:input_type -> banda.v1.InterruptRequest
+	51,  // 201: banda.v1.ThreadService.SetMode:input_type -> banda.v1.SetModeRequest
+	54,  // 202: banda.v1.ThreadService.SetAgentSettings:input_type -> banda.v1.SetAgentSettingsRequest
+	56,  // 203: banda.v1.ThreadService.Retry:input_type -> banda.v1.RetryRequest
+	58,  // 204: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
+	60,  // 205: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
+	62,  // 206: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
+	70,  // 207: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
+	72,  // 208: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
+	138, // 209: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
+	139, // 210: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
+	74,  // 211: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
+	76,  // 212: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
+	78,  // 213: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
+	80,  // 214: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
+	82,  // 215: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
+	85,  // 216: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
+	87,  // 217: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
+	89,  // 218: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
+	91,  // 219: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
+	93,  // 220: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
+	95,  // 221: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
+	98,  // 222: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
+	133, // 223: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
+	136, // 224: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
+	39,  // 225: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
+	126, // 226: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
+	128, // 227: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
+	131, // 228: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
+	143, // 229: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
+	151, // 230: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
+	145, // 231: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
+	148, // 232: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
+	180, // 233: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
+	182, // 234: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
+	184, // 235: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
+	187, // 236: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
+	189, // 237: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
+	193, // 238: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
+	64,  // 239: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
+	66,  // 240: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
+	68,  // 241: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
+	202, // 242: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
+	204, // 243: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
+	206, // 244: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
+	208, // 245: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
+	210, // 246: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
+	212, // 247: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
+	214, // 248: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
+	217, // 249: banda.v1.ThreadService.PullRequestChoices:input_type -> banda.v1.PullRequestChoicesRequest
+	219, // 250: banda.v1.ThreadService.PullRequestResolve:input_type -> banda.v1.PullRequestResolveRequest
+	228, // 251: banda.v1.ThreadService.AddRepository:input_type -> banda.v1.AddRepositoryRequest
+	100, // 252: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
+	102, // 253: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
+	106, // 254: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
+	108, // 255: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
+	110, // 256: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
+	112, // 257: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
+	114, // 258: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
+	116, // 259: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
+	118, // 260: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
+	120, // 261: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
+	122, // 262: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
+	123, // 263: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
+	124, // 264: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
+	222, // 265: banda.v1.SettingsService.SetGitIdentity:input_type -> banda.v1.SetGitIdentityRequest
+	225, // 266: banda.v1.SettingsService.SetThreadDefaults:input_type -> banda.v1.SetThreadDefaultsRequest
+	234, // 267: banda.v1.SettingsService.GetWorkloadIdentity:input_type -> banda.v1.GetWorkloadIdentityRequest
+	237, // 268: banda.v1.SettingsService.AddIdTokenAudience:input_type -> banda.v1.AddIdTokenAudienceRequest
+	239, // 269: banda.v1.SettingsService.RemoveIdTokenAudience:input_type -> banda.v1.RemoveIdTokenAudienceRequest
+	241, // 270: banda.v1.SettingsService.GetGitHub:input_type -> banda.v1.GetGitHubRequest
+	247, // 271: banda.v1.SettingsService.GitHubAppManifest:input_type -> banda.v1.GitHubAppManifestRequest
+	249, // 272: banda.v1.SettingsService.ListGitHubInstallations:input_type -> banda.v1.ListGitHubInstallationsRequest
+	252, // 273: banda.v1.SettingsService.RemoveGitHubApp:input_type -> banda.v1.RemoveGitHubAppRequest
+	254, // 274: banda.v1.SettingsService.DisconnectGitHub:input_type -> banda.v1.DisconnectGitHubRequest
+	258, // 275: banda.v1.SettingsService.GetGitLab:input_type -> banda.v1.GetGitLabRequest
+	263, // 276: banda.v1.SettingsService.SetGitLabApp:input_type -> banda.v1.SetGitLabAppRequest
+	265, // 277: banda.v1.SettingsService.RemoveGitLabApp:input_type -> banda.v1.RemoveGitLabAppRequest
+	267, // 278: banda.v1.SettingsService.DisconnectGitLab:input_type -> banda.v1.DisconnectGitLabRequest
+	157, // 279: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
+	191, // 280: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
+	231, // 281: banda.v1.RunnerService.IdTokens:input_type -> banda.v1.IdTokensRequest
+	256, // 282: banda.v1.RunnerService.GitCredential:input_type -> banda.v1.GitCredentialRequest
+	42,  // 283: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
+	44,  // 284: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
+	46,  // 285: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
+	48,  // 286: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
+	50,  // 287: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
+	52,  // 288: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
+	55,  // 289: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
+	57,  // 290: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
+	59,  // 291: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
+	61,  // 292: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
+	63,  // 293: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
+	71,  // 294: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
+	73,  // 295: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
+	156, // 296: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
+	140, // 297: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
+	75,  // 298: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
+	77,  // 299: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
+	79,  // 300: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
+	81,  // 301: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
+	83,  // 302: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
+	86,  // 303: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
+	88,  // 304: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
+	90,  // 305: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	92,  // 306: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
+	94,  // 307: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
+	96,  // 308: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
+	99,  // 309: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
+	134, // 310: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
+	137, // 311: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
+	40,  // 312: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
+	127, // 313: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
+	129, // 314: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
+	132, // 315: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
+	144, // 316: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
+	152, // 317: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
+	146, // 318: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
+	149, // 319: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
+	181, // 320: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
+	183, // 321: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
+	185, // 322: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
+	188, // 323: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
+	190, // 324: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
+	195, // 325: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
+	65,  // 326: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
+	67,  // 327: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
+	69,  // 328: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
+	203, // 329: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
+	205, // 330: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
+	207, // 331: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
+	209, // 332: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
+	211, // 333: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
+	213, // 334: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
+	215, // 335: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
+	218, // 336: banda.v1.ThreadService.PullRequestChoices:output_type -> banda.v1.PullRequestChoicesResponse
+	220, // 337: banda.v1.ThreadService.PullRequestResolve:output_type -> banda.v1.PullRequestResolveResponse
+	229, // 338: banda.v1.ThreadService.AddRepository:output_type -> banda.v1.AddRepositoryResponse
+	101, // 339: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
+	103, // 340: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
+	107, // 341: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
+	109, // 342: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
+	111, // 343: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
+	113, // 344: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
+	115, // 345: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
+	117, // 346: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
+	119, // 347: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
+	121, // 348: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
+	86,  // 349: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
+	88,  // 350: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
+	90,  // 351: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	223, // 352: banda.v1.SettingsService.SetGitIdentity:output_type -> banda.v1.SetGitIdentityResponse
+	226, // 353: banda.v1.SettingsService.SetThreadDefaults:output_type -> banda.v1.SetThreadDefaultsResponse
+	235, // 354: banda.v1.SettingsService.GetWorkloadIdentity:output_type -> banda.v1.GetWorkloadIdentityResponse
+	238, // 355: banda.v1.SettingsService.AddIdTokenAudience:output_type -> banda.v1.AddIdTokenAudienceResponse
+	240, // 356: banda.v1.SettingsService.RemoveIdTokenAudience:output_type -> banda.v1.RemoveIdTokenAudienceResponse
+	242, // 357: banda.v1.SettingsService.GetGitHub:output_type -> banda.v1.GetGitHubResponse
+	248, // 358: banda.v1.SettingsService.GitHubAppManifest:output_type -> banda.v1.GitHubAppManifestResponse
+	250, // 359: banda.v1.SettingsService.ListGitHubInstallations:output_type -> banda.v1.ListGitHubInstallationsResponse
+	253, // 360: banda.v1.SettingsService.RemoveGitHubApp:output_type -> banda.v1.RemoveGitHubAppResponse
+	255, // 361: banda.v1.SettingsService.DisconnectGitHub:output_type -> banda.v1.DisconnectGitHubResponse
+	259, // 362: banda.v1.SettingsService.GetGitLab:output_type -> banda.v1.GetGitLabResponse
+	264, // 363: banda.v1.SettingsService.SetGitLabApp:output_type -> banda.v1.SetGitLabAppResponse
+	266, // 364: banda.v1.SettingsService.RemoveGitLabApp:output_type -> banda.v1.RemoveGitLabAppResponse
+	268, // 365: banda.v1.SettingsService.DisconnectGitLab:output_type -> banda.v1.DisconnectGitLabResponse
+	166, // 366: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
+	192, // 367: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
+	232, // 368: banda.v1.RunnerService.IdTokens:output_type -> banda.v1.IdTokensResponse
+	257, // 369: banda.v1.RunnerService.GitCredential:output_type -> banda.v1.GitCredentialResponse
+	283, // [283:370] is the sub-list for method output_type
+	196, // [196:283] is the sub-list for method input_type
+	196, // [196:196] is the sub-list for extension type_name
+	196, // [196:196] is the sub-list for extension extendee
+	0,   // [0:196] is the sub-list for field type_name
 }
 
 func init() { file_banda_v1_banda_proto_init() }
@@ -15397,6 +17895,7 @@ func file_banda_v1_banda_proto_init() {
 		(*ConnectResponse_HttpTunnel)(nil),
 		(*ConnectResponse_Permission)(nil),
 		(*ConnectResponse_Ping)(nil),
+		(*ConnectResponse_IdTokensChanged)(nil),
 	}
 	file_banda_v1_banda_proto_msgTypes[179].OneofWrappers = []any{}
 	file_banda_v1_banda_proto_msgTypes[194].OneofWrappers = []any{}
@@ -15406,7 +17905,7 @@ func file_banda_v1_banda_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_banda_v1_banda_proto_rawDesc), len(file_banda_v1_banda_proto_rawDesc)),
 			NumEnums:      14,
-			NumMessages:   221,
+			NumMessages:   260,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

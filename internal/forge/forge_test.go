@@ -15,7 +15,7 @@ import (
 )
 
 func TestRepo(t *testing.T) {
-	c := Config{Hosts: map[string]string{"git.corp.example": GitLab, "ghe.corp": GitHub}}
+	c := Config{Hosts: map[string]string{"git.corp.example": GitLab, "ghe.corp": GitHub, "git.corp.example:8443": GitLab}}
 	for url, want := range map[string]Repo{
 		"https://github.com/o/r.git":        {GitHub, "github.com", "o/r"},
 		"git@github.com:o/r.git":            {GitHub, "github.com", "o/r"},
@@ -28,14 +28,21 @@ func TestRepo(t *testing.T) {
 		"https://github.com/o":              {},
 		"https://github.com/o/r/tree/main":  {}, // not a repository
 		"file:///opt/e2e/plain.git":         {},
+		// Another port is another server: a known forge only where FORGE_HOSTS names that host:port.
+		"https://github.com:443/o/r":             {GitHub, "github.com", "o/r"},
+		"ssh://git@gitlab.com:22/g/p":            {GitLab, "gitlab.com", "g/p"},
+		"https://github.com:8443/o/r":            {},
+		"http://gitlab.com:8080/g/p":             {},
+		"https://ghe.corp:8443/o/r":              {},
+		"https://git.corp.example:8443/team/app": {GitLab, "git.corp.example:8443", "team/app"},
 	} {
 		got, ok := c.Repo(url)
 		if got != want || ok != (want.Kind != "") {
 			t.Errorf("Repo(%q) = %+v, %v; want %+v", url, got, ok, want)
 		}
 	}
-	if _, err := ParseHosts("a=github, b=gitlab"); err != nil {
-		t.Error(err)
+	if h, err := ParseHosts("a=github, b=gitlab, Git.Corp:8443=gitlab"); err != nil || h["git.corp:8443"] != GitLab {
+		t.Error(h, err)
 	}
 	if _, err := ParseHosts("a=gitea"); err == nil {
 		t.Error("ParseHosts accepted an unknown kind")
@@ -83,7 +90,7 @@ func (f *fake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func open(t *testing.T, kind, base string) Forge {
 	r := Repo{Kind: kind, Host: "forge.test", Path: "o/r"}
-	f, err := Config{TestURL: base}.Open(r, "tok")
+	f, err := Config{TestURL: base}.Open(r, Token{Value: "tok", Fix: "check GIT_TOKEN in Settings"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +220,7 @@ func TestETags(t *testing.T) {
 		w.Write([]byte(`{"number": 3}`))
 	}))
 	defer srv.Close()
-	client := &http.Client{Transport: newETags("etag-test")}
+	client := &http.Client{Transport: newETags("etag-test", nil)}
 	for i := range 2 {
 		res, err := client.Get(srv.URL + "/x")
 		if err != nil {
@@ -316,8 +323,8 @@ func TestGitLab(t *testing.T) {
 	if err := g.Merge(ctx, 6, "merge"); !errors.As(err, &fe) || fe.Code != Refused {
 		t.Errorf("merge refused: %v", err)
 	}
-	if f.auth[0] != "tok" {
-		t.Errorf("PRIVATE-TOKEN %q", f.auth[0])
+	if f.auth[0] != "Bearer tok" { // OAuth tokens only work this way; personal ones work either way
+		t.Errorf("Authorization %q", f.auth[0])
 	}
 }
 
@@ -336,18 +343,18 @@ func TestRepos(t *testing.T) {
 		},
 	})
 	c := Config{TestURL: base}
-	found, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok", "old")
+	found, err := c.Repos(context.Background(), GitHub, "ghe.corp", Token{Value: "tok"}, "old")
 	if err != nil || len(found) != 1 || found[0].Name != "o/old" || searched != "old in:name fork:true user:me user:o" {
 		t.Errorf("GitHub search %v, %v, q %q", found, err, searched)
 	}
-	if _, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok", "p"); err != nil || glSearch != "p" {
+	if _, err := c.Repos(context.Background(), GitLab, "gitlab.com", Token{Value: "tok"}, "p"); err != nil || glSearch != "p" {
 		t.Errorf("GitLab search %q, %v", glSearch, err)
 	}
-	gh, err := c.Repos(context.Background(), GitHub, "ghe.corp", "tok", "")
+	gh, err := c.Repos(context.Background(), GitHub, "ghe.corp", Token{Value: "tok"}, "")
 	if err != nil || len(gh) != 1 || gh[0].Url != "https://ghe.corp/o/r.git" || gh[0].Description != "d" {
 		t.Errorf("GitHub repos %v, %v", gh, err)
 	}
-	gl, err := c.Repos(context.Background(), GitLab, "gitlab.com", "tok", "")
+	gl, err := c.Repos(context.Background(), GitLab, "gitlab.com", Token{Value: "tok"}, "")
 	if err != nil || len(gl) != 1 || gl[0].Url != "https://gitlab.com/g/sub/p.git" || gl[0].Forge != GitLab {
 		t.Errorf("GitLab repos %v, %v", gl, err)
 	}

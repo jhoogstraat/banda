@@ -70,6 +70,43 @@ Generated secrets (session secret, Postgres passwords, Dex client secret) surviv
 - **The controller in the chart, or a pre-install hook applying it:** it's cluster-wide (CRDs, its own namespace) and shared with anything else using agent-sandbox; a hook would need cluster-admin from a release that otherwise needs a namespace. One documented `kubectl apply` is simpler and honest.
 - **GitOps (Argo CD, Flux):** optional on top; both take a chart or a Kustomize overlay as they are.
 
+## GitHub App
+
+Settings creates the team's GitHub App through GitHub's manifest flow and stores it in the Secret `banda-github-app` in the sandbox namespace (the release's namespace with the chart). For GitOps, or an app you already have, create that Secret yourself, with these keys:
+
+| Key | Value |
+|---|---|
+| `host` | `github.com` (default) or a GitHub Enterprise Server host named in `FORGE_HOSTS` as `github` |
+| `app-id` | The app's numeric id |
+| `slug` | Its name in URLs (`https://<host>/apps/<slug>`) |
+| `client-id`, `client-secret` | Its OAuth client, for users connecting |
+| `private-key` | A private key of the app, PEM |
+
+```sh
+kubectl -n banda create secret generic banda-github-app --from-literal=app-id=123456 --from-literal=slug=banda-acme \
+  --from-literal=client-id=Iv23li... --from-literal=client-secret=... --from-file=private-key=banda-acme.private-key.pem
+```
+
+Give the app the permissions Settings asks for (contents and workflows read and write, metadata read, pull requests read and write, checks and commit statuses read), the callback URL `$PUBLIC_URL/github/callback`, "Expire user authorization tokens" on, and no webhook. Banda reads the Secret within 30 seconds of a change; Settings then shows it as set up by the deployment, and nobody can replace it from Settings. Another app in the Secret (a new `app-id` or `host`) ends every connection to the old one: Banda revokes each with the old app's keys and deletes its tokens, and everyone connects again. No pod mounts it: the private key is the one long-lived credential left, and only the API holds it. Users' tokens are in `banda-forge-<hash>` Secrets beside it, likewise.
+
+Make the app an organization's. Whoever owns it can install it anywhere they administer and, through its keys on GitHub, reach every repository it is installed on, whatever their own access. One created under a personal account moves on GitHub: the app's settings → **Advanced** → **Transfer ownership**, to an organization (the person needs to own it). The id, keys and installations stay, so the Secret doesn't change.
+
+## GitLab application
+
+Settings keeps each GitLab host's application in the Secret `banda-gitlab-app-<host>` (e.g. `banda-gitlab-app-gitlab.com`; for a `host:port` in `FORGE_HOSTS`, `banda-gitlab-app-<host>-<port>`) in the sandbox namespace. To make it by hand, create the application on GitLab (a group's with few Owners, or the instance's under Admin → Applications: whoever can edit it can get every connected teammate's tokens) with the Redirect URI `$PUBLIC_URL/gitlab/callback`, Confidential, and the scopes `api` and `write_repository` only, then the Secret with these keys:
+
+| Key | Value |
+|---|---|
+| `application-id` | The application's ID |
+| `secret` | Its secret |
+| `host` | Optional: the Secret's name says it (`gitlab.com`, or a host named in `FORGE_HOSTS` as `gitlab`) |
+
+```sh
+kubectl -n banda create secret generic banda-gitlab-app-gitlab.com --from-literal=application-id=... --from-literal=secret=gloas-...
+```
+
+Banda reads it within 30 seconds of a change; Settings then shows it as set up by the deployment, without checking it (a wrong secret shows on the first connect). No pod mounts it; users' tokens of both grants are in their `banda-forge-<hash>` Secrets beside it, likewise. Settings can't replace one made by hand: change the Secret. Another `application-id` in it ends everyone's connections through the old application, each revoked with the old credentials first (Banda notices while running; connections to an application replaced while the API was down end when GitLab refuses them). A new `secret` for the same application keeps them.
+
 ## Postgres
 
 The bundled Postgres (`postgres.enabled`, default) is one StatefulSet with two roles:
@@ -110,6 +147,29 @@ Options:
 3. **A split discovery URL** (`oidc.InsecureIssuerURLContext`: discover at the internal URL, accept the public issuer). Discovery then hands out the public token and keys endpoints, so the API still has to reach the public URL for the token exchange and keys.
 
 With `dex.enabled` the chart sets the issuer to `$PUBLIC_URL/dex`, `DEX_URL` to the Dex service and Dex's redirect URI to `$PUBLIC_URL/auth/callback`. Requests to the issuer's origin are only the provider's, as only the OIDC client uses that transport, so the API matches on origin alone. Real OIDC providers need none of this. The e2e world signs in the same way: its OIDC API serves the run's Dex at `/dex`.
+
+## Rotating the identity keys
+
+Workload identity tokens ([configuration](configuration.md#workload-identity)) are signed with the keys in the Secret `banda-identity` in the sandbox namespace, each named `<unix seconds>.pem` after when it starts signing. The API publishes every key in it and signs with the newest that is due; it reads the Secret when it starts. To rotate without breaking verifiers that cache the keys (Banda serves them cacheable for 5 minutes; some cache longer):
+
+```sh
+NS=banda                              # SANDBOX_NAMESPACE
+FROM=$(( $(date +%s) + 3600 ))        # signs from an hour from now
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$FROM.pem"
+kubectl -n $NS patch secret banda-identity --type merge \
+  -p "{\"data\":{\"$FROM.pem\":\"$(base64 < "$FROM.pem" | tr -d '\n')\"}}"
+rm "$FROM.pem"
+kubectl -n $NS rollout restart deployment/banda-api   # publishes the new key at once
+```
+
+The API reads the Secret only when it starts, so the restart is what publishes the key; without it the new key never signs. Verifiers that copied the keys (`jwt_validation_pubkeys` in OpenBao/Vault) need the new one before `$FROM`: Settings shows them. From `$FROM` on the new key signs. Keep the old key for at least 20 minutes after `$FROM`: its last tokens live 15 minutes, and verifiers may cache the key set for 5. Then remove it and restart the API again:
+
+```sh
+kubectl -n $NS patch secret banda-identity --type json -p '[{"op":"remove","path":"/data/<old>.pem"}]'
+kubectl -n $NS rollout restart deployment/banda-api
+```
+
+Deleting the Secret makes the API create a new key on its next start, which signs at once: tokens of the old key stop verifying and verifiers that copied the keys need the new one. Do that only if a key leaked. There is no rotation UI.
 
 ## Releases
 

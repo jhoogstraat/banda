@@ -36,6 +36,8 @@ import (
 const (
 	home      = "/home/banda"
 	claudeDir = home + "/.claude"
+	// IDTokenDir holds a thread's workload identity tokens, in memory only.
+	IDTokenDir = "/run/banda/id-tokens"
 )
 
 type Config struct {
@@ -394,6 +396,37 @@ func (c *Client) Env(ctx context.Context, owner, name string) (string, error) {
 	return value, nil
 }
 
+// ForgeSecret names the Secret with a user's tokens for a forge host. Like
+// the GitHub App's (banda-github-app), no pod mounts it: only the API reads
+// it, and the names differ from banda-env-*, which pods load.
+func ForgeSecret(owner, host string) string { return "banda-forge-" + hash(owner+" "+host) }
+
+// Secret returns a Secret's data, nil if there is no such Secret.
+func (c *Client) Secret(ctx context.Context, name string) (map[string][]byte, error) {
+	sec, err := c.kube.CoreV1().Secrets(c.cfg.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return sec.Data, nil
+}
+
+// PutSecret merges data into the Secret name (see patchSecret).
+func (c *Client) PutSecret(ctx context.Context, name, label string, data map[string][]byte) error {
+	return c.patchSecret(ctx, name, label, data)
+}
+
+// DeleteSecret deletes a Secret; one already gone is fine.
+func (c *Client) DeleteSecret(ctx context.Context, name string) error {
+	err := c.kube.CoreV1().Secrets(c.cfg.Namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
 func (c *Client) SetAPIKey(ctx context.Context, owner, key string) error {
 	return c.patchSecret(ctx, authSecret(owner), "user-secret", map[string][]byte{"ANTHROPIC_API_KEY": []byte(key)})
 }
@@ -499,6 +532,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 		"BANDA_SECRET_NAMES":           strings.Join(secrets, ","),
 		"BANDA_GIT_NAME":               gitName, // empty: the runner's default
 		"BANDA_GIT_EMAIL":              gitEmail,
+		"BANDA_ID_TOKEN_DIR":           IDTokenDir,
 	}
 	if t.Handoffs > 0 { // a new owner's session: the old one's transcript is on the old owner's volume
 		env["BANDA_SESSION_KEY"] = fmt.Sprintf("/handoff-%d", t.Handoffs)
@@ -533,7 +567,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
 						AutomountServiceAccountToken:  &no,
-						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim)},
+						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim), idTokenVolume},
 						Containers: []corev1.Container{{
 							Name:            "runner",
 							Image:           c.cfg.Image,
@@ -541,7 +575,8 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 							Env:             vars,
 							EnvFrom:         envFrom,
 							Resources:       limits(c.cfg.Sizes.CPU, c.cfg.Sizes.Memory, c.cfg.Sizes.Scratch),
-							VolumeMounts:    []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir}},
+							VolumeMounts: []corev1.VolumeMount{{Name: "home", MountPath: home}, {Name: "claude", MountPath: claudeDir},
+								{Name: "id-tokens", MountPath: IDTokenDir}},
 						}},
 					},
 				},
@@ -595,6 +630,37 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 			OperatingMode: sbv1.SandboxOperatingModeRunning,
 		},
 	}
+}
+
+// idTokenVolume keeps identity tokens in memory: never on the thread's
+// volume, gone with the pod.
+var idTokenVolume = corev1.Volume{Name: "id-tokens", VolumeSource: corev1.VolumeSource{
+	EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory, SizeLimit: new(resource.MustParse("1Mi"))}}}
+
+// identitySecret holds the workload identity signing keys (internal/identity):
+// only the API reads it, no pod mounts it.
+const identitySecret = "banda-identity"
+
+// IdentityKeys returns the signing keys, creating the Secret with first's
+// if there is none yet. Not through Helm, whose template would replace them.
+func (c *Client) IdentityKeys(ctx context.Context, first func() (map[string][]byte, error)) (map[string][]byte, error) {
+	secrets := c.kube.CoreV1().Secrets(c.cfg.Namespace)
+	sec, err := secrets.Get(ctx, identitySecret, metav1.GetOptions{})
+	if err == nil {
+		return sec.Data, nil
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	data, err := first()
+	if err != nil {
+		return nil, err
+	}
+	_, err = secrets.Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: identitySecret,
+		Labels: map[string]string{"banda.dev/identity": "true"}}, Data: data}, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) { // another API created it first
+		return c.IdentityKeys(ctx, first)
+	}
+	return data, err
 }
 
 func claudeVolume(claim string) corev1.Volume {

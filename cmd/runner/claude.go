@@ -220,6 +220,10 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 		"You are running inside Banda thread %s %s. Teammates and other agents may post messages into this thread; they appear in your prompt with their name. "+
 			"The banda MCP server's tools, listed in its instructions, let you see and search the team's other threads, post into them and start sub-threads.",
 		threadID, where)
+	if ids.dir != "" {
+		prompt += " " + ids.dir + " holds short-lived OIDC identity tokens naming this thread's owner, a file per audience the team configured (often none), " +
+			"which the team's secret managers and clouds accept in place of stored credentials; Banda refreshes them, so read the file each time and never print one."
+	}
 	if p := profileText(s.profile); p != "" {
 		prompt += "\n\n" + p
 	}

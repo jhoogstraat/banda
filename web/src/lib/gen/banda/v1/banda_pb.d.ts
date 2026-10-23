@@ -3999,6 +3999,14 @@ export declare type ConnectResponse = Message$1<"banda.v1.ConnectResponse"> & {
      */
     value: Ping;
     case: "ping";
+  } | {
+    /**
+     * Sent on connect and when the team's audiences change: fetch IdTokens.
+     *
+     * @generated from field: banda.v1.IdTokensChanged id_tokens_changed = 16;
+     */
+    value: IdTokensChanged;
+    case: "idTokensChanged";
   } | { case: undefined; value?: undefined };
 };
 
@@ -5450,6 +5458,20 @@ export declare type ListForgeReposResponse = Message$1<"banda.v1.ListForgeReposR
    * @generated from field: repeated banda.v1.ForgeRepo repos = 1;
    */
   repos: ForgeRepo[];
+
+  /**
+   * A host whose repositories aren't listed until the caller connects it.
+   *
+   * @generated from field: string connect_host = 2;
+   */
+  connectHost: string;
+
+  /**
+   * Its forge: "github" or "gitlab".
+   *
+   * @generated from field: string connect_forge = 3;
+   */
+  connectForge: string;
 };
 
 /**
@@ -5763,6 +5785,1018 @@ export declare type AddRepositoryResponse = Message$1<"banda.v1.AddRepositoryRes
  * Use `create(AddRepositoryResponseSchema)` to create a new message.
  */
 export declare const AddRepositoryResponseSchema: GenMessage<AddRepositoryResponse>;
+
+/**
+ * @generated from message banda.v1.IdTokensChanged
+ */
+export declare type IdTokensChanged = Message$1<"banda.v1.IdTokensChanged"> & {
+};
+
+/**
+ * Describes the message banda.v1.IdTokensChanged.
+ * Use `create(IdTokensChangedSchema)` to create a new message.
+ */
+export declare const IdTokensChangedSchema: GenMessage<IdTokensChanged>;
+
+/**
+ * @generated from message banda.v1.IdTokensRequest
+ */
+export declare type IdTokensRequest = Message$1<"banda.v1.IdTokensRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message banda.v1.IdTokensRequest.
+ * Use `create(IdTokensRequestSchema)` to create a new message.
+ */
+export declare const IdTokensRequestSchema: GenMessage<IdTokensRequest>;
+
+/**
+ * @generated from message banda.v1.IdTokensResponse
+ */
+export declare type IdTokensResponse = Message$1<"banda.v1.IdTokensResponse"> & {
+  /**
+   * Every audience's; files of audiences not listed go.
+   *
+   * @generated from field: repeated banda.v1.IdToken tokens = 1;
+   */
+  tokens: IdToken[];
+
+  /**
+   * When to fetch again.
+   *
+   * @generated from field: int32 refresh_seconds = 2;
+   */
+  refreshSeconds: number;
+};
+
+/**
+ * Describes the message banda.v1.IdTokensResponse.
+ * Use `create(IdTokensResponseSchema)` to create a new message.
+ */
+export declare const IdTokensResponseSchema: GenMessage<IdTokensResponse>;
+
+/**
+ * @generated from message banda.v1.IdToken
+ */
+export declare type IdToken = Message$1<"banda.v1.IdToken"> & {
+  /**
+   * @generated from field: string audience = 1;
+   */
+  audience: string;
+
+  /**
+   * The file name in BANDA_ID_TOKEN_DIR.
+   *
+   * @generated from field: string file = 2;
+   */
+  file: string;
+
+  /**
+   * A JWT signed by the issuer (internal/identity).
+   *
+   * @generated from field: string token = 3;
+   */
+  token: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 4;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.IdToken.
+ * Use `create(IdTokenSchema)` to create a new message.
+ */
+export declare const IdTokenSchema: GenMessage<IdToken>;
+
+/**
+ * @generated from message banda.v1.GetWorkloadIdentityRequest
+ */
+export declare type GetWorkloadIdentityRequest = Message$1<"banda.v1.GetWorkloadIdentityRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.GetWorkloadIdentityRequest.
+ * Use `create(GetWorkloadIdentityRequestSchema)` to create a new message.
+ */
+export declare const GetWorkloadIdentityRequestSchema: GenMessage<GetWorkloadIdentityRequest>;
+
+/**
+ * @generated from message banda.v1.GetWorkloadIdentityResponse
+ */
+export declare type GetWorkloadIdentityResponse = Message$1<"banda.v1.GetWorkloadIdentityResponse"> & {
+  /**
+   * PUBLIC_URL: the iss claim and where discovery is.
+   *
+   * @generated from field: string issuer = 1;
+   */
+  issuer: string;
+
+  /**
+   * @generated from field: string jwks_url = 2;
+   */
+  jwksUrl: string;
+
+  /**
+   * @generated from field: repeated banda.v1.IdTokenAudience audiences = 3;
+   */
+  audiences: IdTokenAudience[];
+
+  /**
+   * The repositories of the team's threads as the repo claim names them,
+   * most recently used first, for the recipes.
+   *
+   * @generated from field: repeated string repos = 4;
+   */
+  repos: string[];
+
+  /**
+   * The caller's sign-in email: their tokens' sub is user:<email>.
+   *
+   * @generated from field: string email = 5;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message banda.v1.GetWorkloadIdentityResponse.
+ * Use `create(GetWorkloadIdentityResponseSchema)` to create a new message.
+ */
+export declare const GetWorkloadIdentityResponseSchema: GenMessage<GetWorkloadIdentityResponse>;
+
+/**
+ * @generated from message banda.v1.IdTokenAudience
+ */
+export declare type IdTokenAudience = Message$1<"banda.v1.IdTokenAudience"> & {
+  /**
+   * @generated from field: string audience = 1;
+   */
+  audience: string;
+
+  /**
+   * Where thread pods find its token.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp added_at = 3;
+   */
+  addedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string added_by = 4;
+   */
+  addedBy: string;
+};
+
+/**
+ * Describes the message banda.v1.IdTokenAudience.
+ * Use `create(IdTokenAudienceSchema)` to create a new message.
+ */
+export declare const IdTokenAudienceSchema: GenMessage<IdTokenAudience>;
+
+/**
+ * @generated from message banda.v1.AddIdTokenAudienceRequest
+ */
+export declare type AddIdTokenAudienceRequest = Message$1<"banda.v1.AddIdTokenAudienceRequest"> & {
+  /**
+   * @generated from field: string audience = 1;
+   */
+  audience: string;
+};
+
+/**
+ * Describes the message banda.v1.AddIdTokenAudienceRequest.
+ * Use `create(AddIdTokenAudienceRequestSchema)` to create a new message.
+ */
+export declare const AddIdTokenAudienceRequestSchema: GenMessage<AddIdTokenAudienceRequest>;
+
+/**
+ * @generated from message banda.v1.AddIdTokenAudienceResponse
+ */
+export declare type AddIdTokenAudienceResponse = Message$1<"banda.v1.AddIdTokenAudienceResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.AddIdTokenAudienceResponse.
+ * Use `create(AddIdTokenAudienceResponseSchema)` to create a new message.
+ */
+export declare const AddIdTokenAudienceResponseSchema: GenMessage<AddIdTokenAudienceResponse>;
+
+/**
+ * @generated from message banda.v1.RemoveIdTokenAudienceRequest
+ */
+export declare type RemoveIdTokenAudienceRequest = Message$1<"banda.v1.RemoveIdTokenAudienceRequest"> & {
+  /**
+   * @generated from field: string audience = 1;
+   */
+  audience: string;
+};
+
+/**
+ * Describes the message banda.v1.RemoveIdTokenAudienceRequest.
+ * Use `create(RemoveIdTokenAudienceRequestSchema)` to create a new message.
+ */
+export declare const RemoveIdTokenAudienceRequestSchema: GenMessage<RemoveIdTokenAudienceRequest>;
+
+/**
+ * @generated from message banda.v1.RemoveIdTokenAudienceResponse
+ */
+export declare type RemoveIdTokenAudienceResponse = Message$1<"banda.v1.RemoveIdTokenAudienceResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.RemoveIdTokenAudienceResponse.
+ * Use `create(RemoveIdTokenAudienceResponseSchema)` to create a new message.
+ */
+export declare const RemoveIdTokenAudienceResponseSchema: GenMessage<RemoveIdTokenAudienceResponse>;
+
+/**
+ * @generated from message banda.v1.GetGitHubRequest
+ */
+export declare type GetGitHubRequest = Message$1<"banda.v1.GetGitHubRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.GetGitHubRequest.
+ * Use `create(GetGitHubRequestSchema)` to create a new message.
+ */
+export declare const GetGitHubRequestSchema: GenMessage<GetGitHubRequest>;
+
+/**
+ * @generated from message banda.v1.GetGitHubResponse
+ */
+export declare type GetGitHubResponse = Message$1<"banda.v1.GetGitHubResponse"> & {
+  /**
+   * Unset: no GitHub App yet.
+   *
+   * @generated from field: banda.v1.GitHubApp app = 1;
+   */
+  app?: GitHubApp | undefined;
+
+  /**
+   * The caller's, unset: not connected.
+   *
+   * @generated from field: banda.v1.ForgeConnection connection = 2;
+   */
+  connection?: ForgeConnection | undefined;
+
+  /**
+   * GitHub hosts the app can be created on: github.com and FORGE_HOSTS'.
+   *
+   * @generated from field: repeated string hosts = 3;
+   */
+  hosts: string[];
+
+  /**
+   * The caller has a GIT_TOKEN secret (deprecated for the app's host).
+   *
+   * @generated from field: bool legacy_token = 4;
+   */
+  legacyToken: boolean;
+
+  /**
+   * The latest time someone created, replaced or removed the app; unset if never.
+   *
+   * @generated from field: banda.v1.GitHubAppChange last_change = 5;
+   */
+  lastChange?: GitHubAppChange | undefined;
+
+  /**
+   * The app the caller just created on the forge wasn't what Banda asked for, so Banda didn't keep it.
+   *
+   * @generated from field: banda.v1.GitHubAppRefusal refusal = 6;
+   */
+  refusal?: GitHubAppRefusal | undefined;
+};
+
+/**
+ * Describes the message banda.v1.GetGitHubResponse.
+ * Use `create(GetGitHubResponseSchema)` to create a new message.
+ */
+export declare const GetGitHubResponseSchema: GenMessage<GetGitHubResponse>;
+
+/**
+ * @generated from message banda.v1.GitHubAppChange
+ */
+export declare type GitHubAppChange = Message$1<"banda.v1.GitHubAppChange"> & {
+  /**
+   * "created", "replaced" or "removed"
+   *
+   * @generated from field: string action = 1;
+   */
+  action: string;
+
+  /**
+   * @generated from field: string by = 2;
+   */
+  by: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp at = 3;
+   */
+  at?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string host = 4;
+   */
+  host: string;
+
+  /**
+   * The app it put in place; empty on remove.
+   *
+   * @generated from field: string slug = 5;
+   */
+  slug: string;
+
+  /**
+   * @generated from field: string owner = 6;
+   */
+  owner: string;
+
+  /**
+   * The app it replaced or removed; empty on create.
+   *
+   * @generated from field: string was_slug = 7;
+   */
+  wasSlug: string;
+
+  /**
+   * @generated from field: string was_owner = 8;
+   */
+  wasOwner: string;
+};
+
+/**
+ * Describes the message banda.v1.GitHubAppChange.
+ * Use `create(GitHubAppChangeSchema)` to create a new message.
+ */
+export declare const GitHubAppChangeSchema: GenMessage<GitHubAppChange>;
+
+/**
+ * @generated from message banda.v1.GitHubAppRefusal
+ */
+export declare type GitHubAppRefusal = Message$1<"banda.v1.GitHubAppRefusal"> & {
+  /**
+   * How it differs, e.g. "public, other permissions".
+   *
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+
+  /**
+   * Where its owner deletes it on the forge.
+   *
+   * @generated from field: string delete_url = 2;
+   */
+  deleteUrl: string;
+
+  /**
+   * @generated from field: string slug = 3;
+   */
+  slug: string;
+};
+
+/**
+ * Describes the message banda.v1.GitHubAppRefusal.
+ * Use `create(GitHubAppRefusalSchema)` to create a new message.
+ */
+export declare const GitHubAppRefusalSchema: GenMessage<GitHubAppRefusal>;
+
+/**
+ * @generated from message banda.v1.GitHubApp
+ */
+export declare type GitHubApp = Message$1<"banda.v1.GitHubApp"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * @generated from field: string slug = 2;
+   */
+  slug: string;
+
+  /**
+   * The app's page and where it is installed, on the forge.
+   *
+   * @generated from field: string url = 3;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string install_url = 4;
+   */
+  installUrl: string;
+
+  /**
+   * Who created it from Settings, and when; empty when it was made by hand (a Secret from Helm or GitOps).
+   *
+   * @generated from field: string created_by = 5;
+   */
+  createdBy: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 6;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * The account that owns it.
+   *
+   * @generated from field: string owner = 7;
+   */
+  owner: string;
+
+  /**
+   * Its Secret is there but unusable, and why.
+   *
+   * @generated from field: string error = 8;
+   */
+  error: string;
+
+  /**
+   * A user account owns it: whoever that is reaches every repository it is installed on.
+   *
+   * @generated from field: bool personal = 9;
+   */
+  personal: boolean;
+};
+
+/**
+ * Describes the message banda.v1.GitHubApp.
+ * Use `create(GitHubAppSchema)` to create a new message.
+ */
+export declare const GitHubAppSchema: GenMessage<GitHubApp>;
+
+/**
+ * A user's OAuth connection to a forge host.
+ *
+ * @generated from message banda.v1.ForgeConnection
+ */
+export declare type ForgeConnection = Message$1<"banda.v1.ForgeConnection"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * "github" or "gitlab"
+   *
+   * @generated from field: string forge = 2;
+   */
+  forge: string;
+
+  /**
+   * @generated from field: string login = 3;
+   */
+  login: string;
+
+  /**
+   * @generated from field: string avatar_url = 4;
+   */
+  avatarUrl: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp connected_at = 5;
+   */
+  connectedAt?: Timestamp | undefined;
+
+  /**
+   * The forge no longer accepts it (revoked, expired): connect again.
+   *
+   * @generated from field: bool broken = 6;
+   */
+  broken: boolean;
+};
+
+/**
+ * Describes the message banda.v1.ForgeConnection.
+ * Use `create(ForgeConnectionSchema)` to create a new message.
+ */
+export declare const ForgeConnectionSchema: GenMessage<ForgeConnection>;
+
+/**
+ * @generated from message banda.v1.GitHubAppManifestRequest
+ */
+export declare type GitHubAppManifestRequest = Message$1<"banda.v1.GitHubAppManifestRequest"> & {
+  /**
+   * Empty is github.com.
+   *
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * Empty: the caller's own account.
+   *
+   * @generated from field: string organization = 2;
+   */
+  organization: string;
+
+  /**
+   * Replace the team's app, which ends everyone's connection to it. Without
+   * it, creating one while there is an app is refused.
+   *
+   * @generated from field: bool replace = 3;
+   */
+  replace: boolean;
+};
+
+/**
+ * Describes the message banda.v1.GitHubAppManifestRequest.
+ * Use `create(GitHubAppManifestRequestSchema)` to create a new message.
+ */
+export declare const GitHubAppManifestRequestSchema: GenMessage<GitHubAppManifestRequest>;
+
+/**
+ * @generated from message banda.v1.GitHubAppManifestResponse
+ */
+export declare type GitHubAppManifestResponse = Message$1<"banda.v1.GitHubAppManifestResponse"> & {
+  /**
+   * Where the browser posts the form, with the manifest field.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string manifest = 2;
+   */
+  manifest: string;
+};
+
+/**
+ * Describes the message banda.v1.GitHubAppManifestResponse.
+ * Use `create(GitHubAppManifestResponseSchema)` to create a new message.
+ */
+export declare const GitHubAppManifestResponseSchema: GenMessage<GitHubAppManifestResponse>;
+
+/**
+ * @generated from message banda.v1.ListGitHubInstallationsRequest
+ */
+export declare type ListGitHubInstallationsRequest = Message$1<"banda.v1.ListGitHubInstallationsRequest"> & {
+  /**
+   * Ask the forge now: the browser is back from installing.
+   *
+   * @generated from field: bool fresh = 1;
+   */
+  fresh: boolean;
+};
+
+/**
+ * Describes the message banda.v1.ListGitHubInstallationsRequest.
+ * Use `create(ListGitHubInstallationsRequestSchema)` to create a new message.
+ */
+export declare const ListGitHubInstallationsRequestSchema: GenMessage<ListGitHubInstallationsRequest>;
+
+/**
+ * @generated from message banda.v1.ListGitHubInstallationsResponse
+ */
+export declare type ListGitHubInstallationsResponse = Message$1<"banda.v1.ListGitHubInstallationsResponse"> & {
+  /**
+   * @generated from field: repeated banda.v1.GitHubInstallation installations = 1;
+   */
+  installations: GitHubInstallation[];
+};
+
+/**
+ * Describes the message banda.v1.ListGitHubInstallationsResponse.
+ * Use `create(ListGitHubInstallationsResponseSchema)` to create a new message.
+ */
+export declare const ListGitHubInstallationsResponseSchema: GenMessage<ListGitHubInstallationsResponse>;
+
+/**
+ * @generated from message banda.v1.GitHubInstallation
+ */
+export declare type GitHubInstallation = Message$1<"banda.v1.GitHubInstallation"> & {
+  /**
+   * @generated from field: string account = 1;
+   */
+  account: string;
+
+  /**
+   * @generated from field: string avatar_url = 2;
+   */
+  avatarUrl: string;
+
+  /**
+   * All the account's repositories, or repositories of them.
+   *
+   * @generated from field: bool all_repositories = 3;
+   */
+  allRepositories: boolean;
+
+  /**
+   * @generated from field: int32 repositories = 4;
+   */
+  repositories: number;
+
+  /**
+   * @generated from field: string manage_url = 5;
+   */
+  manageUrl: string;
+};
+
+/**
+ * Describes the message banda.v1.GitHubInstallation.
+ * Use `create(GitHubInstallationSchema)` to create a new message.
+ */
+export declare const GitHubInstallationSchema: GenMessage<GitHubInstallation>;
+
+/**
+ * @generated from message banda.v1.RemoveGitHubAppRequest
+ */
+export declare type RemoveGitHubAppRequest = Message$1<"banda.v1.RemoveGitHubAppRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.RemoveGitHubAppRequest.
+ * Use `create(RemoveGitHubAppRequestSchema)` to create a new message.
+ */
+export declare const RemoveGitHubAppRequestSchema: GenMessage<RemoveGitHubAppRequest>;
+
+/**
+ * @generated from message banda.v1.RemoveGitHubAppResponse
+ */
+export declare type RemoveGitHubAppResponse = Message$1<"banda.v1.RemoveGitHubAppResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.RemoveGitHubAppResponse.
+ * Use `create(RemoveGitHubAppResponseSchema)` to create a new message.
+ */
+export declare const RemoveGitHubAppResponseSchema: GenMessage<RemoveGitHubAppResponse>;
+
+/**
+ * @generated from message banda.v1.DisconnectGitHubRequest
+ */
+export declare type DisconnectGitHubRequest = Message$1<"banda.v1.DisconnectGitHubRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.DisconnectGitHubRequest.
+ * Use `create(DisconnectGitHubRequestSchema)` to create a new message.
+ */
+export declare const DisconnectGitHubRequestSchema: GenMessage<DisconnectGitHubRequest>;
+
+/**
+ * @generated from message banda.v1.DisconnectGitHubResponse
+ */
+export declare type DisconnectGitHubResponse = Message$1<"banda.v1.DisconnectGitHubResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.DisconnectGitHubResponse.
+ * Use `create(DisconnectGitHubResponseSchema)` to create a new message.
+ */
+export declare const DisconnectGitHubResponseSchema: GenMessage<DisconnectGitHubResponse>;
+
+/**
+ * @generated from message banda.v1.GitCredentialRequest
+ */
+export declare type GitCredentialRequest = Message$1<"banda.v1.GitCredentialRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message banda.v1.GitCredentialRequest.
+ * Use `create(GitCredentialRequestSchema)` to create a new message.
+ */
+export declare const GitCredentialRequestSchema: GenMessage<GitCredentialRequest>;
+
+/**
+ * @generated from message banda.v1.GitCredentialResponse
+ */
+export declare type GitCredentialResponse = Message$1<"banda.v1.GitCredentialResponse"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string password = 2;
+   */
+  password: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message banda.v1.GitCredentialResponse.
+ * Use `create(GitCredentialResponseSchema)` to create a new message.
+ */
+export declare const GitCredentialResponseSchema: GenMessage<GitCredentialResponse>;
+
+/**
+ * @generated from message banda.v1.GetGitLabRequest
+ */
+export declare type GetGitLabRequest = Message$1<"banda.v1.GetGitLabRequest"> & {
+};
+
+/**
+ * Describes the message banda.v1.GetGitLabRequest.
+ * Use `create(GetGitLabRequestSchema)` to create a new message.
+ */
+export declare const GetGitLabRequestSchema: GenMessage<GetGitLabRequest>;
+
+/**
+ * @generated from message banda.v1.GetGitLabResponse
+ */
+export declare type GetGitLabResponse = Message$1<"banda.v1.GetGitLabResponse"> & {
+  /**
+   * GitLab hosts: gitlab.com and FORGE_HOSTS', gitlab.com first.
+   *
+   * @generated from field: repeated banda.v1.GitLabHost hosts = 1;
+   */
+  hosts: GitLabHost[];
+
+  /**
+   * Where GitLab sends browsers back: the application's Redirect URI.
+   *
+   * @generated from field: string redirect_uri = 2;
+   */
+  redirectUri: string;
+
+  /**
+   * The scopes the application needs: Banda's and git's.
+   *
+   * @generated from field: repeated string scopes = 3;
+   */
+  scopes: string[];
+
+  /**
+   * The caller has a GITLAB_TOKEN or GIT_TOKEN secret (deprecated where an application is).
+   *
+   * @generated from field: bool legacy_token = 4;
+   */
+  legacyToken: boolean;
+};
+
+/**
+ * Describes the message banda.v1.GetGitLabResponse.
+ * Use `create(GetGitLabResponseSchema)` to create a new message.
+ */
+export declare const GetGitLabResponseSchema: GenMessage<GetGitLabResponse>;
+
+/**
+ * @generated from message banda.v1.GitLabHost
+ */
+export declare type GitLabHost = Message$1<"banda.v1.GitLabHost"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * Unset: no application on this host yet.
+   *
+   * @generated from field: banda.v1.GitLabApp app = 2;
+   */
+  app?: GitLabApp | undefined;
+
+  /**
+   * The caller's, unset: not connected.
+   *
+   * @generated from field: banda.v1.ForgeConnection connection = 3;
+   */
+  connection?: ForgeConnection | undefined;
+
+  /**
+   * @generated from field: string admin_apps_url = 5;
+   */
+  adminAppsUrl: string;
+
+  /**
+   * @generated from field: string group_apps_url = 6;
+   */
+  groupAppsUrl: string;
+
+  /**
+   * The latest time someone set up, replaced or removed its application; unset if never.
+   *
+   * @generated from field: banda.v1.GitLabAppChange last_change = 7;
+   */
+  lastChange?: GitLabAppChange | undefined;
+};
+
+/**
+ * Describes the message banda.v1.GitLabHost.
+ * Use `create(GitLabHostSchema)` to create a new message.
+ */
+export declare const GitLabHostSchema: GenMessage<GitLabHost>;
+
+/**
+ * @generated from message banda.v1.GitLabAppChange
+ */
+export declare type GitLabAppChange = Message$1<"banda.v1.GitLabAppChange"> & {
+  /**
+   * "created", "replaced" or "removed"
+   *
+   * @generated from field: string action = 1;
+   */
+  action: string;
+
+  /**
+   * @generated from field: string by = 2;
+   */
+  by: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp at = 3;
+   */
+  at?: Timestamp | undefined;
+
+  /**
+   * The application it put in place; empty on remove.
+   *
+   * @generated from field: string application_id = 4;
+   */
+  applicationId: string;
+
+  /**
+   * The one it replaced or removed; empty on create.
+   *
+   * @generated from field: string was_application_id = 5;
+   */
+  wasApplicationId: string;
+};
+
+/**
+ * Describes the message banda.v1.GitLabAppChange.
+ * Use `create(GitLabAppChangeSchema)` to create a new message.
+ */
+export declare const GitLabAppChangeSchema: GenMessage<GitLabAppChange>;
+
+/**
+ * @generated from message banda.v1.GitLabApp
+ */
+export declare type GitLabApp = Message$1<"banda.v1.GitLabApp"> & {
+  /**
+   * Public: GitLab shows it in every authorize URL. The secret is never returned.
+   *
+   * @generated from field: string application_id = 1;
+   */
+  applicationId: string;
+
+  /**
+   * Who set it up from Settings, and when; empty when made by hand (a Secret from Helm or GitOps).
+   *
+   * @generated from field: string created_by = 2;
+   */
+  createdBy: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 3;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * Its Secret is there but unusable, and why.
+   *
+   * @generated from field: string error = 4;
+   */
+  error: string;
+
+  /**
+   * GitLab refused its ID or secret when renewing a connection: someone
+   * changed or deleted it on GitLab. Connections keep their tokens meanwhile.
+   *
+   * @generated from field: bool needs_attention = 5;
+   */
+  needsAttention: boolean;
+};
+
+/**
+ * Describes the message banda.v1.GitLabApp.
+ * Use `create(GitLabAppSchema)` to create a new message.
+ */
+export declare const GitLabAppSchema: GenMessage<GitLabApp>;
+
+/**
+ * @generated from message banda.v1.SetGitLabAppRequest
+ */
+export declare type SetGitLabAppRequest = Message$1<"banda.v1.SetGitLabAppRequest"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+
+  /**
+   * @generated from field: string application_id = 2;
+   */
+  applicationId: string;
+
+  /**
+   * @generated from field: string secret = 3;
+   */
+  secret: string;
+
+  /**
+   * Replace the host's application, which ends everyone's connection through
+   * it. Without it, setting one up while there is one is refused.
+   *
+   * @generated from field: bool replace = 4;
+   */
+  replace: boolean;
+};
+
+/**
+ * Describes the message banda.v1.SetGitLabAppRequest.
+ * Use `create(SetGitLabAppRequestSchema)` to create a new message.
+ */
+export declare const SetGitLabAppRequestSchema: GenMessage<SetGitLabAppRequest>;
+
+/**
+ * @generated from message banda.v1.SetGitLabAppResponse
+ */
+export declare type SetGitLabAppResponse = Message$1<"banda.v1.SetGitLabAppResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetGitLabAppResponse.
+ * Use `create(SetGitLabAppResponseSchema)` to create a new message.
+ */
+export declare const SetGitLabAppResponseSchema: GenMessage<SetGitLabAppResponse>;
+
+/**
+ * @generated from message banda.v1.RemoveGitLabAppRequest
+ */
+export declare type RemoveGitLabAppRequest = Message$1<"banda.v1.RemoveGitLabAppRequest"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+};
+
+/**
+ * Describes the message banda.v1.RemoveGitLabAppRequest.
+ * Use `create(RemoveGitLabAppRequestSchema)` to create a new message.
+ */
+export declare const RemoveGitLabAppRequestSchema: GenMessage<RemoveGitLabAppRequest>;
+
+/**
+ * @generated from message banda.v1.RemoveGitLabAppResponse
+ */
+export declare type RemoveGitLabAppResponse = Message$1<"banda.v1.RemoveGitLabAppResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.RemoveGitLabAppResponse.
+ * Use `create(RemoveGitLabAppResponseSchema)` to create a new message.
+ */
+export declare const RemoveGitLabAppResponseSchema: GenMessage<RemoveGitLabAppResponse>;
+
+/**
+ * @generated from message banda.v1.DisconnectGitLabRequest
+ */
+export declare type DisconnectGitLabRequest = Message$1<"banda.v1.DisconnectGitLabRequest"> & {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host: string;
+};
+
+/**
+ * Describes the message banda.v1.DisconnectGitLabRequest.
+ * Use `create(DisconnectGitLabRequestSchema)` to create a new message.
+ */
+export declare const DisconnectGitLabRequestSchema: GenMessage<DisconnectGitLabRequest>;
+
+/**
+ * @generated from message banda.v1.DisconnectGitLabResponse
+ */
+export declare type DisconnectGitLabResponse = Message$1<"banda.v1.DisconnectGitLabResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.DisconnectGitLabResponse.
+ * Use `create(DisconnectGitLabResponseSchema)` to create a new message.
+ */
+export declare const DisconnectGitLabResponseSchema: GenMessage<DisconnectGitLabResponse>;
 
 /**
  * @generated from enum banda.v1.Status
@@ -7023,6 +8057,128 @@ export declare const SettingsService: GenService<{
     input: typeof SetThreadDefaultsRequestSchema;
     output: typeof SetThreadDefaultsResponseSchema;
   },
+  /**
+   * Workload identity: Banda as an OIDC issuer of short-lived tokens naming
+   * each thread's owner, for the audiences the team adds (none: off). Anyone
+   * signed in lists, adds and removes audiences; running threads get the
+   * change within seconds.
+   *
+   * @generated from rpc banda.v1.SettingsService.GetWorkloadIdentity
+   */
+  getWorkloadIdentity: {
+    methodKind: "unary";
+    input: typeof GetWorkloadIdentityRequestSchema;
+    output: typeof GetWorkloadIdentityResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.SettingsService.AddIdTokenAudience
+   */
+  addIdTokenAudience: {
+    methodKind: "unary";
+    input: typeof AddIdTokenAudienceRequestSchema;
+    output: typeof AddIdTokenAudienceResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.SettingsService.RemoveIdTokenAudience
+   */
+  removeIdTokenAudience: {
+    methodKind: "unary";
+    input: typeof RemoveIdTokenAudienceRequestSchema;
+    output: typeof RemoveIdTokenAudienceResponseSchema;
+  },
+  /**
+   * GitHub: the team's GitHub App (one per Banda, set up by anyone signed in)
+   * and the caller's connection to it. Its keys and tokens stay in the API.
+   *
+   * @generated from rpc banda.v1.SettingsService.GetGitHub
+   */
+  getGitHub: {
+    methodKind: "unary";
+    input: typeof GetGitHubRequestSchema;
+    output: typeof GetGitHubResponseSchema;
+  },
+  /**
+   * A manifest for the browser to post to the forge, which creates the app and
+   * returns to /github/app; see internal/api/github.go.
+   *
+   * @generated from rpc banda.v1.SettingsService.GitHubAppManifest
+   */
+  gitHubAppManifest: {
+    methodKind: "unary";
+    input: typeof GitHubAppManifestRequestSchema;
+    output: typeof GitHubAppManifestResponseSchema;
+  },
+  /**
+   * The accounts the app is installed on (asks the forge, cached for a minute).
+   *
+   * @generated from rpc banda.v1.SettingsService.ListGitHubInstallations
+   */
+  listGitHubInstallations: {
+    methodKind: "unary";
+    input: typeof ListGitHubInstallationsRequestSchema;
+    output: typeof ListGitHubInstallationsResponseSchema;
+  },
+  /**
+   * Banda forgets the app; it stays on the forge, where its owner deletes it.
+   *
+   * @generated from rpc banda.v1.SettingsService.RemoveGitHubApp
+   */
+  removeGitHubApp: {
+    methodKind: "unary";
+    input: typeof RemoveGitHubAppRequestSchema;
+    output: typeof RemoveGitHubAppResponseSchema;
+  },
+  /**
+   * Revokes the caller's connection at the forge and forgets it.
+   *
+   * @generated from rpc banda.v1.SettingsService.DisconnectGitHub
+   */
+  disconnectGitHub: {
+    methodKind: "unary";
+    input: typeof DisconnectGitHubRequestSchema;
+    output: typeof DisconnectGitHubResponseSchema;
+  },
+  /**
+   * GitLab: the team's OAuth application per GitLab host (made by hand on
+   * GitLab, its ID and secret pasted here) and the caller's connections.
+   *
+   * @generated from rpc banda.v1.SettingsService.GetGitLab
+   */
+  getGitLab: {
+    methodKind: "unary";
+    input: typeof GetGitLabRequestSchema;
+    output: typeof GetGitLabResponseSchema;
+  },
+  /**
+   * Verifies the application's ID and secret with GitLab and keeps them.
+   *
+   * @generated from rpc banda.v1.SettingsService.SetGitLabApp
+   */
+  setGitLabApp: {
+    methodKind: "unary";
+    input: typeof SetGitLabAppRequestSchema;
+    output: typeof SetGitLabAppResponseSchema;
+  },
+  /**
+   * Banda forgets the application and everyone's connections through it.
+   *
+   * @generated from rpc banda.v1.SettingsService.RemoveGitLabApp
+   */
+  removeGitLabApp: {
+    methodKind: "unary";
+    input: typeof RemoveGitLabAppRequestSchema;
+    output: typeof RemoveGitLabAppResponseSchema;
+  },
+  /**
+   * Revokes both of the caller's grants on the host at GitLab and forgets them.
+   *
+   * @generated from rpc banda.v1.SettingsService.DisconnectGitLab
+   */
+  disconnectGitLab: {
+    methodKind: "unary";
+    input: typeof DisconnectGitLabRequestSchema;
+    output: typeof DisconnectGitLabResponseSchema;
+  },
 }>;
 
 /**
@@ -7049,6 +8205,30 @@ export declare const RunnerService: GenService<{
     methodKind: "unary";
     input: typeof ForkPatchRequestSchema;
     output: typeof ForkPatchResponseSchema;
+  },
+  /**
+   * Identity tokens for the thread's owner, one per audience of the team's.
+   * Only for a connected thread runner; fetched again on IdTokensChanged.
+   *
+   * @generated from rpc banda.v1.RunnerService.IdTokens
+   */
+  idTokens: {
+    methodKind: "unary";
+    input: typeof IdTokensRequestSchema;
+    output: typeof IdTokensResponseSchema;
+  },
+  /**
+   * A short-lived credential for git, for the thread's own repository only:
+   * the GitHub App's installation token, as the owner may use it, or on GitLab
+   * the owner's git-only OAuth token. Refused with
+   * a reason a person can act on.
+   *
+   * @generated from rpc banda.v1.RunnerService.GitCredential
+   */
+  gitCredential: {
+    methodKind: "unary";
+    input: typeof GitCredentialRequestSchema;
+    output: typeof GitCredentialResponseSchema;
   },
 }>;
 

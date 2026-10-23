@@ -65,7 +65,9 @@ var scpLike = regexp.MustCompile(`^\w[\w.~-]*@\w[\w.-]*:[\w./~-]+$`)
 // checkRepoURL accepts only URLs that git clones plainly: anything else may
 // reach git as a transport that runs commands (ext::) or as an option. It
 // refuses credentials in an https URL: everyone sees a thread's repository,
-// forks reuse it, and the runner redacts only GIT_TOKEN. Empty is no repository.
+// forks reuse it, and the runner redacts only GIT_TOKEN. It refuses whitespace
+// and shell characters, which no git host needs and which would land in the
+// shell and CEL of Settings' identity recipes. Empty is no repository.
 func checkRepoURL(repo string) error {
 	if repo == "" || scpLike.MatchString(repo) {
 		return nil
@@ -75,7 +77,10 @@ func checkRepoURL(repo string) error {
 		return connect.NewError(connect.CodeInvalidArgument, "the repository must be an https, http, ssh, git or file URL, or user@host:path")
 	}
 	if (u.Scheme == "https" || u.Scheme == "http") && u.User != nil {
-		return connect.NewError(connect.CodeInvalidArgument, "the repository URL must not contain credentials: add a GIT_TOKEN secret in Settings instead")
+		return connect.NewError(connect.CodeInvalidArgument, "the repository URL must not contain credentials: connect GitHub, or add a GIT_TOKEN secret, in Settings instead")
+	}
+	if strings.ContainsAny(repo, " \t\r\n`$;&|<>()\\\"'*?[]{}!#") {
+		return connect.NewError(connect.CodeInvalidArgument, "the repository URL must not contain whitespace, quotes, backslashes or any of $`;&|<>()*?[]{}!#")
 	}
 	return nil
 }

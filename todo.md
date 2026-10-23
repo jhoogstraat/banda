@@ -23,7 +23,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 
 - [ ] `mise run up`, sign in as alice, create a thread on a real repo.
 - [ ] Log in to Claude Code with your own subscription (Settings or the thread's terminal); check the login survives a suspend and resume, and is shared by a second thread.
-- [ ] Add a `GIT_TOKEN` secret; check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
+- [ ] Set up the GitHub App from Settings and connect (or add a `GIT_TOKEN` secret); check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
 - [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in docs/usage.md are enough and no more.
 - [ ] Verify against the real CLI what is only sourced from docs (PLAN.md, "Verified only partly" and "Not yet"):
   - [ ] a real turn streams correctly (tool calls, thinking, subagents, the TodoWrite plan);
@@ -66,7 +66,8 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] Sandbox sizes as settings (`SANDBOX_CPU`, `SANDBOX_MEMORY`, … and the chart's `sandboxes:`).
 - [ ] Size nodes for concurrent threads.
 - [x] Clean up what lingers: token Secrets are owned by their Sandbox; pushed environments idle for `DELETE_IDLE_AFTER` (30 days) are deleted like settled ones. Token Secrets from before this change go in a sweep at API start (drop it once every install has started once).
-- [ ] `SANDBOX_EGRESS_ALLOW` for the private networks agents need (git host, staging); a read-only kubeconfig as a team secret for DevOps.
+- [ ] `SANDBOX_EGRESS_ALLOW` for the private networks agents need (git host, staging); a read-only kubeconfig as a team secret for DevOps, or better a kubeconfig with `tokenFile` and workload identity.
+- [ ] Workload identity against the real systems: Banda on https, then each recipe in Settings (OpenBao/Vault, Infisical, AWS, GCP, Kubernetes) end to end, and a key rotation (docs/deployment.md); only the tokens themselves are tested so far.
 - [x] Monitoring: `/metrics` on `METRICS_ADDR` (threads by status, sandboxes, runners, internal errors, uptime); logs on stdout. PVC disk use comes from the kubelet's `kubelet_volume_stats_*`, not Banda.
 - [ ] Monitoring on the team cluster: a scrape config (or ServiceMonitor) and alerts on internal errors and full volumes.
 
@@ -81,7 +82,11 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 ## Later (not needed to run fully)
 
 - [ ] Several API replicas: Postgres `LISTEN/NOTIFY` fan-out; the in-memory "suspend after the turn" moves to the database.
-- [ ] A GitHub App (per-user OAuth) instead of personal tokens; webhooks as an add-on to polling for installs that can receive them.
+- [x] A GitHub App instead of personal tokens on GitHub: set up from Settings (manifest flow) or by hand, per-user OAuth with rotating refresh tokens, installation tokens for git in sandboxes scoped to the thread's repository (fake forge only).
+- [ ] The GitHub App against github.com and a GitHub Enterprise Server: the manifest flow, installing, connecting, token expiry and refresh, pushes touching `.github/workflows`.
+- [x] GitLab as an OAuth connection per user and host, beside GitHub's (`forge_connections`): a team application per host set up from Settings, two grants per user (`api` in the API, `write_repository` for sandboxes), rotating refresh tokens (fake forge only).
+- [ ] The GitLab application against gitlab.com and a self-hosted GitLab: creating it in a group, the secret check, both consents, token refresh after 2 hours, revocation from GitLab's settings, a push with the git-only token.
+- [ ] Webhooks as an add-on to polling for installs that can receive them.
 - [x] Pull requests: search on the forge in the repo picker; reviewers and labels from lists; resolving review threads; spotting a pull request the agent opened itself (fake forge only, like the rest).
 - [x] Reviewers and labels in the create dialog, not only the Pull request tab.
 - [x] New threads and races with attachments; "Spawn sub-thread" with a profile chip and attachments; agents handing off through MCP (`handoff_thread`).

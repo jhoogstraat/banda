@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import ForgeAction from '#lib/components/forge-action.svelte';
+	import { forgeAction } from '#lib/github.svelte.js';
 	import { Message, MessageContent, MessageResponse } from '#lib/components/ai-elements/message/index.js';
 
 	export { agentText };
@@ -9,6 +11,7 @@
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 	import AppWindowIcon from '@lucide/svelte/icons/app-window';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
@@ -204,7 +207,10 @@
 				<Button size="sm" variant="outline" onclick={() => act(api.handoffDecline({ threadId }))}><XIcon /> Decline</Button>
 				{#if briefing}<span class="flex items-center gap-2 text-xs text-muted-foreground"><Loader size={12} /> The agent is writing your briefing</span>{/if}
 			</div>
-			<p class="text-xs text-muted-foreground">Its next turns run on your Claude subscription, with your secrets.</p>
+			<p class="text-xs text-muted-foreground">
+				Its next turns run on your Claude subscription, with your secrets. The files and hooks in its environment come from {from}’s agent
+				and will run with your accounts.
+			</p>
 		{:else if open && owner}
 			<div class="flex items-center gap-2">
 				<Button size="sm" variant="outline" onclick={() => act(api.handoffDecline({ threadId }))}><XIcon /> Cancel handoff</Button>
@@ -248,6 +254,12 @@
 			>{changeText(item.changed, item.actor === 'system' ? '' : userName(item.actor))}: <span class="font-medium text-foreground">{p.title}</span></span
 		>
 		{#if onshow}<button class="shrink-0 underline-offset-2 hover:text-foreground hover:underline" onclick={() => onshow('pull')}>View</button>{/if}
+	</div>
+{:else if item.kind === 'notice' && item.text.startsWith('No identity tokens:')}
+	<!-- Workload identity refused for the owner (internal/api/identity.go): a calm line, as for a push that can't happen. -->
+	<div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+		<KeyRoundIcon class="mt-px size-3.5 shrink-0" />
+		<span class="min-w-0 flex-1">{item.text}</span>
 	</div>
 {:else if item.kind === 'notice'}
 	<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
@@ -295,7 +307,11 @@
 	{#if owner}
 		<div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
 			<CloudOffIcon class="size-3.5 shrink-0" />
-			{#if item.text.includes('GIT_TOKEN')}
+			{#if forgeAction(item.text)}
+				<!-- The button names the action, so the line needn't say where. -->
+				<span class="min-w-0 flex-1">{item.text.replaceAll('`', '').replace(/https?:\/\/\S+\/installations\/new/, 'GitHub').replace(/ in Settings\b/i, '')}</span>
+				<ForgeAction message={item.text} thread={thread ?? { id: threadId, repoUrl: '' }} />
+			{:else if item.text.includes('GIT_TOKEN')}
 				<span class="min-w-0 flex-1">This thread's work only lives in its environment: pushing to origin needs a GIT_TOKEN.</span>
 				<Button size="xs" variant="outline" href="/settings?secret=GIT_TOKEN#secrets">Add GIT_TOKEN in Settings</Button>
 			{:else}

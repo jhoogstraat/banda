@@ -30,13 +30,16 @@ export default defineConfig({
 				})
 		}
 	],
-	// Connect paths look like /banda.v1.ThreadService/WatchThread -> the Go API, as does the OIDC login flow.
+	// Connect paths look like /banda.v1.ThreadService/WatchThread -> the Go API, as do the OIDC login flow, the GitHub App's and GitLab's and the issuer's discovery.
 	// /dex reaches the dev Dex, so LAN clients sign in through this one port.
 	server: {
 		proxy: {
 			'/banda.v1.': api,
 			'/auth': api,
 			'/files': api,
+			'/.well-known/': api, // workload identity discovery and keys, at PUBLIC_URL
+			'/github': api,
+			'/gitlab': api,
 			'/dex': 'http://localhost:5556'
 		}
 	}

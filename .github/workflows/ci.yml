@@ -24,6 +24,7 @@ jobs:
       - run: pnpm -C web check
       - run: node web/src/lib/events.check.ts
       - run: node web/src/lib/inbox.check.ts
+      - run: node web/src/lib/identity-recipes.check.ts
       - run: buf lint
       - name: generated code is up to date
         run: |

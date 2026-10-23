@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ForgeAction from '#lib/components/forge-action.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import BotIcon from '@lucide/svelte/icons/bot';
@@ -125,7 +126,12 @@
 				{/if}
 			</div>
 		{/if}
-		{#if error}<p class="mb-2 text-sm text-destructive">{error}</p>{/if}
+		{#if error}
+			<div class="mb-2 flex flex-wrap items-center gap-2">
+				<p class="text-sm text-destructive">{error}</p>
+				<ForgeAction message={error} />
+			</div>
+		{/if}
 		<PromptInput.Root onSubmit={submit} {...attachLimits} onError={(e) => (error = e.message)}>
 			<fieldset disabled={busy} class="contents">
 				<PromptInput.Attachments class="px-2">

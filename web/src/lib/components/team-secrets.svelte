@@ -1,14 +1,15 @@
 <script lang="ts">
 	// The team's secrets in Settings: like the user's own, in every thread of
 	// every teammate, and anyone may replace or delete them.
-	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+	import { timestampDate } from '@bufbuild/protobuf/wkt';
 	import { ConnectError } from '@connectrpc/connect';
+	import SettingsHeading from '#lib/components/settings-heading.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { settingsApi } from '#lib/api.js';
 	import type { SecretInfo } from '#lib/gen/banda/v1/banda_pb.js';
 	import { userName } from '#lib/threads.svelte.js';
-	import { ago } from '#lib/utils.js';
+	import { since } from '#lib/utils.js';
 
 	let secrets = $state<SecretInfo[]>([]);
 	let error = $state('');
@@ -45,11 +46,6 @@
 		return true;
 	}
 
-	const since = (t?: Timestamp) => {
-		const a = ago(t);
-		return a === 'now' ? 'just now' : `${a} ago`;
-	};
-
 	async function add(e: SubmitEvent) {
 		e.preventDefault();
 		if (!validName(name)) {
@@ -71,13 +67,7 @@
 </script>
 
 <section id="team-secrets" aria-label="Team secrets">
-	<h2 class="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
-		Team secrets
-		<span class="text-xs font-normal text-muted-foreground">
-			passed to every thread of every teammate; a personal secret of the same name wins
-		</span>
-	</h2>
-	{#if error}<p class="mb-3 text-sm text-destructive">{error}</p>{/if}
+	<SettingsHeading title="Team secrets" note="in every teammate’s threads; a personal secret of the same name wins" {error} />
 	<div class="divide-y rounded-lg border">
 		{#each secrets as s (s.name)}
 			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">

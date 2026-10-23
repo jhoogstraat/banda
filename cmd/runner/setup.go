@@ -215,16 +215,34 @@ func checkout(ctx context.Context) (string, error) {
 		}
 		return nil
 	}
+	// Banda manages git's credentials: what an agent wrote into the git config
+	// on the thread's volume (perhaps the previous owner's, before a handoff)
+	// doesn't get to see them. Hooks stay, and run with the owner's credentials.
+	for _, f := range []string{filepath.Join(work, ".git", "config"), filepath.Join(os.Getenv("HOME"), ".gitconfig"),
+		filepath.Join(cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(os.Getenv("HOME"), ".config")), "git", "config")} {
+		if err := dropCredentialConfig(ctx, f); err != nil {
+			return "", err
+		}
+	}
 	// The owner's identity (Settings), set on every start so a change applies.
 	steps := [][]string{
 		{"config", "--global", "user.name", cmp.Or(os.Getenv("BANDA_GIT_NAME"), "Banda")},
 		{"config", "--global", "user.email", cmp.Or(os.Getenv("BANDA_GIT_EMAIL"), "banda@localhost")},
 	}
-	if u, err := url.Parse(os.Getenv("BANDA_REPO_URL")); err == nil && u.Scheme == "https" && os.Getenv("GIT_TOKEN") != "" {
-		// Only for the repo's host. Reads the token from the environment at use
-		// time; it is never written to disk.
-		steps = append(steps, []string{"config", "--global", "credential.https://" + u.Host + ".helper",
-			`!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
+	if u, err := url.Parse(os.Getenv("BANDA_REPO_URL")); err == nil && u.Scheme == "https" {
+		// Only for the repo's host, in order: a token from the API for the
+		// thread's repository (the GitHub App's), then GIT_TOKEN, read from the
+		// environment at use time. Neither is ever written to disk.
+		key := "credential.https://" + u.Host + ".helper"
+		exec.CommandContext(ctx, "git", "config", "--global", "--unset-all", key).Run() // none yet is fine
+		self, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		steps = append(steps, []string{"config", "--global", "--add", key, self + " git-credential"})
+		if os.Getenv("GIT_TOKEN") != "" {
+			steps = append(steps, []string{"config", "--global", "--add", key, `!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f`})
+		}
 	}
 	for _, args := range steps {
 		if err := git(args...); err != nil {
@@ -254,6 +272,30 @@ func checkout(ctx context.Context) (string, error) {
 		return kept, git("-C", work, "switch", branch)
 	}
 	return kept, git("-C", work, "switch", "-c", branch)
+}
+
+// dropCredentialConfig removes the credential.*, include.* and includeIf.*
+// keys from the git config file f, if there is one: a helper there would be
+// handed the token git asks for, and an include could add one.
+func dropCredentialConfig(ctx context.Context, f string) error {
+	if _, err := os.Stat(f); err != nil {
+		return nil
+	}
+	out, err := exec.CommandContext(ctx, "git", "config", "--file", f, "--null", "--name-only", "--get-regexp", `^(credential|include|includeif)\.`).Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 { // none
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read %s: %w", f, err)
+	}
+	for _, key := range strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00") {
+		// Exit 5: a key listed twice is gone already.
+		if err := exec.CommandContext(ctx, "git", "config", "--file", f, "--unset-all", key).Run(); err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 5) {
+			return fmt.Errorf("remove %s from %s: %w", key, f, err)
+		}
+	}
+	return nil
 }
 
 // adopt makes the folder a checkout of the thread branch, based on the base

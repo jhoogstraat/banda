@@ -107,3 +107,13 @@ func TestDexProxy(t *testing.T) {
 		t.Fatalf("other host: %q", b)
 	}
 }
+
+// Only an explicit false (some providers send a string) leaves an email
+// unverified; Entra ID sends no claim at all.
+func TestEmailVerified(t *testing.T) {
+	for claim, want := range map[any]bool{true: true, nil: true, "true": true, false: false, "false": false} {
+		if got := emailVerified(claim); got != want {
+			t.Errorf("emailVerified(%#v) = %v", claim, got)
+		}
+	}
+}

@@ -41,3 +41,18 @@ func TestScrubPermissionRequest(t *testing.T) {
 		t.Errorf("not redacted: %v", r)
 	}
 }
+
+// GitHub's and GitLab's tokens are redacted by their shape: an installation token from the
+// API is in no variable.
+func TestRedactGitHubTokens(t *testing.T) {
+	for _, tok := range []string{"ghs_16C7e42F292c6912E7710c838347Ae178B4a", "ghu_abcdefghijklmnop1234", "ghr_1B4a2e77838347a7E420ce178F2E7c6912E1",
+		"ghp_abcdefghijklmnopqrstuvwxyz0123456789", "gho_abcdefghijklmnop1234", "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz",
+		"glpat-xYz12_AbCdEfGhIjKlMnOp", "gloas-0123456789abcdef0123456789abcdef"} {
+		if got := redact("password=" + tok + "\n"); got != "password=[redacted]\n" {
+			t.Errorf("%s: got %q", tok, got)
+		}
+	}
+	if got := redact("ghost_town ghs_short"); got != "ghost_town ghs_short" {
+		t.Errorf("ordinary text: got %q", got)
+	}
+}

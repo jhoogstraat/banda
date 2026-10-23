@@ -8,14 +8,44 @@ Once a thread's branch is pushed, its owner opens a pull request (GitLab: merge 
 
 ![The Pull request tab](screenshots/pull-request.png)
 
-Banda acts with each person's own token, from their secrets in Settings (the same ones their threads get, so a personal secret beats a team one):
+On GitHub the team sets up a **GitHub App** once, on GitLab an **application** per host, and everyone connects their account (below). Otherwise Banda acts with each person's own token from their secrets in Settings (the same ones their threads get, so a personal secret beats a team one); where the team has an app that is deprecated, and only used until the person connects:
 
 | Forge | Secret | Token |
 |---|---|---|
-| GitHub, GitHub Enterprise Server | `GIT_TOKEN` | Fine-grained: Contents read and write (pushes), Pull requests read and write (also labels and resolving review threads), Commit statuses read, Checks read (Actions read for workflow runs), Metadata read (collaborators, search). Classic: `repo`. |
-| GitLab, self-hosted GitLab | `GITLAB_TOKEN`, else `GIT_TOKEN` | A personal access token with the `api` scope (`write_repository` alone pushes but can't open merge requests). |
+| GitHub, GitHub Enterprise Server (without the app, or not connected; deprecated) | `GIT_TOKEN` | Fine-grained: Contents read and write (pushes), Pull requests read and write (also labels and resolving review threads), Commit statuses read, Checks read (Actions read for workflow runs), Metadata read (collaborators, search). Classic: `repo`. |
+| GitLab, self-hosted GitLab (without the application, or not connected; deprecated) | `GITLAB_TOKEN`, else `GIT_TOKEN` (git in threads uses `GIT_TOKEN` only) | A personal access token with the `api` scope (`write_repository` alone pushes but can't open merge requests). |
 
-github.com and gitlab.com are known; name self-hosted hosts in `FORGE_HOSTS`, e.g. `FORGE_HOSTS=git.corp.example=gitlab,ghe.corp.example=github`. The API polls linked pull requests every `PULL_REQUEST_POLL` (default `30s`) while someone has the thread open and ten times slower otherwise, with conditional requests on GitHub; no webhooks are needed. In the cluster the API needs `get` on Secrets in the sandbox namespace to read the tokens. Without a known forge or a token, the header links to GitHub's compare page instead.
+github.com and gitlab.com are known; name self-hosted hosts in `FORGE_HOSTS`, e.g. `FORGE_HOSTS=git.corp.example=gitlab,ghe.corp.example=github`. A repository URL with a port other than the scheme's default (`https://git.corp.example:8443/team/app`) is another server: it is a known forge only if `FORGE_HOSTS` names that exact `host:port` (`git.corp.example:8443=gitlab`); otherwise Banda gives it no forge token and git no credential. The API polls linked pull requests every `PULL_REQUEST_POLL` (default `30s`) while someone has the thread open and ten times slower otherwise, with conditional requests on GitHub; no webhooks are needed. In the cluster the API needs `get` on Secrets in the sandbox namespace to read the tokens. Without a known forge or a token, the header links to GitHub's compare page instead.
+
+### The GitHub App
+
+Settings → **GitHub App** walks through it, and anyone signed in can do it, as with team secrets:
+
+1. **Create the app on GitHub.** Pick the host (github.com, or a GitHub Enterprise Server named in `FORGE_HOSTS`) and who owns it: an organization (the default) or your own account. Whoever owns it reaches every repository it is installed on, whatever their own access there, so for an organization's repositories create it in the organization. GitHub shows its name ("Banda (<your host>)", editable) and permissions before you confirm, then sends you back. It is private, has no webhook, and asks only for what Banda uses: code and workflow files (pushes), pull requests, checks and commit statuses. Banda checks what GitHub made (private, exactly those permissions, no events or webhook elsewhere, the owner you picked) and keeps nothing else: Settings then says how it differs, with a link to delete it on GitHub.
+2. **Install it** on the accounts whose repositories threads use (all repositories or a selection). From then on the section shows the app and where it is installed, with a link to change that on GitHub.
+3. **Connect your account**: Settings → **Accounts** → **Connect GitHub**. Everyone does this once; the nav marks **Accounts** until you have.
+
+From then on pull requests, comments and merges go out as you, the repository chip lists the repositories you reach through the app, and git in your threads gets a token from Banda that lasts an hour and reaches only the thread's repository (read-only if you may only read it). Nothing long-lived enters a sandbox. When something is missing the thread says what, with a button: connect GitHub (straight to GitHub and back to the thread, whose button then says you're connected), reconnect it (you revoked Banda on GitHub, or the connection expired), or install the app for that repository. **Disconnect** revokes Banda's access on GitHub. A `GIT_TOKEN` secret still works for anyone not connected.
+
+Once there is an app, creating another means **Replace the app…** under it, which says first what it does: everyone's connection to the old app is revoked, each teammate connects again, and an owner of each account installs the new app there. **Remove from Banda** ends the connections the same way. Either stays on GitHub, where its owner can delete it. Settings shows everyone the latest change ("Replaced by bob · 2h ago, was banda-acme owned by acme"), and each teammate's **Accounts** says who replaced the app and when. An app made by hand (docs/deployment.md) is changed where it was made, not here.
+
+An app created under your own account can move to an organization: on GitHub, the app's settings → **Advanced** → **Transfer ownership**, to an organization you own. Its id, keys and installations stay, so Banda keeps working, and Settings shows the new owner once it has next asked GitHub where the app is installed.
+
+### GitLab
+
+Settings → **GitLab** walks through it, once per GitLab host, and anyone signed in can do it. A team without GitLab sees one line there, **Set up GitLab**, which opens the walk-through (as do the threads' **Set up GitLab** buttons):
+
+1. **Create an application on GitLab.** Pick the host (gitlab.com, or one named in `FORGE_HOSTS`) and who owns it: a group (recommended: it outlives any one person), or on a self-hosted GitLab the instance (an administrator makes it, and can mark it trusted to skip the consent screens). Not a person's account: see below. Settings links to that applications page and shows what to fill in, each with a copy button: a name, the Redirect URI (`$PUBLIC_URL/gitlab/callback`, exactly), Confidential ticked, and only the scopes `api` and `write_repository`.
+2. **Paste its Application ID and Secret** into Settings. Banda checks them with GitLab before keeping them, where no sandbox can read them.
+3. **Connect your account**: Settings → **Accounts** → **Connect GitLab**, which shows there once the team has an application. GitLab asks twice: once for Banda (`api`: merge requests, your projects), once for git in your threads (`write_repository`: push and pull, nothing else). Cancelling either connects nothing.
+
+From then on merge requests, comments and merges go out as you, and git in your threads gets a token from Banda that only does git and lasts at most two hours, renewed as needed. Unlike GitHub's, it isn't limited to the thread's project: GitLab can't narrow a user's token, so it reaches every project you can push to on that host. The `api` token never enters a sandbox. When something is missing the thread says what, with a button: set up GitLab, connect it, or reconnect it (you revoked Banda on GitLab). **Disconnect** revokes both of Banda's tokens on GitLab. Both approvals have to come from the same GitLab account: if the second came from another (the browser's GitLab session changed in between), Banda revokes both and says which account to sign in as. Connecting starts only from Settings: a link on another site to `/gitlab/connect` (or `/github/connect`) lands back in Settings without connecting. A `GITLAB_TOKEN` or `GIT_TOKEN` secret still works for anyone not connected.
+
+Whoever can edit the application on GitLab holds more than anyone else: the group's Owners, or on a self-hosted GitLab the instance's administrators, can add a Redirect URI of their own and, since GitLab skips the consent screen for a confidential application someone already approved with the same scopes, get `api` tokens for every connected teammate without them noticing. Own it by a group with few Owners, and keep it there.
+
+Once a host has an application, setting up another means **Replace** on its row, which says first what it does: everyone's connection through the old one is revoked with its credentials and each teammate connects again (a renewed secret of the same application keeps the connections). **Remove from Banda** asks first and ends the connections the same way. Either leaves the application on GitLab, where its owner can delete it. Settings shows everyone the latest change ("Replaced by bob · 2h ago, was 3f9a…"), and the GitLab section of each teammate not connected says who replaced or removed it and when. An application made by hand (docs/deployment.md) is changed where it was made, not here; one whose ID changes there ends the connections through the old one the same way. If GitLab refuses the application's ID or secret when renewing a connection (someone renewed the secret or deleted the application on GitLab), Settings says the application needs attention and connections keep their tokens until it is fixed; only GitLab refusing a person's own grant disconnects them ("Reconnect GitLab").
+
+Banda manages git's credentials in threads: at every start it removes `credential.*`, `include.*` and `includeIf.*` settings from the checkout's `.git/config` and the thread's `~/.gitconfig`, which an agent could have planted to send them elsewhere, before setting its own. Git hooks (`core.hooksPath`, husky) and every file in the checkout stay, and they run with the current owner's credentials: after a handoff, with the new owner's. Accept a handoff only for a thread you would check out yourself. Banda also replaces every git token it gave a thread with `[redacted]` in what the thread reports (its chat, tool output, terminal), for as long as the token is valid.
 
 ## Permissions
 
@@ -27,13 +57,22 @@ The profile chip in the composer sets who the agent works with in that thread: *
 
 ## Settings
 
-Settings has a section each, linked from its side nav, which marks the one in view (`/settings#claude`, `#git`, `#defaults`, `#notifications`, `#appearance`, `#secrets`, `#team-secrets`, `#shortcuts`):
+Settings has two groups of sections, **You** (yours alone) and **Team** (shared: a change applies to every teammate), each section linked from the side nav, which marks the one in view and puts a dot on what waits on you (Claude Code to log in to, an account to connect).
+
+You (`/settings#claude`, `#accounts`, `#git`, `#defaults`, `#notifications`, `#appearance`, `#secrets`, `#shortcuts`):
 
 - **Claude Code**: sign in with your subscription or an API key.
+- **Accounts**: your GitHub and GitLab accounts, a row for each forge and host the team has set up (`#github`, `#gitlab`), to connect, reconnect or disconnect.
 - **Git identity**: the name and email of commits in your threads, by default your sign-in's. A thread handed to you uses yours. Like secrets, it applies when an environment next starts.
 - **New threads**: the model, effort, permission mode and profile the new-thread composer (and a race) starts with, and what threads created through the API without them get (sub-threads keep their parent's).
 - **Notifications** and **Appearance** (System, Light or Dark; dark by default) are per browser.
-- **Secrets**, **Team secrets** and the **keyboard shortcuts**.
+- **Secrets** and the **keyboard shortcuts**.
+
+Team (`#github-app`, `#gitlab-app`, `#team-secrets`, `#workload-identity`):
+
+- **GitHub App** and **GitLab**: setting them up (see [The GitHub App](#the-github-app) and [GitLab](#gitlab)).
+- **Team secrets**.
+- **Workload identity**: Banda's issuer and the team's token audiences, which give every running thread short-lived tokens naming its owner, and, folded until opened, recipes for OpenBao/Vault, Infisical, AWS, Google Cloud and Kubernetes filled in with this Banda's values. A secret manager that trusts Banda replaces pasted credentials: the agent signs in with the token file and fetches what it needs ([configuration](configuration.md#workload-identity)).
 
 ## Work without a repository
 

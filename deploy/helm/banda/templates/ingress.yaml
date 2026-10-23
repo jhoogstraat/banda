@@ -1,5 +1,6 @@
 {{- if and .Values.api.enabled .Values.ingress.enabled }}
-# Banda on ingress.host (with /dex for a bundled Dex), the preview on ingress.previewHost.
+# Banda on ingress.host (with /dex for a bundled Dex, and /.well-known/ for the workload
+# identity issuer, which must stay public), the preview on ingress.previewHost.
 # Thread streams are long-lived; the API keeps them busy with a keepalive every
 # 25 s (see ingress.annotations in values.yaml for longer timeouts).
 apiVersion: networking.k8s.io/v1

@@ -80,7 +80,7 @@ test('anyone comments with their own token: a teammate without one is told how, 
 	expect(await refused(bob.threads.pullRequestComment({ threadId: t.id, body: 'hi' }))).toContain('You have no token for github.com: add GIT_TOKEN in Settings');
 	let page = await open(bob, t.id);
 	await page.getByRole('button', { name: /^PR #1/ }).click();
-	await expect(pane(page).getByText('Comments go out with your own token')).toBeVisible();
+	await expect(pane(page).getByText('Comments go out as you: connect GitHub, or add a GIT_TOKEN secret')).toBeVisible();
 
 	await bob.settings.setSecret({ name: 'GIT_TOKEN', value: 'bob-token' });
 	await page.reload();

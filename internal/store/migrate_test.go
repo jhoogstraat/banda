@@ -76,6 +76,12 @@ func with(t *testing.T, extra map[string]string) fs.FS {
 	return m
 }
 
+// migrationNames is the real migrations' names followed by extra, comma-separated: extras sort after them.
+func migrationNames(t *testing.T, extra ...string) string {
+	names, _ := fs.Glob(embedded(t), "*.sql")
+	return strings.Join(append(names, extra...), ",")
+}
+
 func applied(t *testing.T, db *pgxpool.Pool) string {
 	var s string
 	if err := db.QueryRow(context.Background(), `SELECT string_agg(name, ',' ORDER BY name) FROM schema_migrations`).Scan(&s); err != nil {
@@ -86,15 +92,15 @@ func applied(t *testing.T, db *pgxpool.Pool) string {
 
 func TestMigrateFreshAndAgain(t *testing.T) {
 	db, ctx := testDB(t), context.Background()
-	fsys := with(t, map[string]string{"0002_note.sql": `ALTER TABLE threads ADD COLUMN note text NOT NULL DEFAULT ''`})
+	fsys := with(t, map[string]string{"9002_note.sql": `ALTER TABLE threads ADD COLUMN note text NOT NULL DEFAULT ''`})
 	if err := migrate(ctx, db, fsys); err != nil {
 		t.Fatal(err)
 	}
-	// 0002 isn't idempotent: running everything again must skip it.
+	// 9002 isn't idempotent: running everything again must skip it.
 	if err := migrate(ctx, db, fsys); err != nil {
 		t.Fatal(err)
 	}
-	if got := applied(t, db); got != "0001_baseline.sql,0002_note.sql" {
+	if got := applied(t, db); got != migrationNames(t, "9002_note.sql") {
 		t.Fatalf("applied %s", got)
 	}
 }
@@ -132,11 +138,11 @@ func TestMigrateExistingDatabase(t *testing.T) {
 func TestMigrateFailureRollsBack(t *testing.T) {
 	db, ctx := testDB(t), context.Background()
 	fsys := with(t, map[string]string{
-		"0002_bad.sql":  `CREATE TABLE half (x int); SELECT 1/0`,
-		"0003_next.sql": `CREATE TABLE next (x int)`,
+		"9002_bad.sql":  `CREATE TABLE half (x int); SELECT 1/0`,
+		"9003_next.sql": `CREATE TABLE next (x int)`,
 	})
 	err := migrate(ctx, db, fsys)
-	if err == nil || !strings.Contains(err.Error(), "0002_bad.sql") {
+	if err == nil || !strings.Contains(err.Error(), "9002_bad.sql") {
 		t.Fatalf("error %v", err)
 	}
 	var half, next *string
@@ -144,14 +150,14 @@ func TestMigrateFailureRollsBack(t *testing.T) {
 	if half != nil || next != nil {
 		t.Fatal("the failed migration, or one after it, left a table")
 	}
-	if got := applied(t, db); got != "0001_baseline.sql" {
+	if got := applied(t, db); got != migrationNames(t) {
 		t.Fatalf("applied %s", got)
 	}
 }
 
 func TestMigrateConcurrentStarts(t *testing.T) {
 	db := testDB(t)
-	fsys := with(t, map[string]string{"0002_once.sql": `CREATE TABLE once (x int)`}) // fails if applied twice
+	fsys := with(t, map[string]string{"9002_once.sql": `CREATE TABLE once (x int)`}) // fails if applied twice
 	var wg sync.WaitGroup
 	errs := make([]error, 6)
 	for i := range errs {
@@ -167,7 +173,7 @@ func TestMigrateConcurrentStarts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := applied(t, db); got != "0001_baseline.sql,0002_once.sql" {
+	if got := applied(t, db); got != migrationNames(t, "9002_once.sql") {
 		t.Fatalf("applied %s", got)
 	}
 }

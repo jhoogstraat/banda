@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/identity"
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
@@ -51,6 +52,10 @@ type Service struct {
 	// skip: ingress controllers cut streams quiet for longer than their read
 	// timeout (60 s for ingress-nginx).
 	Keepalive time.Duration
+	// Identity signs thread pods' workload identity tokens (identity.go),
+	// which their runners fetch every IDTokenRefresh.
+	Identity       *identity.Issuer
+	IDTokenRefresh time.Duration
 
 	mu sync.Mutex
 	// watchers holds each WatchThread's channel and its behind signal (see watch).
@@ -78,10 +83,20 @@ type Service struct {
 	inbox    map[*inboxWatcher]struct{}
 	// reports holds the latest lineage report of each thread until it is done.
 	reports map[string]chan struct{}
+	// idTokens holds each thread's latest minted tokens, and idTokensDue
+	// whether an IdTokensChanged is waiting to go out (see identity.go).
+	idTokens    map[string]mintedTokens
+	idTokensDue bool
 	// deliveries holds a mutex per thread, see lockDelivery.
 	deliveries sync.Map
 
 	tokens forgeTokens
+	// handedOut: the git credentials each thread's runner got, redacted from what it sends (redact.go).
+	handedOut handedOut
+	gh        *gitHub
+	gl        *gitLabs
+	// PublicURL is the origin browsers use; the GitHub App's flows return there.
+	PublicURL string
 
 	// Preview configures the preview origin (preview.go). Set before serving.
 	Preview      PreviewConfig
@@ -103,7 +118,10 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		previews:  map[string]chan struct{}{},
 		inbox:     map[*inboxWatcher]struct{}{},
 		reports:   map[string]chan struct{}{},
+		idTokens:  map[string]mintedTokens{},
 		tokens:    forgeTokens{m: map[string]cachedToken{}, backoff: map[string]time.Time{}},
+		gh:        newGitHub(sb),
+		gl:        newGitLabs(sb),
 
 		DeleteSettledAfter: 7 * 24 * time.Hour,
 		DeleteIdleAfter:    30 * 24 * time.Hour,
@@ -113,6 +131,7 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		OverlapWindow:      7 * 24 * time.Hour,
 		WatchBuffer:        256,
 		Keepalive:          25 * time.Second,
+		IDTokenRefresh:     5 * time.Minute,
 		loginLastUsed:      map[string]time.Time{},
 		previewKey:         signer(rand.Text()),
 	}

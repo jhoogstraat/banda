@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -22,11 +21,7 @@ import (
 	"syscall"
 	"time"
 
-	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
-
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
-	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
 	"github.com/jhoogstraat/banda/internal/tunnel"
 )
 
@@ -43,6 +38,10 @@ var (
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "git-credential" { // git's credential helper, see checkout
+		gitCredential(os.Args[2])
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	err := run(ctx)
@@ -61,10 +60,9 @@ func main() {
 func run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	ids.scan(time.Now())
 
-	tr := &http.Transport{Protocols: new(http.Protocols)}
-	tr.Protocols.SetUnencryptedHTTP2(true)
-	api := bandav1connect.NewRunnerServiceClient(connect.NewClient(connecthttp.NewTransport(&http.Client{Transport: tr}, os.Getenv("BANDA_API_URL"))))
+	api := newAPI()
 	stream, err := api.Connect(ctx)
 	if err != nil {
 		return err
@@ -99,6 +97,7 @@ func run(ctx context.Context) error {
 	// queueCmd never blocks: setup and the login wait can take long, and the
 	// terminal, files and previews keep working meanwhile.
 	queueCmd, cmds := unbounded[*bandav1.ConnectResponse]()
+	idTokensChanged := make(chan struct{}, 1)
 	want := &wanted{s: settings{os.Getenv("BANDA_MODEL"), os.Getenv("BANDA_EFFORT"), os.Getenv("BANDA_PROFILE")}}
 	pushes := &pusher{report: send}
 	lastDiff := "" // the first turn after a start always pushes
@@ -111,6 +110,10 @@ func run(ctx context.Context) error {
 		return sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_HttpTunnel{HttpTunnel: t}})
 	})
 	defer tunnels.CloseAll()
+	// The API sends its first message once it has taken the stream as this
+	// thread's runner: only then does it give git credentials (GitCredential).
+	registered := make(chan struct{})
+	var once sync.Once
 	go func() {
 		defer cancel()
 		for {
@@ -119,7 +122,13 @@ func run(ctx context.Context) error {
 				log.Print("API connection: ", err)
 				return
 			}
+			once.Do(func() { close(registered) })
 			switch k := msg.Kind.(type) {
+			case *bandav1.ConnectResponse_IdTokensChanged:
+				select {
+				case idTokensChanged <- struct{}{}:
+				default: // a fetch is due anyway
+				}
 			case *bandav1.ConnectResponse_Ping:
 				go sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Pong{Pong: &bandav1.Pong{}}})
 			case *bandav1.ConnectResponse_Prompt, *bandav1.ConnectResponse_Stop, *bandav1.ConnectResponse_Permission:
@@ -164,7 +173,17 @@ func run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+	select {
+	case <-registered:
+	case <-ctx.Done():
+		return nil
+	}
 	go reportPorts(ctx, sendReq) // the preview works during setup and after it failed
+	if ids.dir != "" {           // setup scripts may use them too
+		go ids.run(ctx, func(ctx context.Context) (*bandav1.IdTokensResponse, error) {
+			return api.IdTokens(ctx, &bandav1.IdTokensRequest{ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN")})
+		}, idTokensChanged)
+	}
 	forkPatch := func(ctx context.Context) (*bandav1.ForkPatchResponse, error) {
 		return api.ForkPatch(ctx, &bandav1.ForkPatchRequest{ThreadId: threadID, Token: os.Getenv("BANDA_RUNNER_TOKEN")})
 	}

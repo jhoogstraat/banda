@@ -170,18 +170,26 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		Username string `json:"preferred_username"`
 		Email    string `json:"email"`
+		Verified any    `json:"email_verified"` // some providers send "false"
 	}
 	if err := idt.Claims(&claims); err != nil {
 		fail(err)
 		return
 	}
-	u := store.User{ID: idt.Subject, Name: cmp.Or(claims.Name, claims.Username, claims.Email, idt.Subject), Email: claims.Email}
+	u := store.User{ID: idt.Subject, Name: cmp.Or(claims.Name, claims.Username, claims.Email, idt.Subject), Email: claims.Email,
+		EmailVerified: emailVerified(claims.Verified)}
 	if err := o.store.UpsertUser(r.Context(), u); err != nil {
 		fail(err)
 		return
 	}
 	http.SetCookie(w, o.cookie(sessionCookie, o.sign(u.ID, time.Now().Add(sessionTTL)), int(sessionTTL.Seconds())))
 	http.Redirect(w, r, localPath(flow.Get("next")), http.StatusFound)
+}
+
+// emailVerified reads the email_verified claim: only false says unverified.
+// Without it the email is trusted, as Kubernetes does, since Entra ID omits it.
+func emailVerified(claim any) bool {
+	return claim != false && claim != "false"
 }
 
 // localPath returns next if it is a plain path on this site, else "/": no

@@ -40,8 +40,8 @@ ENTRYPOINT ["/usr/local/bin/runner"]
 # succeeds, leaving a background process), setup-hold (it waits for
 # ~/e2e-release/setup) and profiles (its .banda/profiles/spec.md replaces the
 # Specification text). Their pre-receive hook can hold a push. A repo URL
-# https://github.com/e2e/<name>.git is the git server's <name> too, for what
-# only shows for GitHub repos (the pull request link).
+# https://github.com/e2e/<name>.git (and gitlab.com's) is the git server's
+# <name> too, for what only shows for forge repos (the pull request link).
 FROM sandbox AS fake
 COPY deploy/fake-claude /usr/local/bin/claude
 COPY deploy/e2e-pre-receive /opt/e2e/pre-receive
@@ -55,5 +55,6 @@ RUN repo() { git init -q -b main /tmp/$1 && mkdir -p /tmp/$1/.banda/profiles && 
  && repo setup-hold 'until [ -e ~/e2e-release/setup ]; do sleep 0.2; done\n' setup.sh \
  && repo profiles 'Spec as the e2e repo wants it\nAsk about the weather first.\n' profiles/spec.md \
  && chown -R 1000:1000 /opt/e2e \
- && git config --system url.git://e2e-git/.insteadOf https://github.com/e2e/
+ && git config --system url.git://e2e-git/.insteadOf https://github.com/e2e/ \
+ && git config --system --add url.git://e2e-git/.insteadOf https://gitlab.com/e2e/
 USER 1000

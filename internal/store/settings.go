@@ -187,6 +187,14 @@ func (s *Store) CheckLoginToken(ctx context.Context, userID, token string) bool 
 	return want != nil && token != "" && subtle.ConstantTimeCompare([]byte(*want), []byte(TokenHash(token))) == 1
 }
 
+// DropRunnerToken invalidates the thread's runner token, for a handoff: the
+// old owner's pod must not act for the thread, or mint tokens naming the new
+// owner, before provision gives the new pod its own.
+func (s *Store) DropRunnerToken(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = '' WHERE id = $1`, id)
+	return err
+}
+
 // NewRunnerToken gives the thread a new runner token. Only its hash is kept.
 func (s *Store) NewRunnerToken(ctx context.Context, id string) (string, error) {
 	token := rand.Text()

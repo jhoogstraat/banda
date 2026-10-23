@@ -100,6 +100,11 @@ func (s *Service) HandoffAccept(ctx context.Context, req *bandav1.HandoffAcceptR
 			return nil, err
 		}
 		offer := lastOffer(events)
+		// With the owner, under the row lock: the old pod's token stops working
+		// now, not once provision gets to it.
+		if err := tx.DropRunnerToken(ctx, t.ID); err != nil {
+			return nil, err
+		}
 		from = t.OwnerID
 		// The conversation holds every message so far, also one waiting for a start.
 		t.PendingPrompt, t.PendingImages = handoffPrompt(names, *t, events, offer, by), nil

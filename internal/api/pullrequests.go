@@ -25,8 +25,9 @@ import (
 // the forge. The owner creates, links, edits and merges it with their token;
 // anyone comments with their own.
 
-// forgeTokens caches users' forge tokens briefly: reading three Secrets per
-// call would make every page load hit Kubernetes. Never logged or returned.
+// forgeTokens caches users' legacy forge tokens (secrets) briefly: reading
+// three Secrets per call would make every page load hit Kubernetes. Never
+// logged or returned.
 // Forges says which repository hosts are GitHub or GitLab, for toProto too. Set before serving.
 var Forges forge.Config
 
@@ -38,8 +39,8 @@ type forgeTokens struct {
 }
 
 type cachedToken struct {
-	value string
-	at    time.Time
+	value, name string
+	at          time.Time
 }
 
 const tokenTTL = 30 * time.Second
@@ -48,29 +49,61 @@ const tokenTTL = 30 * time.Second
 // GitLab takes GITLAB_TOKEN first, for someone who needs both forges.
 var tokenNames = map[string][]string{forge.GitHub: {"GIT_TOKEN"}, forge.GitLab: {"GITLAB_TOKEN", "GIT_TOKEN"}}
 
-// forgeToken is the user's token for the forge, from the secrets their thread pods get.
-func (s *Service) forgeToken(ctx context.Context, userID, kind string) (string, error) {
+// forgeToken is the user's token for a host. On the GitHub App's host it is
+// their connection's (Settings, "Connect GitHub"), on a GitLab host with the
+// team's application their api grant's ("Connect GitLab"); elsewhere, or
+// until they connect, the secret their thread pods get (deprecated where an
+// app is). Empty if they have neither.
+func (s *Service) forgeToken(ctx context.Context, userID, kind, host string) (forge.Token, error) {
+	if kind == forge.GitLab {
+		if a := s.gitLabAppFor(ctx, host); a != nil {
+			t, err := s.gitLabToken(ctx, s.gl.api, userID, a)
+			if err != nil && !errors.Is(err, forge.ErrRevoked) {
+				return forge.Token{}, err
+			}
+			if t.Access != "" {
+				return forge.Token{Value: t.Access, Fix: "reconnect GitLab in Settings"}, nil
+			}
+		}
+	}
+	if a := s.appFor(ctx, host); a != nil {
+		token, err := s.userToken(ctx, userID, a)
+		if err != nil && !errors.Is(err, forge.ErrRevoked) {
+			return forge.Token{}, err
+		}
+		if token != "" {
+			return forge.Token{Value: token, Fix: "reconnect GitHub in Settings", App: true}, nil
+		}
+	}
+	return s.legacyToken(ctx, userID, kind)
+}
+
+// legacyToken is the user's token for the forge kind from their secrets.
+func (s *Service) legacyToken(ctx context.Context, userID, kind string) (forge.Token, error) {
 	key := userID + " " + kind
 	s.tokens.mu.Lock()
 	c, ok := s.tokens.m[key]
 	s.tokens.mu.Unlock()
-	if ok && time.Since(c.at) < tokenTTL {
-		return c.value, nil
-	}
-	var value string
-	for _, name := range tokenNames[kind] {
-		v, err := s.sandboxes.Env(ctx, userID, name)
-		if err != nil {
-			return "", err
+	if !ok || time.Since(c.at) >= tokenTTL {
+		c = cachedToken{at: time.Now()}
+		for _, name := range tokenNames[kind] {
+			v, err := s.sandboxes.Env(ctx, userID, name)
+			if err != nil {
+				return forge.Token{}, err
+			}
+			if v != "" {
+				c.value, c.name = v, name
+				break
+			}
 		}
-		if value = v; value != "" {
-			break
-		}
+		s.tokens.mu.Lock()
+		s.tokens.m[key] = c
+		s.tokens.mu.Unlock()
 	}
-	s.tokens.mu.Lock()
-	s.tokens.m[key] = cachedToken{value, time.Now()}
-	s.tokens.mu.Unlock()
-	return value, nil
+	if c.value == "" {
+		return forge.Token{}, nil
+	}
+	return forge.Token{Value: c.value, Fix: "check " + c.name + " in Settings"}, nil
 }
 
 // tokensChanged forgets cached tokens after a secret changed: the user's, or everyone's (empty).
@@ -93,19 +126,42 @@ func (s *Service) openForge(ctx context.Context, t store.Thread, userID string) 
 	if !ok {
 		return nil, errNoForge
 	}
-	token, err := s.forgeToken(ctx, userID, repo.Kind)
+	token, err := s.forgeToken(ctx, userID, repo.Kind, repo.Host)
 	if err != nil {
-		return nil, err
+		return nil, forgeError(err)
 	}
-	if token == "" {
-		who := "The owner has"
-		if userID == user(ctx) {
-			who = "You have"
-		}
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Sprintf("%s no token for %s: add %s in Settings",
-			who, repo.Host, strings.Join(tokenNames[repo.Kind], " or ")))
+	if token.Value == "" {
+		return nil, s.noToken(ctx, userID, repo)
 	}
 	return Forges.Open(repo, token)
+}
+
+// noToken says what the user, or for someone else the owner, needs to do
+// before Banda can act on the repository's forge. Messages for the caller
+// name the action in Settings, which the web client turns into a button.
+func (s *Service) noToken(ctx context.Context, userID string, repo forge.Repo) error {
+	me := userID == user(ctx)
+	if s.appFor(ctx, repo.Host) != nil || repo.Kind == forge.GitLab && s.gitLabAppFor(ctx, repo.Host) != nil {
+		name := map[string]string{forge.GitHub: "GitHub", forge.GitLab: "GitLab"}[repo.Kind]
+		c, err := s.store.ForgeConnection(ctx, userID, repo.Host)
+		if err != nil {
+			return err
+		}
+		switch {
+		case c != nil && c.Broken && me:
+			return refuse("Reconnect " + name + " in Settings: " + name + " no longer accepts your connection")
+		case c != nil && c.Broken:
+			return refuse("The owner's " + name + " connection no longer works: they need to reconnect it")
+		case me:
+			return refuse("Connect " + name + " in Settings to do this on " + repo.Host)
+		}
+		return refuse("The owner hasn't connected " + name + " yet")
+	}
+	who := "The owner has"
+	if me {
+		who = "You have"
+	}
+	return refuse(fmt.Sprintf("%s no token for %s: add %s in Settings", who, repo.Host, strings.Join(tokenNames[repo.Kind], " or ")))
 }
 
 // forgeErrors are the codes of forge.Error's codes; their messages are the forge's answer, made safe.
@@ -120,11 +176,11 @@ func (s *Service) forgeReady(ctx context.Context, t store.Thread) bool {
 	if !ok {
 		return false
 	}
-	token, err := s.forgeToken(ctx, t.OwnerID, repo.Kind)
+	token, err := s.forgeToken(ctx, t.OwnerID, repo.Kind, repo.Host)
 	if err != nil {
 		slog.Error("forge token", "thread", t.ID, "err", err) // e.g. no RBAC for Secrets: the link still works
 	}
-	return token != ""
+	return token.Value != ""
 }
 
 // changes are what tell the chat (and so the agent) about a pull request,
@@ -266,11 +322,11 @@ func (s *Service) PullRequestGet(ctx context.Context, req *bandav1.PullRequestGe
 	}
 	res := &bandav1.PullRequestGetResponse{PullRequest: pr}
 	if repo, ok := Forges.Repo(t.RepoURL); ok {
-		token, err := s.forgeToken(ctx, user(ctx), repo.Kind)
+		token, err := s.forgeToken(ctx, user(ctx), repo.Kind, repo.Host)
 		if err != nil {
-			return nil, err
+			return nil, forgeError(err)
 		}
-		res.CanComment = token != ""
+		res.CanComment = token.Value != ""
 	}
 	return res, nil
 }
@@ -487,6 +543,8 @@ func (s *Service) spot(ctx context.Context, id string) {
 // ListForgeRepos asks every known forge the caller has a token for, at once;
 // one that fails or takes over 10 s is left out (the URL field still works).
 // Without a query, the 100 most recently pushed per forge, filtered in the browser; with one, the forges search.
+// On the GitHub App's host it lists what the caller reaches through the app,
+// and says so if they haven't connected.
 func (s *Service) ListForgeRepos(ctx context.Context, req *bandav1.ListForgeReposRequest) (*bandav1.ListForgeReposResponse, error) {
 	query := strings.TrimSpace(req.Query)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -494,16 +552,33 @@ func (s *Service) ListForgeRepos(ctx context.Context, req *bandav1.ListForgeRepo
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	found := map[string][]*bandav1.ForgeRepo{}
+	res := &bandav1.ListForgeReposResponse{}
 	for host, kind := range Forges.Known() {
-		token, err := s.forgeToken(ctx, user(ctx), kind)
+		token, err := s.forgeToken(ctx, user(ctx), kind, host)
 		if err != nil {
-			return nil, err
+			slog.Info("forge token", "host", host, "user", user(ctx), "err", err)
+			continue
 		}
-		if token == "" {
+		a := s.appFor(ctx, host)
+		if token.Value == "" {
+			// ponytail: one host to connect is offered; a team rarely has two unconnected forges with apps.
+			if a != nil || kind == forge.GitLab && s.gitLabAppFor(ctx, host) != nil {
+				res.ConnectHost, res.ConnectForge = host, kind
+			}
 			continue
 		}
 		wg.Go(func() {
-			repos, err := Forges.Repos(ctx, kind, host, token, query)
+			var repos []*bandav1.ForgeRepo
+			var err error
+			if token.App {
+				repos, err = a.Repos(ctx, token.Value, query)
+			} else {
+				repos, err = Forges.Repos(ctx, kind, host, token, query)
+			}
+			var fe *forge.Error
+			if errors.As(err, &fe) && fe.Code == forge.Unauthorized && token.App { // they revoked Banda on GitHub
+				s.connectionRefused(ctx, user(ctx), host)
+			}
 			if err != nil {
 				slog.Info("list forge repos", "host", host, "user", user(ctx), "err", err)
 			}
@@ -513,7 +588,6 @@ func (s *Service) ListForgeRepos(ctx context.Context, req *bandav1.ListForgeRepo
 		})
 	}
 	wg.Wait()
-	res := &bandav1.ListForgeReposResponse{}
 	for _, host := range slices.Sorted(maps.Keys(found)) {
 		res.Repos = append(res.Repos, found[host]...)
 	}

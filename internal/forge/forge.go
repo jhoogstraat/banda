@@ -76,6 +76,9 @@ type Config struct {
 	// TestURL replaces https://<host> for API calls (tests only): GitHub's API
 	// is then at TestURL/api/v3/, GitLab's at TestURL/api/v4/.
 	TestURL string
+	// Refused, if set, hears of every token a forge answered 401 to: a user may
+	// have revoked it.
+	Refused func(token string)
 }
 
 // ParseHosts reads FORGE_HOSTS: host=github|gitlab, comma-separated.
@@ -103,10 +106,13 @@ func (c Config) Repo(repoURL string) (Repo, bool) {
 		host, path = m[1], m[2]
 	} else if u, err := url.Parse(repoURL); err == nil && slices.Contains([]string{"https", "http", "ssh"}, u.Scheme) {
 		host, path = u.Hostname(), u.Path
+		if p := u.Port(); p != "" && p != map[string]string{"https": "443", "http": "80", "ssh": "22"}[u.Scheme] {
+			host += ":" + p
+		}
 	}
 	host = strings.ToLower(host)
 	kind := c.Hosts[host]
-	if kind == "" {
+	if kind == "" && !strings.Contains(host, ":") { // another port is another server: only FORGE_HOSTS names one
 		kind = map[string]string{"github.com": GitHub, "gitlab.com": GitLab}[host]
 	}
 	path = strings.TrimSuffix(strings.Trim(path, "/"), ".git")
@@ -116,16 +122,34 @@ func (c Config) Repo(repoURL string) (Repo, bool) {
 	return Repo{Kind: kind, Host: host, Path: path}, true
 }
 
-// Open returns the repository's forge as the token's user.
-func (c Config) Open(r Repo, token string) (Forge, error) {
-	base := "https://" + r.Host
+// Token is a user's token for a forge, and what they do about one the forge refuses.
+type Token struct {
+	Value string
+	// Fix, e.g. "reconnect GitHub in Settings", ends the message of a refused token.
+	Fix string
+	// App: a user's token from the GitHub App's OAuth flow, not a secret.
+	App bool
+}
+
+// Base is where a forge host's web pages are, https://<host> (TestURL in tests).
+func (c Config) Base(host string) string {
 	if c.TestURL != "" {
-		base = strings.TrimSuffix(c.TestURL, "/")
+		return strings.TrimSuffix(c.TestURL, "/")
+	}
+	return "https://" + host
+}
+
+// Open returns the repository's forge as the token's user.
+func (c Config) Open(r Repo, token Token) (Forge, error) {
+	base := c.Base(r.Host)
+	var refused func()
+	if c.Refused != nil {
+		refused = func() { c.Refused(token.Value) }
 	}
 	if r.Kind == GitHub {
-		return newGitHub(r, base, token)
+		return newGitHub(r, base, token, refused)
 	}
-	return newGitLab(r, base, token)
+	return newGitLab(r, base, token, refused)
 }
 
 // Known lists every host Banda knows the forge of.
@@ -137,7 +161,7 @@ func (c Config) Known() map[string]string {
 
 // Repos lists the token's user's 100 most recently pushed repositories on the
 // host, or with a query the first 100 of theirs whose name matches.
-func (c Config) Repos(ctx context.Context, kind, host, token, query string) ([]*bandav1.ForgeRepo, error) {
+func (c Config) Repos(ctx context.Context, kind, host string, token Token, query string) ([]*bandav1.ForgeRepo, error) {
 	r := Repo{Kind: kind, Host: host}
 	f, err := c.Open(r, token)
 	if err != nil {
@@ -160,7 +184,7 @@ func (c Config) Repos(ctx context.Context, kind, host, token, query string) ([]*
 		}
 		projects, _, err := f.c.Projects.ListProjects(opt, gitlab.WithContext(ctx))
 		if err != nil {
-			return nil, glError(err)
+			return nil, f.fail(err)
 		}
 		for _, p := range projects {
 			out = append(out, &bandav1.ForgeRepo{Url: "https://" + host + "/" + p.PathWithNamespace + ".git", Name: p.PathWithNamespace, Description: p.Description, Forge: kind})
@@ -191,14 +215,14 @@ const (
 func (e *Error) Error() string { return e.Msg }
 
 // fromStatus maps an HTTP error status and the forge's message to an Error.
-func fromStatus(name string, status int, msg string) error {
+func fromStatus(name, fix string, status int, msg string) error {
 	msg = strings.TrimSpace(msg)
 	if len(msg) > 300 {
 		msg = msg[:300] + "…"
 	}
 	switch {
 	case status == http.StatusUnauthorized:
-		return &Error{Unauthorized, name + " refused the token: check GIT_TOKEN in Settings"}
+		return &Error{Unauthorized, name + " refused the token: " + fix}
 	case status == http.StatusTooManyRequests:
 		return &Error{RateLimited, name + "'s rate limit is used up; Banda tries again later"}
 	case status == http.StatusForbidden:
@@ -224,8 +248,10 @@ func unreachable(name string, err error) error {
 // URL and token, and doesn't count against GitHub's rate limit.
 // ponytail: one process-wide cache, emptied whole when it reaches 5000 entries.
 type etags struct {
-	next  http.RoundTripper
-	token string // hashed into the key: another token may see something else
+	next     http.RoundTripper
+	token    string // hashed into the key: another token may see something else
+	refused  func() // on a 401, if set
+	uncached bool   // only refused: GitLab's GETs aren't conditional
 }
 
 type cached struct {
@@ -239,14 +265,14 @@ var etagCache = struct {
 	m map[string]cached
 }{m: map[string]cached{}}
 
-func newETags(token string) *etags {
+func newETags(token string, refused func()) *etags {
 	sum := sha256.Sum256([]byte(token))
-	return &etags{next: http.DefaultTransport, token: fmt.Sprintf("%x", sum[:8])}
+	return &etags{next: http.DefaultTransport, token: fmt.Sprintf("%x", sum[:8]), refused: refused}
 }
 
 func (t *etags) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Method != http.MethodGet {
-		return t.next.RoundTrip(req)
+	if req.Method != http.MethodGet || t.uncached {
+		return t.tell(t.next.RoundTrip(req))
 	}
 	key := t.token + " " + req.URL.String()
 	etagCache.Lock()
@@ -256,7 +282,7 @@ func (t *etags) RoundTrip(req *http.Request) (*http.Response, error) {
 		req = req.Clone(req.Context())
 		req.Header.Set("If-None-Match", c.etag)
 	}
-	res, err := t.next.RoundTrip(req)
+	res, err := t.tell(t.next.RoundTrip(req))
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +310,14 @@ func (t *etags) RoundTrip(req *http.Request) (*http.Response, error) {
 		res.Body = io.NopCloser(bytes.NewReader(body))
 	}
 	return res, nil
+}
+
+// tell calls refused on a 401.
+func (t *etags) tell(res *http.Response, err error) (*http.Response, error) {
+	if err == nil && res.StatusCode == http.StatusUnauthorized && t.refused != nil {
+		t.refused()
+	}
+	return res, err
 }
 
 // Rollup is the state of a set of checks: failing if any fails, else pending

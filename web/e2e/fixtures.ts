@@ -446,6 +446,7 @@ export class Api {
 				ADDR: `:${port}`,
 				PREVIEW_ADDR: `:${await freePort()}`,
 				RUNNER_API_URL: `http://${HOST}:${port}`,
+				PUBLIC_URL: this.url, // where flows through a forge (the GitHub App's) come back to
 				...this.env
 			},
 			stdio: ['ignore', out, out]

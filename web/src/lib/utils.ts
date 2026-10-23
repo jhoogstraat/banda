@@ -18,6 +18,12 @@ export function ago(ts?: Timestamp, now = Date.now()) {
 	return unit ? Math.floor(s / size) + unit : "now";
 }
 
+/** ago as words: "just now", "2h ago". */
+export function since(ts?: Timestamp) {
+	const a = ago(ts);
+	return a === "now" ? "just now" : `${a} ago`;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

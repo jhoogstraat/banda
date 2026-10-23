@@ -4,11 +4,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -17,6 +21,7 @@ import (
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
 	"github.com/jhoogstraat/banda/internal/api"
 	"github.com/jhoogstraat/banda/internal/forge"
+	"github.com/jhoogstraat/banda/internal/identity"
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 )
@@ -56,6 +61,15 @@ func main() {
 		log.Printf("deleted %d token Secrets of deleted sandboxes", n)
 	}
 	started := time.Now()
+	publicURL := strings.TrimRight(env("PUBLIC_URL", "http://localhost:5173"), "/")
+	keys, err := sb.IdentityKeys(ctx, identity.FirstKey)
+	if err != nil {
+		log.Fatalf("workload identity keys (Secret banda-identity): %v", err)
+	}
+	issuer, err := identity.New(publicURL, keys)
+	if err != nil {
+		log.Fatalf("workload identity keys (Secret banda-identity): %v", err)
+	}
 
 	auth, httpUser := api.DevAuth(), api.DevUser
 	var sso *api.OIDC
@@ -64,7 +78,7 @@ func main() {
 			Issuer:        issuer,
 			ClientID:      os.Getenv("OIDC_CLIENT_ID"),
 			ClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
-			PublicURL:     env("PUBLIC_URL", "http://localhost:5173"),
+			PublicURL:     publicURL,
 			SessionSecret: os.Getenv("SESSION_SECRET"),
 			DexURL:        os.Getenv("DEX_URL"),
 			Provider:      os.Getenv("OIDC_PROVIDER_NAME"),
@@ -78,6 +92,7 @@ func main() {
 	}
 	server := connect.NewServer(auth, api.Errors())
 	svc := api.New(st, sb)
+	svc.Identity = issuer
 	bandav1connect.RegisterThreadServiceHandler(server, svc)
 	bandav1connect.RegisterRunnerServiceHandler(server, svc)
 	bandav1connect.RegisterUserServiceHandler(server, svc)
@@ -121,13 +136,27 @@ func main() {
 			log.Fatalf("TEST_KEEPALIVE_EVERY: %q is not a positive duration", v)
 		}
 	}
+	// Tests only: how often runners fetch identity tokens (default 5m).
+	if v := os.Getenv("TEST_ID_TOKEN_REFRESH"); v != "" {
+		if svc.IDTokenRefresh, err = time.ParseDuration(v); err != nil || svc.IDTokenRefresh < time.Second {
+			log.Fatalf("TEST_ID_TOKEN_REFRESH: %q is not a duration of at least 1s", v)
+		}
+	}
 	go svc.SuspendIdle(ctx, idle, every)
 	hosts, err := forge.ParseHosts(os.Getenv("FORGE_HOSTS"))
 	if err != nil {
 		log.Fatalf("FORGE_HOSTS: %v", err)
 	}
+	if err := testHooks(os.Getenv("TEST_FORGE_URL"), os.Getenv("TEST_GITHUB_APP_SECRET"), os.Getenv("TEST_GITLAB_APP_SECRET")); err != nil {
+		log.Fatal(err)
+	}
 	// TEST_FORGE_URL: tests only, a fake forge API in place of every forge's.
-	api.Forges = forge.Config{Hosts: hosts, TestURL: os.Getenv("TEST_FORGE_URL")}
+	api.Forges = forge.Config{Hosts: hosts, TestURL: os.Getenv("TEST_FORGE_URL"), Refused: svc.TokenRefused}
+	svc.PublicURL = env("PUBLIC_URL", "http://localhost:5173")
+	// Tests only: the GitHub App's Secret, for APIs side by side in one namespace.
+	api.GitHubAppSecret = env("TEST_GITHUB_APP_SECRET", api.GitHubAppSecret)
+	// Tests only: the prefix of the GitLab applications' Secrets, likewise.
+	api.GitLabAppSecret = env("TEST_GITLAB_APP_SECRET", api.GitLabAppSecret)
 	poll, err := time.ParseDuration(env("PULL_REQUEST_POLL", "30s"))
 	if err != nil {
 		log.Fatalf("PULL_REQUEST_POLL: %v", err)
@@ -153,7 +182,11 @@ func main() {
 	if sso != nil {
 		sso.Mount(mux)
 	}
+	mux.Handle("GET "+identity.DiscoveryPath, issuer.Handler()) // public: secret managers and clouds verify tokens with it
+	mux.Handle("GET "+identity.JWKSPath, issuer.Handler())
 	mux.Handle("/mcp", svc.MCPHandler())
+	mux.Handle("/github/", svc.GitHubHandler(httpUser))
+	mux.Handle("/gitlab/", svc.GitLabHandler(httpUser))
 	mux.Handle("/files", svc.FilesHandler(httpUser))
 	mux.Handle("/files/", svc.FilesHandler(httpUser))
 	if dir := os.Getenv("WEB_DIR"); dir != "" {
@@ -186,4 +219,24 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// testHooks refuses test settings that would hand credentials elsewhere if
+// set in a deployment: the fake forge gets users' tokens and the app's JWTs,
+// so it must be on this machine, and the apps' Secrets must stay their own
+// (no pod mounts banda-github-app* or banda-gitlab-app*, see the chart).
+func testHooks(forgeURL, appSecret, gitlabSecret string) error {
+	if forgeURL != "" {
+		u, err := url.Parse(forgeURL)
+		if err != nil || u.Scheme != "http" && u.Scheme != "https" || !slices.Contains([]string{"127.0.0.1", "::1", "localhost"}, u.Hostname()) {
+			return fmt.Errorf("TEST_FORGE_URL: %q isn't on this machine (127.0.0.1, ::1 or localhost): it is for tests only, and forges get users' tokens", forgeURL)
+		}
+	}
+	if appSecret != "" && !strings.HasPrefix(appSecret, "banda-github-app") {
+		return fmt.Errorf("TEST_GITHUB_APP_SECRET: %q doesn't start with banda-github-app: it is for tests only", appSecret)
+	}
+	if gitlabSecret != "" && !strings.HasPrefix(gitlabSecret, "banda-gitlab-app") {
+		return fmt.Errorf("TEST_GITLAB_APP_SECRET: %q doesn't start with banda-gitlab-app: it is for tests only", gitlabSecret)
+	}
+	return nil
 }

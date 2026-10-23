@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ForgeAction from '#lib/components/forge-action.svelte';
 	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
@@ -92,7 +93,12 @@
 				</Button>
 				<Button type="submit" class="ml-auto" disabled={busy || !title.trim()}>Create {what}</Button>
 			</div>
-			{#if error}<p class="text-sm text-destructive" role="alert">{error}</p>{/if}
+			{#if error}
+				<div class="space-y-2">
+					<p class="text-sm text-destructive" role="alert">{error}</p>
+					<ForgeAction message={error} {thread} size="sm" />
+				</div>
+			{/if}
 		</form>
 	</Dialog.Content>
 </Dialog.Root>

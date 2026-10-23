@@ -11,7 +11,7 @@ When you notice an inefficiency or make a mistake that a clearer instruction wou
 
 ## Layout
 
-- `cmd/api`: Go API (Connect RPC, OIDC sign-in, MCP at `/mcp`). `internal/` holds its packages: `api`, `thread` (state machine), `sandbox` (agent-sandbox pods), `store` (Postgres), `tunnel` (preview connections over the runner's stream, shared with the runner).
+- `cmd/api`: Go API (Connect RPC, OIDC sign-in, MCP at `/mcp`). `internal/` holds its packages: `api`, `thread` (state machine), `sandbox` (agent-sandbox pods), `store` (Postgres), `tunnel` (preview connections over the runner's stream, shared with the runner), `identity` (the workload identity issuer).
 - `cmd/runner`: runs inside each sandbox pod, drives the unmodified `claude` CLI and calls back to the API.
 - `proto/` → `gen/` via `mise run gen` (buf). Don't edit `gen/`.
 - `web/`: SvelteKit static SPA (Svelte 5, shadcn-svelte, pnpm).
@@ -25,6 +25,8 @@ When you notice an inefficiency or make a mistake that a clearer instruction wou
 - The kind cluster `banda` (kubectl context `kind-banda`) runs the agent-sandbox controller, Postgres and Dex. The API and web dev servers run on the Mac; sandbox pods reach the API as `host.containers.internal`.
 - Start, restart and check the stack with `mise run up` / `e2e` / `down`; see the `run-locally` skill.
 - Never run the real `claude` binary for tests: it uses the user's personal subscription. `mise run e2e` uses a fake agent.
+
+- Security: sandboxes are untrusted and get only short-lived, narrowly scoped credentials minted by the API (VISION.md principle 2); long-lived keys never enter a pod, and secret values never reach Postgres, logs or the browser.
 
 ## Checks
 

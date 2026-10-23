@@ -35,7 +35,7 @@ The first `up` creates the cluster and builds the sandbox image, which takes sev
 1. Open the URL and sign in as `alice@example.com` with password `password` (`bob` and `carol` exist too, for trying it as a team).
 2. Create a thread: type a prompt and pick a repository (or **No repository**).
 3. The first thread says "Claude Code is not logged in". Click **Log in to Claude Code**, open the URL shown in the terminal, sign in with your Claude subscription and paste the code back. Your login is kept and shared by all your threads.
-4. For private repositories, auto-push and pull requests, add a `GIT_TOKEN` secret in Settings (scopes in [docs/usage.md](docs/usage.md#github-and-gitlab)).
+4. For private repositories, auto-push and pull requests, set up the GitHub App or a GitLab application in Settings and connect your account ([docs/usage.md](docs/usage.md#the-github-app)), or add a `GIT_TOKEN` secret (scopes there too).
 
 `mise run down` stops it; `mise run up` again restarts it. With Docker instead of Podman, see [docs/development.md](docs/development.md#prerequisites).
 

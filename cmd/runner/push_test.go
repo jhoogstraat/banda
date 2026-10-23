@@ -7,26 +7,40 @@ import (
 	"path/filepath"
 	"testing"
 
+	"connectrpc.com/connect/v2"
+
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 )
 
-func TestCanPush(t *testing.T) {
+func TestPushBlocked(t *testing.T) {
 	t.Setenv("GIT_TOKEN", "")
-	for url, want := range map[string]bool{
-		"https://github.com/o/r.git":   false,
-		"git@github.com:o/r.git":       false,
-		"ssh://git@host/o/r.git":       false,
-		"file:///opt/e2e/setup-bg.git": true,
-		"git://e2e-git/push.git":       true,
-		"/tmp/origin.git":              true,
+	refused := connect.NewError(connect.CodeFailedPrecondition, "connect GitHub in Settings, so Banda can push as you")
+	ask := askCredential
+	askCredential = func(context.Context) (*bandav1.GitCredentialResponse, error) { return nil, refused }
+	t.Cleanup(func() { askCredential = ask })
+	const noToken = "an https remote needs a GIT_TOKEN secret"
+	for url, want := range map[string]string{
+		"https://github.com/o/r.git":   refused.Message(),
+		"git@github.com:o/r.git":       noToken,
+		"ssh://git@host/o/r.git":       noToken,
+		"file:///opt/e2e/setup-bg.git": "",
+		"git://e2e-git/push.git":       "",
+		"/tmp/origin.git":              "",
 	} {
-		if got := canPush(url); got != want {
-			t.Errorf("%s: got %v, want %v", url, got, want)
+		if got := pushBlocked(context.Background(), url); got != want {
+			t.Errorf("%s: got %q, want %q", url, got, want)
 		}
 	}
+	askCredential = func(context.Context) (*bandav1.GitCredentialResponse, error) {
+		return &bandav1.GitCredentialResponse{}, nil
+	}
+	if got := pushBlocked(context.Background(), "https://github.com/o/r.git"); got != "" {
+		t.Errorf("https with a credential from the API: %q", got)
+	}
+	askCredential = func(context.Context) (*bandav1.GitCredentialResponse, error) { return nil, refused }
 	t.Setenv("GIT_TOKEN", "x")
-	if !canPush("https://github.com/o/r.git") {
-		t.Error("https with a token")
+	if got := pushBlocked(context.Background(), "https://github.com/o/r.git"); got != "" {
+		t.Errorf("https with GIT_TOKEN: %q", got)
 	}
 }
 

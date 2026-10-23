@@ -12,11 +12,15 @@ type User struct {
 	ID    string
 	Name  string
 	Email string
+	// EmailVerified is false when the identity provider said the email is
+	// unverified; set only at sign-in.
+	EmailVerified bool
 }
 
 func (s *Store) UpsertUser(ctx context.Context, u User) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, email) VALUES ($1, $2, $3)
-		ON CONFLICT (id) DO UPDATE SET name = excluded.name, email = excluded.email`, u.ID, u.Name, u.Email)
+	_, err := s.db.Exec(ctx, `INSERT INTO users (id, name, email, email_verified) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id) DO UPDATE SET name = excluded.name, email = excluded.email, email_verified = excluded.email_verified`,
+		u.ID, u.Name, u.Email, u.EmailVerified)
 	return err
 }
 

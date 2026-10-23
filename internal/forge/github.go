@@ -21,25 +21,40 @@ type gitHub struct {
 	c           *github.Client
 	owner, name string
 	graphql     string // GraphQL endpoint: drafts can't be toggled over REST
+	fix         string // see Token
 }
 
-func newGitHub(r Repo, base, token string) (Forge, error) {
-	opts := []github.ClientOptionsFunc{github.WithAuthToken(token), github.WithTransport(newETags(token)), github.WithTimeout(30 * time.Second)}
-	graphql := "https://api.github.com/graphql"
-	if base != "https://github.com" { // GitHub Enterprise Server (or a test's fake), at <base>/api/v3/
-		opts = append(opts, github.WithEnterpriseURLs(base+"/api/v3/", base+"/api/uploads/"))
-		graphql = base + "/api/graphql"
-	}
-	c, err := github.NewClient(opts...)
+func newGitHub(r Repo, base string, token Token, refused func()) (Forge, error) {
+	c, err := gitHubClient(base, token.Value, github.WithTransport(newETags(token.Value, refused)))
 	if err != nil {
 		return nil, err
 	}
+	graphql := "https://api.github.com/graphql"
+	if base != "https://github.com" {
+		graphql = base + "/api/graphql"
+	}
 	owner, name, _ := strings.Cut(r.Path, "/")
-	return &gitHub{c: c, owner: owner, name: name, graphql: graphql}, nil
+	return &gitHub{c: c, owner: owner, name: name, graphql: graphql, fix: token.Fix}, nil
 }
 
-// ghError maps go-github's errors to Error.
-func ghError(err error) error {
+// gitHubClient is a client for the GitHub at base (https://<host>) with a
+// bearer token, if any: github.com's API is api.github.com, GitHub Enterprise
+// Server's (or a test's fake) is at <base>/api/v3/.
+func gitHubClient(base, token string, opts ...github.ClientOptionsFunc) (*github.Client, error) {
+	opts = append(opts, github.WithTimeout(30*time.Second))
+	if token != "" {
+		opts = append(opts, github.WithAuthToken(token))
+	}
+	if base != "https://github.com" {
+		opts = append(opts, github.WithEnterpriseURLs(base+"/api/v3/", base+"/api/uploads/"))
+	}
+	return github.NewClient(opts...)
+}
+
+func (g *gitHub) fail(err error) error { return ghError(err, g.fix) }
+
+// ghError maps go-github's errors to Error; fix says what to do about a refused token.
+func ghError(err error, fix string) error {
 	if err == nil {
 		return nil
 	}
@@ -54,7 +69,7 @@ func ghError(err error) error {
 		for _, e := range er.Errors {
 			msg = strings.TrimSuffix(msg+"; "+cmp.Or(e.Message, e.Code), "; ")
 		}
-		return fromStatus("GitHub", er.Response.StatusCode, msg)
+		return fromStatus("GitHub", fix, er.Response.StatusCode, msg)
 	}
 	return unreachable("GitHub", err)
 }
@@ -62,7 +77,7 @@ func ghError(err error) error {
 func (g *gitHub) Find(ctx context.Context, branch string) (int, error) {
 	prs, _, err := g.c.PullRequests.List(ctx, g.owner, g.name, &github.PullRequestListOptions{State: "open", Head: g.owner + ":" + branch})
 	if err != nil || len(prs) == 0 {
-		return 0, ghError(err)
+		return 0, g.fail(err)
 	}
 	return prs[0].GetNumber(), nil
 }
@@ -70,7 +85,7 @@ func (g *gitHub) Find(ctx context.Context, branch string) (int, error) {
 func (g *gitHub) Create(ctx context.Context, n New) (int, error) {
 	pr, _, err := g.c.PullRequests.Create(ctx, g.owner, g.name, github.CreatePullRequest{
 		Title: &n.Title, Body: &n.Body, Head: n.Head, Base: n.Base, Draft: &n.Draft})
-	return pr.GetNumber(), ghError(err)
+	return pr.GetNumber(), g.fail(err)
 }
 
 func ts(t *github.Timestamp) *timestamppb.Timestamp {
@@ -83,7 +98,7 @@ func ts(t *github.Timestamp) *timestamppb.Timestamp {
 func (g *gitHub) Get(ctx context.Context, number int) (*bandav1.PullRequest, error) {
 	pr, _, err := g.c.PullRequests.Get(ctx, g.owner, g.name, number)
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	out := &bandav1.PullRequest{
 		Summary: &bandav1.PullRequestSummary{Forge: GitHub, Number: int32(number), Url: pr.GetHTMLURL(), Title: pr.GetTitle(),
@@ -127,7 +142,7 @@ func (g *gitHub) Get(ctx context.Context, number int) (*bandav1.PullRequest, err
 	}
 	repo, _, err := g.c.Repositories.Get(ctx, g.owner, g.name)
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	for method, allowed := range map[string]*bool{"merge": repo.AllowMergeCommit, "squash": repo.AllowSquashMerge, "rebase": repo.AllowRebaseMerge} {
 		if allowed == nil || *allowed { // not shown without push access: offer it, GitHub decides
@@ -145,7 +160,7 @@ var methodOrder = map[string]int{"squash": 0, "merge": 1, "rebase": 2}
 func (g *gitHub) checks(ctx context.Context, out *bandav1.PullRequest) error {
 	runs, _, err := g.c.Checks.ListCheckRunsForRef(ctx, g.owner, g.name, out.HeadSha, &github.ListCheckRunsOptions{ListOptions: github.ListOptions{PerPage: 100}})
 	if err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	for _, r := range runs.CheckRuns {
 		c := &bandav1.PullRequestCheck{Name: r.GetName(), Status: r.GetStatus(), Url: cmp.Or(r.GetDetailsURL(), r.GetHTMLURL()),
@@ -165,7 +180,7 @@ func (g *gitHub) checks(ctx context.Context, out *bandav1.PullRequest) error {
 	}
 	status, _, err := g.c.Repositories.GetCombinedStatus(ctx, g.owner, g.name, out.HeadSha, &github.ListOptions{PerPage: 100})
 	if err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	for _, st := range status.Statuses {
 		c := &bandav1.PullRequestCheck{Name: st.GetContext(), Status: st.GetState(), Url: st.GetTargetURL(), StartedAt: ts(st.CreatedAt),
@@ -191,7 +206,7 @@ func (g *gitHub) conversation(ctx context.Context, number int, pr *github.PullRe
 	page := &github.ListOptions{PerPage: 100}
 	reviews, _, err := g.c.PullRequests.ListReviews(ctx, g.owner, g.name, number, page)
 	if err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	// A reviewer's verdict is their latest approval or change request (comments don't replace it).
 	verdicts := map[string]bandav1.ReviewState{}
@@ -228,7 +243,7 @@ func (g *gitHub) conversation(ctx context.Context, number int, pr *github.PullRe
 
 	comments, _, err := g.c.Issues.ListComments(ctx, g.owner, g.name, number, &github.IssueListCommentsOptions{ListOptions: *page})
 	if err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	for _, c := range comments {
 		out.Comments = append(out.Comments, &bandav1.PullRequestComment{Id: strconv.FormatInt(c.GetID(), 10), Author: c.GetUser().GetLogin(),
@@ -236,7 +251,7 @@ func (g *gitHub) conversation(ctx context.Context, number int, pr *github.PullRe
 	}
 	lines, _, err := g.c.PullRequests.ListComments(ctx, g.owner, g.name, number, &github.PullRequestListCommentsOptions{ListOptions: *page})
 	if err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	var threads map[int64]reviewThread
 	if len(lines) > 0 {
@@ -264,7 +279,7 @@ func (g *gitHub) Update(ctx context.Context, pr *bandav1.PullRequest, e Edit) er
 	n := int(pr.Summary.Number)
 	if e.Title != nil || e.Body != nil {
 		if _, _, err := g.c.PullRequests.Edit(ctx, g.owner, g.name, n, &github.PullRequest{Title: e.Title, Body: e.Body}); err != nil {
-			return ghError(err)
+			return g.fail(err)
 		}
 	}
 	if e.Draft != nil && *e.Draft != (pr.Summary.State == bandav1.PullState_PULL_STATE_DRAFT) {
@@ -278,17 +293,17 @@ func (g *gitHub) Update(ctx context.Context, pr *bandav1.PullRequest, e Edit) er
 	}
 	if len(e.Reviewers) > 0 {
 		if _, _, err := g.c.PullRequests.RequestReviewers(ctx, g.owner, g.name, n, github.ReviewersRequest{Reviewers: e.Reviewers}); err != nil {
-			return ghError(err)
+			return g.fail(err)
 		}
 	}
 	if len(e.AddLabels) > 0 {
 		if _, _, err := g.c.Issues.AddLabelsToIssue(ctx, g.owner, g.name, n, e.AddLabels); err != nil {
-			return ghError(err)
+			return g.fail(err)
 		}
 	}
 	for _, l := range e.RemoveLabels {
 		if _, err := g.c.Issues.RemoveLabelForIssue(ctx, g.owner, g.name, n, l); err != nil {
-			return ghError(err)
+			return g.fail(err)
 		}
 	}
 	return nil
@@ -299,14 +314,14 @@ func (g *gitHub) Choices(ctx context.Context) (*bandav1.PullRequestChoicesRespon
 	out := &bandav1.PullRequestChoicesResponse{}
 	users, _, err := g.c.Repositories.ListCollaborators(ctx, g.owner, g.name, &github.ListCollaboratorsOptions{ListOptions: github.ListOptions{PerPage: 100}})
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	for _, u := range users {
 		out.Reviewers = append(out.Reviewers, u.GetLogin())
 	}
 	labels, _, err := g.c.Issues.ListLabels(ctx, g.owner, g.name, &github.ListOptions{PerPage: 100})
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	for _, l := range labels {
 		out.Labels = append(out.Labels, l.GetName())
@@ -329,11 +344,11 @@ func (g *gitHub) Resolve(ctx context.Context, _ int, thread string, resolved boo
 func (g *gitHub) repos(ctx context.Context, query string) ([]*github.Repository, error) {
 	recent, _, err := g.c.Repositories.ListByAuthenticatedUser(ctx, &github.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: github.ListOptions{PerPage: 100}})
 	if err != nil || query == "" {
-		return recent, ghError(err)
+		return recent, g.fail(err)
 	}
 	me, _, err := g.c.Users.Get(ctx, "")
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	owners := []string{me.GetLogin()}
 	for _, r := range recent {
@@ -350,7 +365,7 @@ func (g *gitHub) repos(ctx context.Context, query string) ([]*github.Repository,
 	}
 	res, _, err := g.c.Search.Repositories(ctx, q, &github.SearchOptions{ListOptions: github.ListOptions{PerPage: 100}})
 	if err != nil {
-		return nil, ghError(err)
+		return nil, g.fail(err)
 	}
 	return res.Repositories, nil
 }
@@ -367,7 +382,7 @@ func (g *gitHub) graphQL(ctx context.Context, query string, vars map[string]any,
 		Errors []struct{ Message string } `json:"errors"`
 	}
 	if _, err := g.c.Do(req, &res); err != nil {
-		return ghError(err)
+		return g.fail(err)
 	}
 	if len(res.Errors) > 0 {
 		return &Error{Refused, "GitHub: " + res.Errors[0].Message}
@@ -416,18 +431,18 @@ type reviewThread struct {
 
 func (g *gitHub) Merge(ctx context.Context, number int, method string) error {
 	_, _, err := g.c.PullRequests.Merge(ctx, g.owner, g.name, number, "", &github.PullRequestOptions{MergeMethod: method})
-	return ghError(err)
+	return g.fail(err)
 }
 
 func (g *gitHub) Comment(ctx context.Context, number int, body, replyTo string) error {
 	if replyTo == "" {
 		_, _, err := g.c.Issues.CreateComment(ctx, g.owner, g.name, number, github.IssueCommentRequest{Body: body})
-		return ghError(err)
+		return g.fail(err)
 	}
 	id, err := strconv.ParseInt(replyTo, 10, 64)
 	if err != nil {
 		return &Error{NotFound, "GitHub has no such review comment"}
 	}
 	_, _, err = g.c.PullRequests.CreateCommentInReplyTo(ctx, g.owner, g.name, number, body, id)
-	return ghError(err)
+	return g.fail(err)
 }

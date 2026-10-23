@@ -8,6 +8,7 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { Response } from '#lib/components/ai-elements/response/index.js';
+	import ForgeAction from '#lib/components/forge-action.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import LoadState from '#lib/components/load-state.svelte';
 	import PullRequestLabels from '#lib/components/pull-request-labels.svelte';
@@ -198,6 +199,7 @@
 				{#if pr.error}
 					<TriangleAlertIcon class="size-3.5 shrink-0 text-amber-500" />
 					<span class="text-amber-600 dark:text-amber-400">As of {since(pr.fetchedAt)}: {pr.error}</span>
+					{#if owner}<ForgeAction message={pr.error} {thread} />{/if}
 				{:else}
 					Updated {since(pr.fetchedAt)}
 				{/if}
@@ -227,7 +229,12 @@
 		{:else if s.state === PullState.MERGED}
 			<p class="text-xs text-muted-foreground">Merged{pr.mergedBy ? ` by ${pr.mergedBy}` : ''}{pr.mergedAt ? ` ${since(pr.mergedAt)}` : ''}.</p>
 		{/if}
-		{#if error}<p class="text-xs text-destructive" role="alert">{error}</p>{/if}
+		{#if error}
+			<div class="flex flex-wrap items-center gap-2">
+				<p class="text-xs text-destructive" role="alert">{error}</p>
+				<ForgeAction message={error} {thread} />
+			</div>
+		{/if}
 
 		<section class="space-y-2" aria-label="Description">
 			{#if editing}
@@ -322,8 +329,10 @@
 					<Button type="submit" size="sm" disabled={busy || !comment.trim()}>Comment</Button>
 				</form>
 			{:else}
+				{@const forge = thread.forge === 'gitlab' ? 'GitLab' : 'GitHub'}
 				<p class="text-xs text-muted-foreground">
-					Comments go out with your own token: add <a href="/settings?secret=GIT_TOKEN#secrets" class="underline">GIT_TOKEN</a> in Settings to comment here.
+					Comments go out as you: <a href="/settings#{forge.toLowerCase()}" class="underline underline-offset-2">connect {forge}</a>, or add a
+					<a href="/settings?secret=GIT_TOKEN#secrets" class="underline underline-offset-2">GIT_TOKEN</a> secret, in Settings to comment here.
 				</p>
 			{/if}
 		</section>

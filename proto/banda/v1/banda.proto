@@ -193,6 +193,34 @@ service SettingsService {
   rpc SetGitIdentity(SetGitIdentityRequest) returns (SetGitIdentityResponse);
   // What the caller's new threads start with when they don't say.
   rpc SetThreadDefaults(SetThreadDefaultsRequest) returns (SetThreadDefaultsResponse);
+  // Workload identity: Banda as an OIDC issuer of short-lived tokens naming
+  // each thread's owner, for the audiences the team adds (none: off). Anyone
+  // signed in lists, adds and removes audiences; running threads get the
+  // change within seconds.
+  rpc GetWorkloadIdentity(GetWorkloadIdentityRequest) returns (GetWorkloadIdentityResponse);
+  rpc AddIdTokenAudience(AddIdTokenAudienceRequest) returns (AddIdTokenAudienceResponse);
+  rpc RemoveIdTokenAudience(RemoveIdTokenAudienceRequest) returns (RemoveIdTokenAudienceResponse);
+  // GitHub: the team's GitHub App (one per Banda, set up by anyone signed in)
+  // and the caller's connection to it. Its keys and tokens stay in the API.
+  rpc GetGitHub(GetGitHubRequest) returns (GetGitHubResponse);
+  // A manifest for the browser to post to the forge, which creates the app and
+  // returns to /github/app; see internal/api/github.go.
+  rpc GitHubAppManifest(GitHubAppManifestRequest) returns (GitHubAppManifestResponse);
+  // The accounts the app is installed on (asks the forge, cached for a minute).
+  rpc ListGitHubInstallations(ListGitHubInstallationsRequest) returns (ListGitHubInstallationsResponse);
+  // Banda forgets the app; it stays on the forge, where its owner deletes it.
+  rpc RemoveGitHubApp(RemoveGitHubAppRequest) returns (RemoveGitHubAppResponse);
+  // Revokes the caller's connection at the forge and forgets it.
+  rpc DisconnectGitHub(DisconnectGitHubRequest) returns (DisconnectGitHubResponse);
+  // GitLab: the team's OAuth application per GitLab host (made by hand on
+  // GitLab, its ID and secret pasted here) and the caller's connections.
+  rpc GetGitLab(GetGitLabRequest) returns (GetGitLabResponse);
+  // Verifies the application's ID and secret with GitLab and keeps them.
+  rpc SetGitLabApp(SetGitLabAppRequest) returns (SetGitLabAppResponse);
+  // Banda forgets the application and everyone's connections through it.
+  rpc RemoveGitLabApp(RemoveGitLabAppRequest) returns (RemoveGitLabAppResponse);
+  // Revokes both of the caller's grants on the host at GitLab and forgets them.
+  rpc DisconnectGitLab(DisconnectGitLabRequest) returns (DisconnectGitLabResponse);
 }
 
 // RunnerService is dialed by the runner inside each sandbox pod, so the API
@@ -201,6 +229,14 @@ service RunnerService {
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
   // The changes a fork starts from, applied once after the first checkout.
   rpc ForkPatch(ForkPatchRequest) returns (ForkPatchResponse);
+  // Identity tokens for the thread's owner, one per audience of the team's.
+  // Only for a connected thread runner; fetched again on IdTokensChanged.
+  rpc IdTokens(IdTokensRequest) returns (IdTokensResponse);
+  // A short-lived credential for git, for the thread's own repository only:
+  // the GitHub App's installation token, as the owner may use it, or on GitLab
+  // the owner's git-only OAuth token. Refused with
+  // a reason a person can act on.
+  rpc GitCredential(GitCredentialRequest) returns (GitCredentialResponse);
 }
 
 enum Status {
@@ -1283,6 +1319,8 @@ message ConnectResponse {
     HttpTunnel http_tunnel = 11;
     PermissionCommand permission = 14;
     Ping ping = 15;
+    // Sent on connect and when the team's audiences change: fetch IdTokens.
+    IdTokensChanged id_tokens_changed = 16;
   }
 }
 
@@ -1708,6 +1746,10 @@ message ListForgeReposResponse {
   // The caller's most recently pushed repositories on each forge they have a
   // token for, newest first; a forge that fails is left out.
   repeated ForgeRepo repos = 1;
+  // A host whose repositories aren't listed until the caller connects it.
+  string connect_host = 2;
+  // Its forge: "github" or "gitlab".
+  string connect_forge = 3;
 }
 
 message ForgeRepo {
@@ -1784,3 +1826,256 @@ message AddRepositoryRequest {
 }
 
 message AddRepositoryResponse {}
+
+message IdTokensChanged {}
+
+message IdTokensRequest {
+  string thread_id = 1;
+  string token = 2;
+}
+
+message IdTokensResponse {
+  // Every audience's; files of audiences not listed go.
+  repeated IdToken tokens = 1;
+  // When to fetch again.
+  int32 refresh_seconds = 2;
+}
+
+message IdToken {
+  string audience = 1;
+  // The file name in BANDA_ID_TOKEN_DIR.
+  string file = 2;
+  // A JWT signed by the issuer (internal/identity).
+  string token = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message GetWorkloadIdentityRequest {}
+
+message GetWorkloadIdentityResponse {
+  // PUBLIC_URL: the iss claim and where discovery is.
+  string issuer = 1;
+  string jwks_url = 2;
+  repeated IdTokenAudience audiences = 3;
+  // The repositories of the team's threads as the repo claim names them,
+  // most recently used first, for the recipes.
+  repeated string repos = 4;
+  // The caller's sign-in email: their tokens' sub is user:<email>.
+  string email = 5;
+}
+
+message IdTokenAudience {
+  string audience = 1;
+  // Where thread pods find its token.
+  string path = 2;
+  google.protobuf.Timestamp added_at = 3;
+  string added_by = 4;
+}
+
+message AddIdTokenAudienceRequest {
+  string audience = 1;
+}
+
+message AddIdTokenAudienceResponse {}
+
+message RemoveIdTokenAudienceRequest {
+  string audience = 1;
+}
+
+message RemoveIdTokenAudienceResponse {}
+
+message GetGitHubRequest {}
+
+message GetGitHubResponse {
+  // Unset: no GitHub App yet.
+  GitHubApp app = 1;
+  // The caller's, unset: not connected.
+  ForgeConnection connection = 2;
+  // GitHub hosts the app can be created on: github.com and FORGE_HOSTS'.
+  repeated string hosts = 3;
+  // The caller has a GIT_TOKEN secret (deprecated for the app's host).
+  bool legacy_token = 4;
+  // The latest time someone created, replaced or removed the app; unset if never.
+  GitHubAppChange last_change = 5;
+  // The app the caller just created on the forge wasn't what Banda asked for, so Banda didn't keep it.
+  GitHubAppRefusal refusal = 6;
+}
+
+message GitHubAppChange {
+  // "created", "replaced" or "removed"
+  string action = 1;
+  string by = 2;
+  google.protobuf.Timestamp at = 3;
+  string host = 4;
+  // The app it put in place; empty on remove.
+  string slug = 5;
+  string owner = 6;
+  // The app it replaced or removed; empty on create.
+  string was_slug = 7;
+  string was_owner = 8;
+}
+
+message GitHubAppRefusal {
+  // How it differs, e.g. "public, other permissions".
+  string reason = 1;
+  // Where its owner deletes it on the forge.
+  string delete_url = 2;
+  string slug = 3;
+}
+
+message GitHubApp {
+  string host = 1;
+  string slug = 2;
+  // The app's page and where it is installed, on the forge.
+  string url = 3;
+  string install_url = 4;
+  // Who created it from Settings, and when; empty when it was made by hand (a Secret from Helm or GitOps).
+  string created_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+  // The account that owns it.
+  string owner = 7;
+  // Its Secret is there but unusable, and why.
+  string error = 8;
+  // A user account owns it: whoever that is reaches every repository it is installed on.
+  bool personal = 9;
+}
+
+// A user's OAuth connection to a forge host.
+message ForgeConnection {
+  string host = 1;
+  // "github" or "gitlab"
+  string forge = 2;
+  string login = 3;
+  string avatar_url = 4;
+  google.protobuf.Timestamp connected_at = 5;
+  // The forge no longer accepts it (revoked, expired): connect again.
+  bool broken = 6;
+}
+
+message GitHubAppManifestRequest {
+  // Empty is github.com.
+  string host = 1;
+  // Empty: the caller's own account.
+  string organization = 2;
+  // Replace the team's app, which ends everyone's connection to it. Without
+  // it, creating one while there is an app is refused.
+  bool replace = 3;
+}
+
+message GitHubAppManifestResponse {
+  // Where the browser posts the form, with the manifest field.
+  string url = 1;
+  string manifest = 2;
+}
+
+message ListGitHubInstallationsRequest {
+  // Ask the forge now: the browser is back from installing.
+  bool fresh = 1;
+}
+
+message ListGitHubInstallationsResponse {
+  repeated GitHubInstallation installations = 1;
+}
+
+message GitHubInstallation {
+  string account = 1;
+  string avatar_url = 2;
+  // All the account's repositories, or repositories of them.
+  bool all_repositories = 3;
+  int32 repositories = 4;
+  string manage_url = 5;
+}
+
+message RemoveGitHubAppRequest {}
+
+message RemoveGitHubAppResponse {}
+
+message DisconnectGitHubRequest {}
+
+message DisconnectGitHubResponse {}
+
+message GitCredentialRequest {
+  string thread_id = 1;
+  string token = 2;
+}
+
+message GitCredentialResponse {
+  string username = 1;
+  string password = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message GetGitLabRequest {}
+
+message GetGitLabResponse {
+  // GitLab hosts: gitlab.com and FORGE_HOSTS', gitlab.com first.
+  repeated GitLabHost hosts = 1;
+  // Where GitLab sends browsers back: the application's Redirect URI.
+  string redirect_uri = 2;
+  // The scopes the application needs: Banda's and git's.
+  repeated string scopes = 3;
+  // The caller has a GITLAB_TOKEN or GIT_TOKEN secret (deprecated where an application is).
+  bool legacy_token = 4;
+}
+
+message GitLabHost {
+  string host = 1;
+  // Unset: no application on this host yet.
+  GitLabApp app = 2;
+  // The caller's, unset: not connected.
+  ForgeConnection connection = 3;
+  // Where applications are created on it: the instance's (admin; empty on
+  // gitlab.com), and a group's with {group} in place of its path.
+  reserved 4; // user_apps_url: whoever owns it can take everyone's tokens, so a person's account isn't offered
+  string admin_apps_url = 5;
+  string group_apps_url = 6;
+  // The latest time someone set up, replaced or removed its application; unset if never.
+  GitLabAppChange last_change = 7;
+}
+
+message GitLabAppChange {
+  // "created", "replaced" or "removed"
+  string action = 1;
+  string by = 2;
+  google.protobuf.Timestamp at = 3;
+  // The application it put in place; empty on remove.
+  string application_id = 4;
+  // The one it replaced or removed; empty on create.
+  string was_application_id = 5;
+}
+
+message GitLabApp {
+  // Public: GitLab shows it in every authorize URL. The secret is never returned.
+  string application_id = 1;
+  // Who set it up from Settings, and when; empty when made by hand (a Secret from Helm or GitOps).
+  string created_by = 2;
+  google.protobuf.Timestamp created_at = 3;
+  // Its Secret is there but unusable, and why.
+  string error = 4;
+  // GitLab refused its ID or secret when renewing a connection: someone
+  // changed or deleted it on GitLab. Connections keep their tokens meanwhile.
+  bool needs_attention = 5;
+}
+
+message SetGitLabAppRequest {
+  string host = 1;
+  string application_id = 2;
+  string secret = 3;
+  // Replace the host's application, which ends everyone's connection through
+  // it. Without it, setting one up while there is one is refused.
+  bool replace = 4;
+}
+
+message SetGitLabAppResponse {}
+
+message RemoveGitLabAppRequest {
+  string host = 1;
+}
+
+message RemoveGitLabAppResponse {}
+
+message DisconnectGitLabRequest {
+  string host = 1;
+}
+
+message DisconnectGitLabResponse {}

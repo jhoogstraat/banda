@@ -1,9 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+	import { timestampDate } from '@bufbuild/protobuf/wkt';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import TeamSecrets from '#lib/components/team-secrets.svelte';
+	import WorkloadIdentity from '#lib/components/workload-identity.svelte';
+	import ForgeAccounts from '#lib/components/forge-accounts.svelte';
+	import GitHubApp from '#lib/components/github-app.svelte';
+	import GitLabApp from '#lib/components/gitlab-app.svelte';
+	import SettingsHeading from '#lib/components/settings-heading.svelte';
+	import { github } from '#lib/github.svelte.js';
+	import { gitlab } from '#lib/gitlab.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { ConnectError } from '@connectrpc/connect';
@@ -25,7 +32,7 @@
 	import { shortcuts } from '#lib/shortcuts.svelte.js';
 	import { askNotify, notifyKinds, setNotifyKind, threads } from '#lib/threads.svelte.js';
 	import type { AlertKind } from '#lib/inbox.js';
-	import { ago } from '#lib/utils.js';
+	import { since } from '#lib/utils.js';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 
 	let accounts = $state<HarnessAccount[]>([]);
@@ -40,9 +47,14 @@
 
 	const message = (e: unknown) => ConnectError.from(e).rawMessage;
 
+	// Only the latest load applies: an earlier one can answer last, with what was there before.
+	let loads = 0;
 	async function load() {
+		const n = ++loads;
 		try {
-			({ accounts, secrets, defaultProfile, gitIdentity, threadDefaults } = await settingsApi.getSettings({}));
+			const res = await settingsApi.getSettings({});
+			if (n !== loads) return;
+			({ accounts, secrets, defaultProfile, gitIdentity, threadDefaults } = res);
 			if (!loaded) ({ name: gitName, email: gitEmail } = gitIdentity ?? { name: '', email: '' });
 			loaded = true;
 			error = '';
@@ -66,11 +78,6 @@
 		await load();
 		return true;
 	}
-
-	const since = (t?: Timestamp) => {
-		const a = ago(t);
-		return a === 'now' ? 'just now' : `${a} ago`;
-	};
 
 	// [dot colour, label] of an account.
 	function status(a: HarnessAccount): [string, string] {
@@ -109,15 +116,21 @@
 		if (!(await act('defaults', settingsApi.setDefaultProfile({ profile: name })))) defaultProfile = before;
 	}
 
-	// What new threads start with: Banda's default until changed (the API's, as in the composer).
-	const shown = $derived({
-		model: threadDefaults?.model || models[0],
-		effort: threadDefaults?.effort || 'high',
-		permissions: permissionLabel(threadDefaults?.permissionMode || PermissionMode.BYPASS)
-	});
-	function setDefaults(change: Partial<typeof shown>) {
-		const d = { ...shown, ...change };
-		act('defaults', settingsApi.setThreadDefaults({ defaults: { model: d.model, effort: d.effort, permissionMode: permissionModes[d.permissions] } }));
+	// What new threads start with: Banda's default until changed (the API's, as in the composer). The latest pick
+	// shows until it is saved and reloaded, so quick changes build on each other, not on a reload still on its way.
+	type Defaults = { model: string; effort: string; permissions: string };
+	let picked = $state.raw<Defaults>();
+	const shown = $derived<Defaults>(
+		picked ?? {
+			model: threadDefaults?.model || models[0],
+			effort: threadDefaults?.effort || 'high',
+			permissions: permissionLabel(threadDefaults?.permissionMode || PermissionMode.BYPASS)
+		}
+	);
+	async function setDefaults(change: Partial<Defaults>) {
+		const d = (picked = { ...shown, ...change });
+		await act('defaults', settingsApi.setThreadDefaults({ defaults: { model: d.model, effort: d.effort, permissionMode: permissionModes[d.permissions] } }));
+		if (picked === d) picked = undefined; // saved and reloaded, or failed: the server's again
 	}
 
 	// Git identity: empty fields use the sign-in's name and email.
@@ -148,16 +161,41 @@
 					: 'Off: the browser hasn’t been asked yet.'
 	);
 
-	const sections = [
-		['claude', 'Claude Code'],
-		['git', 'Git identity'],
-		['defaults', 'New threads'],
-		['notifications', 'Notifications'],
-		['appearance', 'Appearance'],
-		['secrets', 'Secrets'],
-		['team-secrets', 'Team secrets'],
-		['shortcuts', 'Keyboard shortcuts']
+	// Two groups: what is yours (applies to you only), and what the team shares (applies to everyone).
+	const groups: [string, string, [string, string][]][] = [
+		[
+			'You',
+			'',
+			[
+				['claude', 'Claude Code'],
+				['accounts', 'Accounts'],
+				['git', 'Git identity'],
+				['defaults', 'New threads'],
+				['notifications', 'Notifications'],
+				['appearance', 'Appearance'],
+				['secrets', 'Secrets'],
+				['shortcuts', 'Keyboard shortcuts']
+			]
+		],
+		[
+			'Team',
+			'Shared by everyone: a change here applies to every teammate.',
+			[
+				['github-app', 'GitHub App'],
+				['gitlab-app', 'GitLab'],
+				['team-secrets', 'Team secrets'],
+				['workload-identity', 'Workload identity']
+			]
+		]
 	];
+	const sections = groups.flatMap(([, , s]) => s);
+	// What waits on me, marked in the nav: Claude Code to log in, an account to connect to a forge the team set up.
+	const attention = $derived({
+		claude: accounts.some((a) => a.authMethod !== AuthMethod.API_KEY && a.loginState === LoginState.LOGGED_OUT),
+		accounts:
+			(!!github.res?.app && !github.res.app.error && (!github.res.connection || github.res.connection.broken)) ||
+			!!gitlab.res?.hosts.some((h) => h.app && !h.app.error && (!h.connection || h.connection.broken))
+	} as Record<string, boolean>);
 	// The nav marks the section in view: the last whose top has scrolled past the top, the last one at the bottom.
 	let scroller = $state<HTMLElement>();
 	let current = $state('claude');
@@ -199,11 +237,14 @@
 </script>
 
 {#snippet heading(at: typeof errorAt | '', text: string, note: string)}
-	<h2 class="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
-		{text}
-		{#if note}<span class="text-xs font-normal text-muted-foreground">{note}</span>{/if}
-	</h2>
-	{#if error && errorAt === at}<p class="mb-3 text-sm text-destructive">{error}</p>{/if}
+	<SettingsHeading title={text} {note} error={errorAt === at ? error : ''} />
+{/snippet}
+
+{#snippet group(name: string, note: string)}
+	<div class="-mb-4 border-b pb-2 not-first:mt-10">
+		<h2 class="text-base font-semibold">{name}</h2>
+		{#if note}<p class="text-xs text-muted-foreground">{note}</p>{/if}
+	</div>
 {/snippet}
 
 <div class="flex min-w-0 flex-1 flex-col">
@@ -213,20 +254,27 @@
 		<!-- The section nav: a sticky column on desktop, a row of links above the sections on a phone. -->
 		<div class="mx-auto w-full max-w-5xl p-4 md:flex md:gap-8">
 			<nav aria-label="Settings sections" class="mb-6 md:sticky md:top-4 md:mb-0 md:w-44 md:shrink-0 md:self-start">
-				<ul class="flex flex-wrap gap-1 md:flex-col">
-					{#each sections as [id, label] (id)}
-						<li>
-							<a
-								href="#{id}"
-								aria-current={current === id ? 'location' : undefined}
-								class="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
-								>{label}</a
-							>
-						</li>
-					{/each}
-				</ul>
+				{#each groups as [name, , items] (name)}
+					<p class="px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground first:pt-0 max-md:pt-1" id="nav-{name}">{name}</p>
+					<ul class="flex flex-wrap gap-1 md:flex-col max-md:mb-1" aria-labelledby="nav-{name}">
+						{#each items as [id, label] (id)}
+							<li>
+								<a
+									href="#{id}"
+									aria-current={current === id ? 'location' : undefined}
+									class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
+								>
+									{label}
+									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				{/each}
 			</nav>
-			<div class="min-w-0 flex-1 space-y-10 [&>section]:scroll-mt-4">
+			<div class="flex min-w-0 flex-1 flex-col gap-10 [&>section]:scroll-mt-4">
+			{@render group('You', '')}
+
 			<section id="claude" aria-label="Claude Code">
 				{@render heading('accounts', 'Claude Code', 'applies to environments started afterwards')}
 				<div class="divide-y rounded-lg border">
@@ -235,7 +283,8 @@
 						{@const method = chosen[a.harness] ?? a.authMethod}
 						<div class="space-y-3 p-4">
 							<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-								<span class="font-medium">{a.displayName || a.harness}</span>
+								<!-- One harness: the heading names it already. -->
+								{#if accounts.length > 1}<span class="font-medium">{a.displayName || a.harness}</span>{/if}
 								<span class="inline-flex items-center gap-1.5 text-sm">
 									<span class="size-2 shrink-0 rounded-full {dot}"></span>
 									{label}
@@ -297,8 +346,10 @@
 				</div>
 			</section>
 
+			<ForgeAccounts />
+
 			<section id="git" aria-label="Git identity">
-				{@render heading('git', 'Git identity', 'who commits in your threads are by; applies to environments started afterwards')}
+				{@render heading('git', 'Git identity', 'who your commits are by; applies to environments started afterwards')}
 				<form class="space-y-3 rounded-lg border p-4" onsubmit={saveGit}>
 					<div class="flex flex-wrap gap-2">
 						<Input class="w-48 flex-auto" aria-label="Name" placeholder={gitIdentity?.signInName || 'Name'} autocomplete="off" bind:value={gitName} />
@@ -420,8 +471,6 @@
 				</div>
 			</section>
 
-			<TeamSecrets />
-
 			<section id="shortcuts" aria-label="Keyboard shortcuts">
 				{@render heading('', 'Keyboard shortcuts', 'never while typing; ? shows them anywhere')}
 				<dl class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-lg border p-4 text-sm">
@@ -431,6 +480,17 @@
 					{/each}
 				</dl>
 			</section>
+
+			{@render group('Team', groups[1][1])}
+
+			<GitHubApp />
+
+			<GitLabApp />
+
+			<TeamSecrets />
+
+			<WorkloadIdentity />
+
 			</div>
 		</div>
 	</div>

@@ -38,6 +38,11 @@ func TestCheckRepoURL(t *testing.T) {
 		"ftp://example.com/a.git":                            false,
 		"https://example.com/a.git\n--upload-pack=x":         false,
 		"git@github.com:acme/app.git\n-x":                    false,
+		"https://github.com/acme/app$(id).git":               false,
+		"https://github.com/acme/a'b.git":                    false,
+		"https://github.com/acme/a b.git":                    false,
+		"ssh://git@github.com/acme/app`id`":                  false,
+		"https://github.com/~acme/app.git":                   true,
 	} {
 		if err := checkRepoURL(repo); (err == nil) != ok {
 			t.Errorf("checkRepoURL(%q) = %v", repo, err)

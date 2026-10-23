@@ -207,10 +207,49 @@ const (
 	// SettingsServiceSetThreadDefaultsProcedure is the procedure name of the SettingsService's
 	// SetThreadDefaults RPC.
 	SettingsServiceSetThreadDefaultsProcedure = "/banda.v1.SettingsService/SetThreadDefaults"
+	// SettingsServiceGetWorkloadIdentityProcedure is the procedure name of the SettingsService's
+	// GetWorkloadIdentity RPC.
+	SettingsServiceGetWorkloadIdentityProcedure = "/banda.v1.SettingsService/GetWorkloadIdentity"
+	// SettingsServiceAddIdTokenAudienceProcedure is the procedure name of the SettingsService's
+	// AddIdTokenAudience RPC.
+	SettingsServiceAddIdTokenAudienceProcedure = "/banda.v1.SettingsService/AddIdTokenAudience"
+	// SettingsServiceRemoveIdTokenAudienceProcedure is the procedure name of the SettingsService's
+	// RemoveIdTokenAudience RPC.
+	SettingsServiceRemoveIdTokenAudienceProcedure = "/banda.v1.SettingsService/RemoveIdTokenAudience"
+	// SettingsServiceGetGitHubProcedure is the procedure name of the SettingsService's GetGitHub RPC.
+	SettingsServiceGetGitHubProcedure = "/banda.v1.SettingsService/GetGitHub"
+	// SettingsServiceGitHubAppManifestProcedure is the procedure name of the SettingsService's
+	// GitHubAppManifest RPC.
+	SettingsServiceGitHubAppManifestProcedure = "/banda.v1.SettingsService/GitHubAppManifest"
+	// SettingsServiceListGitHubInstallationsProcedure is the procedure name of the SettingsService's
+	// ListGitHubInstallations RPC.
+	SettingsServiceListGitHubInstallationsProcedure = "/banda.v1.SettingsService/ListGitHubInstallations"
+	// SettingsServiceRemoveGitHubAppProcedure is the procedure name of the SettingsService's
+	// RemoveGitHubApp RPC.
+	SettingsServiceRemoveGitHubAppProcedure = "/banda.v1.SettingsService/RemoveGitHubApp"
+	// SettingsServiceDisconnectGitHubProcedure is the procedure name of the SettingsService's
+	// DisconnectGitHub RPC.
+	SettingsServiceDisconnectGitHubProcedure = "/banda.v1.SettingsService/DisconnectGitHub"
+	// SettingsServiceGetGitLabProcedure is the procedure name of the SettingsService's GetGitLab RPC.
+	SettingsServiceGetGitLabProcedure = "/banda.v1.SettingsService/GetGitLab"
+	// SettingsServiceSetGitLabAppProcedure is the procedure name of the SettingsService's SetGitLabApp
+	// RPC.
+	SettingsServiceSetGitLabAppProcedure = "/banda.v1.SettingsService/SetGitLabApp"
+	// SettingsServiceRemoveGitLabAppProcedure is the procedure name of the SettingsService's
+	// RemoveGitLabApp RPC.
+	SettingsServiceRemoveGitLabAppProcedure = "/banda.v1.SettingsService/RemoveGitLabApp"
+	// SettingsServiceDisconnectGitLabProcedure is the procedure name of the SettingsService's
+	// DisconnectGitLab RPC.
+	SettingsServiceDisconnectGitLabProcedure = "/banda.v1.SettingsService/DisconnectGitLab"
 	// RunnerServiceConnectProcedure is the procedure name of the RunnerService's Connect RPC.
 	RunnerServiceConnectProcedure = "/banda.v1.RunnerService/Connect"
 	// RunnerServiceForkPatchProcedure is the procedure name of the RunnerService's ForkPatch RPC.
 	RunnerServiceForkPatchProcedure = "/banda.v1.RunnerService/ForkPatch"
+	// RunnerServiceIdTokensProcedure is the procedure name of the RunnerService's IdTokens RPC.
+	RunnerServiceIdTokensProcedure = "/banda.v1.RunnerService/IdTokens"
+	// RunnerServiceGitCredentialProcedure is the procedure name of the RunnerService's GitCredential
+	// RPC.
+	RunnerServiceGitCredentialProcedure = "/banda.v1.RunnerService/GitCredential"
 )
 
 var (
@@ -2685,6 +2724,90 @@ var (
 			Procedure:  SettingsServiceSetThreadDefaultsProcedure,
 		}
 	})
+	settingsServiceGetWorkloadIdentitySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("GetWorkloadIdentity"),
+			Procedure:  SettingsServiceGetWorkloadIdentityProcedure,
+		}
+	})
+	settingsServiceAddIdTokenAudienceSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("AddIdTokenAudience"),
+			Procedure:  SettingsServiceAddIdTokenAudienceProcedure,
+		}
+	})
+	settingsServiceRemoveIdTokenAudienceSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("RemoveIdTokenAudience"),
+			Procedure:  SettingsServiceRemoveIdTokenAudienceProcedure,
+		}
+	})
+	settingsServiceGetGitHubSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("GetGitHub"),
+			Procedure:  SettingsServiceGetGitHubProcedure,
+		}
+	})
+	settingsServiceGitHubAppManifestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("GitHubAppManifest"),
+			Procedure:  SettingsServiceGitHubAppManifestProcedure,
+		}
+	})
+	settingsServiceListGitHubInstallationsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("ListGitHubInstallations"),
+			Procedure:  SettingsServiceListGitHubInstallationsProcedure,
+		}
+	})
+	settingsServiceRemoveGitHubAppSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("RemoveGitHubApp"),
+			Procedure:  SettingsServiceRemoveGitHubAppProcedure,
+		}
+	})
+	settingsServiceDisconnectGitHubSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("DisconnectGitHub"),
+			Procedure:  SettingsServiceDisconnectGitHubProcedure,
+		}
+	})
+	settingsServiceGetGitLabSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("GetGitLab"),
+			Procedure:  SettingsServiceGetGitLabProcedure,
+		}
+	})
+	settingsServiceSetGitLabAppSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("SetGitLabApp"),
+			Procedure:  SettingsServiceSetGitLabAppProcedure,
+		}
+	})
+	settingsServiceRemoveGitLabAppSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("RemoveGitLabApp"),
+			Procedure:  SettingsServiceRemoveGitLabAppProcedure,
+		}
+	})
+	settingsServiceDisconnectGitLabSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("SettingsService").Methods().ByName("DisconnectGitLab"),
+			Procedure:  SettingsServiceDisconnectGitLabProcedure,
+		}
+	})
 )
 
 // SettingsServiceClient is a client for the banda.v1.SettingsService service.
@@ -2716,6 +2839,34 @@ type SettingsServiceClient interface {
 	SetGitIdentity(context.Context, *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error)
 	// What the caller's new threads start with when they don't say.
 	SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error)
+	// Workload identity: Banda as an OIDC issuer of short-lived tokens naming
+	// each thread's owner, for the audiences the team adds (none: off). Anyone
+	// signed in lists, adds and removes audiences; running threads get the
+	// change within seconds.
+	GetWorkloadIdentity(context.Context, *v1.GetWorkloadIdentityRequest) (*v1.GetWorkloadIdentityResponse, error)
+	AddIdTokenAudience(context.Context, *v1.AddIdTokenAudienceRequest) (*v1.AddIdTokenAudienceResponse, error)
+	RemoveIdTokenAudience(context.Context, *v1.RemoveIdTokenAudienceRequest) (*v1.RemoveIdTokenAudienceResponse, error)
+	// GitHub: the team's GitHub App (one per Banda, set up by anyone signed in)
+	// and the caller's connection to it. Its keys and tokens stay in the API.
+	GetGitHub(context.Context, *v1.GetGitHubRequest) (*v1.GetGitHubResponse, error)
+	// A manifest for the browser to post to the forge, which creates the app and
+	// returns to /github/app; see internal/api/github.go.
+	GitHubAppManifest(context.Context, *v1.GitHubAppManifestRequest) (*v1.GitHubAppManifestResponse, error)
+	// The accounts the app is installed on (asks the forge, cached for a minute).
+	ListGitHubInstallations(context.Context, *v1.ListGitHubInstallationsRequest) (*v1.ListGitHubInstallationsResponse, error)
+	// Banda forgets the app; it stays on the forge, where its owner deletes it.
+	RemoveGitHubApp(context.Context, *v1.RemoveGitHubAppRequest) (*v1.RemoveGitHubAppResponse, error)
+	// Revokes the caller's connection at the forge and forgets it.
+	DisconnectGitHub(context.Context, *v1.DisconnectGitHubRequest) (*v1.DisconnectGitHubResponse, error)
+	// GitLab: the team's OAuth application per GitLab host (made by hand on
+	// GitLab, its ID and secret pasted here) and the caller's connections.
+	GetGitLab(context.Context, *v1.GetGitLabRequest) (*v1.GetGitLabResponse, error)
+	// Verifies the application's ID and secret with GitLab and keeps them.
+	SetGitLabApp(context.Context, *v1.SetGitLabAppRequest) (*v1.SetGitLabAppResponse, error)
+	// Banda forgets the application and everyone's connections through it.
+	RemoveGitLabApp(context.Context, *v1.RemoveGitLabAppRequest) (*v1.RemoveGitLabAppResponse, error)
+	// Revokes both of the caller's grants on the host at GitLab and forgets them.
+	DisconnectGitLab(context.Context, *v1.DisconnectGitLabRequest) (*v1.DisconnectGitLabResponse, error)
 }
 
 // NewSettingsServiceClient constructs a client for the banda.v1.SettingsService service. Multiple
@@ -2774,6 +2925,34 @@ type SettingsServiceHandler interface {
 	SetGitIdentity(context.Context, *v1.SetGitIdentityRequest) (*v1.SetGitIdentityResponse, error)
 	// What the caller's new threads start with when they don't say.
 	SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error)
+	// Workload identity: Banda as an OIDC issuer of short-lived tokens naming
+	// each thread's owner, for the audiences the team adds (none: off). Anyone
+	// signed in lists, adds and removes audiences; running threads get the
+	// change within seconds.
+	GetWorkloadIdentity(context.Context, *v1.GetWorkloadIdentityRequest) (*v1.GetWorkloadIdentityResponse, error)
+	AddIdTokenAudience(context.Context, *v1.AddIdTokenAudienceRequest) (*v1.AddIdTokenAudienceResponse, error)
+	RemoveIdTokenAudience(context.Context, *v1.RemoveIdTokenAudienceRequest) (*v1.RemoveIdTokenAudienceResponse, error)
+	// GitHub: the team's GitHub App (one per Banda, set up by anyone signed in)
+	// and the caller's connection to it. Its keys and tokens stay in the API.
+	GetGitHub(context.Context, *v1.GetGitHubRequest) (*v1.GetGitHubResponse, error)
+	// A manifest for the browser to post to the forge, which creates the app and
+	// returns to /github/app; see internal/api/github.go.
+	GitHubAppManifest(context.Context, *v1.GitHubAppManifestRequest) (*v1.GitHubAppManifestResponse, error)
+	// The accounts the app is installed on (asks the forge, cached for a minute).
+	ListGitHubInstallations(context.Context, *v1.ListGitHubInstallationsRequest) (*v1.ListGitHubInstallationsResponse, error)
+	// Banda forgets the app; it stays on the forge, where its owner deletes it.
+	RemoveGitHubApp(context.Context, *v1.RemoveGitHubAppRequest) (*v1.RemoveGitHubAppResponse, error)
+	// Revokes the caller's connection at the forge and forgets it.
+	DisconnectGitHub(context.Context, *v1.DisconnectGitHubRequest) (*v1.DisconnectGitHubResponse, error)
+	// GitLab: the team's OAuth application per GitLab host (made by hand on
+	// GitLab, its ID and secret pasted here) and the caller's connections.
+	GetGitLab(context.Context, *v1.GetGitLabRequest) (*v1.GetGitLabResponse, error)
+	// Verifies the application's ID and secret with GitLab and keeps them.
+	SetGitLabApp(context.Context, *v1.SetGitLabAppRequest) (*v1.SetGitLabAppResponse, error)
+	// Banda forgets the application and everyone's connections through it.
+	RemoveGitLabApp(context.Context, *v1.RemoveGitLabAppRequest) (*v1.RemoveGitLabAppResponse, error)
+	// Revokes both of the caller's grants on the host at GitLab and forgets them.
+	DisconnectGitLab(context.Context, *v1.DisconnectGitLabRequest) (*v1.DisconnectGitLabResponse, error)
 }
 
 // RegisterSettingsServiceHandler registers svc as the banda.v1.SettingsService implementation on
@@ -2794,6 +2973,18 @@ func RegisterSettingsServiceHandler(server *connect.Server, svc SettingsServiceH
 		connect.Method{Spec: settingsServiceResizeLoginTerminalSpec(), Handler: adapter.resizeLoginTerminal},
 		connect.Method{Spec: settingsServiceSetGitIdentitySpec(), Handler: adapter.setGitIdentity},
 		connect.Method{Spec: settingsServiceSetThreadDefaultsSpec(), Handler: adapter.setThreadDefaults},
+		connect.Method{Spec: settingsServiceGetWorkloadIdentitySpec(), Handler: adapter.getWorkloadIdentity},
+		connect.Method{Spec: settingsServiceAddIdTokenAudienceSpec(), Handler: adapter.addIdTokenAudience},
+		connect.Method{Spec: settingsServiceRemoveIdTokenAudienceSpec(), Handler: adapter.removeIdTokenAudience},
+		connect.Method{Spec: settingsServiceGetGitHubSpec(), Handler: adapter.getGitHub},
+		connect.Method{Spec: settingsServiceGitHubAppManifestSpec(), Handler: adapter.gitHubAppManifest},
+		connect.Method{Spec: settingsServiceListGitHubInstallationsSpec(), Handler: adapter.listGitHubInstallations},
+		connect.Method{Spec: settingsServiceRemoveGitHubAppSpec(), Handler: adapter.removeGitHubApp},
+		connect.Method{Spec: settingsServiceDisconnectGitHubSpec(), Handler: adapter.disconnectGitHub},
+		connect.Method{Spec: settingsServiceGetGitLabSpec(), Handler: adapter.getGitLab},
+		connect.Method{Spec: settingsServiceSetGitLabAppSpec(), Handler: adapter.setGitLabApp},
+		connect.Method{Spec: settingsServiceRemoveGitLabAppSpec(), Handler: adapter.removeGitLabApp},
+		connect.Method{Spec: settingsServiceDisconnectGitLabSpec(), Handler: adapter.disconnectGitLab},
 	)
 }
 
@@ -2866,6 +3057,54 @@ func (UnimplementedSettingsServiceHandler) SetGitIdentity(context.Context, *v1.S
 
 func (UnimplementedSettingsServiceHandler) SetThreadDefaults(context.Context, *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetThreadDefaults is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) GetWorkloadIdentity(context.Context, *v1.GetWorkloadIdentityRequest) (*v1.GetWorkloadIdentityResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.GetWorkloadIdentity is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) AddIdTokenAudience(context.Context, *v1.AddIdTokenAudienceRequest) (*v1.AddIdTokenAudienceResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.AddIdTokenAudience is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) RemoveIdTokenAudience(context.Context, *v1.RemoveIdTokenAudienceRequest) (*v1.RemoveIdTokenAudienceResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.RemoveIdTokenAudience is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) GetGitHub(context.Context, *v1.GetGitHubRequest) (*v1.GetGitHubResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.GetGitHub is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) GitHubAppManifest(context.Context, *v1.GitHubAppManifestRequest) (*v1.GitHubAppManifestResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.GitHubAppManifest is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) ListGitHubInstallations(context.Context, *v1.ListGitHubInstallationsRequest) (*v1.ListGitHubInstallationsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.ListGitHubInstallations is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) RemoveGitHubApp(context.Context, *v1.RemoveGitHubAppRequest) (*v1.RemoveGitHubAppResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.RemoveGitHubApp is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) DisconnectGitHub(context.Context, *v1.DisconnectGitHubRequest) (*v1.DisconnectGitHubResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.DisconnectGitHub is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) GetGitLab(context.Context, *v1.GetGitLabRequest) (*v1.GetGitLabResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.GetGitLab is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) SetGitLabApp(context.Context, *v1.SetGitLabAppRequest) (*v1.SetGitLabAppResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.SetGitLabApp is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) RemoveGitLabApp(context.Context, *v1.RemoveGitLabAppRequest) (*v1.RemoveGitLabAppResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.RemoveGitLabApp is not implemented")
+}
+
+func (UnimplementedSettingsServiceHandler) DisconnectGitLab(context.Context, *v1.DisconnectGitLabRequest) (*v1.DisconnectGitLabResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.SettingsService.DisconnectGitLab is not implemented")
 }
 
 type settingsServiceClient struct {
@@ -2971,6 +3210,102 @@ func (c *settingsServiceClient) SetGitIdentity(ctx context.Context, req *v1.SetG
 func (c *settingsServiceClient) SetThreadDefaults(ctx context.Context, req *v1.SetThreadDefaultsRequest) (*v1.SetThreadDefaultsResponse, error) {
 	var res v1.SetThreadDefaultsResponse
 	if err := c.client.CallUnary(ctx, settingsServiceSetThreadDefaultsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) GetWorkloadIdentity(ctx context.Context, req *v1.GetWorkloadIdentityRequest) (*v1.GetWorkloadIdentityResponse, error) {
+	var res v1.GetWorkloadIdentityResponse
+	if err := c.client.CallUnary(ctx, settingsServiceGetWorkloadIdentitySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) AddIdTokenAudience(ctx context.Context, req *v1.AddIdTokenAudienceRequest) (*v1.AddIdTokenAudienceResponse, error) {
+	var res v1.AddIdTokenAudienceResponse
+	if err := c.client.CallUnary(ctx, settingsServiceAddIdTokenAudienceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) RemoveIdTokenAudience(ctx context.Context, req *v1.RemoveIdTokenAudienceRequest) (*v1.RemoveIdTokenAudienceResponse, error) {
+	var res v1.RemoveIdTokenAudienceResponse
+	if err := c.client.CallUnary(ctx, settingsServiceRemoveIdTokenAudienceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) GetGitHub(ctx context.Context, req *v1.GetGitHubRequest) (*v1.GetGitHubResponse, error) {
+	var res v1.GetGitHubResponse
+	if err := c.client.CallUnary(ctx, settingsServiceGetGitHubSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) GitHubAppManifest(ctx context.Context, req *v1.GitHubAppManifestRequest) (*v1.GitHubAppManifestResponse, error) {
+	var res v1.GitHubAppManifestResponse
+	if err := c.client.CallUnary(ctx, settingsServiceGitHubAppManifestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) ListGitHubInstallations(ctx context.Context, req *v1.ListGitHubInstallationsRequest) (*v1.ListGitHubInstallationsResponse, error) {
+	var res v1.ListGitHubInstallationsResponse
+	if err := c.client.CallUnary(ctx, settingsServiceListGitHubInstallationsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) RemoveGitHubApp(ctx context.Context, req *v1.RemoveGitHubAppRequest) (*v1.RemoveGitHubAppResponse, error) {
+	var res v1.RemoveGitHubAppResponse
+	if err := c.client.CallUnary(ctx, settingsServiceRemoveGitHubAppSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) DisconnectGitHub(ctx context.Context, req *v1.DisconnectGitHubRequest) (*v1.DisconnectGitHubResponse, error) {
+	var res v1.DisconnectGitHubResponse
+	if err := c.client.CallUnary(ctx, settingsServiceDisconnectGitHubSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) GetGitLab(ctx context.Context, req *v1.GetGitLabRequest) (*v1.GetGitLabResponse, error) {
+	var res v1.GetGitLabResponse
+	if err := c.client.CallUnary(ctx, settingsServiceGetGitLabSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) SetGitLabApp(ctx context.Context, req *v1.SetGitLabAppRequest) (*v1.SetGitLabAppResponse, error) {
+	var res v1.SetGitLabAppResponse
+	if err := c.client.CallUnary(ctx, settingsServiceSetGitLabAppSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) RemoveGitLabApp(ctx context.Context, req *v1.RemoveGitLabAppRequest) (*v1.RemoveGitLabAppResponse, error) {
+	var res v1.RemoveGitLabAppResponse
+	if err := c.client.CallUnary(ctx, settingsServiceRemoveGitLabAppSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *settingsServiceClient) DisconnectGitLab(ctx context.Context, req *v1.DisconnectGitLabRequest) (*v1.DisconnectGitLabResponse, error) {
+	var res v1.DisconnectGitLabResponse
+	if err := c.client.CallUnary(ctx, settingsServiceDisconnectGitLabSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -3130,6 +3465,150 @@ func (h settingsServiceHandler) setThreadDefaults(ctx context.Context, _ connect
 	return stream.Send(res)
 }
 
+func (h settingsServiceHandler) getWorkloadIdentity(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetWorkloadIdentityRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetWorkloadIdentity(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) addIdTokenAudience(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AddIdTokenAudienceRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AddIdTokenAudience(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) removeIdTokenAudience(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveIdTokenAudienceRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveIdTokenAudience(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) getGitHub(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetGitHubRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetGitHub(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) gitHubAppManifest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GitHubAppManifestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GitHubAppManifest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) listGitHubInstallations(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListGitHubInstallationsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListGitHubInstallations(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) removeGitHubApp(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveGitHubAppRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveGitHubApp(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) disconnectGitHub(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DisconnectGitHubRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DisconnectGitHub(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) getGitLab(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetGitLabRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetGitLab(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) setGitLabApp(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetGitLabAppRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetGitLabApp(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) removeGitLabApp(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveGitLabAppRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveGitLabApp(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h settingsServiceHandler) disconnectGitLab(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DisconnectGitLabRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DisconnectGitLab(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
 var (
 	runnerServiceConnectSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
@@ -3145,6 +3624,20 @@ var (
 			Procedure:  RunnerServiceForkPatchProcedure,
 		}
 	})
+	runnerServiceIdTokensSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("RunnerService").Methods().ByName("IdTokens"),
+			Procedure:  RunnerServiceIdTokensProcedure,
+		}
+	})
+	runnerServiceGitCredentialSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("RunnerService").Methods().ByName("GitCredential"),
+			Procedure:  RunnerServiceGitCredentialProcedure,
+		}
+	})
 )
 
 // RunnerServiceClient is a client for the banda.v1.RunnerService service.
@@ -3152,6 +3645,14 @@ type RunnerServiceClient interface {
 	Connect(context.Context) (RunnerServiceConnectClientStream, error)
 	// The changes a fork starts from, applied once after the first checkout.
 	ForkPatch(context.Context, *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error)
+	// Identity tokens for the thread's owner, one per audience of the team's.
+	// Only for a connected thread runner; fetched again on IdTokensChanged.
+	IdTokens(context.Context, *v1.IdTokensRequest) (*v1.IdTokensResponse, error)
+	// A short-lived credential for git, for the thread's own repository only:
+	// the GitHub App's installation token, as the owner may use it, or on GitLab
+	// the owner's git-only OAuth token. Refused with
+	// a reason a person can act on.
+	GitCredential(context.Context, *v1.GitCredentialRequest) (*v1.GitCredentialResponse, error)
 }
 
 // NewRunnerServiceClient constructs a client for the banda.v1.RunnerService service. Multiple
@@ -3201,6 +3702,14 @@ type RunnerServiceHandler interface {
 	Connect(context.Context, RunnerServiceConnectServerStream) error
 	// The changes a fork starts from, applied once after the first checkout.
 	ForkPatch(context.Context, *v1.ForkPatchRequest) (*v1.ForkPatchResponse, error)
+	// Identity tokens for the thread's owner, one per audience of the team's.
+	// Only for a connected thread runner; fetched again on IdTokensChanged.
+	IdTokens(context.Context, *v1.IdTokensRequest) (*v1.IdTokensResponse, error)
+	// A short-lived credential for git, for the thread's own repository only:
+	// the GitHub App's installation token, as the owner may use it, or on GitLab
+	// the owner's git-only OAuth token. Refused with
+	// a reason a person can act on.
+	GitCredential(context.Context, *v1.GitCredentialRequest) (*v1.GitCredentialResponse, error)
 }
 
 // RegisterRunnerServiceHandler registers svc as the banda.v1.RunnerService implementation on
@@ -3210,6 +3719,8 @@ func RegisterRunnerServiceHandler(server *connect.Server, svc RunnerServiceHandl
 	server.Register(
 		connect.Method{Spec: runnerServiceConnectSpec(), Handler: adapter.connect},
 		connect.Method{Spec: runnerServiceForkPatchSpec(), Handler: adapter.forkPatch},
+		connect.Method{Spec: runnerServiceIdTokensSpec(), Handler: adapter.idTokens},
+		connect.Method{Spec: runnerServiceGitCredentialSpec(), Handler: adapter.gitCredential},
 	)
 }
 
@@ -3248,6 +3759,14 @@ func (UnimplementedRunnerServiceHandler) ForkPatch(context.Context, *v1.ForkPatc
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.RunnerService.ForkPatch is not implemented")
 }
 
+func (UnimplementedRunnerServiceHandler) IdTokens(context.Context, *v1.IdTokensRequest) (*v1.IdTokensResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.RunnerService.IdTokens is not implemented")
+}
+
+func (UnimplementedRunnerServiceHandler) GitCredential(context.Context, *v1.GitCredentialRequest) (*v1.GitCredentialResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.RunnerService.GitCredential is not implemented")
+}
+
 type runnerServiceClient struct {
 	client *connect.Client
 }
@@ -3268,6 +3787,22 @@ func (c *runnerServiceClient) ForkPatch(ctx context.Context, req *v1.ForkPatchRe
 	return &res, nil
 }
 
+func (c *runnerServiceClient) IdTokens(ctx context.Context, req *v1.IdTokensRequest) (*v1.IdTokensResponse, error) {
+	var res v1.IdTokensResponse
+	if err := c.client.CallUnary(ctx, runnerServiceIdTokensSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *runnerServiceClient) GitCredential(ctx context.Context, req *v1.GitCredentialRequest) (*v1.GitCredentialResponse, error) {
+	var res v1.GitCredentialResponse
+	if err := c.client.CallUnary(ctx, runnerServiceGitCredentialSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 type runnerServiceHandler struct{ svc RunnerServiceHandler }
 
 func (h runnerServiceHandler) connect(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
@@ -3280,6 +3815,30 @@ func (h runnerServiceHandler) forkPatch(ctx context.Context, _ connect.Spec, str
 		return err
 	}
 	res, err := h.svc.ForkPatch(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h runnerServiceHandler) idTokens(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.IdTokensRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.IdTokens(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h runnerServiceHandler) gitCredential(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GitCredentialRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GitCredential(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -190,7 +190,9 @@ test.describe('repository URLs', () => {
 			'ftp://example.com/a.git',
 			'https://example.com/a.git\n--upload-pack=x',
 			'https://example.com/a\tb.git',
-			'https:///a.git'
+			'https:///a.git',
+			'https://github.com/e2e/plain$(id).git', // lands in the shell and CEL of the identity recipes
+			"https://github.com/e2e/pl'ain.git"
 		])
 			expect(await refused(alice.create({ repoUrl: url })), url).toContain('invalid_argument');
 		for (const url of ['file:///opt/e2e/plain.git', repo()]) {

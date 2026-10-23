@@ -3,6 +3,7 @@ package sandbox
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"slices"
 	"strings"
@@ -226,4 +227,70 @@ func sandboxes(t *testing.T, list ...*sbv1.Sandbox) *sbfake.Clientset {
 		}
 	}
 	return c
+}
+
+// The first start creates the keys; later starts, and another API racing it,
+// get the same ones.
+func TestIdentityKeys(t *testing.T) {
+	c := &Client{cfg: Config{Namespace: "ns"}, kube: kubefake.NewClientset()}
+	made := 0
+	first := func() (map[string][]byte, error) {
+		made++
+		return map[string][]byte{"1.pem": []byte(fmt.Sprint(made))}, nil
+	}
+	a, err := c.IdentityKeys(t.Context(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := c.IdentityKeys(t.Context(), first)
+	if err != nil || made != 1 || string(a["1.pem"]) != "1" || string(b["1.pem"]) != "1" {
+		t.Fatalf("got %q then %q (%v), made %d", a, b, err, made)
+	}
+}
+
+// Identity tokens sit in memory in thread pods only; the signing keys are in
+// no pod.
+func TestIdentityVolumes(t *testing.T) {
+	c := &Client{}
+	thread := c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "subscription", nil, store.GitIdentity{}).Spec.PodTemplate.Spec
+	login := c.loginSandbox("alice", "claude").Spec.PodTemplate.Spec
+	for name, spec := range map[string]corev1.PodSpec{"thread": thread, "login": login} {
+		for _, v := range spec.Volumes {
+			if v.Secret != nil || v.Projected != nil {
+				t.Errorf("%s pod mounts a Secret: %+v", name, v)
+			}
+			if v.Name == "id-tokens" && name == "login" {
+				t.Error("a login environment has an identity token volume")
+			}
+		}
+		for _, f := range spec.Containers[0].EnvFrom {
+			if f.SecretRef.Name == identitySecret {
+				t.Errorf("%s pod has the signing keys in its environment", name)
+			}
+		}
+	}
+	v := thread.Volumes[slices.IndexFunc(thread.Volumes, func(v corev1.Volume) bool { return v.Name == "id-tokens" })]
+	if v.EmptyDir == nil || v.EmptyDir.Medium != corev1.StorageMediumMemory {
+		t.Errorf("identity tokens not in memory: %+v", v)
+	}
+	if !slices.ContainsFunc(thread.Containers[0].VolumeMounts, func(m corev1.VolumeMount) bool { return m.Name == "id-tokens" && m.MountPath == IDTokenDir }) ||
+		!slices.ContainsFunc(thread.Containers[0].Env, func(e corev1.EnvVar) bool { return e.Name == "BANDA_ID_TOKEN_DIR" && e.Value == IDTokenDir }) {
+		t.Error("thread pod lacks the identity token mount or BANDA_ID_TOKEN_DIR")
+	}
+}
+
+// Users' forge tokens, the GitHub App's key and the GitLab applications'
+// secrets stay with the API: no pod, thread or login, references their Secrets.
+func TestPodsDontMountForgeSecrets(t *testing.T) {
+	c := &Client{}
+	for _, sb := range []any{
+		c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "api_key", []string{"X"}, store.GitIdentity{}),
+		c.loginSandbox("alice", "claude"),
+	} {
+		spec, _ := json.Marshal(sb)
+		if s := string(spec); strings.Contains(s, ForgeSecret("alice", "github.com")) || strings.Contains(s, "banda-forge-") || strings.Contains(s, "banda-github-app") ||
+			strings.Contains(s, ForgeSecret("alice", "gitlab.com")) || strings.Contains(s, "banda-gitlab-app") {
+			t.Errorf("pod spec names a forge Secret: %s", s)
+		}
+	}
 }

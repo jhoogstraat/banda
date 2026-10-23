@@ -99,6 +99,31 @@ test('defaults for new threads: set in Settings, the composer starts with them a
 	expect(await t.get()).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
 });
 
+test('defaults: quick changes build on each other while Settings reloads slowly', async ({ as }) => {
+	const alice = as('alice');
+	const page = await alice.page();
+	await page.goto('/settings#defaults');
+	const defaults = page.getByRole('region', { name: 'New threads' });
+	await expect(defaults.getByLabel('Model')).toHaveValue('claude-opus-5-5');
+	// Each save reloads Settings; a slow reload used to leave the next change building on the old values.
+	await page.route('**/banda.v1.SettingsService/GetSettings', async (r) => {
+		await new Promise((done) => setTimeout(done, 1500));
+		await r.continue().catch(() => {});
+	});
+	const saved = () => page.waitForResponse('**/banda.v1.SettingsService/SetThreadDefaults');
+	await Promise.all([saved(), defaults.getByLabel('Model').selectOption('claude-sonnet-5-5')]);
+	await Promise.all([saved(), defaults.getByLabel('Effort').selectOption('low')]);
+	await Promise.all([saved(), defaults.getByLabel('Permissions').selectOption('Plan')]);
+	expect((await alice.settings.getSettings({})).threadDefaults).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
+	await expect(defaults.getByLabel('Model')).toHaveValue('claude-sonnet-5-5');
+	await expect(defaults.getByLabel('Effort')).toHaveValue('low');
+	// Once saved, the page shows the server's values again: a change made elsewhere shows at the next reload.
+	await page.unroute('**/banda.v1.SettingsService/GetSettings');
+	await alice.settings.setThreadDefaults({ defaults: { model: 'claude-opus-5-5', effort: 'low', permissionMode: PermissionMode.PLAN } });
+	await defaults.locator('input[type=radio]:not(:checked)').first().check(); // saving the profile reloads
+	await expect(defaults.getByLabel('Model')).toHaveValue('claude-opus-5-5');
+});
+
 /** The browser's Notification, recorded: asks once, then shows. */
 const stubNotification = (page: Page) =>
 	page.addInitScript(() => {
@@ -159,10 +184,15 @@ test('the section nav links to every section; the shortcuts are listed', async (
 	const page = await as('alice').page();
 	await page.goto('/settings');
 	const nav = page.getByRole('navigation', { name: 'Settings sections' });
-	for (const id of ['claude', 'git', 'defaults', 'notifications', 'appearance', 'secrets', 'team-secrets', 'shortcuts']) {
+	for (const id of ['claude', 'accounts', 'git', 'defaults', 'notifications', 'appearance', 'secrets', 'shortcuts', 'github-app', 'gitlab-app', 'team-secrets', 'workload-identity']) {
 		await expect(nav.locator(`a[href="#${id}"]`)).toHaveCount(1);
 		await expect(page.locator(`section#${id}`)).toHaveCount(1);
 	}
+	// Grouped: what is mine, and what the team shares, in the nav and on the page.
+	await expect(nav.getByRole('list', { name: 'You' }).getByRole('link')).toHaveText(['Claude Code', 'Accounts', 'Git identity', 'New threads', 'Notifications', 'Appearance', 'Secrets', 'Keyboard shortcuts']);
+	await expect(nav.getByRole('list', { name: 'Team' }).getByRole('link')).toHaveText(['GitHub App', 'GitLab', 'Team secrets', 'Workload identity']);
+	await expect(page.getByRole('heading', { level: 2, name: 'Team' })).toBeVisible();
+	await expect(page.getByText('Shared by everyone: a change here applies to every teammate.')).toBeVisible();
 	// It marks the section in view, following clicks and scrolling.
 	const current = nav.locator('a[aria-current="location"]');
 	await expect(current).toHaveText('Claude Code');

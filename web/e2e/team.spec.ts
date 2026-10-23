@@ -14,6 +14,15 @@ async function visit(page: Page) {
 	await seen;
 }
 
+/** A section of the brief, unfolded: the e2e run is one team, so other tests' threads finish into it too. */
+async function briefSection(page: Page, name: string) {
+	const section = page.getByRole('region', { name: 'Brief' }).getByRole('region', { name });
+	await expect(section).toBeVisible();
+	const more = section.getByRole('button', { name: /^\d+ more$/ });
+	if (await more.isVisible()) await more.click();
+	return section;
+}
+
 test('team board: alice’s threads grouped by what needs her, paused ones folded; quiet carol only when asked', async ({ as }) => {
 	const [alice, bob, carol] = [as('alice'), as('bob'), as('carol')];
 	await carol.users.me({}); // on the team, without threads
@@ -68,10 +77,10 @@ test('brief: bob reads what alice’s agent finished and what she settled, once;
 
 	await visit(page);
 	const brief = page.getByRole('region', { name: 'Brief' });
-	const finished = brief.getByRole('region', { name: 'Finished' }).getByRole('link', { name: /e2e: for the brief/ });
+	const finished = (await briefSection(page, 'Finished')).getByRole('link', { name: /e2e: for the brief/ });
 	await expect(finished).toContainText(alice.id);
 	await expect(finished).toContainText(words);
-	await expect(brief.getByRole('region', { name: 'Settled' }).getByRole('link', { name: /settled for the brief/ })).toBeVisible();
+	await expect((await briefSection(page, 'Settled')).getByRole('link', { name: /settled for the brief/ })).toBeVisible();
 	await finished.click();
 	await expect(page).toHaveURL(`/t/${t.id}`);
 

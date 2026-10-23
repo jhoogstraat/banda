@@ -59,6 +59,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		// The pod's environment has the settings it was created with; a
 		// container restart in the same pod would miss later changes.
 		r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_AgentSettings{AgentSettings: agentSettings(t)}}
+		r.ch <- &bandav1.ConnectResponse{Kind: &bandav1.ConnectResponse_IdTokensChanged{IdTokensChanged: &bandav1.IdTokensChanged{}}}
 	}
 
 	// The token alone doesn't replace a runner that still answers: that one
@@ -126,6 +127,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 		if err != nil {
 			return nil
 		}
+		s.redactRunner(id, msg)
 		switch k := msg.Kind.(type) {
 		case *bandav1.ConnectRequest_Ready:
 			if err := s.ready(bg, id, r); err != nil {

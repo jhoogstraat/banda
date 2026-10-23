@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import FolderIcon from '@lucide/svelte/icons/folder';
+	import GitHubMark from '#lib/components/github-mark.svelte';
+	import GitLabMark from '#lib/components/gitlab-mark.svelte';
 	import FolderGit2Icon from '@lucide/svelte/icons/folder-git-2';
 	import GitBranchIcon from '@lucide/svelte/icons/git-branch';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
@@ -20,11 +23,15 @@
 	// filters them, and what is typed is searched on the forges too (debounced), for those beyond the first page.
 	let mine = $state<ForgeRepo[]>([]);
 	let found = $state<ForgeRepo[]>([]);
+	// A host whose repositories show once I connect it, and its forge.
+	let connectHost = $state('');
+	let connectForge = $state('');
 	let asked = false;
 	$effect(() => {
 		if (!open || asked) return;
 		asked = true;
-		api.listForgeRepos({}).then((r) => (mine = r.repos)).catch(() => {}); // without them the field still takes a URL
+		// Without them the field still takes a URL.
+		api.listForgeRepos({}).then((r) => ((mine = r.repos), (connectHost = r.connectHost), (connectForge = r.connectForge))).catch(() => {});
 	});
 	$effect(() => {
 		const query = custom.trim();
@@ -80,6 +87,15 @@
 			{/if}
 			<DropdownMenu.RadioItem value={noRepo} title="For work without code: the agent starts in an empty folder">No repository</DropdownMenu.RadioItem>
 		</DropdownMenu.RadioGroup>
+		{#if connectHost}
+			<DropdownMenu.Item class="text-xs text-muted-foreground" onSelect={() => goto(connectForge === 'gitlab' ? '/settings#gitlab' : '/settings#github')}>
+				{#if connectForge === 'gitlab'}
+					<GitLabMark class="size-3.5" /> Connect GitLab to list your repositories on {connectHost}
+				{:else}
+					<GitHubMark class="size-3.5" /> Connect GitHub to list your repositories on {connectHost}
+				{/if}
+			</DropdownMenu.Item>
+		{/if}
 		<form class="flex gap-1 p-1" onsubmit={useCustom}>
 			<Input bind:value={custom} onkeydown={keepKeys} placeholder="Search yours, or a URL" aria-label="Repository URL" class="h-7 min-w-0 text-xs" />
 			<Button type="submit" size="sm" disabled={!custom.trim()}>Use</Button>

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,24 +16,6 @@ import (
 
 // The remote turned the push down for good, not just this once.
 var refused = regexp.MustCompile(`(?i)\b403\b|permission|denied|authentication failed|could not read username|read-only|not allowed`)
-
-// canPush: https needs a token (see checkout); there are no SSH keys in the sandbox.
-func canPush(repo string) bool {
-	if strings.HasPrefix(repo, "git@") {
-		return false
-	}
-	u, err := url.Parse(repo)
-	if err != nil {
-		return false
-	}
-	switch u.Scheme {
-	case "https", "http":
-		return os.Getenv("GIT_TOKEN") != ""
-	case "ssh":
-		return false
-	}
-	return true // file://, git://, a path
-}
 
 // pusher pushes the thread branch and reports where the work lives, when
 // that changed.
@@ -63,9 +44,9 @@ func (p *pusher) push(ctx context.Context) *bandav1.AutoPush {
 
 func pushBranch(ctx context.Context) *bandav1.AutoPush {
 	branch := os.Getenv("BANDA_BRANCH")
-	if !canPush(os.Getenv("BANDA_REPO_URL")) {
+	if why := pushBlocked(ctx, os.Getenv("BANDA_REPO_URL")); why != "" {
 		return &bandav1.AutoPush{State: bandav1.AutoPushState_AUTO_PUSH_STATE_UNAVAILABLE,
-			Detail: "origin can't be pushed to (an https remote needs a GIT_TOKEN secret), so this thread's work only lives in its environment."}
+			Detail: "origin can't be pushed to, so this thread's work only lives in its environment: " + why + "."}
 	}
 	git := func(args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, "git", args...)
