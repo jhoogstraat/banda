@@ -53,8 +53,6 @@ jobs:
   # gateway of kind's network (host_ip in deploy/dev.sh).
   e2e:
     runs-on: ubuntu-24.04
-    # ponytail: not one fully green run on Actions yet (see todo.md); drop once it has one.
-    continue-on-error: true
     # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30. The steps have their own
     # limits, below the job's, so a slow run still prints what ran and uploads its artifacts.
     timeout-minutes: 80
@@ -76,8 +74,8 @@ jobs:
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web exec playwright install --with-deps chromium
         timeout-minutes: 15
-      # Twice the runs stalled ~27 minutes in, the kind API server unreachable for minutes: the runner's memory and
-      # biggest processes every 15 s, into the artifact.
+      # The runner's memory and biggest processes every 15 s, into the artifact: the 8 GB runner swapped once
+      # (leaked browser tabs) and stalled the kind API server for minutes.
       - run: |
           mkdir -p /tmp/banda-e2e-usage
           (while sleep 15; do date -u +%T; free -m | sed 1d; ps -eo rss=,pcpu=,args= --sort=-rss | head -10 | cut -c1-160; done) >/tmp/banda-e2e-usage/log 2>&1 &
