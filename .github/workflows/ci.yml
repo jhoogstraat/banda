@@ -76,12 +76,21 @@ jobs:
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web exec playwright install --with-deps chromium
         timeout-minutes: 15
+      # Twice the runs stalled ~27 minutes in, the kind API server unreachable for minutes: the runner's memory and
+      # biggest processes every 15 s, into the artifact.
+      - run: |
+          mkdir -p /tmp/banda-e2e-usage
+          (while sleep 15; do date -u +%T; free -m | sed 1d; ps -eo rss=,pcpu=,args= --sort=-rss | head -10 | cut -c1-160; done) >/tmp/banda-e2e-usage/log 2>&1 &
       - run: mise run e2e
         timeout-minutes: 50
         env:
           E2E_WORKERS: "2"
       - if: always()
         run: df -h /
+      - if: failure() || cancelled()
+        run: |
+          sudo dmesg -T | tail -200 >/tmp/banda-e2e-usage/dmesg
+          kind export logs /tmp/banda-e2e-kind --name banda
       - if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
