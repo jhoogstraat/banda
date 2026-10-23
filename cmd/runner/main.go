@@ -259,6 +259,14 @@ func run(ctx context.Context) error {
 					return fmt.Errorf("claude exited: %w", claude.cmd.Wait())
 				}
 				events, turnEnded, authFailed := translate(raw)
+				// The diff before the turn's end: whoever sees the turn end sees its changes.
+				d := ""
+				if turnEnded && repoURL != "" { // without a repository there is no diff and nothing to push
+					d = redact(diff(ctx))
+					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: d}}}); err != nil {
+						return err
+					}
+				}
 				for _, e := range events {
 					if te := e.GetTurnEnded(); te != nil {
 						// The CLI folds prompts into a running turn, so a result can end
@@ -301,15 +309,9 @@ func run(ctx context.Context) error {
 					authNoticed = false
 					perms.clear()
 				}
-				if turnEnded && repoURL != "" { // without a repository there is no diff and nothing to push
-					d := redact(diff(ctx))
-					if err := sendReq(&bandav1.ConnectRequest{Kind: &bandav1.ConnectRequest_Diff{Diff: &bandav1.Diff{Diff: d}}}); err != nil {
-						return err
-					}
-					if d != lastDiff { // auto-push, so the work also lives on origin
-						lastDiff = d
-						go pushes.push(ctx)
-					}
+				if turnEnded && repoURL != "" && d != lastDiff { // auto-push, so the work also lives on origin
+					lastDiff = d
+					go pushes.push(ctx)
 				}
 			}
 		}

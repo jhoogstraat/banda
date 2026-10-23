@@ -67,6 +67,15 @@ test('turns that change no file store no diffChanged', async ({ as }) => {
 	expect((await t.events()).filter((e) => e.kind.case === 'diffChanged')).toHaveLength(2);
 });
 
+// The runner reported a turn's diff after its end: whoever read the thread as the turn ended could miss its changes.
+test('a turn’s changes are in the thread’s diff by the time the turn ends', async ({ as }) => {
+	const t = await as('alice').create(); // writes hello1.txt
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.turn(() => t.send('write another'));
+	const kinds = (await t.events()).map((e) => e.kind.case).filter((k) => k === 'diffChanged' || k === 'turnEnded');
+	expect(kinds).toEqual(['diffChanged', 'turnEnded', 'diffChanged', 'turnEnded']);
+});
+
 // B20: a watcher whose buffer overflowed was dropped and reconnected, flickering presence and losing the stream.
 test('a watcher that falls behind catches up from the store: the same events as a fresh load, no duplicates or gaps', async ({ as, startApi }) => {
 	const api = await startApi({ WATCH_BUFFER: '4' });

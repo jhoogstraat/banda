@@ -551,5 +551,8 @@ export const test = base.extend<Fixtures>({
 		}
 		// Bound the pods on the shared kind node: the run's namespace goes at the end anyway.
 		if (sandboxes.length) await kube('delete', 'sandbox', ...sandboxes, '--ignore-not-found', '--wait=false');
+		// The users' tabs: Playwright closes only the contexts of its own page fixture, and the worker's browser
+		// outlives the test. Left open they took 12 GB by the end of a run and stalled CI's runner in swap.
+		await Promise.all(browser.contexts().map((c) => c.close()));
 	}
 });
