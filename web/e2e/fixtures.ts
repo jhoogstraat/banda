@@ -317,6 +317,13 @@ export class Thread {
 		return this.user.threads.snooze({ threadId: this.id, until: timestampFromDate(new Date('2099-01-01')) });
 	}
 
+	/** Waits until the thread's pod runs and isn't terminating. It may not exist yet: expect.poll gives up when kubectl
+	 *  says NotFound, so this polls with until. */
+	podRunning(timeout = 120_000) {
+		const phase = () => kube('get', 'pod', this.pod, '--ignore-not-found', '-o', 'jsonpath={.status.phase}{.metadata.deletionTimestamp}');
+		return until(async () => (await phase()) === 'Running', async () => `pod ${this.pod} to run, is ${(await phase()) || 'absent'}`, timeout);
+	}
+
 	/** Waits until the thread's pod is gone (suspended or deleted). */
 	podGone(timeout = 90_000) {
 		return until(async () => !(await exists('pod', this.pod)), () => `pod ${this.pod} is still there`, timeout);

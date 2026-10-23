@@ -183,9 +183,7 @@ test('B8: a prompt posted while the thread is being suspended wins: the environm
 	// here; the idle sweep suspends the same way.
 	const api = await startApi({ TEST_SUSPEND_PAUSE: '5s' });
 	const t = await as('alice', api).create({ repoUrl: repo('setup-hold') });
-	const running = () =>
-		expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}{.metadata.deletionTimestamp}'), { timeout: 90_000 }).toBe('Running');
-	await running();
+	await t.podRunning(90_000);
 	await t.release('setup');
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	// The resumed environment runs its setup again and holds there, past the pause.
@@ -195,7 +193,7 @@ test('B8: a prompt posted while the thread is being suspended wins: the environm
 	await t.send('e2e: wake up');
 	await snoozing;
 	await new Promise((r) => setTimeout(r, 2000));
-	await running(); // and not suspended by the snooze
+	await t.podRunning(90_000); // and not suspended by the snooze
 	await t.release('setup');
 	await t.waitFor('to answer', (i) => i.status === Status.AWAITING_INPUT && i.diff.includes('hello2.txt'));
 });

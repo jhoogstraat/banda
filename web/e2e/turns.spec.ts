@@ -1,6 +1,6 @@
 // Turns: every message reaches the agent, in order, and every turn ends, also when the agent folds a
 // prompt into its turn, is interrupted, crashes or loses the API.
-import { expect, kube, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
+import { expect, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 const said = (text: string) => (e: { kind: { case?: string; value?: unknown } }) =>
 	e.kind.case === 'agentText' && (e.kind.value as { text: string }).text === text;
@@ -12,7 +12,7 @@ const turnsEnded = (t: Thread, n: number) =>
 test('B1(b): a teammate’s note posted while the thread starts reaches the agent', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create({ repoUrl: repo('setup-hold'), prompt: 'first e2e-echo' });
-	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 120_000 }).toBe('Running');
+	await t.podRunning();
 	await t.as(bob).send('TEAMMATE-NOTE use postgres');
 	await t.release('setup');
 	await t.waitForStatus(Status.AWAITING_INPUT);

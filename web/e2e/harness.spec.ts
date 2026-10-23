@@ -57,7 +57,7 @@ test('the git server holds a branch’s push until released', async ({ as }) => 
 
 test('setup-hold keeps a thread starting until released', async ({ as }) => {
 	const t = await as('alice').create({ repoUrl: repo('setup-hold') });
-	await expect.poll(() => kube('get', 'pod', t.pod, '-o', 'jsonpath={.status.phase}'), { timeout: 60_000 }).toBe('Running');
+	await t.podRunning(60_000);
 	await new Promise((r) => setTimeout(r, 3000));
 	expect((await t.get()).status).toBe(Status.STARTING);
 	await t.release('setup');
