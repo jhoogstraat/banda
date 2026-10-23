@@ -17,6 +17,17 @@ What isn't proven is **real use**: no real Claude Code turn has run through Band
 | 5. A non-engineer gets work done | Profiles built; untried with a person |
 | 6. One person installs it from one page | Helm chart, Kustomize and release manifests (docs/deployment.md); never installed outside kind |
 
+## Roadmap (2026-10-24)
+
+Every risk left is the same one: the real thing behaves differently from the fake (agent, forge, cluster, terms). So no new features until real use asks for one. The milestones swap a fake for the real thing, cheapest first. Agents do the work marked for them; the rest needs Joshua.
+
+1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them.
+2. **Dogfood on this Mac** (Joshua; agents fix). The Phase 1 steps that need a person: your own Claude login, the GitHub App on github.com, bob on the LAN, a week of real work, ideally Banda building Banda. Each annoyance becomes a failing e2e test and a fix within a day.
+3. **Cold install** (agents rehearse it, Joshua runs it on the team cluster). Follow docs/deployment.md "Install" word for word on a fresh kind cluster, as a stranger would, and fix every gap in the page; an opt-in ServiceMonitor and alert rules for internal errors and full volumes; a recommendation on multi-node volumes (pin a user's pods to one node, or RWX). Done when one page takes an empty cluster to a signed-in team (vision goal 6).
+4. **Terms, then launch** (agents research, Joshua asks). Collect Anthropic's current public wording on subscription login in hosted tools, shared use and teammate turns, and draft the questions (PLAN.md, open question 3). The open-source launch waits for the answer.
+
+On hold until real use asks for them: waking a parent that is starting or errored, accepting a handoff during the briefing, free replies and option previews on permission prompts, per-thread preview origins, webhooks, several replicas, other harnesses.
+
 ## Phase 1: run it for real on this Mac (Podman + kind)
 
 The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Postgres, Dex).
