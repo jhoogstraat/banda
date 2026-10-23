@@ -7,6 +7,8 @@ A web app where a team builds software together with coding agents. Each thread 
 - [todo.md](todo.md): what is left before Banda runs fully, by phase.
 - [README.md](README.md): what Banda is and the quick start; `docs/`: [usage](docs/usage.md), [configuration](docs/configuration.md) (every setting), [deployment](docs/deployment.md) (Helm, Kustomize, releases), [development](docs/development.md) (dev loop, tests).
 
+When you notice an inefficiency or make a mistake that a clearer instruction would have prevented, improve this file (or the relevant skill or doc) right away so it doesn't happen again.
+
 ## Layout
 
 - `cmd/api`: Go API (Connect RPC, OIDC sign-in, MCP at `/mcp`). `internal/` holds its packages: `api`, `thread` (state machine), `sandbox` (agent-sandbox pods), `store` (Postgres), `tunnel` (preview connections over the runner's stream, shared with the runner).
