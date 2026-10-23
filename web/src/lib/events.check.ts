@@ -53,7 +53,14 @@ if (added?.kind !== 'repo' || added.actor !== 'alice' || added.repo.repoUrl !== 
 apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));
 apply(chat, ev({ case: 'diffChanged', value: {} }));
 const changed = chat.items.at(-1);
-if (changed?.kind !== 'turn' || !changed.diff) throw new Error('diffChanged should mark the turn before it');
+if (changed?.kind !== 'turn' || !changed.diff) throw new Error('diffChanged right after a turn (older history) should mark it');
+apply(chat, ev({ case: 'agentText', value: { text: 'done' } }));
+apply(chat, ev({ case: 'diffChanged', value: {} }));
+apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));
+const ahead = chat.items.at(-1);
+if (ahead?.kind !== 'turn' || !ahead.diff) throw new Error('diffChanged right before a turn ends should mark that turn');
+apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));
+if (chat.items.at(-1)?.kind !== 'turn' || (chat.items.at(-1) as { diff?: boolean }).diff) throw new Error('a turn without a diffChanged should not be marked');
 apply(chat, { seq: 10n, actor: 'bob', kind: { case: 'modeChanged', value: { mode: Mode.CHAT, reason: 'posted' } } } as Event);
 const mode = chat.items.at(-1);
 if (mode?.kind !== 'mode' || mode.actor !== 'bob' || mode.reason !== 'posted') throw new Error('modeChanged should say who switched and why');

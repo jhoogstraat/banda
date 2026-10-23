@@ -42,7 +42,7 @@ export type Item = { key: number } & (
 	// The agent asks before a tool call (`tool`, the call itself when it was streamed); `resolved` once answered.
 	// `votes` are teammates' latest votes on a question (AskUserQuestion), by user.
 	| { kind: 'permission'; req: PermissionRequested; tool: Tool; resolved?: PermissionResolved & { by: string }; votes: Record<string, Record<string, string>> }
-	// `diff`: the turn changed the diff (the diffChanged event right after it).
+	// `diff`: the turn changed the diff (the diffChanged event right before it, in older history right after it).
 	| { kind: 'turn'; turn: TurnEnded; diff?: boolean }
 	// A sub-thread was spawned, finished its turns or failed.
 	| { kind: 'lineage'; actor: string; update: LineageUpdate }
@@ -92,6 +92,8 @@ export type Chat = {
 	};
 	present: string[];
 	typing: Record<string, number>;
+	// A diffChanged waiting for the turn it belongs to.
+	diffAhead: boolean;
 };
 
 export const newChat = (): Chat => ({
@@ -103,7 +105,8 @@ export const newChat = (): Chat => ({
 	tools: new Map(),
 	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), handoffs: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
 	present: [],
-	typing: {}
+	typing: {},
+	diffAhead: false
 });
 
 // Ephemeral events (seq 0) that start an item get keys below zero.
@@ -255,7 +258,8 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'turnEnded':
 			chat.streaming = '';
-			chat.items.push({ key, kind: 'turn', turn: k.value });
+			chat.items.push({ key, kind: 'turn', turn: k.value, diff: chat.diffAhead || undefined });
+			chat.diffAhead = false;
 			break;
 		case 'setupStep': {
 			// A checklist: a step joins the last item's checklist, or replaces its running step with the same id.
@@ -288,8 +292,10 @@ export function apply(chat: Chat, e: Event) {
 			chat.items.push({ key, kind: 'port', port: k.value });
 			break;
 		case 'diffChanged': {
-			const turn = chat.items.findLast((i) => i.kind === 'turn');
-			if (turn) turn.diff = true;
+			// The runner reports a turn's diff right before its end; history from before 2026-10-23 has it right after.
+			const last = chat.items.at(-1);
+			if (last?.kind === 'turn') last.diff = true;
+			else chat.diffAhead = true;
 			break;
 		}
 		case 'agentSettings':
@@ -320,8 +326,8 @@ export function apply(chat: Chat, e: Event) {
 // Prepends older history (the events right before the oldest loaded one, in seq order), giving the
 // same chat as applying everything in order: a group split by the page edge is joined, and calls and
 // results waiting for their tool call are attached.
-// ponytail: a setup checklist split by the page edge stays two checklists, and a turn whose diffChanged
-// starts the newer page has no "View diff".
+// ponytail: a setup checklist split by the page edge stays two checklists, and a turn split from its
+// diffChanged by the page edge has no "View diff".
 export function prepend(chat: Chat, events: Event[]) {
 	const old = newChat();
 	for (const e of events) apply(old, e);
