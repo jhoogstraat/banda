@@ -50,8 +50,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   # deploy/dev.sh e2e on kind with Docker: the API runs on the runner, sandboxes reach it at the
-  # gateway of kind's network (host_ip in deploy/dev.sh).
+  # gateway of kind's network (host_ip in deploy/dev.sh). On main only: changes are tested locally before they land,
+  # and a red main is fixed forward.
   e2e:
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30. The steps have their own
     # limits, below the job's, so a slow run still prints what ran and uploads its artifacts.
