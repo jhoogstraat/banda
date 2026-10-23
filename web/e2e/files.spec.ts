@@ -17,7 +17,7 @@ test('attachments: a chat message’s image is folded into the next prompt as an
 	expect(events.flatMap((e) => (e.kind.case === 'message' ? e.kind.value.attachments.map((a) => a.name) : []))).toContain('dot.png');
 });
 
-test('files are served as uploaded, sandboxed; binaries, files over 5 MB and other people’s uploads are refused', async ({ as }) => {
+test('files are served as uploaded, sandboxed; binaries, files over 5 MB and other people’s uploads are refused', { tag: '@key' }, async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const pngId = await bob.attach('dot.png', 'image/png', png);
 	const txtId = await bob.attach('notes.md', '', '# Notes\nuse ``` fences\n');

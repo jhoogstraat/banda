@@ -185,7 +185,7 @@ test('search finds a teammate’s words and opens the thread at them; the palett
 	});
 });
 
-test('settings: secrets are added, replaced and deleted, never shown; the account switches to an API key and back', async ({ as }) => {
+test('settings: secrets are added, replaced and deleted, never shown; the account switches to an API key and back', { tag: '@key' }, async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/settings');
 	page.on('dialog', (d) => d.accept());

@@ -39,7 +39,7 @@ test('a teammate’s post switches to chat mode; only the owner ends it; the cha
 	]);
 });
 
-test('the inbox stream pushes a new mention live; a teammate’s post makes the thread unread until it is read', async ({ as }) => {
+test('the inbox stream pushes a new mention live; a teammate’s post makes the thread unread until it is read', { tag: '@key' }, async ({ as }) => {
 	const [bob, carol] = [as('bob'), as('carol')];
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -53,7 +53,7 @@ test('the inbox stream pushes a new mention live; a teammate’s post makes the 
 	expect((await t.get()).unread).toBe(true);
 });
 
-test('bob’s new thread shows up live on carol’s team board, then its error', async ({ as }) => {
+test('bob’s new thread shows up live on carol’s team board, then its error', { tag: '@key' }, async ({ as }) => {
 	const [bob, carol] = [as('bob'), as('carol')];
 	const board = listen((signal) => carol.threads.teamWatch({}, { signal }));
 	await board.until(() => true, 'carol’s first board');
@@ -65,7 +65,7 @@ test('bob’s new thread shows up live on carol’s team board, then its error',
 	board.stop();
 });
 
-test('a teammate’s @agent post waits for the owner; approving runs it as the teammate’s turn', async ({ as }) => {
+test('a teammate’s @agent post waits for the owner; approving runs it as the teammate’s turn', { tag: '@key' }, async ({ as }) => {
 	const bob = as('bob');
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);

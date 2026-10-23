@@ -39,7 +39,7 @@ test('a turn streams in: the working agent, its running tool call, then the fold
 	await expect(page.getByText(/\$ cat hello1\.txt\s+hello 1/)).toBeVisible();
 });
 
-test('permission and plan cards: the owner allows a call asked before it streamed (B15) and approves a plan; the teammate waits', async ({ as }) => {
+test('permission and plan cards: the owner allows a call asked before it streamed (B15) and approves a plan; the teammate waits', { tag: '@key' }, async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);

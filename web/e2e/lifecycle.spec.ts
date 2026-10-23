@@ -4,7 +4,7 @@ import { DB, expect, kube, refused, repo, sql, Status, test, type Thread } from 
 
 const steps = async (t: Thread, id: string, state: SetupState) => (await t.of('setupStep')).filter((s) => s.id === id && s.state === state);
 
-test('a thread starts its sandbox, runs the first turn and has its file in the diff', async ({ as }) => {
+test('a thread starts its sandbox, runs the first turn and has its file in the diff', { tag: '@key' }, async ({ as }) => {
 	const t = await as('alice').create({ prompt: 'e2e: add a file' });
 	const info = await t.waitForStatus(Status.AWAITING_INPUT);
 	expect(info.diff).toContain('hello1.txt');

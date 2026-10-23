@@ -28,7 +28,7 @@ async function signIn(browser: Browser, user: string, path = '/') {
 	return page;
 }
 
-test('alice and bob sign in through Dex side by side; signing out ends only alice’s session', async ({ browser }) => {
+test('alice and bob sign in through Dex side by side; signing out ends only alice’s session', { tag: '@key' }, async ({ browser }) => {
 	const [alice, bob] = [await signIn(browser, 'alice'), await signIn(browser, 'bob', '/search?q=hello')];
 	expect((await (await me(alice)).json()).user).toMatchObject({ name: 'alice', email: 'alice@example.com' });
 	expect((await (await me(bob)).json()).user).toMatchObject({ name: 'bob', email: 'bob@example.com' });
@@ -59,7 +59,7 @@ test('a failed sign-in comes back to the sign-in page and says why', async ({ br
 	await expect(page.getByRole('link', { name: 'Sign in with Dex' })).toHaveAttribute('href', '/auth/login?next=%2Fsearch');
 });
 
-test('without a session the API refuses requests, whatever headers they carry', async () => {
+test('without a session the API refuses requests, whatever headers they carry', { tag: '@key' }, async () => {
 	const r = await fetch(`${OIDC_API}/banda.v1.UserService/Me`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', 'X-Banda-User': 'alice' },

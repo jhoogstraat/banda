@@ -5,7 +5,7 @@ import { expect, repo, Status, test } from './fixtures.ts';
 
 const composer = 'Ask the agent…'; // the owner's, in agent mode
 
-test('a thread created from the home page streams the agent’s reply in', async ({ as }) => {
+test('a thread created from the home page streams the agent’s reply in', { tag: '@key' }, async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Choose repository' }).click();
@@ -17,7 +17,7 @@ test('a thread created from the home page streams the agent’s reply in', async
 	await expect(page.getByText('Created hello1.txt with claude-opus-5-5 · high')).toBeVisible({ timeout: 90_000 });
 });
 
-test('bob opens alice’s thread and sees her next message and the agent’s reply live', async ({ as }) => {
+test('bob opens alice’s thread and sees her next message and the agent’s reply live', { tag: '@key' }, async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);

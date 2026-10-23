@@ -51,16 +51,18 @@ jobs:
 
   # deploy/dev.sh e2e on kind with Docker: the API runs on the runner, sandboxes reach it at the
   # gateway of kind's network (host_ip in deploy/dev.sh). On main only: changes are tested locally before they land,
-  # and a red main is fixed forward.
+  # and a red main is fixed forward. Only the tests tagged @key (the main journeys and the security guarantees, about
+  # 6 minutes summed); the whole suite runs locally.
   e2e:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
-    # Playwright's apt dependencies alone took 10 minutes once; the suite takes about 30. The steps have their own
-    # limits, below the job's, so a slow run still prints what ran and uploads its artifacts.
+    # Playwright's apt dependencies alone took 10 minutes once; the cluster and images take about 6, the @key tests
+    # about 4. The steps have their own limits, below the job's, so a slow run still prints what ran and uploads its
+    # artifacts.
     timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
-      # The images, kind's copy of them and ~200 tests' sandboxes fill the runner's disk: drop toolchains it never uses.
+      # The images, kind's copy of them and the tests' sandboxes fill the runner's disk: drop toolchains it never uses.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
@@ -76,15 +78,36 @@ jobs:
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web exec playwright install --with-deps chromium
         timeout-minutes: 15
+      # Without it the API's build downloads every module and compiles client-go. Keyed on go.sum only, so it is
+      # saved when the dependencies change, not on every push.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum', 'mise.toml') }}
+          restore-keys: go-${{ runner.os }}-
+      # The fake sandbox image from the images job's layer cache: deploy/dev.sh then builds neither it nor the dev
+      # image (E2E_IMAGE), about 2 minutes uncached.
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/sandbox.Dockerfile
+          target: fake
+          tags: localhost/banda-sandbox:e2e
+          load: true
+          cache-from: type=gha,scope=sandbox
       # The runner's memory and biggest processes every 15 s, into the artifact: the 8 GB runner swapped once
       # (leaked browser tabs) and stalled the kind API server for minutes.
       - run: |
           mkdir -p /tmp/banda-e2e-usage
           (while sleep 15; do date -u +%T; free -m | sed 1d; ps -eo rss=,pcpu=,args= --sort=-rss | head -10 | cut -c1-160; done) >/tmp/banda-e2e-usage/log 2>&1 &
-      - run: mise run e2e
+      - run: mise run e2e -- --grep @key
         timeout-minutes: 50
         env:
           E2E_WORKERS: "2"
+          E2E_IMAGE: localhost/banda-sandbox:e2e
       - if: always()
         run: df -h /
       - if: failure() || cancelled()

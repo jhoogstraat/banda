@@ -24,7 +24,7 @@ const mcpStatus = async (api: string, threadId: string, token: string) =>
 	).status;
 
 test.describe('network', () => {
-	test('F1, F4: a sandbox reaches the API, the git server and the internet, and nothing else in the cluster or on the host', async ({ as }) => {
+	test('F1, F4: a sandbox reaches the API, the git server and the internet, and nothing else in the cluster or on the host', { tag: '@key' }, async ({ as }) => {
 		const alice = as('alice');
 		const [a, b] = [await alice.create(), await as('bob').create()];
 		await a.waitForStatus(Status.AWAITING_INPUT);
@@ -51,7 +51,7 @@ test.describe('network', () => {
 		for (const [what, [host, port]] of Object.entries(closed)) expect(await reaches(a.pod, host, port), what).toBe(false);
 	});
 
-	test('F1: Postgres accepts connections only from the API, not from other pods', async () => {
+	test('F1: Postgres accepts connections only from the API, not from other pods', { tag: '@key' }, async () => {
 		expect(await reaches('e2e-git', 'postgres.banda.svc.cluster.local', 5432)).toBe(false);
 	});
 });
@@ -125,7 +125,7 @@ test.describe('pods', () => {
 		return token;
 	}
 
-	test('F6, F9, F2: thread and login pods have resource limits, no service account token, and their runner token from a Secret', async ({ as }) => {
+	test('F6, F9, F2: thread and login pods have resource limits, no service account token, and their runner token from a Secret', { tag: '@key' }, async ({ as }) => {
 		const alice = as('alice');
 		const t = await alice.create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
@@ -136,7 +136,7 @@ test.describe('pods', () => {
 });
 
 test.describe('tokens', () => {
-	test('F2: nothing the database holds for a thread or its owner works as their runner token', async ({ as }) => {
+	test('F2: nothing the database holds for a thread or its owner works as their runner token', { tag: '@key' }, async ({ as }) => {
 		const alice = as('alice');
 		const t = await alice.create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
@@ -156,7 +156,7 @@ test.describe('tokens', () => {
 	/** Runs a second runner in the thread's pod, with its environment (and so its token), for up to 15 s. */
 	const secondRunner = (t: Thread, home = '/tmp/second') => kexec(t.pod, `mkdir -p ${home}; HOME=${home} timeout 15 runner 2>&1; echo exit=$?`);
 
-	test('F2: a second runner with the thread’s token can’t take over a live runner', async ({ as }) => {
+	test('F2: a second runner with the thread’s token can’t take over a live runner', { tag: '@key' }, async ({ as }) => {
 		const t = await as('alice').create();
 		await t.waitForStatus(Status.AWAITING_INPUT);
 		const out = await secondRunner(t);
@@ -204,7 +204,7 @@ test.describe('browser', () => {
 	// Regression guards for what open risk 6 relies on (PLAN.md): all pass since round 3.
 	const list = `${API}/banda.v1.ThreadService/ListThreads`;
 
-	test('F8: the Connect API refuses CORS-simple requests and answers no preflight', async () => {
+	test('F8: the Connect API refuses CORS-simple requests and answers no preflight', { tag: '@key' }, async () => {
 		const simple = await fetch(list, { method: 'POST', headers: { 'Content-Type': 'text/plain', 'X-Banda-User': 'e2e-csrf' }, body: '{}' });
 		expect(simple.status).toBe(415);
 		const form = await fetch(list, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Banda-User': 'e2e-csrf' }, body: 'a=b' });
@@ -217,7 +217,7 @@ test.describe('browser', () => {
 		expect(preflight.headers.get('access-control-allow-credentials')).toBeNull();
 	});
 
-	test('F8: uploads from another site are refused; pages refuse frames', async ({ as }) => {
+	test('F8: uploads from another site are refused; pages refuse frames', { tag: '@key' }, async ({ as }) => {
 		const alice = as('alice');
 		for (const site of ['cross-site', 'same-site']) {
 			const r = await fetch(`${API}/files?name=a.txt`, { method: 'POST', headers: { 'Content-Type': 'text/plain', 'X-Banda-User': alice.id, 'Sec-Fetch-Site': site }, body: 'x' });

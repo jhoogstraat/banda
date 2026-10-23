@@ -60,7 +60,8 @@ host_ip() {
 cluster() {
 	if ! kind get clusters 2>/dev/null | grep -qx banda; then
 		mise run cluster
-		mise run image
+		# E2E_IMAGE (CI): the e2e suite brings its image, it needs no dev image.
+		[ -n "${E2E_IMAGE:-}" ] || mise run image
 	else
 		$C start banda-control-plane >/dev/null
 		for _ in $(seq 60); do kc get nodes >/dev/null 2>&1 && break; sleep 2; done
@@ -108,6 +109,7 @@ servers() {
 # a git server and Dex), database banda_e2e_<run>, image localhost/banda-sandbox:fake-<run> and two APIs
 # on free ports (dev auth, and OIDC for the sign-in tests), serving the web build. <run> comes from the
 # checkout path; a rerun wipes its world first. E2E_KEEP=1 keeps the namespace and database.
+# E2E_IMAGE names a fake image built already (CI builds it from the images job's layer cache).
 e2e() {
 	run=$(printf %s "$PWD" | shasum | cut -c1-8)
 	LOG=/tmp/banda-e2e-$run ns=banda-e2e-$run db=banda_e2e_$run
@@ -118,7 +120,7 @@ e2e() {
 	echo $$ >"$LOG/pid"
 	PIDS=()
 	trap e2e_down EXIT
-	export SANDBOX_IMAGE=localhost/banda-sandbox:fake-$run
+	export SANDBOX_IMAGE=${E2E_IMAGE:-localhost/banda-sandbox:fake-$run}
 	TARGET=fake mise run image >"$LOG/image.log" 2>&1 & local image=$!
 	go build -o "$LOG/api" ./cmd/api & local api=$!
 	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!

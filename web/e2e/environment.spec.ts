@@ -9,7 +9,7 @@ test('push reports its result as a notice', async ({ as }) => {
 	await t.waitForEvent((e) => e.kind.case === 'notice' && e.kind.value.text.startsWith('Push'), 'the push notice', 20_000);
 });
 
-test('snoozing suspends the environment; a prompt resumes it with the checkout intact, the settings changed while paused and its images', async ({ as }) => {
+test('snoozing suspends the environment; a prompt resumes it with the checkout intact, the settings changed while paused and its images', { tag: '@key' }, async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -32,7 +32,7 @@ test('snoozing suspends the environment; a prompt resumes it with the checkout i
 
 const sandbox = (id: string, field: string) => kube('get', 'sandbox', `t-${id}`, '-o', `jsonpath={.spec.${field}}`);
 
-test('auto-push and settling: commits reach origin; settling schedules deletion, unsettling cancels it; after the delay the owner recreates the environment from the pushed branch', async ({ as }) => {
+test('auto-push and settling: commits reach origin; settling schedules deletion, unsettling cancels it; after the delay the owner recreates the environment from the pushed branch', { tag: '@key' }, async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create({ prompt: 'e2e: commit a file' });
 	await t.waitForStatus(Status.AWAITING_INPUT);

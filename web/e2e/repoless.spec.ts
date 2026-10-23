@@ -4,7 +4,7 @@ import { expect, kube, refused, repo, sql, Status, test, until, type Thread } fr
 
 const files = async (t: Thread) => (await t.user.threads.listFiles({ threadId: t.id })).paths;
 
-test('a thread without a repository: no branches, setup or pushes; its turn writes files in an empty folder that settling keeps and a prompt resumes', async ({ as }) => {
+test('a thread without a repository: no branches, setup or pushes; its turn writes files in an empty folder that settling keeps and a prompt resumes', { tag: '@key' }, async ({ as }) => {
 	const alice = as('alice');
 	const word = `quokka${Date.now()}`;
 	const t = await alice.create({ repoUrl: '', baseBranch: 'main', prompt: `e2e: write a file ${word}` });

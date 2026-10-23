@@ -2,13 +2,13 @@
 import { request } from '@playwright/test';
 import { collect, expect, kube, refused, sql, Status, test, type User } from './fixtures.ts';
 
-test('terminal runs commands in the sandbox', async ({ as }) => {
+test('terminal runs commands in the sandbox', { tag: '@key' }, async ({ as }) => {
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	expect(await t.terminal('echo e2e-terminal-$((6*7))')).toContain('e2e-terminal-42');
 });
 
-test('the owner’s secrets are in the environment (no API key), and redacted from files, the diff and the database', async ({ as }) => {
+test('the owner’s secrets are in the environment (no API key), and redacted from files, the diff and the database', { tag: '@key' }, async ({ as }) => {
 	const alice = as('alice');
 	const secret = `e2e-secret-${Date.now()}`;
 	await alice.settings.setSecret({ name: 'E2E_SECRET', value: secret });
@@ -27,7 +27,7 @@ test('the owner’s secrets are in the environment (no API key), and redacted fr
 	});
 });
 
-test('files are listed; paths outside the checkout are refused', async ({ as }) => {
+test('files are listed; paths outside the checkout are refused', { tag: '@key' }, async ({ as }) => {
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	expect((await t.user.threads.listFiles({ threadId: t.id })).paths).toContain('README');
@@ -36,7 +36,7 @@ test('files are listed; paths outside the checkout are refused', async ({ as }) 
 
 const ports = (u: User, threadId: string, wake = false) => collect((signal) => u.threads.previewWatch({ threadId, wake }, { signal })).then((r) => r.filter((p) => !p.keepalive));
 
-test('the preview lists the dev server the agent started, to teammates too, and serves it only with the cookie from PreviewOpen', async ({ as }) => {
+test('the preview lists the dev server the agent started, to teammates too, and serves it only with the cookie from PreviewOpen', { tag: '@key' }, async ({ as }) => {
 	const bob = as('bob');
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);

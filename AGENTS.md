@@ -28,8 +28,8 @@ When you notice an inefficiency or make a mistake that a clearer instruction wou
 
 ## Checks
 
-- `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. A bug fix comes with an e2e test that fails before it; a known bug not fixed yet is reproduced in its spec as `test.fail()`.
-- `node web/src/lib/events.check.ts`: web event reducer. `pnpm -C web check`: Svelte types. `mise run chart-check`: the chart and Kustomize overlays. CI (`.github/workflows`) runs these on pull requests and on `main`, the e2e suite only on `main` (about 30 minutes); a `v*` tag releases images and the chart.
+- `mise run test`: Go unit tests. `mise run e2e`: the end-to-end suite (API and browser) against the kind cluster, in a namespace and database of its own, so checkouts run it side by side. `mise run e2e -- e2e/permissions.spec.ts` runs one file, `-- -g "<title>"` matching tests. Key tests (the main journeys and security guarantees) are tagged `@key`: `mise run e2e -- --grep @key`. A bug fix comes with an e2e test that fails before it; a known bug not fixed yet is reproduced in its spec as `test.fail()`.
+- `node web/src/lib/events.check.ts`: web event reducer. `pnpm -C web check`: Svelte types. `mise run chart-check`: the chart and Kustomize overlays. CI (`.github/workflows`) runs these on pull requests and on `main`, the `@key` e2e tests only on `main`; a `v*` tag releases images and the chart.
 
 ## Git
 

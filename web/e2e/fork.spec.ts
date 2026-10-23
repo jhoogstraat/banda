@@ -18,7 +18,7 @@ test('a teammate forks a thread with commits: the fork is theirs, starts from th
 	expect((await src.of('forkNote')).filter((n) => n.threadId === fork.id)).toHaveLength(1);
 });
 
-test('a race of 2 runs both tries on their models; compare shows them; picking one settles and pauses the other and notes it in both', async ({ as }) => {
+test('a race of 2 runs both tries on their models; compare shows them; picking one settles and pauses the other and notes it in both', { tag: '@key' }, async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const { threads } = await alice.threads.race({ repoUrl: repo(), baseBranch: 'main', prompt: 'e2e: race', tries: [{}, { model: 'claude-sonnet-5-5' }] });
 	const [a, b] = threads.map((t) => alice.thread(t.id));

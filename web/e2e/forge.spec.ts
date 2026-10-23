@@ -35,7 +35,7 @@ async function open(user: User, id: string) {
 
 const pane = (page: Page) => page.getByRole('tabpanel');
 
-test('the owner opens a pull request from the dialog; the header chip, the tab and a line when its checks fail, which reaches the agent', async ({ as, startApi, forge }) => {
+test('the owner opens a pull request from the dialog; the header chip, the tab and a line when its checks fail, which reaches the agent', { tag: '@key' }, async ({ as, startApi, forge }) => {
 	const { alice, t } = await world(as, startApi, forge);
 	const title = (await t.get()).title;
 	const page = await open(alice, t.id);

@@ -19,7 +19,7 @@ test('login environment: logout and login in its terminal update the login state
 	expect(pod.spec.volumes.filter((v: object) => 'secret' in v || 'persistentVolumeClaim' in v)).toHaveLength(1);
 });
 
-test('secrets: set, reserved and invalid names and subscription tokens refused, values never returned', async ({ as }) => {
+test('secrets: set, reserved and invalid names and subscription tokens refused, values never returned', { tag: '@key' }, async ({ as }) => {
 	const alice = as('alice');
 	const secret = `e2e-secret-${Date.now()}`;
 	await alice.settings.setSecret({ name: 'E2E_SECRET', value: secret });
