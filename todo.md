@@ -26,6 +26,16 @@ Every risk left is the same one: the real thing behaves differently from the fak
 3. **Cold install** (agents rehearse it, Joshua runs it on the team cluster). Follow docs/deployment.md "Install" word for word on a fresh kind cluster, as a stranger would, and fix every gap in the page; an opt-in ServiceMonitor and alert rules for internal errors and full volumes; a recommendation on multi-node volumes (pin a user's pods to one node, or RWX). Done when one page takes an empty cluster to a signed-in team (vision goal 6).
 4. **Terms, then launch** (agents research, Joshua asks). Collect Anthropic's current public wording on subscription login in hosted tools, shared use and teammate turns, and draft the questions (PLAN.md, open question 3). The open-source launch waits for the answer.
 
+**Features**, until the dogfood week ends:
+
+- **Add** only what turns a signal the real CLI already sends into honest state (principles 6 and 7). Each comes with a contract test on milestone 1's fake Messages API, so it waits for milestone 1. The runner drops `rate_limit_event`, `compact_boundary` and every `api_retry` except auth errors today:
+  - usage limits: each person has one limit, shared by all their threads (one login per person) and spent faster in Banda than in a terminal, since that's the point. Show the reset time once per person (the board, their threads); hold queued prompts, races and sub-threads; resume when the limit resets; a teammate can carry on in a fork on their own subscription;
+  - retries and overload as one calm status line, not a spinner that says nothing;
+  - compaction as a line in the chat;
+  - the CLI's own slash commands and skills offered in the composer.
+- **Freeze** the forges (no new forge feature until github.com and a GitLab are verified) and workload identity (no new recipe until one has worked against a real vault).
+- **Cut** after the week whatever nobody used. Candidates: the Pull request tab's conversation and merging (the forge's page is one click away), person pages beside the board's columns, and whichever of the five "what needs me" views (Needs input, Decisions, the board's Needs them, the morning brief, notifications) nobody opens.
+
 On hold until real use asks for them: waking a parent that is starting or errored, accepting a handoff during the briefing, free replies and option previews on permission prompts, per-thread preview origins, webhooks, several replicas, other harnesses.
 
 ## Phase 1: run it for real on this Mac (Podman + kind)
