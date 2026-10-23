@@ -1,0 +1,47 @@
+{{- /* For the Prometheus operator (kube-prometheus-stack): both off by default, see monitoring in values.yaml. */}}
+{{- with .Values.monitoring }}
+{{- if and .serviceMonitor.enabled $.Values.api.enabled $.Values.api.metricsPort }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: banda-api
+  labels:
+    {{- include "banda.labels" $ | nindent 4 }}
+    {{- with .labels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  namespaceSelector: {matchNames: [{{ $.Release.Namespace }}]}
+  selector:
+    matchLabels: {app.kubernetes.io/part-of: banda}
+  endpoints:
+    - port: metrics # only banda-api's Service has it
+{{- end }}
+{{- if .prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: banda
+  labels:
+    {{- include "banda.labels" $ | nindent 4 }}
+    {{- with .labels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  groups:
+    - name: banda
+      rules:
+        - alert: BandaInternalErrors
+          expr: increase(banda_internal_errors_total{namespace="{{ $.Release.Namespace }}"}[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: Banda logged internal errors in the last 10 minutes
+            description: 'kubectl -n {{ $.Release.Namespace }} logs deploy/banda-api | grep "internal error"'
+        # The kubelet's numbers, not Banda's: threads' volumes, users' Claude volumes, Postgres's.
+        - alert: BandaVolumeFull
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="{{ $.Release.Namespace }}", persistentvolumeclaim=~"home-t-.*|claude-.*|data-postgres-0|postgres-backup"}
+              / kubelet_volume_stats_capacity_bytes > {{ .prometheusRule.volumeFull }}
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: 'Volume {{ "{{ $labels.persistentvolumeclaim }}" }} is {{ "{{ $value | humanizePercentage }}" }} full'
+{{- end }}
+{{- end }}

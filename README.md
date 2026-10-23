@@ -46,9 +46,11 @@ Banda needs a Kubernetes cluster whose CNI enforces NetworkPolicy, the [agent-sa
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
 helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-namespace \
-  --set ingress.enabled=true,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=banda-tls \
+  --set ingress.enabled=true,ingress.className=nginx,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=banda-tls \
   --set oidc.issuer=https://login.example.com,oidc.clientSecret=... --set podCIDR=10.42.0.0/16
 ```
+
+Step by step, with what to have ready (an ingress class, the pod network, TLS) and a bundled Dex instead of a provider: [docs/deployment.md, "Install"](docs/deployment.md#install).
 
 | Option | For |
 |---|---|

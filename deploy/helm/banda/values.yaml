@@ -102,6 +102,16 @@ postgres:
   # Dev only: a NodePort for an API outside the cluster.
   nodePort: null
 
+# For the Prometheus operator's CRDs (kube-prometheus-stack). Add the labels its
+# Prometheus selects, e.g. {release: kube-prometheus-stack}.
+monitoring:
+  # Scrapes the API's /metrics (api.metricsPort).
+  serviceMonitor: {enabled: false, labels: {}}
+  # Alerts BandaInternalErrors (banda_internal_errors_total rose in 10 min) and
+  # BandaVolumeFull (a thread's, a user's Claude or Postgres's volume above
+  # volumeFull for 15 min, from the kubelet's kubelet_volume_stats_*).
+  prometheusRule: {enabled: false, labels: {}, volumeFull: 0.9}
+
 # Dex, a small OIDC provider with static users, for demos and dev. The API
 # serves it at <publicUrl>/dex (DEX_URL), so it needs no host of its own.
 dex:

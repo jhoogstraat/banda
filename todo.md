@@ -70,7 +70,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Ingress on a real cluster: confirm a quiet thread page stays connected for minutes behind the team's controller.
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [x] Versioned schema migrations: `internal/store/migrations/NNNN_*.sql`, each once, under an advisory lock (docs/development.md).
-- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", is the start; it needs a run on a real cluster.
+- [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", was followed word for word on a fresh kind cluster with ingress-nginx and the bundled Dex (Helm and Kustomize, 2026-10-24); it needs a run on the team cluster with a real provider and TLS.
 - [ ] Decide on Claude: confirm the persistent login volume and teammate turns with Anthropic (PLAN.md, open question 3) before more than the core team uses it.
 
 ## Open-source launch
@@ -90,7 +90,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] `SANDBOX_EGRESS_ALLOW` for the private networks agents need (git host, staging); a read-only kubeconfig as a team secret for DevOps, or better a kubeconfig with `tokenFile` and workload identity.
 - [ ] Workload identity against the real systems: Banda on https, then each recipe in Settings (OpenBao/Vault, Infisical, AWS, GCP, Kubernetes) end to end, and a key rotation (docs/deployment.md); only the tokens themselves are tested so far.
 - [x] Monitoring: `/metrics` on `METRICS_ADDR` (threads by status, sandboxes, runners, internal errors, uptime); logs on stdout. PVC disk use comes from the kubelet's `kubelet_volume_stats_*`, not Banda.
-- [ ] Monitoring on the team cluster: a scrape config (or ServiceMonitor) and alerts on internal errors and full volumes.
+- [ ] Monitoring on the team cluster: the chart's opt-in ServiceMonitor and PrometheusRule (`monitoring.*`) are only rendered, never run against a Prometheus operator.
 
 ## Built 2026-10-22 (needs real use)
 

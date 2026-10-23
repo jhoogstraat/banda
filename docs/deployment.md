@@ -1,28 +1,64 @@
 # Deployment
 
-Checked against the repo on 2026-10-22. Banda runs on one Mac in Podman (kind) for development, and on a cluster a team shares. It is open source under MIT, so strangers install it with values nobody can predict.
+Checked against the repo on 2026-10-24; "Install" followed word for word on a fresh kind cluster. Banda runs on one Mac in Podman (kind) for development, and on a cluster a team shares. It is open source under MIT, so strangers install it with values nobody can predict.
 
 Settings are in [configuration.md](configuration.md).
 
 ## Install
 
-Banda needs a Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and the [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller, which is cluster-wide and not part of the chart:
+From an empty cluster to a signed-in team. You need:
 
-```sh
-kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
-```
+- A Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and a default StorageClass (`kubectl get storageclass`).
+- An ingress controller, and its IngressClass name (`kubectl get ingressclass`).
+- Two hostnames pointing at the ingress controller, e.g. `banda.example.com` and `preview.banda.example.com` (the Browser tab; a sibling or subdomain of the first), and a TLS Secret covering both in the namespace `banda` (`kubectl create namespace banda` first), from cert-manager or `kubectl -n banda create secret tls banda-tls --cert=... --key=...`.
+- Your cluster's pod network, e.g. `kubectl cluster-info dump | grep -m1 -o -- '--cluster-cidr=[^"]*'` (a node's `spec.podCIDR` is only its slice).
+- An OIDC provider with a client for Banda and the redirect URI `https://banda.example.com/auth/callback`; or none, with the bundled Dex below.
 
-Everything else is the Helm chart `deploy/helm/banda`, released to `oci://ghcr.io/jhoogstraat/charts/banda` with images `ghcr.io/jhoogstraat/banda-api` and `banda-sandbox` (amd64 and arm64) of the same version. Its [values](../deploy/helm/banda/values.yaml) are the settings above: `publicUrl`, `ingress.*` (Banda and the preview on sibling hosts, with TLS), `oidc.*` or `dex.*`, `postgres.*` (bundled, or `postgres.enabled=false` and your own `DATABASE_URL`), `podCIDR` (your pod network, for the ingress policies), `egressAllow`, and `api.env` for the rest.
+1. The [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller, which is cluster-wide and not part of the chart:
 
-```sh
-helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-namespace \
-  --set ingress.enabled=true,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=banda-tls \
-  --set oidc.issuer=https://login.example.com,oidc.clientSecret=... --set podCIDR=10.42.0.0/16
-```
+   ```sh
+   kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+   ```
 
-Register `$PUBLIC_URL/auth/callback` with your provider. To try it without one, `--set dex.enabled=true` with `dex.users` (see `deploy/kustomize/kind/values.yaml`): the API serves Dex at `$PUBLIC_URL/dex`, so it needs no host of its own (see "Sign-in with the bundled Dex" below). The session secret, both Postgres passwords and the Dex client secret are generated on install and kept on upgrades.
+2. A values file, `banda.values.yaml` (every value: [values.yaml](../deploy/helm/banda/values.yaml); the API's settings: [configuration.md](configuration.md), through `api.env`):
 
-Without Helm: every release has `banda.yaml`, the chart rendered as the Kustomize base renders it, and `deploy/kustomize/base` inflates the chart for Kustomize (`kubectl kustomize --enable-helm`, which runs `helm`); `deploy/kustomize/example` patches it for a real cluster. Neither can keep generated secrets, so both read their settings from a Secret you create first:
+   ```yaml
+   podCIDR: 10.42.0.0/16
+   ingress:
+     enabled: true
+     className: nginx
+     host: banda.example.com
+     previewHost: preview.banda.example.com
+     tlsSecret: banda-tls
+   oidc:
+     issuer: https://login.example.com
+     clientSecret: ...
+     providerName: Acme # "Sign in with Acme"
+   ```
+
+   Without a provider, replace `oidc` with the bundled Dex and a user per teammate. The API serves it at `https://banda.example.com/dex`, so it needs no host of its own ("Sign-in with the bundled Dex" below). The password hash is bcrypt: `htpasswd -nbBC 10 "" <password> | cut -d: -f2`; `userID` is any unique string, e.g. from `uuidgen`.
+
+   ```yaml
+   dex:
+     enabled: true
+     users:
+       - {email: ann@example.com, username: ann, userID: 1f0c2a52-..., hash: "$2y$10$..."}
+   ```
+
+3. The chart, released to `oci://ghcr.io/jhoogstraat/charts/banda` with the images `ghcr.io/jhoogstraat/banda-api` and `banda-sandbox` (amd64 and arm64) of the same version. The session secret, both Postgres passwords and Dex's client secret are generated on install and kept on upgrades.
+
+   ```sh
+   helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-namespace -f banda.values.yaml
+   kubectl -n banda rollout status deployment/banda-api
+   ```
+
+4. Open `https://banda.example.com` and sign in. Before the first thread, each teammate connects Claude Code once (**Connect** above the composer): it opens Claude Code's login in a terminal, and the login is shared by all their threads. Then [usage.md](usage.md). Each thread's pod starts in the namespace `banda`: `kubectl -n banda get pods`.
+
+Upgrades: `helm upgrade banda oci://ghcr.io/jhoogstraat/charts/banda -n banda -f banda.values.yaml --version <new>`.
+
+### Without Helm
+
+Every release has `banda.yaml`, the chart rendered as the Kustomize base renders it, and `deploy/kustomize/base` inflates the chart for Kustomize (`kubectl kustomize --enable-helm`, which runs `helm`); `deploy/kustomize/example` patches it for a real cluster. Neither can keep generated secrets, so both read their settings from a Secret you create first:
 
 ```sh
 kubectl create namespace banda
@@ -31,7 +67,7 @@ kubectl -n banda create secret generic banda-api --from-literal=SESSION_SECRET=$
 kubectl -n banda apply -f https://github.com/jhoogstraat/banda/releases/download/v1.0.0/banda.yaml
 ```
 
-The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` to `http://localhost:8787` (a port-forward) and `SANDBOX_IMAGE` to the release's, so patch the first for an ingress, as the example overlay does, and add the Ingress.
+The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` to `http://localhost:8787` (a port-forward) and `SANDBOX_IMAGE` to the release's, so patch the first for an ingress, as the example overlay does, and add the Ingress. Apply an overlay with `kubectl kustomize --enable-helm <overlay> | kubectl -n banda apply -f -`: the `-n` matters, as Kustomize leaves what a chart inflated without a namespace, which would otherwise land in `default`. Neither has Dex: for that, an overlay inflates the chart itself with its values, as `deploy/kustomize/kind` does, with `api.existingSecret: banda-api`, `dex.enabled` and `dex.users` (the Secret then needs only `OIDC_CLIENT_SECRET` of the OIDC settings).
 
 ### In kind
 
@@ -192,4 +228,4 @@ Also in [todo.md](../todo.md).
   ```
 
   Other controllers have their own (Traefik's `respondingTimeouts` on the entry point, a cloud load balancer's idle timeout): keep them above 25 s.
-- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job or ServiceMonitor at it. Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume). Logs go to stdout.
+- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job at it, or with the Prometheus operator set `monitoring.serviceMonitor.enabled`. Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume), not Banda's. `monitoring.prometheusRule.enabled` adds two alerts: `BandaInternalErrors` when `banda_internal_errors_total` rose in the last 10 minutes, and `BandaVolumeFull` when a thread's, a user's Claude or Postgres's volume is fuller than `volumeFull` (0.9) for 15 minutes, from the kubelet's numbers. Both resources take `labels` for the Prometheus that should select them (kube-prometheus-stack: `release: <its release>`). Logs go to stdout.
