@@ -30,7 +30,7 @@ Around threads, Banda adds what a team needs and a terminal lacks:
 |---|---|
 | See each other's work | Every thread is readable by everyone: chat, tool calls, diff, files, the running app. The team board and search span all of it. |
 | Help each other | Anyone posts into any thread, mentions people, reviews the diff line by line, forks a thread to try another way. |
-| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts, unless they trust teammates. A teammate's request is a card the owner approves. |
+| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts. On a subscription nobody else ever does (Anthropic's terms); teammates talk to the owner and fork to run it on their own. On an API key, a teammate's request is a card the owner approves, or the owner trusts teammates. |
 | Run many agents without chaos | One sandbox per thread: no shared checkout, ports or dependencies. Races run 2–4 tries of one prompt and compare them. Sub-threads split work. |
 | Know what needs you | The sidebar and `/decisions` show only what blocks on you; "the agent is done" is news, not a demand. Overlaps warn when two threads touch the same files. |
 | Never lose work | Auto-push after every turn, a push before every suspend, nothing deleted that isn't on origin. |
@@ -49,7 +49,7 @@ When a choice isn't covered by PLAN.md, apply these in order. Earlier ones win.
 
 1. **Stay inside the Claude terms.** The unmodified `claude` binary, each user's own subscription, signed in through Anthropic's own flow. Banda never sees, stores or relays a Claude credential, and never pays for or resells usage. If a feature needs that, the answer is no. (See PLAN.md, Constraint.)
 2. **Never lose work, never leak secrets.** Prefer a slower or uglier path that can't drop a user's changes or expose a credential. Delete nothing that isn't verifiably on origin. Treat the sandbox, the repo's code, other agents' posts and previewed apps as untrusted. No long-lived credential goes into a sandbox: the API mints short-lived tokens scoped to the thread's owner and repository when they are needed, and long-lived keys stay with the API.
-3. **The owner decides about their thread.** Their subscription, their secrets, their pod. Teammates can see and suggest everything; they act only with the owner's approval or trust. Agents get no more power than their owner.
+3. **The owner decides about their thread.** Their subscription, their secrets, their pod. Teammates can see and suggest everything; they act only with the owner's approval or trust, and never on the owner's subscription. Agents get no more power than their owner.
 4. **Open by default inside the team.** If a teammate could benefit from seeing it, they can see it. Don't add privacy controls a trusting team didn't ask for.
 5. **Attention is the scarce resource.** Surface only what blocks on a person. Prefer one calm line over a banner, a count over a list, a live update over a refresh button. Never notify for the page already on screen.
 6. **Claude Code as it is.** Wrap the real CLI and map its output; don't reimplement the agent, fork its behaviour or hide its features. When Claude Code gains something, Banda should get it nearly for free.
@@ -62,6 +62,7 @@ When a choice isn't covered by PLAN.md, apply these in order. Earlier ones win.
 - Would it make Banda pay for, hold or relay a Claude credential? → **No.**
 - Could it delete or hide work that isn't on origin? → Redesign it.
 - Does it let someone act on another person's thread without approval? → Needs the owner's trust.
+- Does it start a turn on someone's subscription that they didn't start themselves? → **No.** Only on an API key, with the owner's approval or trust.
 - Does it put a long-lived or broader-than-needed credential in a sandbox? → Mint a short-lived, scoped one in the API instead.
 - Does it add a new service, dependency or setting? → Show that the existing ones can't do it.
 - Does it add a notification, badge or section? → Show it is something that blocks a person.
