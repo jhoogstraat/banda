@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -42,6 +43,8 @@ type line struct {
 	Result       string  `json:"result"`
 	DurationMS   int64   `json:"duration_ms"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
+	// user: a tool's structured result; the task tools' say a task changed.
+	ToolUseResult json.RawMessage `json:"tool_use_result"`
 	// The prompts this turn ended (their uuid): its own and those folded into it.
 	UserMessageUUIDs []string `json:"user_message_uuids"`
 	// system/api_retry
@@ -115,6 +118,13 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 				events = append(events, &bandav1.Event{Kind: &bandav1.Event_ToolResult{ToolResult: &bandav1.ToolResult{ToolCallId: b.ToolUseID, Output: text(b.Content), IsError: b.IsError}}})
 			}
 		}
+		var task struct {
+			Task   json.RawMessage `json:"task"`
+			TaskID string          `json:"taskId"`
+		}
+		if json.Unmarshal(l.ToolUseResult, &task) == nil && (task.Task != nil || task.TaskID != "") {
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_PlanChanged{PlanChanged: &bandav1.PlanChanged{Items: plan()}}})
+		}
 	case "result":
 		if sub {
 			return nil, false, false
@@ -141,6 +151,30 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 			Id: l.RequestID, Decision: bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED}}})
 	}
 	return events, false, false
+}
+
+// plan is the session's task list as the CLI keeps it, one file per task
+// (<config>/tasks/<session>/<id>.json), in the order they were created. The
+// task tools change one task per call, so the files are the whole list, also
+// after a restart. See docs/research/claude-headless.md §3.
+func plan() []*bandav1.PlanItem {
+	files, _ := filepath.Glob(filepath.Join(configDir(), "tasks", sessionID(threadID+os.Getenv("BANDA_SESSION_KEY")), "*.json"))
+	type task struct {
+		ID, Subject, Status, ActiveForm string
+	}
+	var tasks []task
+	for _, f := range files {
+		var t task
+		if b, err := os.ReadFile(f); err == nil && json.Unmarshal(b, &t) == nil && t.Status != "deleted" {
+			tasks = append(tasks, t)
+		}
+	}
+	slices.SortFunc(tasks, func(a, b task) int { return cmp.Or(cmp.Compare(len(a.ID), len(b.ID)), cmp.Compare(a.ID, b.ID)) })
+	items := []*bandav1.PlanItem{}
+	for _, t := range tasks {
+		items = append(items, &bandav1.PlanItem{Content: t.Subject, Status: t.Status, ActiveForm: t.ActiveForm})
+	}
+	return items
 }
 
 // endedPrompts is how many prompts a result ended. The result's
@@ -249,7 +283,8 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	// Subagents and Bash default to the background otherwise: one then ends after its
 	// turn and starts a turn of its own, which no prompt asked for and an idle suspend
 	// cuts short. See docs/research/claude-headless.md §3.
-	cmd.Env = append(os.Environ(), "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1")
+	// -p offers no TodoWrite; this offers the task tools, the plan (docs/research/claude-headless.md §3).
+	cmd.Env = append(os.Environ(), "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1", "CLAUDE_CODE_ENABLE_TODO_TOOLS=1")
 	cmd.Dir = work
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()
@@ -326,10 +361,10 @@ func sessionID(thread string) string {
 }
 
 func hasTranscript(sid string) bool {
-	dir := os.Getenv("CLAUDE_CONFIG_DIR")
-	if dir == "" {
-		dir = filepath.Join(os.Getenv("HOME"), ".claude")
-	}
-	m, _ := filepath.Glob(filepath.Join(dir, "projects", "*", sid+".jsonl"))
+	m, _ := filepath.Glob(filepath.Join(configDir(), "projects", "*", sid+".jsonl"))
 	return len(m) > 0
+}
+
+func configDir() string {
+	return cmp.Or(os.Getenv("CLAUDE_CONFIG_DIR"), filepath.Join(os.Getenv("HOME"), ".claude"))
 }

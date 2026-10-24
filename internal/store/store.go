@@ -542,17 +542,6 @@ func (s *Store) Count(ctx context.Context, id, kind string) (int, error) {
 	return n, err
 }
 
-// Plan returns the latest TodoWrite call of the agent itself (not of a subagent) with seq < beforeSeq, or nil.
-func (s *Store) Plan(ctx context.Context, id string, beforeSeq int64) (*bandav1.Event, error) {
-	events, err := s.events(ctx, `SELECT body FROM events WHERE thread_id = $1 AND seq < $2
-		AND body->'toolCall'->>'name' = 'TodoWrite' AND NOT body->'toolCall' ? 'parentToolCallId'
-		ORDER BY seq DESC LIMIT 1`, id, beforeSeq)
-	if len(events) == 0 {
-		return nil, err
-	}
-	return events[0], err
-}
-
 func (s *Store) events(ctx context.Context, query string, args ...any) ([]*bandav1.Event, error) {
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {

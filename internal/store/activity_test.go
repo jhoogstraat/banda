@@ -14,7 +14,7 @@ func TestActivity(t *testing.T) {
 		{&bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "Edit", InputJson: `{"file_path":"/home/banda/work/src/x.ts","old_string":"a"}`}}}, "Edit src/x.ts"},
 		{&bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "Bash", InputJson: `{"command":"go test ./..."}`}}}, "Bash go test ./..."},
 		{&bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "Read", InputJson: `{"file_path":"/etc/hosts"}`}}}, "Read hosts"},
-		{&bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "TodoWrite", InputJson: `{}`}}}, "updated the plan"},
+		{&bandav1.Event{Kind: &bandav1.Event_ToolCall{ToolCall: &bandav1.ToolCall{Name: "TaskUpdate", InputJson: `{"taskId":"1","status":"completed"}`}}}, "updated the plan"},
 		{&bandav1.Event{Kind: &bandav1.Event_Message{Message: &bandav1.Message{Text: "\n  first line\nsecond"}}}, "first line"},
 		{&bandav1.Event{Kind: &bandav1.Event_StatusChanged{StatusChanged: &bandav1.StatusChanged{Status: bandav1.Status_STATUS_ERRORED, Reason: "Setup failed: tools"}}}, "errored: Setup failed: tools"},
 		{&bandav1.Event{Kind: &bandav1.Event_StatusChanged{StatusChanged: &bandav1.StatusChanged{Status: bandav1.Status_STATUS_ERRORED}}}, "errored"},

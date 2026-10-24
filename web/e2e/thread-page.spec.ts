@@ -33,7 +33,7 @@ test('a turn streams in: the working agent, its running tool call, then the fold
 	await expect(page.getByText('Created hello1.txt with claude-opus-5-5 · high')).toBeVisible();
 	await expect(page.getByText(/Turn finished in \d+\.\ds · \$0\.0100/)).toBeVisible();
 	await expect(page.getByText('Agent is working…')).toBeHidden();
-	const tools = page.getByRole('button', { name: /^Used 6 tools/ });
+	const tools = page.getByRole('button', { name: /^Used 9 tools/ });
 	await tools.click();
 	await page.getByRole('button', { name: /cat hello1\.txt/ }).click();
 	await expect(page.getByText(/\$ cat hello1\.txt\s+hello 1/)).toBeVisible();
@@ -124,6 +124,19 @@ test('question, edit and rule cards: bob votes and alice answers; alice edits a 
 		await expect(bobPage.getByText(`${alice.id} no longer always allows touch …`)).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Allowed: 1' })).toHaveCount(0);
 	});
+});
+
+test('the agent’s task list is the plan pinned above the composer while a task is open', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await post(page, 'e2e-tasks');
+	await expect(page.getByText('Half done')).toBeVisible();
+	// The CLI keeps the first turn's two done tasks in the list.
+	await expect(page.getByRole('button', { name: 'Plan 3/4 done' })).toBeVisible();
+	await expect(page.getByRole('listitem').filter({ hasText: 'Writing the fix' })).toBeVisible(); // the task in progress
+	await expect(page.getByRole('listitem').filter({ hasText: 'Read the code' })).toBeVisible();
 });
 
 test('the agent entering plan mode itself shows in the header and the chat', async ({ as }) => {

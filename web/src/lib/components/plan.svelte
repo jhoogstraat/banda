@@ -4,10 +4,10 @@
 	import CircleIcon from '@lucide/svelte/icons/circle';
 	import ListTodoIcon from '@lucide/svelte/icons/list-todo';
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
-	import type { Todo } from '#lib/events.js';
+	import type { PlanItem } from '#lib/gen/banda/v1/banda_pb.js';
 
-	// The agent's latest TodoWrite list, pinned above the composer while something is left to do.
-	let { plan }: { plan: Todo[] } = $props();
+	// The agent's latest task list, pinned above the composer while something is left to do.
+	let { plan }: { plan: PlanItem[] } = $props();
 
 	let open = $state(true);
 	const done = $derived(plan.filter((t) => t.status === 'completed').length);
@@ -20,7 +20,7 @@
 			<ListTodoIcon class="size-3.5 shrink-0 text-muted-foreground" />
 			<span class="shrink-0 font-medium">Plan</span>
 			<span class="shrink-0 text-muted-foreground">{done}/{plan.length} done</span>
-			<span class="min-w-0 flex-1 truncate text-muted-foreground group-data-[state=open]/plan:invisible">{current?.activeForm ?? current?.content ?? ''}</span>
+			<span class="min-w-0 flex-1 truncate text-muted-foreground group-data-[state=open]/plan:invisible">{current?.activeForm || current?.content || ''}</span>
 			<ChevronRightIcon class="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/plan:rotate-90" />
 		</CollapsibleTrigger>
 		<CollapsibleContent>
@@ -38,7 +38,7 @@
 						{:else}
 							<CircleIcon class="size-3.5 shrink-0 {t.status === 'in_progress' ? 'animate-pulse fill-primary text-primary' : 'text-muted-foreground'}" />
 						{/if}
-						<span class="min-w-0 truncate">{t.status === 'in_progress' ? (t.activeForm ?? t.content) : t.content}</span>
+						<span class="min-w-0 truncate">{t.status === 'in_progress' ? (t.activeForm || t.content) : t.content}</span>
 					</li>
 				{/each}
 			</ul>

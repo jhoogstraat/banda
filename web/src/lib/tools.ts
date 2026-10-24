@@ -7,7 +7,7 @@ import ListTodoIcon from '@lucide/svelte/icons/list-todo';
 import SearchIcon from '@lucide/svelte/icons/search';
 import TerminalIcon from '@lucide/svelte/icons/terminal';
 import WrenchIcon from '@lucide/svelte/icons/wrench';
-import { todos, type Tool } from './events.ts';
+import type { Tool } from './events.ts';
 
 export const icons: Record<string, typeof WrenchIcon> = {
 	Bash: TerminalIcon,
@@ -21,7 +21,8 @@ export const icons: Record<string, typeof WrenchIcon> = {
 	WebSearch: GlobeIcon,
 	Task: BotIcon,
 	Agent: BotIcon,
-	TodoWrite: ListTodoIcon
+	TaskCreate: ListTodoIcon,
+	TaskUpdate: ListTodoIcon
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,14 +127,11 @@ export function describe(tool: Tool): { label: string; detail: string; meta: str
 				meta: tool.children.length ? plural(tool.children.length, 'tool') : ''
 			};
 		}
-		case 'TodoWrite': {
-			const t = todos(tool.call);
-			return {
-				label: 'Plan',
-				detail: t.find((x) => x.status === 'in_progress')?.activeForm ?? '',
-				meta: `${t.filter((x) => x.status === 'completed').length}/${t.length} done`
-			};
-		}
+		// The task tools change the plan one task at a time; the plan above the composer shows all of it.
+		case 'TaskCreate':
+			return { label: 'Plan', detail: `Add “${i.subject ?? ''}”`, meta: '' };
+		case 'TaskUpdate':
+			return { label: 'Plan', detail: `#${i.taskId ?? ''} ${(i.status ?? 'updated').replace('_', ' ')}`, meta: '' };
 	}
 	return {
 		label: tool.call.name,

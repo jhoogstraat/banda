@@ -23,8 +23,7 @@ func TestTranslate(t *testing.T) {
 		{`{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Let me think.","signature":"x"}]},"parent_tool_use_id":null}`, "agent_thinking:Let me think.", false, false},
 		{`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"echo hi"}}]},"parent_tool_use_id":null}`, `tool_call:Bash {"command":"echo hi"}`, false, false},
 		{`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_1","type":"tool_result","content":"hi","is_error":false}]},"parent_tool_use_id":null,"tool_use_result":{"stdout":"hi"}}`, "tool_result:toolu_1 hi", false, false},
-		// TodoWrite and a Task with a nested call (the "Plans and subagents" section).
-		{`{"type":"assistant","message":{"id":"msg_2","content":[{"type":"tool_use","id":"toolu_todo1","name":"TodoWrite","input":{"todos":[{"content":"Fix the parser","status":"in_progress","activeForm":"Fixing the parser"}]}}]},"parent_tool_use_id":null,"session_id":"s"}`, `tool_call:TodoWrite {"todos":[{"content":"Fix the parser","status":"in_progress","activeForm":"Fixing the parser"}]}`, false, false},
+		// A Task with a nested call (the "Plans and subagents" section).
 		{`{"type":"assistant","message":{"id":"msg_3","content":[{"type":"tool_use","id":"toolu_task1","name":"Task","input":{"description":"Find the parser","prompt":"Where is the config parser?","subagent_type":"Explore"}}]},"parent_tool_use_id":null,"session_id":"s"}`, `tool_call:Task {"description":"Find the parser","prompt":"Where is the config parser?","subagent_type":"Explore"}`, false, false},
 		{`{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Where is the config parser?"}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, "", false, false},
 		{`{"type":"assistant","message":{"id":"msg_4","content":[{"type":"tool_use","id":"toolu_sub1","name":"Grep","input":{"pattern":"func parse","path":"internal"}}]},"parent_tool_use_id":"toolu_task1","session_id":"s"}`, `tool_call:Grep {"pattern":"func parse","path":"internal"} parent=toolu_task1`, false, false},
@@ -50,6 +49,40 @@ func TestTranslate(t *testing.T) {
 		}
 		if got != tt.want || ended != tt.ended || auth != tt.auth {
 			t.Errorf("%s:\n got %q ended=%v auth=%v\nwant %q ended=%v auth=%v", tt.line, got, ended, auth, tt.want, tt.ended, tt.auth)
+		}
+	}
+}
+
+// A task tool's result sends the CLI's whole task list, read from its files.
+func TestPlan(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Setenv("BANDA_SESSION_KEY", "k")
+	dir := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "tasks", sessionID(threadID+"k"))
+	os.MkdirAll(dir, 0o755)
+	for id, task := range map[string]string{
+		"2":  `{"id":"2","subject":"Run the tests","activeForm":"Running the tests","status":"in_progress"}`,
+		"10": `{"id":"10","subject":"Ship it","status":"pending"}`,
+		"1":  `{"id":"1","subject":"Fix the parser","activeForm":"Fixing the parser","status":"completed","blocks":[]}`,
+	} {
+		os.WriteFile(filepath.Join(dir, id+".json"), []byte(task), 0o644)
+	}
+	os.WriteFile(filepath.Join(dir, ".highwatermark"), []byte("10"), 0o644)
+	// Verbatim from mise run contract.
+	events, _, _ := translate([]byte(`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_u1","type":"tool_result","content":"Updated task #2 status"}]},"parent_tool_use_id":null,"tool_use_result":{"success":true,"taskId":"2","updatedFields":["status"],"statusChange":{"from":"pending","to":"in_progress"}}}`))
+	var got []string
+	for _, e := range events {
+		got = append(got, describe(e))
+	}
+	want := []string{"tool_result:toolu_u1 Updated task #2 status",
+		"plan_changed:completed Fix the parser (Fixing the parser), in_progress Run the tests (Running the tests), pending Ship it ()"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s", strings.Join(got, "\n"))
+	}
+	// Another tool's structured result, or a plain string one, isn't a plan.
+	for _, l := range []string{`{"type":"user","message":{"content":[{"tool_use_id":"t","type":"tool_result","content":"x"}]},"tool_use_result":"Error: x"}`,
+		`{"type":"user","message":{"content":[{"tool_use_id":"t","type":"tool_result","content":"x"}]},"tool_use_result":{"stdout":"x"}}`} {
+		if events, _, _ := translate([]byte(l)); len(events) != 1 {
+			t.Errorf("%s: %d events", l, len(events))
 		}
 	}
 }
@@ -133,6 +166,12 @@ func describe(e *bandav1.Event) string {
 		return "permission_resolved:" + e.GetPermissionResolved().Decision.String()
 	case e.GetPermissionModeChanged() != nil:
 		return "permission_mode_changed:" + e.GetPermissionModeChanged().Mode.String()
+	case e.GetPlanChanged() != nil:
+		var items []string
+		for _, i := range e.GetPlanChanged().Items {
+			items = append(items, i.Status+" "+i.Content+" ("+i.ActiveForm+")")
+		}
+		return "plan_changed:" + strings.Join(items, ", ")
 	}
 	return ""
 }

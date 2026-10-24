@@ -381,7 +381,7 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
 
   /**
    * Sent before a tail for its context, not in seq order: the latest plan
-   * (TodoWrite call) from before the tail. Not part of the chat.
+   * (PlanChanged) from before the tail. Not part of the chat.
    *
    * @generated from field: bool context = 5;
    */
@@ -618,6 +618,15 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: RepoAdded;
     case: "repoAdded";
+  } | {
+    /**
+     * The agent's task list changed (TaskCreate, TaskUpdate): the whole list.
+     * Not part of the chat; the latest is the plan pinned above the composer.
+     *
+     * @generated from field: banda.v1.PlanChanged plan_changed = 50;
+     */
+    value: PlanChanged;
+    case: "planChanged";
   } | { case: undefined; value?: undefined };
 };
 
@@ -626,6 +635,52 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export declare const EventSchema: GenMessage<Event>;
+
+/**
+ * @generated from message banda.v1.PlanChanged
+ */
+export declare type PlanChanged = Message$1<"banda.v1.PlanChanged"> & {
+  /**
+   * @generated from field: repeated banda.v1.PlanItem items = 1;
+   */
+  items: PlanItem[];
+};
+
+/**
+ * Describes the message banda.v1.PlanChanged.
+ * Use `create(PlanChangedSchema)` to create a new message.
+ */
+export declare const PlanChangedSchema: GenMessage<PlanChanged>;
+
+/**
+ * @generated from message banda.v1.PlanItem
+ */
+export declare type PlanItem = Message$1<"banda.v1.PlanItem"> & {
+  /**
+   * @generated from field: string content = 1;
+   */
+  content: string;
+
+  /**
+   * "pending", "in_progress" or "completed".
+   *
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * Present tense, shown while in progress: "Running the tests".
+   *
+   * @generated from field: string active_form = 3;
+   */
+  activeForm: string;
+};
+
+/**
+ * Describes the message banda.v1.PlanItem.
+ * Use `create(PlanItemSchema)` to create a new message.
+ */
+export declare const PlanItemSchema: GenMessage<PlanItem>;
 
 /**
  * @generated from message banda.v1.ForkNote

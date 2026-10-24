@@ -86,6 +86,11 @@ func textBlock(s string) map[string]any { return map[string]any{"type": "text", 
 func thinkingBlock(s string) map[string]any {
 	return map[string]any{"type": "thinking", "thinking": s}
 }
+
+// apiError is a script reply that fails the request with this status and error type.
+func apiError(status int, typ string) map[string]any {
+	return map[string]any{"status": status, "error": typ}
+}
 func toolUse(id, name, input string) map[string]any {
 	return map[string]any{"type": "tool_use", "id": id, "name": name, "input": json.RawMessage(input)}
 }
@@ -166,6 +171,12 @@ func (f *fakeAPI) messages(w http.ResponseWriter, r *http.Request) {
 	}
 	if content == nil {
 		content = []map[string]any{textBlock("ok")}
+	}
+	if status, ok := content[0]["status"].(int); ok { // an error reply: see apiError
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]any{"type": content[0]["error"], "message": content[0]["error"]}})
+		return
 	}
 	stop := "end_turn"
 	for _, b := range content {
@@ -426,14 +437,53 @@ func TestContractTurn(t *testing.T) {
 	if s := r.schema("Agent"); s == "" || strings.Contains(s, "run_in_background") || strings.Contains(r.schema("Bash"), "run_in_background") {
 		t.Errorf("Agent's schema: %s", s)
 	}
-	// Banda's plan (the latest TodoWrite) never shows with this CLI: -p offers
-	// no TodoWrite; CLAUDE_CODE_ENABLE_TODO_TOOLS=1 offers TaskCreate/TaskUpdate.
-	if r.schema("TodoWrite") != "" || r.schema("Task") != "" {
-		t.Error("TodoWrite or Task is offered again: update deploy/fake-claude and docs/research/claude-headless.md")
+	// -p offers no TodoWrite; the runner's CLAUDE_CODE_ENABLE_TODO_TOOLS=1 offers the task tools (TestContractPlan).
+	if r.schema("TodoWrite") != "" || r.schema("Task") != "" || r.schema("TaskCreate") == "" {
+		t.Error("TodoWrite or Task is offered again, or TaskCreate isn't: update deploy/fake-claude and docs/research/claude-headless.md")
 	}
 	if r.schema("mcp__banda__list_threads") == "" {
 		t.Error("the banda MCP server's tools are not offered")
 	}
+}
+
+// The task tools change one task per call; after each, the runner sends the
+// whole list from the CLI's files, also after a restart.
+func TestContractPlan(t *testing.T) {
+	contractEnv(t)
+	calls := []map[string]any{
+		toolUse("toolu_c1", "TaskCreate", `{"subject":"Fix the parser","description":"The config parser","activeForm":"Fixing the parser"}`),
+		toolUse("toolu_c2", "TaskCreate", `{"subject":"Run the tests","description":"All of them","activeForm":"Running the tests"}`),
+		toolUse("toolu_u1", "TaskUpdate", `{"taskId":"1","status":"completed"}`),
+		toolUse("toolu_u2", "TaskUpdate", `{"taskId":"2","status":"in_progress"}`),
+		toolUse("toolu_u3", "TaskUpdate", `{"taskId":"2","status":"deleted"}`),
+	}
+	newFakeAPI(t, func(r *apiReq) []map[string]any {
+		l := r.last()
+		switch {
+		case strings.HasSuffix(l, "plan"):
+			return calls[:1]
+		case strings.HasSuffix(l, "drop it"):
+			return calls[4:5]
+		}
+		for i, c := range calls[:3] {
+			if l == "result:"+c["id"].(string) {
+				return calls[i+1 : i+2]
+			}
+		}
+		return nil
+	})
+	s := start(t, settings{})
+	s.setMode(bandav1.PermissionMode_PERMISSION_MODE_BYPASS)
+	want(t, s.turn("plan", nil), "tool_call:TaskCreate", "tool_result:toolu_c1 Task #1 created successfully: Fix the parser",
+		"plan_changed:pending Fix the parser (Fixing the parser)",
+		"plan_changed:pending Fix the parser (Fixing the parser), pending Run the tests (Running the tests)",
+		"plan_changed:completed Fix the parser (Fixing the parser), pending Run the tests (Running the tests)",
+		"tool_call:TaskUpdate", "tool_result:toolu_u2 Updated task #2 status",
+		"plan_changed:completed Fix the parser (Fixing the parser), in_progress Run the tests (Running the tests)", "turn_ended:false")
+	s.stop()
+	s = start(t, settings{})
+	s.setMode(bandav1.PermissionMode_PERMISSION_MODE_BYPASS)
+	want(t, s.turn("drop it", nil), "tool_call:TaskUpdate", "plan_changed:completed Fix the parser (Fixing the parser)", "turn_ended:false")
 }
 
 func TestContractPermissions(t *testing.T) {

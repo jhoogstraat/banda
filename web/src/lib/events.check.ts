@@ -68,22 +68,23 @@ apply(chat, ev({ case: 'portOpened', value: { port: 5173, process: 'vite' } }));
 const port = chat.items.at(-1);
 if (port?.kind !== 'port' || port.port.port !== 5173) throw new Error('portOpened should become a chat item');
 
-// Steps between texts fold into one group; a subagent's calls nest in its Task call; TodoWrite sets the plan.
-const plan = (statuses: string[]) =>
-	JSON.stringify({ todos: statuses.map((status, i) => ({ content: `todo ${i}`, status, activeForm: `doing ${i}` })) });
+// Steps between texts fold into one group; a subagent's calls nest in its Task call; planChanged sets the plan, outside the chat.
+const plan = (statuses: string[]) => ({ items: statuses.map((status, i) => ({ content: `todo ${i}`, status, activeForm: `doing ${i}` })) });
 const n = count();
-apply(chat, ev({ case: 'toolCall', value: { id: 'p1', name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } }));
+apply(chat, ev({ case: 'toolCall', value: { id: 'p1', name: 'TaskCreate', inputJson: '{"subject":"todo 0"}' } }));
+apply(chat, ev({ case: 'planChanged', value: plan(['in_progress', 'pending']) }));
 apply(chat, ev({ case: 'agentThinking', value: { text: 'hmm' } }));
 apply(chat, ev({ case: 'toolCall', value: { id: 'task', name: 'Task', inputJson: '{"description":"look"}' } }));
 apply(chat, ev({ case: 'toolCall', value: { id: 'sub', name: 'Grep', inputJson: '{}', parentToolCallId: 'task' } }));
 apply(chat, ev({ case: 'toolResult', value: { toolCallId: 'sub', output: 'a.go' } }));
-apply(chat, ev({ case: 'toolCall', value: { id: 'p2', name: 'TodoWrite', inputJson: plan(['completed', 'in_progress']) } }));
+apply(chat, ev({ case: 'toolCall', value: { id: 'p2', name: 'TaskUpdate', inputJson: '{"taskId":"1","status":"completed"}' } }));
+apply(chat, ev({ case: 'planChanged', value: plan(['completed', 'in_progress']) }));
 const group = chat.items[n];
-if (count() !== n + 1 || group.kind !== 'steps' || group.steps.map((s) => s.kind === 'tool' ? s.call.name : s.kind).join() !== 'TodoWrite,thinking,Task,TodoWrite')
+if (count() !== n + 1 || group.kind !== 'steps' || group.steps.map((s) => s.kind === 'tool' ? s.call.name : s.kind).join() !== 'TaskCreate,thinking,Task,TaskUpdate')
 	throw new Error('consecutive steps should form one group, without the nested call');
 const task = group.steps[2];
 if (task.kind !== 'tool' || task.children[0]?.result?.output !== 'a.go') throw new Error("a subagent's call should nest in its Task call");
-if (chat.plan.map((t) => t.status).join() !== 'completed,in_progress') throw new Error('the latest TodoWrite should be the plan');
+if (chat.plan.map((t) => t.status).join() !== 'completed,in_progress') throw new Error('the latest planChanged should be the plan');
 apply(chat, ev({ case: 'agentText', value: { text: 'done' } }));
 apply(chat, ev({ case: 'toolCall', value: { id: 'b', name: 'Bash', inputJson: '{}' } }));
 if (count() !== n + 3 || chat.items.at(-1)?.kind !== 'steps') throw new Error('text should end a group');
@@ -148,7 +149,7 @@ const call = (id: string, name: string, parentToolCallId = '') => add({ case: 't
 const result = (id: string) => add({ case: 'toolResult', value: { toolCallId: id, output: `out ${id}` } });
 for (let t = 0; t < 4; t++) {
 	add({ case: 'message', value: { text: `turn ${t}`, attachments: [{ id: `shot${t}`, name: 'shot.png', mediaType: 'image/png' }] } }, { actor: 'dev' });
-	if (t !== 3) add({ case: 'toolCall', value: { id: `todo${t}`, name: 'TodoWrite', inputJson: plan(['in_progress', 'pending']) } });
+	if (t !== 3) add({ case: 'planChanged', value: plan(['in_progress', 'pending']) });
 	call(`r${t}`, 'Read');
 	if (t === 1) add({ case: 'permissionRequested', value: { id: 'p1', toolCallId: 'r1', toolName: 'Read', inputJson: '{}' } });
 	if (t === 2) add({ case: 'permissionResolved', value: { id: 'p1', decision: PermissionDecision.ALLOW, message: '' } }, { actor: 'dev' });
@@ -175,7 +176,7 @@ for (let tail = 1; tail <= history.length; tail++) {
 		const paged = newChat();
 		let oldest = history.length - tail;
 		// The server sends the latest plan from before the tail first, marked as context.
-		const before = history.slice(0, oldest).findLast((e) => e.kind.case === 'toolCall' && e.kind.value.name === 'TodoWrite');
+		const before = history.slice(0, oldest).findLast((e) => e.kind.case === 'planChanged');
 		if (before) apply(paged, { ...before, context: true } as Event);
 		for (const e of history.slice(oldest)) apply(paged, e);
 		while (oldest > 0) {
@@ -192,7 +193,7 @@ for (let tail = 1; tail <= history.length; tail++) {
 	}
 }
 const tailOnly = newChat();
-apply(tailOnly, { ...history[history.findLastIndex((e) => e.kind.case === 'toolCall' && e.kind.value.name === 'TodoWrite')], context: true } as Event);
+apply(tailOnly, { ...history[history.findLastIndex((e) => e.kind.case === 'planChanged')], context: true } as Event);
 for (const e of history.slice(-3)) apply(tailOnly, e);
 if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a context plan sets the plan without adding an item');
 {

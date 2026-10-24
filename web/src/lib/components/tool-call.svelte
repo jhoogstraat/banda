@@ -1,7 +1,5 @@
 <script lang="ts">
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import CircleIcon from '@lucide/svelte/icons/circle';
 	import WrenchIcon from '@lucide/svelte/icons/wrench';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
@@ -11,7 +9,7 @@
 	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#lib/components/ui/collapsible/index.js';
 	import { page } from '$app/state';
 	import { api } from '#lib/api.js';
-	import { todos, type Tool } from '#lib/events.js';
+	import type { Tool } from '#lib/events.js';
 	import { describe, diff, exitCode, icons, input, lines } from '#lib/tools.js';
 	import Self from './tool-call.svelte';
 
@@ -109,17 +107,6 @@
 				{@render more(edits.length)}
 			</div>
 			{#if failed}{@render output(result!.output)}{/if}
-		{:else if name === 'TodoWrite'}
-			<ul class="my-1 space-y-0.5 text-xs">
-				{#each todos(tool.call) as t, i (i)}
-					<li class="flex items-center gap-2 {t.status === 'completed' ? 'text-muted-foreground line-through' : ''}">
-						{#if t.status === 'completed'}<CheckIcon class="size-3.5 text-emerald-500" />{:else}<CircleIcon
-								class="size-3.5 {t.status === 'in_progress' ? 'fill-primary text-primary' : 'text-muted-foreground'}"
-							/>{/if}
-						{t.content}
-					</li>
-				{/each}
-			</ul>
 		{:else if subagent}
 			{#each tool.children as child (child.call.id)}<Self tool={child} />{/each}
 			{#if result}

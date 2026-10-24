@@ -14,7 +14,9 @@
 # "e2e-cmd:<base64 command>" asks for that one instead. "e2e-question" asks two
 # questions (AskUserQuestion, also in bypass mode, like the real CLI) and says
 # "Answers: <the answers' JSON>". "e2e-enter-plan" enters plan mode itself
-# (EnterPlanMode, which the real CLI allows without asking).
+# (EnterPlanMode, which the real CLI allows without asking). Each turn plans
+# with the task tools (TaskCreate, TaskUpdate), keeping the tasks in the CLI's
+# files; "e2e-tasks" leaves one open.
 #
 # Directives a test puts anywhere in a prompt, one case each in the loop below
 # (web/e2e/fixtures.ts has helpers for them):
@@ -51,9 +53,10 @@ if [ "$1" = auth ]; then
   esac
   exit
 fi
-model=default effort=default profile=
+model=default effort=default profile= sid=s
 while [ $# -gt 0 ]; do
   case "$1" in
+    --session-id|--resume) sid=$2; shift ;;
     --model) model=$2; shift ;;
     --effort) effort=$2; shift ;;
     --append-system-prompt) profile=$(awk 'p { print; exit } /^$/ { p = 1 }' <<<"$2"); shift ;;
@@ -61,6 +64,25 @@ while [ $# -gt 0 ]; do
   shift
 done
 mode=default
+# The task list, a file per task, as the real CLI keeps it.
+tasks="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tasks/$sid"
+# task_create <subject> <activeForm>: a TaskCreate call and its result; the id is in $task.
+task_create() {
+  mkdir -p "$tasks"
+  task=$(( $(cat "$tasks/.highwatermark" 2>/dev/null || echo 0) + 1 ))
+  echo $task > "$tasks/.highwatermark"
+  jq -n --arg id $task --arg s "$1" --arg a "$2" '{id:$id,subject:$s,description:$s,activeForm:$a,status:"pending",blocks:[],blockedBy:[]}' > "$tasks/$task.json"
+  jq -cn --arg id $task --arg s "$1" --arg a "$2" '{type:"assistant",message:{content:[{type:"tool_use",id:"toolu_tc\($id)",name:"TaskCreate",input:{subject:$s,description:$s,activeForm:$a}}]},parent_tool_use_id:null}'
+  jq -cn --arg id $task --arg s "$1" '{type:"user",message:{role:"user",content:[{tool_use_id:"toolu_tc\($id)",type:"tool_result",content:"Task #\($id) created successfully: \($s)"}]},parent_tool_use_id:null,tool_use_result:{task:{id:$id,subject:$s}}}'
+}
+# task_update <id> <status>: a TaskUpdate call and its result.
+task_update() {
+  local from
+  from=$(jq -r .status "$tasks/$1.json")
+  jq --arg st "$2" '.status = $st' "$tasks/$1.json" > "$tasks/$1.tmp" && mv "$tasks/$1.tmp" "$tasks/$1.json"
+  jq -cn --arg id "$1" --arg st "$2" '{type:"assistant",message:{content:[{type:"tool_use",id:"toolu_tu\($id)_\($st)",name:"TaskUpdate",input:{taskId:$id,status:$st}}]},parent_tool_use_id:null}'
+  jq -cn --arg id "$1" --arg st "$2" --arg from "$from" '{type:"user",message:{role:"user",content:[{tool_use_id:"toolu_tu\($id)_\($st)",type:"tool_result",content:"Updated task #\($id) status"}]},parent_tool_use_id:null,tool_use_result:{success:true,taskId:$id,updatedFields:["status"],statusChange:{from:$from,to:$st}}}'
+}
 # The runner marshals maps, so keys are sorted: "request" comes before "type".
 setmode() { mode=$(sed 's/.*"mode":"\([A-Za-z]*\)".*/\1/' <<<"$1"); }
 # ask <tool> <tool_use id> <input json>: asks like --permission-prompt-tool stdio
@@ -201,6 +223,13 @@ while next; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;
+    *e2e-tasks*'"type":"user"'*)
+      task_create "Read the code" "Reading the code"; a=$task
+      task_create "Write the fix" "Writing the fix"; b=$task
+      task_update $a completed
+      task_update $b in_progress
+      say "Half done"
+      ;;
     *e2e-question*'"type":"user"'*)
       tool "toolu_q$RANDOM" AskUserQuestion '{"questions":[{"question":"Which database?","header":"Database","options":[{"label":"Postgres","description":"The usual"},{"label":"SQLite","description":"One file"}],"multiSelect":false},{"question":"Which extras?","header":"Extras","options":[{"label":"Cache","description":"Faster reads"},{"label":"Search","description":"Full text"}],"multiSelect":true}]}' "User has answered your questions."
       if [ -n "$ok" ]; then text "Answers: $(jq -c '.response.response.updatedInput.answers' <<<"$answer")"; else text "Not answered: $out"; fi
@@ -256,8 +285,11 @@ JSON
       cat <<JSON
 {"type":"system","subtype":"init","session_id":"s","model":"$model"}
 {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working on it"}},"parent_tool_use_id":null}
-{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_a$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"in_progress","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"pending","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
-{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_a$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
+JSON
+      task_create "Look around" "Looking around"; a=$task
+      task_create "Write hello$n.txt" "Writing hello$n.txt"; b=$task
+      task_update $a in_progress
+      cat <<JSON
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_agent$n","name":"Agent","input":{"description":"Look around","prompt":"List the files","subagent_type":"Explore"}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"type":"text","text":"List the files"}]},"parent_tool_use_id":"toolu_agent$n"}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_sub$n","name":"Bash","input":{"command":"ls","description":"List files"}}]},"parent_tool_use_id":"toolu_agent$n"}
@@ -268,8 +300,10 @@ JSON
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_bash$n","type":"tool_result","content":"hello $n","is_error":false}]},"parent_tool_use_id":null}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_$n","name":"Write","input":{"file_path":"hello$n.txt","content":"hello $n\n"}}]},"parent_tool_use_id":null}
 {"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_$n","type":"tool_result","content":"ok","is_error":false}]},"parent_tool_use_id":null}
-{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_todo_b$n","name":"TodoWrite","input":{"todos":[{"content":"Look around","status":"completed","activeForm":"Looking around"},{"content":"Write hello$n.txt","status":"completed","activeForm":"Writing hello$n.txt"}]}}]},"parent_tool_use_id":null}
-{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_todo_b$n","type":"tool_result","content":"Todos have been modified successfully.","is_error":false}]},"parent_tool_use_id":null}
+JSON
+      task_update $a completed
+      task_update $b completed
+      cat <<JSON
 $reply
 {"type":"result","subtype":"success","is_error":false,"result":"done","duration_ms":1000,"total_cost_usd":$cost,"user_message_uuids":[$uuids]}
 JSON

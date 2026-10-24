@@ -384,7 +384,7 @@ message Event {
   // User id, "agent" or "system".
   string actor = 4;
   // Sent before a tail for its context, not in seq order: the latest plan
-  // (TodoWrite call) from before the tail. Not part of the chat.
+  // (PlanChanged) from before the tail. Not part of the chat.
   bool context = 5;
   // A large payload (a tool call's input strings, a tool result's output) was
   // cut to a few KB. History with full loads the whole event.
@@ -442,7 +442,22 @@ message Event {
     // The owner (actor) gave the thread without a repository one, changed it
     // before its first checkout, or removed it (repo_url empty).
     RepoAdded repo_added = 42;
+    // The agent's task list changed (TaskCreate, TaskUpdate): the whole list.
+    // Not part of the chat; the latest is the plan pinned above the composer.
+    PlanChanged plan_changed = 50;
   }
+}
+
+message PlanChanged {
+  repeated PlanItem items = 1;
+}
+
+message PlanItem {
+  string content = 1;
+  // "pending", "in_progress" or "completed".
+  string status = 2;
+  // Present tense, shown while in progress: "Running the tests".
+  string active_form = 3;
 }
 
 message ForkNote {

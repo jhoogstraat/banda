@@ -18,7 +18,7 @@ test('long threads: a tail replays the last events with the plan from before it 
 	expect(replayed).toHaveLength(200);
 	expect(replayed[0].seq).toBe(1001n);
 	const plan = events.find((e) => e.context);
-	expect(plan?.kind.case === 'toolCall' && plan.kind.value.name).toBe('TodoWrite');
+	expect(plan?.kind.case).toBe('planChanged');
 	expect(plan!.seq).toBeLessThan(1001n);
 	const cut = events.find((e) => e.truncated);
 	expect(cut?.kind.case === 'toolResult' && cut.kind.value.output.length).toBeLessThanOrEqual(4096);

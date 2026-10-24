@@ -60,7 +60,7 @@ func Activity(e *bandav1.Event) *bandav1.TeamActivity {
 
 // toolSummary is the tool name and its main argument: "Edit src/x.ts".
 func toolSummary(c *bandav1.ToolCall) string {
-	if c.Name == "TodoWrite" {
+	if c.Name == "TaskCreate" || c.Name == "TaskUpdate" {
 		return "updated the plan"
 	}
 	var in map[string]any

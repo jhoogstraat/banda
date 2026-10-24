@@ -2,7 +2,7 @@
 # Seeds a suspended thread owned by $OWNER (default dev) with $1 events (default 20000), straight into
 # Postgres (database $DB, default banda), and prints its id. For e2e paging checks and measuring long
 # threads; no agent runs.
-# Each turn of 25 events: a message, a TodoWrite, 10 tool calls with results (1.5 KB, every 7th turn
+# Each turn of 25 events: a message, the plan (planChanged), a thought, 10 tool calls with results (1.5 KB, every 7th turn
 # one of 30 KB), agent text, the turn end.
 set -euo pipefail
 N=${1:-20000}
@@ -18,12 +18,11 @@ SELECT :'id', s, jsonb_build_object('seq', s::text, 'threadId', :'id', 'actor', 
   'time', to_char((now() - make_interval(secs => :n - s)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) ||
   CASE
     WHEN p = 0 THEN jsonb_build_object('message', jsonb_build_object('text', 'turn ' || t || ': keep going'))
-    WHEN p = 1 THEN jsonb_build_object('toolCall', jsonb_build_object('id', 'todo' || t, 'name', 'TodoWrite', 'inputJson',
-      jsonb_build_object('todos', jsonb_build_array(
+    WHEN p = 1 THEN jsonb_build_object('planChanged', jsonb_build_object('items', jsonb_build_array(
         jsonb_build_object('content', 'Turn ' || t || ' step A', 'status', 'completed', 'activeForm', 'Doing A'),
         jsonb_build_object('content', 'Turn ' || t || ' step B', 'status', 'in_progress', 'activeForm', 'Doing turn ' || t || ' step B'),
-        jsonb_build_object('content', 'Turn ' || t || ' step C', 'status', 'pending', 'activeForm', 'Doing C')))::text))
-    WHEN p = 2 THEN jsonb_build_object('toolResult', jsonb_build_object('toolCallId', 'todo' || t, 'output', 'Todos have been modified successfully.'))
+        jsonb_build_object('content', 'Turn ' || t || ' step C', 'status', 'pending', 'activeForm', 'Doing C'))))
+    WHEN p = 2 THEN jsonb_build_object('agentThinking', jsonb_build_object('text', 'Turn ' || t || ': next step B.'))
     WHEN p < 23 AND p % 2 = 1 THEN jsonb_build_object('toolCall', jsonb_build_object('id', 't' || t || '_' || p, 'name',
       (ARRAY['Read', 'Bash', 'Grep', 'Edit', 'Glob'])[p / 2 % 5 + 1], 'inputJson',
       jsonb_build_object('file_path', '/home/banda/work/internal/f' || p || '.go', 'command', 'go test ./...', 'pattern', 'func ',

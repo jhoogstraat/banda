@@ -14,6 +14,7 @@ import {
 	type PermissionMode,
 	type PermissionRequested,
 	type PermissionResolved,
+	type PlanItem,
 	type PreviewPort,
 	type PullRequestChanged,
 	type RepoAdded,
@@ -30,7 +31,6 @@ import {
 export type Tool = { kind: 'tool'; call: ToolCall; result?: ToolResult; children: Tool[]; seq: bigint; resultSeq?: bigint; cut?: boolean };
 // What the agent did between two texts: tool calls and thinking, shown folded.
 export type Step = Tool | { kind: 'thinking'; text: string };
-export type Todo = { content: string; status: 'pending' | 'in_progress' | 'completed'; activeForm?: string };
 
 // `key` is the seq of the event that started the item: stable when older history is prepended.
 export type Item = { key: number } & (
@@ -68,16 +68,16 @@ export type Item = { key: number } & (
 );
 
 // `streaming` is the live assistant bubble: deltas append, the next agent_text replaces it.
-// `plan` is the latest TodoWrite list. `tools` finds a call by id in O(1) for its result and its subagent's calls.
+// `plan` is the latest task list (PlanChanged). `tools` finds a call by id in O(1) for its result and its subagent's calls.
 // `orphans` are what arrived before its tool call is loaded (it's in an older page): results by call id,
 // subagent calls by parent id, turn request and handoff resolutions by their seq, permission answers and votes by request id,
-// and live permission cards whose call comes next, by call id. `planSeq` is the seq of the TodoWrite behind `plan`.
+// and live permission cards whose call comes next, by call id. `planSeq` is the seq of the PlanChanged behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
 	items: Item[];
 	streaming: string;
-	plan: Todo[];
+	plan: PlanItem[];
 	planSeq: bigint;
 	seq: bigint;
 	tools: Map<string, Tool>;
@@ -113,14 +113,6 @@ export const newChat = (): Chat => ({
 let ephemeral = 0;
 const keyOf = (e: Event) => Number(e.seq) || --ephemeral;
 
-export const todos = (call: ToolCall): Todo[] => {
-	try {
-		return JSON.parse(call.inputJson).todos ?? [];
-	} catch {
-		return [];
-	}
-};
-
 // Appends a step to the last item if it is a steps group, else starts one. Returns the stored
 // (in Svelte: proxied) step, so later mutations through `tools` stay reactive.
 function step(chat: Chat, s: Step, key: number) {
@@ -143,9 +135,9 @@ function register(chat: Chat, tool: Tool) {
 	for (const c of tool.children) register(chat, c);
 }
 
-function setPlan(chat: Chat, call: ToolCall, seq: bigint) {
+function setPlan(chat: Chat, plan: PlanItem[], seq: bigint) {
 	if (seq < chat.planSeq) return;
-	chat.plan = todos(call);
+	chat.plan = plan;
 	chat.planSeq = seq;
 }
 
@@ -157,7 +149,7 @@ export function apply(chat: Chat, e: Event) {
 	const k = e.kind;
 	if (e.context) {
 		// The plan from before a tail; everything else in it belongs to older history.
-		if (k.case === 'toolCall' && k.value.name === 'TodoWrite') setPlan(chat, k.value, e.seq);
+		if (k.case === 'planChanged') setPlan(chat, k.value.items, e.seq);
 		return;
 	}
 	if (e.seq > chat.seq) chat.seq = e.seq;
@@ -219,9 +211,11 @@ export function apply(chat: Chat, e: Event) {
 				card.tool = tool;
 				chat.orphans.cards.delete(call.id);
 			}
-			if (call.name === 'TodoWrite' && !call.parentToolCallId) setPlan(chat, call, e.seq);
 			break;
 		}
+		case 'planChanged':
+			setPlan(chat, k.value.items, e.seq);
+			break;
 		case 'toolResult': {
 			const tool = chat.tools.get(k.value.toolCallId);
 			if (tool) Object.assign(tool, { result: k.value, resultSeq: e.seq, cut: tool.cut || e.truncated });
