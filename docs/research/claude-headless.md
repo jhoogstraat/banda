@@ -199,6 +199,21 @@ A subagent is a `Task` tool call (input `description`, `prompt`, `subagent_type`
 
 Banda keeps only the subagent's tool calls (tagged with `parent_tool_call_id`) and results, and nests them in the Task call; its text is repeated by the final result. Newer versions may name the tool `Agent`; the nesting doesn't depend on the name.
 
+### Dev servers with background tasks off
+
+Checked 2026-10-24 against 2.1.301 [contract: `TestContractDevServer`], with the runner's `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`.
+
+**What the model is told: nothing about long-running processes.** Bash's input schema has `command`, `timeout`, `description` and `dangerouslyDisableSandbox`; `run_in_background` is gone. No tool for reading or stopping background output is offered. The only hint left is in the description and the schema: "`timeout` is in milliseconds: default 120000, max 600000 for a foreground command." The system prompt says nothing about servers or background work either.
+
+**What happens when the model backgrounds a server itself:**
+
+- `nohup python3 -m http.server 4173 >/tmp/srv.log 2>&1 &`: the call returns at once with "(Bash completed with no output)". The server keeps serving, and the runner's port list (the Browser tab) shows it after the turn's `result`, after a following turn and after claude exits, as on a restart.
+- `node -e "…listen(4174)" &`, writing to the inherited stdout on every request: the same. The CLI doesn't wait for the output to close. Each command's stdout and stderr go to `/tmp/claude-<uid>/<cwd>/<session>/tasks/<id>.output`, and the CLI deletes that file when the command returns. Writes still succeed, but the agent can't read the log afterwards, and a chatty server fills a deleted file in `/tmp`.
+- The CLI starts each command in its own session (`setsid`; the server's parent becomes PID 1), and kills it neither when the tool call ends, nor at the turn's end, nor when claude exits.
+- In the foreground (`python3 -m http.server 4175`), the call holds until Bash's timeout, then returns `Exit code 143\nCommand timed out after 5s` with the server killed. With the default timeout that is 2 minutes of a stuck turn before the model can try again.
+
+What only a real model can show, in dogfooding: whether it backgrounds the dev server on the first try or first loses 2 minutes in the foreground, and whether it redirects the log to a file it can read later.
+
 ### `user`: tool results (`tool_use_result` holds the structured tool output) [obs]
 
 ```json

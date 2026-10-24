@@ -40,6 +40,7 @@ type apiReq struct {
 	} `json:"messages"`
 	Tools []struct {
 		Name        string          `json:"name"`
+		Description string          `json:"description"`
 		InputSchema json.RawMessage `json:"input_schema"`
 	} `json:"tools"`
 }
@@ -844,5 +845,70 @@ func TestContractUsageLimit(t *testing.T) {
 	if strings.Contains(all, "rate_limit_event") || strings.Contains(all, fmt.Sprint(api.limitedUntil.Unix())) ||
 		!strings.Contains(all, `"subtype":"api_retry","attempt":1,"max_retries":1,"retry_delay_ms":`) || !strings.Contains(all, `"error_status":429,"error":"rate_limit"`) {
 		t.Errorf("the limit's lines changed:\n%s", all)
+	}
+}
+
+// With background tasks off, Bash offers no run_in_background and its text
+// says nothing about long-running processes. A server the model backgrounds
+// with & returns at once and keeps serving after the turn, a following turn
+// and claude's exit (the CLI starts each command in its own session and
+// doesn't kill it), also when it writes to the inherited stdout (a file the CLI
+// deletes). One in the foreground holds the call until Bash's timeout, which
+// kills it. See docs/research/claude-headless.md, dev servers.
+func TestContractDevServer(t *testing.T) {
+	contractEnv(t)
+	calls := map[string]string{
+		"redirected": `nohup python3 -m http.server 4173 >/tmp/srv.log 2>&1 &`,
+		"inherited":  `node -e "require('http').createServer((q,r)=>{console.log('hit',q.url);r.end('node')}).listen(4174)" &`,
+		"foreground": `python3 -m http.server 4175`,
+	}
+	api := newFakeAPI(t, func(r *apiReq) []map[string]any {
+		for p, cmd := range calls {
+			if strings.HasSuffix(r.last(), p) {
+				b, _ := json.Marshal(map[string]any{"command": cmd, "description": "Start the dev server", "timeout": 5000})
+				return []map[string]any{toolUse("toolu_"+p, "Bash", string(b))}
+			}
+		}
+		return nil
+	})
+	// serves waits up to 5 s for the port to answer and the Browser tab's list to have it.
+	serves := func(port uint32) bool {
+		for range 25 {
+			if resp, err := http.Get(fmt.Sprintf("http://localhost:%d/", port)); err == nil {
+				resp.Body.Close()
+				if slices.ContainsFunc(listening(), func(p *bandav1.PreviewPort) bool { return p.Port == port }) {
+					return true
+				}
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		return false
+	}
+	s := start(t, settings{})
+	s.setMode(bandav1.PermissionMode_PERMISSION_MODE_BYPASS)
+	for _, p := range []string{"redirected", "inherited"} {
+		t0 := time.Now()
+		want(t, s.turn(p, nil), "tool_call:Bash", "tool_result:toolu_"+p+" (Bash completed with no output)", "turn_ended:false")
+		if d := time.Since(t0); d > 4*time.Second {
+			t.Errorf("%s: the turn took %s", p, d)
+		}
+	}
+	if !serves(4173) || !serves(4174) {
+		t.Error("a backgrounded server doesn't serve after its turn")
+	}
+	t0 := time.Now()
+	want(t, s.turn("foreground", nil), "tool_call:Bash", "tool_result:toolu_foreground Exit code 143\nCommand timed out after 5s", "turn_ended:false")
+	if _, err := http.Get("http://localhost:4175/"); time.Since(t0) < 5*time.Second || err == nil {
+		t.Errorf("the foreground server: the turn took %s, still serves %v", time.Since(t0), err == nil)
+	}
+	s.stop() // as the runner restarts claude
+	if !serves(4173) || !serves(4174) {
+		t.Error("a backgrounded server doesn't serve after claude exits")
+	}
+	r := api.requests()[0]
+	for _, tl := range r.Tools {
+		if tl.Name == "Bash" && (strings.Contains(tl.Description, "background") || strings.Contains(string(tl.InputSchema), "run_in_background")) {
+			t.Errorf("Bash tells the model about background commands now: update docs/research/claude-headless.md, dev servers:\n%s\n%s", tl.Description, tl.InputSchema)
+		}
 	}
 }
