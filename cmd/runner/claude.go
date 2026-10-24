@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,6 +126,11 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 		return []*bandav1.Event{{Kind: &bandav1.Event_TurnEnded{TurnEnded: te}}}, true, false
 	case "system":
 		return nil, false, l.Subtype == "api_retry" && authErrors[l.Error]
+	case "rate_limit_event":
+		// ponytail: logged, not mapped. Only a subscription session sends it and none has
+		// been seen at a rejection yet (docs/research/claude-headless.md §6): map it to a
+		// per-person limit once dogfooding captures one from the pod's log.
+		log.Print("claude rate_limit_event: ", string(raw))
 	case "control_request": // the CLI asks the host; other subtypes are answered by the caller
 		if r := l.Request; r.Subtype == "can_use_tool" {
 			events = append(events, &bandav1.Event{Kind: &bandav1.Event_PermissionRequested{PermissionRequested: &bandav1.PermissionRequested{

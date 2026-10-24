@@ -29,7 +29,7 @@ Every risk left is the same one: the real thing behaves differently from the fak
 **Features**, until the dogfood week ends:
 
 - **Add** only what turns a signal the real CLI already sends into honest state (principles 6 and 7). Each comes with a contract test on milestone 1's fake Messages API, so it waits for milestone 1. The runner drops `rate_limit_event`, `compact_boundary` and every `api_retry` except auth errors today:
-  - usage limits: each person has one limit, shared by all their threads (one login per person) and spent faster in Banda than in a terminal, since that's the point. Show the reset time once per person (the board, their threads); hold queued prompts, races and sub-threads; resume when the limit resets; a teammate can carry on in a fork on their own subscription. Blocked: the pinned CLI reads the limit's reset only when signed in to claude.ai, so a contract run (API key, by design) sees just `api_retry` `rate_limit` and an `API Error … (429)` result with no reset (docs/research/claude-headless.md §6, `TestContractUsageLimit`). Needs a way to observe a subscription's `rate_limit_event` at a rejection first;
+  - usage limits: each person has one limit, shared by all their threads (one login per person) and spent faster in Banda than in a terminal, since that's the point. Show the reset time once per person (the board, their threads); hold queued prompts, races and sub-threads; resume when the limit resets; a teammate can carry on in a fork on their own subscription. Blocked: the pinned CLI reads the limit's reset only when signed in to claude.ai, so a contract run (API key, by design) sees just `api_retry` `rate_limit` and an `API Error … (429)` result with no reset (docs/research/claude-headless.md §6, `TestContractUsageLimit`). Parked until dogfooding hits a real limit: meanwhile the turn ends with the CLI's own limit text as its error, and the runner logs each `rate_limit_event` to the pod's log, so the first real one gives its shape;
   - retries and overload as one calm status line, not a spinner that says nothing;
   - compaction as a line in the chat;
   - the CLI's own slash commands and skills offered in the composer.
@@ -55,6 +55,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
   - [x] the Banda MCP tools reached from the real CLI through the runner's `--mcp-config` (contract, a stub server with their names); the real server with a real model still comes with dogfooding.
 - [ ] A second person on the LAN (bob) posts, mentions, requests a turn, forks; a handoff to bob with bob's own Claude login.
 - [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR. The runner turns the CLI's background tasks off (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`, so no turn starts after its end), which also takes Bash's `run_in_background`: check the agent still starts a dev server the Browser tab finds, and turn them back on (with a status for background work) if it doesn't.
+- [ ] When you hit a Claude usage limit, save `kubectl -n banda logs t-<thread> | grep rate_limit_event` before the pod suspends (30 min idle): the shape the usage-limit feature waits for.
 - [ ] Use it for a week; write down what's annoying.
 - [x] Run the API in the cluster instead of on the Mac (`mise run deploy`): signs in with Dex at `/dex` through the API.
 
