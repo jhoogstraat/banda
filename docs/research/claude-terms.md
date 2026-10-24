@@ -224,36 +224,24 @@ Inference: only the team-key row makes teammate turns plainly allowed by the tex
 4. **"Ordinary, individual usage" is weaker than the texts that matter.** PLAN.md point 5: "the terms assume 'ordinary, individual usage' by the subscriber". That sentence is about how "advertised usage limits" are sized. The texts that speak to teammate turns are elsewhere and stronger, and PLAN.md doesn't cite them: the full Consumer Terms sentence ("or make your Account available to anyone else"), the Team seat rule ("Users can't route their work through another user's account to use that user's remaining usage") and the Usage Policy line in force from 2026-11-12.
 5. **"Banda's code never sees a token"** (point 2). It is true for tokens. But the login code the user pastes travels through Banda's API and runner stream to the PTY. Whether that code is a "credential" under "may not … intermediate" is open (Q1).
 6. **Team/Enterprise users fall under the Commercial Terms, Pro/Max under the Consumer Terms.** PLAN.md cites only the legal page and treats subscriptions as one case. The Team and Enterprise seat rules are the strictest on shared use.
-7. **The source date.** PLAN.md cites the legal page "checked 2026-10-19". It is unchanged on 2026-10-24, but the Usage Policy changed in the meantime: the new version is published and in force from 2026-11-12. Re-check the pages before sending the message.
+7. **The source date.** PLAN.md cites the legal page "checked 2026-10-19". It is unchanged on 2026-10-24, but the Usage Policy changed in the meantime: the new version is published and in force from 2026-11-12. Re-check the pages when they change.
 8. In `docs/research/claude-login.md`, §5:
    - The Consumer Terms quote stops before "or make your Account available to anyone else".
    - The new legal sections are dated to "between 2026-08-04 and 2026-10-19". They narrow to 2026-08-16 to 2026-08-30.
    - The Recommendation refers to "PLAN.md open question 6", which is now question 3.
 
-## Draft message to Anthropic
+## Decision (2026-10-24)
 
-Send it to the address the legal page gives ("contact sales"), from the team's company account if it has one. Re-check the quoted pages the day you send it.
+No message goes to Anthropic. Banda complies with the text as written, and takes the strict reading where it is unclear:
 
-> **Subject: Permitted authentication for a self-hosted team tool that runs the unmodified Claude Code CLI**
->
-> Hello,
->
-> We are a small team building Banda, an internal web app. We plan to publish it as open source under MIT. Each piece of work in Banda is a thread. It has one owner, and runs the **unmodified, published `claude` binary** (`claude -p --input-format stream-json`) in an isolated Kubernetes pod, on the team's own cluster. Banda doesn't use the Agent SDK or an API proxy, and never pays for usage.
->
-> Sign-in: each user runs `claude auth login` in a terminal in one of their own pods. They finish the sign-in on claude.ai in their own browser and paste the code back into that terminal. The keystrokes pass through Banda's server to the pod and are not stored. The binary writes its login to a per-user volume set as `CLAUDE_CONFIG_DIR`. That user's pods mount the volume across restarts, as your dev container docs describe. Banda's server never mounts it, reads it or stores a token. Users have Pro, Max or Team seats.
->
-> Teammates can read every thread and post into it. On a subscription, only the owner starts the agent's turns: teammates' posts never start one, but the agent sees them as part of the thread when the owner next prompts it. A teammate who wants the agent to act forks the thread onto their own login. Only when the owner runs Claude Code on an API key can a teammate's request start a turn, after the owner approves it or in a thread the owner trusts.
->
-> Our questions, with reference to code.claude.com/docs/en/legal-and-compliance (as of 2026-10-24):
->
-> 1. Does the exemption for "an end user signing in to the unmodified Claude Code binary with their own Claude subscription, including where a platform hosts Claude Code" cover Banda as described, for Pro, Max and Team seats?
-> 2. Who has to agree to the Commercial Terms when an open-source tool like this is self-hosted: each organization that runs it? Does that also hold when its users are on Pro or Max plans under the Consumer Terms?
-> 3. Is keeping the binary's own login on a per-user volume that outlives the pod acceptable? Or should a hosted platform make the user log in again in every new pod?
-> 4. Does relaying the pasted login code from the user's browser to the pod's terminal, without storing it, count as "intermediating" Claude.ai credentials? Would showing a "Log in to Claude" screen in our UI count as "offering Claude.ai login"?
-> 5. On a subscription, is it ordinary individual use when the owner's own turn reads teammates' messages in the thread (as if they had pasted a colleague's note)? We keep teammates from starting turns there, given the Consumer Terms ("make your Account available to anyone else"), the Team seat rule ("route their work through another user's account") and the Usage Policy effective 2026-11-12 ("route requests through consumer subscriptions"). Would a teammate's request that the owner approves one by one be allowed after all? And with an API key, is a teammate's approved request "use by the customer's own authorized users"?
-> 6. Turns that no person starts directly: an agent creates a sub-thread for its owner, or a finished sub-thread wakes its parent, both on the owner's login. Are they "ordinary use" under the Consumer Terms' automated-access clause?
-> 7. Will usage from such a hosted, unmodified binary count against plan limits, or as third-party tool usage drawn from usage credits?
-> 8. For the open-source release: is there anything we should state in the README or the product beyond "runs Claude Code" in plain text?
->
-> Thank you,
-> Joshua Hoogstraat
+| Point | Strict reading | How Banda meets it |
+|---|---|---|
+| Hosting (1a) | Whoever runs Banda has agreed to Anthropic's Commercial Terms | A prerequisite on the install page (docs/deployment.md) and in the README; Banda can't check it |
+| Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription | Teammate turns and trust only when the owner runs Claude Code on an API key (PLAN.md, Teammate turns) |
+| The login code (1c) | Banda never collects, stores or reads a Claude credential, and sign-in completes in Anthropic's flow | The user runs the binary's own `claude auth login` and signs in on claude.ai in their own browser. The code they paste passes through the terminal stream as through an SSH session, which Anthropic's docs describe for containers; Banda neither logs nor stores it, and learns the login state from `claude auth status`, not the credentials file |
+| Offering login (3) | No Claude login form of Banda's own | Banda's buttons open a terminal running the binary's login, named as Claude Code's |
+| The login volume (1d) | Only the mechanism Anthropic documents for dev containers, for one user | Each user's volume is mounted only by their own pods, never by the API |
+| Turns no person started (1e) | Only the owner's own agent, for the owner, through `claude -p` (explicitly allowed) | Agents' sub-threads are their owner's; `wake_parent` wakes once, then only after a person posted; depth and running caps |
+| Names and logos | Plain text only | "Runs Claude Code" in text; no Claude or Anthropic logo |
+
+Re-check the quoted pages when they change.

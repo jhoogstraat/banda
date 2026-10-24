@@ -137,12 +137,12 @@ The docs also warn: with `--dangerously-skip-permissions`, "dev containers do no
 - [Legal](https://code.claude.com/docs/en/legal-and-compliance#acceptable-use): "Advertised usage limits for Pro and Max plans assume ordinary, individual usage of Claude Code and the Agent SDK."
 - OAuth "is intended exclusively for purchasers of Claude Free, Pro, Max, Team, and Enterprise subscription plans".
 - [Support](https://support.claude.com/en/articles/13189465-log-in-to-your-claude-account): "Subscription plans can only be used by subscribers."
-- [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) §2 (effective 2025-10-08): "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else".
+- [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) §2 (effective 2025-10-08): "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else or make your Account available to anyone else".
 - Consequence: a teammate whose message starts a turn on the owner's subscription is someone else using that subscription. Credentials are not shared, but it goes against "only by subscribers" and "individual usage". **Only the owner should be able to start agent turns.** A teammate's `@agent` should wait for the owner's one-click "run as me". This resolves PLAN.md open question 2.
 
 **2026 changes (primary, dated via Wayback snapshots of the legal page):**
 - **2026-02-18:** the "Authentication and credential use" section appears. It is absent on 2026-02-01. It added the "no Claude.ai login in third-party apps / no routing through Free, Pro, Max credentials" rule and "without prior notice" enforcement.
-- **Between 2026-08-04 and 2026-10-19:** three additions, all absent in the 2026-08-04 snapshot:
+- **Between 2026-08-16 and 2026-08-30:** three additions, all absent in the 2026-08-16 snapshot:
   - the "Can customers offer Claude Code in their products?" section (hosted sandboxes, unmodified binary, own credentials)
   - the sentence "may not collect, store, or intermediate Claude.ai credentials or session tokens"
   - the hosted-platform carve-out
@@ -168,7 +168,7 @@ Two other paths sit outside this ranking:
 - A user-supplied Console API key (via `apiKeyHelper` or an env Secret) is explicitly allowed. It is not a subscription, though.
 - Anthropic's [self-hosted environments](https://code.claude.com/docs/en/self-hosted-environments) need no credentials from the host. But they are a Team/Enterprise beta and are driven from claude.ai, not by Banda.
 
-**Pick A, and keep B as the fallback.** It is the only option that gives one login per user without Banda's code ever seeing a token. Anthropic documents exactly this pattern for containers. Its worst failure is "log in again once", and that applies to all pods together. Before going open source or widening the audience, send Anthropic the one-paragraph description from PLAN.md open question 6, as the PLAN already intends. If they object, switch the volume to the pod's lifetime and you are back at B with no other code change.
+**Pick A, and keep B as the fallback.** It is the only option that gives one login per user without Banda's code ever seeing a token. Anthropic documents exactly this pattern for containers. Its worst failure is "log in again once", and that applies to all pods together. Decided 2026-10-24: no question to Anthropic; Banda complies with the terms as written ([claude-terms.md](claude-terms.md), Decision). If they come to rule the volume out, switch it to the pod's lifetime and you are back at B with no other code change.
 
 **Implementation for A:**
 

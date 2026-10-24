@@ -21,10 +21,10 @@ What isn't proven is **real use**: no real Claude Code turn has run through Band
 
 Every risk left is the same one: the real thing behaves differently from the fake (agent, forge, cluster, terms). So no new features until real use asks for one. The milestones swap a fake for the real thing, cheapest first. Agents do the work marked for them; the rest needs Joshua.
 
-1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them. Built 2026-10-24: `mise run contract` and its CI job; left: a green CI run and the TodoWrite decision below.
+1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them. Done 2026-10-24: `mise run contract` passes in CI; the plan follows the CLI's task tools (agents, now).
 2. **Dogfood on this Mac** (Joshua; agents fix). The Phase 1 steps that need a person: your own Claude login, the GitHub App on github.com, bob on the LAN, a week of real work, ideally Banda building Banda. Each annoyance becomes a failing e2e test and a fix within a day.
 3. **Cold install** (agents rehearse it, Joshua runs it on the team cluster). Follow docs/deployment.md "Install" word for word on a fresh kind cluster, as a stranger would, and fix every gap in the page; an opt-in ServiceMonitor and alert rules for internal errors and full volumes; a recommendation on multi-node volumes (pin a user's pods to one node, or RWX). Done when one page takes an empty cluster to a signed-in team (vision goal 6).
-4. **Terms, then launch** (Joshua asks). The wording and a draft message are in docs/research/claude-terms.md: send it before the Usage Policy line takes effect on 2026-11-12. Decided meanwhile: on a subscription only the owner starts turns; teammate turns and trust need an API key (agents, now). The open-source launch waits for the answer.
+4. **Comply, then launch** (decided 2026-10-24: no question to Anthropic). Banda follows the terms as written, and strictly where they are unclear (docs/research/claude-terms.md, Decision): on a subscription only the owner starts turns, teammate turns and trust need an API key (agents, now); the Commercial Terms are a prerequisite on the install page. The launch needs nothing more from Anthropic.
 
 **Features**, until the dogfood week ends:
 
@@ -72,14 +72,13 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [x] Versioned schema migrations: `internal/store/migrations/NNNN_*.sql`, each once, under an advisory lock (docs/development.md).
 - [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", was followed word for word on a fresh kind cluster with ingress-nginx and the bundled Dex (Helm and Kustomize, 2026-10-24); it needs a run on the team cluster with a real provider and TLS.
-- [ ] Decide on Claude: confirm the persistent login volume and teammate turns with Anthropic (PLAN.md, open question 3) before more than the core team uses it.
+- [ ] Comply with the Claude terms as written (docs/research/claude-terms.md, Decision): teammate turns only on API keys is the last change.
 
 ## Open-source launch
 
 - [x] MIT license, SECURITY.md, CONTRIBUTING.md, a README with the quick start and install options.
 - [ ] Create `github.com/jhoogstraat/banda`, push `main`; enable private vulnerability reporting (SECURITY.md points to it).
 - [ ] Tag `v0.1.0`; after the first release, make the GHCR packages `banda-api`, `banda-sandbox` and `charts/banda` public (GHCR creates them private), then check `helm install` from the README works on a fresh cluster.
-- [ ] Confirm with Anthropic first (PLAN.md, open question 3).
 
 ## Phase 3: the team cluster
 
