@@ -98,6 +98,9 @@ type fakeAPI struct {
 	mu     sync.Mutex
 	reqs   []*apiReq
 	mcp    []string // tools called and their Authorization and X-Banda-Thread headers
+	// limitedUntil, when set, answers every request as Anthropic does at a
+	// usage limit: 429 with the unified rate-limit headers.
+	limitedUntil time.Time
 }
 
 func newFakeAPI(t *testing.T, script func(r *apiReq) []map[string]any) *fakeAPI {
@@ -141,7 +144,22 @@ func (f *fakeAPI) messages(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.reqs = append(f.reqs, &req)
 	n := len(f.reqs)
+	until := f.limitedUntil
 	f.mu.Unlock()
+	if !until.IsZero() {
+		h := w.Header()
+		h.Set("Content-Type", "application/json")
+		h.Set("anthropic-ratelimit-unified-status", "rejected")
+		h.Set("anthropic-ratelimit-unified-reset", fmt.Sprint(until.Unix()))
+		h.Set("anthropic-ratelimit-unified-representative-claim", "five_hour")
+		h.Set("anthropic-ratelimit-unified-5h-reset", fmt.Sprint(until.Unix()))
+		h.Set("anthropic-ratelimit-unified-5h-utilization", "1.0")
+		h.Set("anthropic-ratelimit-unified-overage-status", "rejected")
+		h.Set("anthropic-ratelimit-unified-overage-disabled-reason", "org_level_disabled")
+		w.WriteHeader(429)
+		fmt.Fprint(w, `{"type":"error","error":{"type":"rate_limit_error","message":"Error"},"request_id":"req_fake"}`)
+		return
+	}
 	var content []map[string]any
 	if f.script != nil {
 		content = f.script(&req)
@@ -674,4 +692,28 @@ func TestContractInterrupt(t *testing.T) {
 		t.Errorf("interrupted: %s", results[0])
 	}
 	want(t, s.turn("next", nil), "agent_text:ok", "turn_ended:false")
+}
+
+// At a usage limit (a 429 with the unified rate-limit headers) the CLI in
+// API-key mode reads none of them: no rate_limit_event, only api_retry lines
+// and an api_error result without a reset time. It reads them only when signed
+// in to claude.ai, which a contract run never is. If this fails, the CLI now
+// reports the limit here: see docs/research/claude-headless.md, usage limits.
+func TestContractUsageLimit(t *testing.T) {
+	contractEnv(t)
+	t.Setenv("CLAUDE_CODE_MAX_RETRIES", "1") // 10 by default, about 3 minutes
+	api := newFakeAPI(t, nil)
+	api.limitedUntil = time.Now().Add(2 * time.Hour)
+	s := start(t, settings{})
+	s.prompt("hi")
+	events, results := s.until(1, nil)
+	if te := events[len(events)-1].GetTurnEnded(); te == nil || !te.IsError || te.Error != "API Error: Request rejected (429) · Error" ||
+		!strings.Contains(results[0], `"terminal_reason":"api_error"`) || !strings.Contains(results[0], `"api_error_status":429`) {
+		t.Errorf("result: %s", results[0])
+	}
+	all := strings.Join(s.raw, "")
+	if strings.Contains(all, "rate_limit_event") || strings.Contains(all, fmt.Sprint(api.limitedUntil.Unix())) ||
+		!strings.Contains(all, `"subtype":"api_retry","attempt":1,"max_retries":1,"retry_delay_ms":`) || !strings.Contains(all, `"error_status":429,"error":"rate_limit"`) {
+		t.Errorf("the limit's lines changed:\n%s", all)
+	}
 }
