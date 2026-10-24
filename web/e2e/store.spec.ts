@@ -6,7 +6,7 @@ import { DB, expect, listen, sql, Status, test } from './fixtures.ts';
 // B4: Update's closure once queried the pool while its transaction held a connection and the thread's lock.
 test('with a one-connection pool, approving a teammate’s turn does not deadlock', async ({ as, startApi }) => {
 	const api = await startApi({}, { query: 'pool_max_conns=1' });
-	const [alice, bob] = [as('alice', api), as('bob', api)];
+	const [alice, bob] = [await as('alice', api).apiKey(), as('bob', api)];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.as(bob).send('@agent go', { mentionsAgent: true });
@@ -18,7 +18,7 @@ test('with a one-connection pool, approving a teammate’s turn does not deadloc
 
 // B11: posts, approvals and forks loaded every event since the last delivery (or all of them), tool outputs included.
 test('a 20k-event thread: posting, resolving turn requests and forking stay fast', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const seed = async (events: number) => {
 		const { stdout } = await promisify(execFile)('../deploy/long-thread.sh', [String(events)], { env: { ...process.env, DB, OWNER: alice.id } });
 		const t = alice.thread(stdout.trim());

@@ -868,7 +868,10 @@ type Thread struct {
 	Forge string `protobuf:"bytes,37,opt,name=forge,proto3" json:"forge,omitempty"`
 	// The owner has a token for the forge, so Banda can open and manage the
 	// pull request. Set by GetThread only.
-	ForgeReady    bool `protobuf:"varint,38,opt,name=forge_ready,json=forgeReady,proto3" json:"forge_ready,omitempty"`
+	ForgeReady bool `protobuf:"varint,38,opt,name=forge_ready,json=forgeReady,proto3" json:"forge_ready,omitempty"`
+	// The owner runs Claude Code on an API key, so teammates may request turns
+	// and be trusted. On a subscription only the owner runs the agent.
+	TeammateTurns bool `protobuf:"varint,39,opt,name=teammate_turns,json=teammateTurns,proto3" json:"teammate_turns,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1158,6 +1161,13 @@ func (x *Thread) GetForge() string {
 func (x *Thread) GetForgeReady() bool {
 	if x != nil {
 		return x.ForgeReady
+	}
+	return false
+}
+
+func (x *Thread) GetTeammateTurns() bool {
+	if x != nil {
+		return x.TeammateTurns
 	}
 	return false
 }
@@ -16314,8 +16324,7 @@ var File_banda_v1_banda_proto protoreflect.FileDescriptor
 
 const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
-	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf6\n" +
-	"\n" +
+	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9d\v\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bowner_id\x18\x02 \x01(\tR\aownerId\x12\x14\n" +
@@ -16360,7 +16369,8 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\fpull_request\x18$ \x01(\v2\x1c.banda.v1.PullRequestSummaryR\vpullRequest\x12\x14\n" +
 	"\x05forge\x18% \x01(\tR\x05forge\x12\x1f\n" +
 	"\vforge_ready\x18& \x01(\bR\n" +
-	"forgeReady\"\x97\x01\n" +
+	"forgeReady\x12%\n" +
+	"\x0eteammate_turns\x18' \x01(\bR\rteammateTurns\"\x97\x01\n" +
 	"\aOverlap\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x19\n" +

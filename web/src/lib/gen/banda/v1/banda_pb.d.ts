@@ -252,6 +252,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: bool forge_ready = 38;
    */
   forgeReady: boolean;
+
+  /**
+   * The owner runs Claude Code on an API key, so teammates may request turns
+   * and be trusted. On a subscription only the owner runs the agent.
+   *
+   * @generated from field: bool teammate_turns = 39;
+   */
+  teammateTurns: boolean;
 };
 
 /**

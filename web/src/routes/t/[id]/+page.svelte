@@ -120,10 +120,10 @@
 	const reviewKey = `banda-review-${id}`;
 	let pending = $state<Comment[]>(JSON.parse(localStorage.getItem(reviewKey) ?? '[]'));
 	$effect(() => localStorage.setItem(reviewKey, JSON.stringify(pending)));
-	// Ask the agent to address the review: on by default for the owner.
-	let ask = $state(false);
+	// Ask the agent to address the review: on by default for the owner; a teammate can't on a subscription.
+	let ask = $state<boolean>();
 	$effect(() => {
-		ask = owner;
+		ask = owner || thread?.teammateTurns ? owner : undefined;
 	});
 	let focus = $state<Comment>();
 	const waiting = $derived(chat.items.filter((i) => i.kind === 'request' && !i.resolved));

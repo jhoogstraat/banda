@@ -1,5 +1,5 @@
 // Permission modes: the agent asks (deploy/fake-claude's e2e-ask and e2e-plan), and who may answer.
-import { PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { AuthMethod, PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { expect, refused, repo, Status, test, type Thread, type User } from './fixtures.ts';
 
 /** A thread in the given permission mode, after its first turn. */
@@ -66,11 +66,23 @@ test('a denial reaches the agent with its reason, and the command does not run',
 });
 
 test('teammates answer in a trusted thread', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const t = await threadIn(alice, PermissionMode.ASK);
 	await alice.threads.trust({ threadId: t.id, trusted: true });
 	const id = await ask(t, 'e2e-ask by bob');
 	await answer(bob, t, id, PermissionDecision.ALLOW);
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	expect(await permitted(t)).toBe(1);
+});
+
+test('on a subscription a teammate can’t answer a permission prompt, also in a thread trusted while on an API key', async ({ as }) => {
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
+	const t = await threadIn(alice, PermissionMode.ASK);
+	await alice.threads.trust({ threadId: t.id, trusted: true });
+	await alice.settings.setAuthMethod({ harness: 'claude', authMethod: AuthMethod.SUBSCRIPTION });
+	const id = await ask(t, 'e2e-ask once');
+	await refused(answer(bob, t, id, PermissionDecision.ALLOW));
+	await answer(alice, t, id, PermissionDecision.ALLOW);
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	expect(await permitted(t)).toBe(1);
 });
@@ -156,7 +168,7 @@ test('a question (AskUserQuestion) asks even in bypass mode: teammates vote, onl
 });
 
 test('edit before allowing: the owner changes the command that runs; a trusted teammate may allow but not change it', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const t = await threadIn(alice, PermissionMode.ASK);
 	await alice.threads.trust({ threadId: t.id, trusted: true });
 	const id = await ask(t, 'e2e-ask edited');

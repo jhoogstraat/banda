@@ -1,6 +1,6 @@
 // Teammates in a thread: presence, chat mode, the inbox and team board, turn requests, trust and reviews.
-import { Mode } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { expect, listen, png, refused, repo, Status, test, type Thread } from './fixtures.ts';
+import { AuthMethod, Mode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { expect, listen, png, refused, repo, Status, test, until, type Thread } from './fixtures.ts';
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** The seq of the thread's latest turn request. */
@@ -65,9 +65,74 @@ test('bob’s new thread shows up live on carol’s team board, then its error',
 	board.stop();
 });
 
-test('a teammate’s @agent post waits for the owner; approving runs it as the teammate’s turn', { tag: '@key' }, async ({ as }) => {
+test('on a subscription only the owner runs the agent: a teammate’s @agent post is a plain post the owner’s next prompt carries, and there is no trust', { tag: '@key' }, async ({ as }) => {
 	const bob = as('bob');
 	const t = await as('alice').create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	expect((await t.get()).teammateTurns).toBe(false);
+	await t.as(bob).send('@agent e2e: from bob', { mentionsAgent: true });
+	await t.as(bob).send('', { mentionsAgent: true, review: [{ path: 'hello1.txt', startLine: 1, endLine: 1, body: 'e2e: bob asks in a review' }] });
+	await pause(2000);
+	const info = await t.get();
+	expect([info.status, info.turnRequests, info.mode]).toEqual([Status.AWAITING_INPUT, 0, Mode.CHAT]);
+	expect(await t.of('turnRequest')).toHaveLength(0);
+	expect(await t.of('turnEnded')).toHaveLength(1);
+	await refused(t.user.threads.trust({ threadId: t.id, trusted: true }));
+	expect((await t.get()).trusted).toBe(false);
+	const after = await t.turn(() => t.send('@agent carry on', { mentionsAgent: true }));
+	expect(after.diff).toContain('e2e: from bob');
+});
+
+test('switching to a subscription withdraws pending turn requests, saying why, and turns trust off for good', async ({ as }) => {
+	const bob = as('bob');
+	const alice = await as('alice').apiKey();
+	const [asked, trusted] = [await alice.create(), await alice.create()];
+	await Promise.all([asked, trusted].map((t) => t.waitForStatus(Status.AWAITING_INPUT)));
+	await alice.threads.trust({ threadId: trusted.id, trusted: true });
+	await asked.as(bob).send('@agent e2e: from bob', { mentionsAgent: true });
+	await asked.waitFor('a turn request', (i) => i.turnRequests === 1);
+	const seq = await lastRequest(asked);
+
+	await alice.settings.setAuthMethod({ harness: 'claude', authMethod: AuthMethod.SUBSCRIPTION });
+	await asked.waitFor('the request withdrawn', (i) => i.turnRequests === 0);
+	const withdrawn = (await asked.of('turnRequestResolved')).at(-1)!;
+	expect([withdrawn.requestSeq, withdrawn.approved, withdrawn.note]).toEqual([seq, false, expect.stringContaining('Fork to run it on yours')]);
+	await refused(alice.threads.approveTurn({ threadId: asked.id, requestSeq: seq }));
+	expect((await trusted.get()).trusted).toBe(false);
+
+	await alice.apiKey();
+	expect((await trusted.get()).trusted).toBe(false);
+	await trusted.as(bob).send('@agent e2e: from bob again', { mentionsAgent: true });
+	await trusted.waitFor('a turn request again', (i) => i.turnRequests === 1);
+});
+
+test('switching to an API key mid-turn: a teammate’s turn waits until the environment restarts on the key, then runs on it', { tag: '@key' }, async ({ as }) => {
+	const bob = as('bob');
+	const alice = as('alice');
+	const t = await alice.create({ prompt: 'e2e-auth e2e-hold:sub' });
+	await t.waitFor('the held turn on the subscription', (i) => i.status === Status.WORKING);
+	await until(async () => (await t.of('agentText')).some((a) => a.text === 'Auth: subscription') || undefined, () => 'the agent to say it runs on the subscription');
+
+	await alice.apiKey();
+	expect((await t.get()).teammateTurns).toBe(true);
+	await t.as(bob).send('@agent e2e-auth e2e: from bob', { mentionsAgent: true });
+	await t.waitFor('a turn request', (i) => i.turnRequests === 1);
+	const seq = await lastRequest(t);
+	expect(await refused(alice.threads.approveTurn({ threadId: t.id, requestSeq: seq }))).toContain('still runs on your Claude subscription');
+	expect(await refused(alice.threads.trust({ threadId: t.id, trusted: true }))).toContain('still runs on your Claude subscription');
+
+	await t.release('sub');
+	await t.waitForStatus(Status.SUSPENDED); // the turn ended: it restarts on the key with the next prompt
+	await t.podGone();
+	const info = await t.turn(() => alice.threads.approveTurn({ threadId: t.id, requestSeq: seq }));
+	expect(info.diff).toContain(`${bob.id}: @agent e2e-auth e2e: from bob`);
+	expect((await t.of('agentText')).filter((a) => a.text.startsWith('Auth: ')).map((a) => a.text)).toEqual(['Auth: subscription', 'Auth: api key']);
+	await alice.threads.trust({ threadId: t.id, trusted: true });
+});
+
+test('a teammate’s @agent post waits for the owner; approving runs it as the teammate’s turn', { tag: '@key' }, async ({ as }) => {
+	const bob = as('bob');
+	const t = await (await as('alice').apiKey()).create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.as(bob).send('@agent one more', { mentionsAgent: true });
 	await pause(2000);
@@ -84,7 +149,7 @@ test('a teammate’s @agent post waits for the owner; approving runs it as the t
 
 test('declining a request runs no turn and keeps the note', async ({ as }) => {
 	const bob = as('bob');
-	const t = await as('alice').create();
+	const t = await (await as('alice').apiKey()).create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.as(bob).send('@agent not this', { mentionsAgent: true });
 	await t.waitFor('a turn request', (i) => i.turnRequests === 1);
@@ -98,7 +163,7 @@ test('declining a request runs no turn and keeps the note', async ({ as }) => {
 
 test('in a trusted thread a teammate’s @agent post runs directly', async ({ as }) => {
 	const bob = as('bob');
-	const t = await as('alice').create();
+	const t = await (await as('alice').apiKey()).create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await refused(bob.threads.trust({ threadId: t.id, trusted: true }));
 	await t.user.threads.trust({ threadId: t.id, trusted: true });
@@ -122,7 +187,7 @@ test('the owner’s review is a note until it asks @agent; then the agent gets e
 
 test('a teammate’s review asking @agent waits for approval, then reaches the agent with its comments', async ({ as }) => {
 	const bob = as('bob');
-	const t = await as('alice').create();
+	const t = await (await as('alice').apiKey()).create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	await t.as(bob).send('@agent see my review', {
 		mentionsAgent: true,

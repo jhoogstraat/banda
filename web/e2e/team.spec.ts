@@ -24,7 +24,7 @@ async function briefSection(page: Page, name: string) {
 }
 
 test('team board: alice’s threads grouped by what needs her, paused ones folded; quiet carol only when asked', async ({ as }) => {
-	const [alice, bob, carol] = [as('alice'), as('bob'), as('carol')];
+	const [alice, bob, carol] = [await as('alice').apiKey(), as('bob'), as('carol')];
 	await carol.users.me({}); // on the team, without threads
 	const [working, waiting, done, older] = await Promise.all([
 		alice.create({ prompt: 'e2e-hold:grouped' }),

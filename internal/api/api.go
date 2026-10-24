@@ -289,6 +289,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 
 		TurnRequests:       int32(t.Requests),
 		Trusted:            t.Trusted,
+		TeammateTurns:      t.APIKey,
 		AutoPush:           bandav1.AutoPushState(bandav1.AutoPushState_value[t.AutoPush]),
 		EnvironmentDeleted: t.EnvDeleteAt != nil && !t.EnvDeleteAt.After(time.Now()),
 		Activity:           t.Activity,

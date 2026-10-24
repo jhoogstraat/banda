@@ -118,7 +118,9 @@
 			{#if thread.status === Status.ERRORED}
 				<Menu.Item onclick={retry}><RotateCcwIcon /> Retry</Menu.Item>
 			{/if}
-			<!-- A switch, not a check mark: the setting stays, unlike the actions above. -->
+			<!-- A switch, not a check mark: the setting stays, unlike the actions above. Only on an API key: a
+				subscription runs only its owner's turns. -->
+			{#if thread.teammateTurns}
 			<Menu.CheckboxItem
 				checked={thread.trusted}
 				onCheckedChange={(trusted) => act(api.trust({ threadId: thread.id, trusted }))}
@@ -132,6 +134,7 @@
 					<span class="size-3 rounded-full bg-background shadow transition-transform {thread.trusted ? 'translate-x-3' : ''}"></span>
 				</span>
 			</Menu.CheckboxItem>
+			{/if}
 		{/if}
 	</Menu.Content>
 </Menu.Root>

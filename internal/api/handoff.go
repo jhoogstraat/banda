@@ -52,7 +52,7 @@ func (s *Service) offer(ctx context.Context, id, by, actor, to, note string) err
 				if err := u.fresh(t); err != nil {
 					return nil, err
 				}
-				prompt, images = turnPrompt(t, eff, names, u.events, by, &bandav1.Message{Text: briefingRequest(names, by, to, note)}, u.texts)
+				prompt, images = turnPrompt(t, eff, names, u.events, by, false, &bandav1.Message{Text: briefingRequest(names, by, to, note)}, u.texts)
 			} else if actor == by {
 				offer.NoBriefing = map[thread.Status]string{thread.Working: "the agent is working", thread.Suspended: "the environment is paused",
 					thread.Starting: "the environment is starting", thread.Errored: "the environment is unavailable"}[t.Status]
@@ -69,7 +69,7 @@ func (s *Service) offer(ctx context.Context, id, by, actor, to, note string) err
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, id, prompt, images)
+		s.deliver(ctx, id, prompt, images, false)
 	}
 	unlock()
 	s.pokeInbox(to)
@@ -107,13 +107,21 @@ func (s *Service) HandoffAccept(ctx context.Context, req *bandav1.HandoffAcceptR
 		}
 		from = t.OwnerID
 		// The conversation holds every message so far, also one waiting for a start.
-		t.PendingPrompt, t.PendingImages = handoffPrompt(names, *t, events, offer, by), nil
+		t.PendingPrompt, t.PendingImages, t.PendingTeammate = handoffPrompt(names, *t, events, offer, by), nil, false
 		t.DeliveredSeq = t.LastSeq + 1 // the event stored next
 		t.AllowedTools = nil           // "always allow" was the old owner's choice, for their environment
 		t.Handoffs++
 		out := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_HandoffResolved{HandoffResolved: &bandav1.HandoffResolved{
 			OfferSeq: offer.GetSeq(), Accepted: true}}}}, stateEvents(t.State, next)...)
+		st, err := tx.Settings(ctx, by, harness)
+		if err != nil {
+			return nil, err
+		}
 		t.State = next
+		if t.APIKey = st.AuthMethod == "api_key"; !t.APIKey {
+			withdrawn, err := withdrawTurns(ctx, tx, t, or(names[by], by))
+			return append(out, withdrawn...), err
+		}
 		return out, nil
 	})
 	if err != nil {

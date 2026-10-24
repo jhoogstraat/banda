@@ -19,7 +19,7 @@ func TestResolvePermission(t *testing.T) {
 	)
 	thr := func(trusted bool) *store.Thread {
 		th := &store.Thread{PermissionMode: "plan", Permissions: map[string]string{"r1": "Bash", "p1": exitPlanMode}}
-		th.OwnerID, th.Trusted = "ann", trusted
+		th.OwnerID, th.Trusted, th.APIKey, th.EnvAPIKey = "ann", trusted, true, true
 		return th
 	}
 	ans := func(id string, d bandav1.PermissionDecision, m bandav1.PermissionMode) *bandav1.PermissionAnswerRequest {
@@ -64,7 +64,7 @@ func TestAnswerQuestionsRulesAndEdits(t *testing.T) {
 		deny   = bandav1.PermissionDecision_PERMISSION_DECISION_DENY
 	)
 	th := &store.Thread{Permissions: map[string]string{"q": askUserQuestion, "b": "Bash", "w": "Write", "e": "Bash"}}
-	th.OwnerID, th.Trusted = "ann", true
+	th.OwnerID, th.Trusted, th.APIKey, th.EnvAPIKey = "ann", true, true, true
 	answers := map[string]string{"Which?": "A"}
 	for _, r := range []*bandav1.PermissionAnswerRequest{
 		{RequestId: "q", Decision: allow},                    // no answers

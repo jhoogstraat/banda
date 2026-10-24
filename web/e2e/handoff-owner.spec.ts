@@ -141,3 +141,16 @@ test('an agent offers its own thread through MCP (handoff_thread): the same card
 	expect((await bt.get()).ownerId).toBe(bob.id);
 	expect((await bt.prompts()).at(-1)).toContain(`Your briefing for ${bob.id}, written before the handover:\n\n${briefing}`);
 });
+
+test('a handoff to a teammate on a subscription withdraws the waiting turn requests: only they run the agent now', async ({ as }) => {
+	const [alice, bob, carol] = [await teammate(await as('alice').apiKey()), await teammate(as('bob')), as('carol')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.as(carol).send('@agent e2e: from carol', { mentionsAgent: true });
+	await t.waitFor('a turn request', (i) => i.turnRequests === 1);
+	await t.turn(() => alice.threads.handoffOffer({ threadId: t.id, toUserId: bob.id }));
+	await bob.threads.handoffAccept({ threadId: t.id });
+	const info = await t.get();
+	expect([info.ownerId, info.turnRequests, info.teammateTurns]).toEqual([bob.id, 0, false]);
+	expect((await t.of('turnRequestResolved')).at(-1)?.note).toContain('Fork to run it on yours');
+});

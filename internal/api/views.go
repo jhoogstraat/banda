@@ -164,6 +164,20 @@ func (s *Service) park(ctx context.Context, id string) {
 	}
 }
 
+// restartOnKey suspends the thread, unless a turn runs (its end calls this
+// again), if its environment started on its owner's Claude subscription but
+// they are on an API key now: it resumes on the key with the next prompt,
+// and teammates can run the agent then (thread.State.TeammateTurns).
+func (s *Service) restartOnKey(ctx context.Context, id string) {
+	t, err := s.store.Get(ctx, id)
+	if err != nil || !t.APIKey || t.EnvAPIKey || t.Status != thread.AwaitingInput {
+		return // most calls: no write
+	}
+	if effect, err := s.apply(ctx, id, thread.Suspend{ToKey: true}); err == nil {
+		s.do(ctx, id, effect)
+	}
+}
+
 // SuspendIdle suspends environments that have been idle for longer than idle,
 // checking every so often.
 func (s *Service) SuspendIdle(ctx context.Context, idle, every time.Duration) {

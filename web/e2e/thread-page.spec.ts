@@ -4,7 +4,7 @@ import { AutoPushState, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.
 import { expect, repo, Status, test, type Thread, type User } from './fixtures.ts';
 
 // Its placeholder (the accessible name) says what a post does, for the owner or a teammate.
-const composer = (page: Page) => page.getByRole('textbox', { name: /^(Ask the agent…|Message the team|Reply to )/ });
+const composer = (page: Page) => page.getByRole('textbox', { name: /^(Ask the agent…|Message the team|Reply to |Only )/ });
 
 /** The thread's page as user, once its header shows the thread. */
 async function open(user: User, t: Thread, options?: Parameters<User['page']>[0]) {
@@ -192,7 +192,7 @@ test('the agent entering plan mode itself shows in the header and the chat', asy
 });
 
 test('turn requests: bob asks the agent and waits; alice approves one, which runs, and declines another with a note', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
@@ -200,8 +200,8 @@ test('turn requests: bob asks the agent and waits; alice approves one, which run
 	await post(bobPage, '@agent e2e: from bob');
 	await expect(bobPage.getByText(`Waiting for ${alice.id} to approve`)).toBeVisible();
 	await expect(page.getByText('asks the agent')).toBeVisible();
-	// The card is compact: the subscription note is behind an info button, the decline note behind its own.
-	await expect(page.getByRole('button', { name: 'Runs on your Claude subscription' })).toBeVisible();
+	// The card is compact: the API key note is behind an info button, the decline note behind its own.
+	await expect(page.getByRole('button', { name: 'Runs on your API key' })).toBeVisible();
 	await expect(page.getByText(/in this thread's environment/)).toBeHidden();
 	await expect(page.getByRole('textbox', { name: 'Decline note' })).toBeHidden();
 	await expect(page.getByRole('button', { name: /^Approve all/ })).toBeHidden();
@@ -218,7 +218,7 @@ test('turn requests: bob asks the agent and waits; alice approves one, which run
 });
 
 test('turn requests: with several waiting, alice approves them all at once, in the order they were posted', async ({ as }) => {
-	const [alice, bob] = [as('alice'), as('bob')];
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
@@ -450,7 +450,7 @@ test('phone: the sidebar is a drawer that lists the thread and closes once one i
 });
 
 test('the header keeps the title in view, on a phone too; the rest is in a labelled menu with shortcuts, the trust switch included', async ({ as }) => {
-	const alice = as('alice');
+	const alice = await as('alice').apiKey();
 	const t = await alice.create({ prompt: 'e2e: a long title that would never fit next to a row of a dozen icon buttons on a phone' });
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const { defaultBrowserType: _, ...phone } = devices['iPhone 13'];
@@ -473,8 +473,19 @@ test('the header keeps the title in view, on a phone too; the rest is in a label
 	await expect(trust).toHaveAttribute('aria-checked', 'true');
 });
 
-test('a teammate’s post switches to chat mode: the chat says who and why, the owner’s mode chip switches back, placeholders say what a post does', async ({ as }) => {
+test('on a subscription the teammate’s composer says only the owner runs the agent and points to Fork; the owner’s menu has no trust switch', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
+	await expect(bobPage.getByPlaceholder(`Only ${alice.id} runs the agent (their Claude subscription). Fork to run it on yours.`)).toBeVisible();
+	await page.getByRole('button', { name: 'More actions' }).click();
+	await expect(page.getByRole('menuitem', { name: /^Switch to chat mode/ })).toBeVisible();
+	await expect(page.getByRole('menuitemcheckbox', { name: /^Teammates can run the agent/ })).toHaveCount(0);
+});
+
+test('a teammate’s post switches to chat mode: the chat says who and why, the owner’s mode chip switches back, placeholders say what a post does', async ({ as }) => {
+	const [alice, bob] = [await as('alice').apiKey(), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [page, bobPage] = [await open(alice, t), await open(bob, t)];

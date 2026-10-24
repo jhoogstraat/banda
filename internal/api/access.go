@@ -17,7 +17,8 @@ import (
 // preview, attachments) and posts into it; the state machine decides what a
 // post does. Only the owner changes how a thread runs or uses its
 // environment (thread.State.CheckOwner) and answers its agent's permission
-// prompts, unless they trust teammates (thread.State.Trusts). Runners and the
+// prompts, unless they run Claude Code on an API key and trust teammates
+// (thread.State.Trusts). Runners and the
 // MCP server act as their thread, by its runner token.
 
 // owned returns the thread if the caller owns it.
@@ -62,6 +63,8 @@ var codes = map[error]connect.Code{
 	thread.ErrHandoff:     connect.CodeInvalidArgument,
 	thread.ErrBusy:        connect.CodeFailedPrecondition,
 	thread.ErrRepoKept:    connect.CodeFailedPrecondition,
+	thread.ErrNoTrust:     connect.CodeFailedPrecondition,
+	thread.ErrOnLogin:     connect.CodeFailedPrecondition,
 
 	context.Canceled:         connect.CodeCanceled, // the client went away
 	context.DeadlineExceeded: connect.CodeDeadlineExceeded,

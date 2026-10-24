@@ -24,7 +24,7 @@ Every risk left is the same one: the real thing behaves differently from the fak
 1. **The real CLI, without a subscription** (agents, now). All 32 specs rest on `deploy/fake-claude`; if it drifts from the real CLI, the suite proves nothing. `docs/research/claude-headless.md` already ran the real binary against a local fake Messages API. Turn that into contract tests: the pinned `claude` from the sandbox image, a scripted fake Messages API, and the runner's mapping checked per scenario (the "verify against the real CLI" list in Phase 1). They run in a container, never on the Mac, where the login sits in the keychain. Done when they pass in CI and bumping `CLAUDE_VERSION` is a one-line PR that runs them. Done 2026-10-24: `mise run contract` passes in CI; the plan follows the CLI's task tools.
 2. **Dogfood on this Mac** (Joshua; agents fix). The Phase 1 steps that need a person: your own Claude login, the GitHub App on github.com, bob on the LAN, a week of real work, ideally Banda building Banda. Each annoyance becomes a failing e2e test and a fix within a day.
 3. **Cold install** (agents rehearse it, Joshua runs it on the team cluster). Follow docs/deployment.md "Install" word for word on a fresh kind cluster, as a stranger would, and fix every gap in the page; an opt-in ServiceMonitor and alert rules for internal errors and full volumes; a recommendation on multi-node volumes (pin a user's pods to one node, or RWX). Done when one page takes an empty cluster to a signed-in team (vision goal 6).
-4. **Comply, then launch** (decided 2026-10-24: no question to Anthropic). Banda follows the terms as written, and strictly where they are unclear (docs/research/claude-terms.md, Decision): on a subscription only the owner starts turns, teammate turns and trust need an API key (agents, now); the Commercial Terms are a prerequisite on the install page. The launch needs nothing more from Anthropic.
+4. **Comply, then launch** (decided 2026-10-24: no question to Anthropic). Banda follows the terms as written, and strictly where they are unclear (docs/research/claude-terms.md, Decision): on a subscription only the owner starts turns, teammate turns and trust need an API key; the Commercial Terms are a prerequisite on the install page. Done 2026-10-24: the launch needs nothing more from Anthropic, only milestones 2 and 3.
 
 **Features**, until the dogfood week ends:
 
@@ -53,7 +53,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
   - [x] permission modes: `ask`, `accept edits`, `plan` with a real `ExitPlanMode`, `AskUserQuestion` answers, `EnterPlanMode` (contract).
   - [x] switching profile, model and effort mid-thread with `--resume` and `--system-prompt-snapshot off` (contract: the resumed CLI sends them).
   - [x] the Banda MCP tools reached from the real CLI through the runner's `--mcp-config` (contract, a stub server with their names); the real server with a real model still comes with dogfooding.
-- [ ] A second person on the LAN (bob) posts, mentions, requests a turn, forks; a handoff to bob with bob's own Claude login.
+- [ ] A second person on the LAN (bob) posts, mentions, requests a turn (the owner on an API key; on a subscription bob forks instead), forks; a handoff to bob with bob's own Claude login.
 - [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR. The runner turns the CLI's background tasks off (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`, so no turn starts after its end), which also takes Bash's `run_in_background`: check the agent still starts a dev server the Browser tab finds, and turn them back on (with a status for background work) if it doesn't.
 - [ ] When you hit a Claude usage limit, save `kubectl -n banda logs t-<thread> | grep rate_limit_event` before the pod suspends (30 min idle): the shape the usage-limit feature waits for.
 - [ ] Use it for a week; write down what's annoying.
@@ -73,7 +73,7 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [x] `strategy: Recreate` and resource requests on `banda-api`; a liveness probe.
 - [x] Versioned schema migrations: `internal/store/migrations/NNNN_*.sql`, each once, under an advisory lock (docs/development.md).
 - [ ] An install page: one document from empty cluster to signed-in team (vision goal 6). docs/deployment.md, "Install", was followed word for word on a fresh kind cluster with ingress-nginx and the bundled Dex (Helm and Kustomize, 2026-10-24); it needs a run on the team cluster with a real provider and TLS.
-- [ ] Comply with the Claude terms as written (docs/research/claude-terms.md, Decision): teammate turns only on API keys is the last change.
+- [x] Comply with the Claude terms as written (docs/research/claude-terms.md, Decision): on a subscription only the owner runs the agent; teammate turns and trust need an API key and an environment that started on it.
 
 ## Open-source launch
 

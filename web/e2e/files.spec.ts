@@ -3,7 +3,7 @@ import { API, expect, png, refused, repo, Status, test } from './fixtures.ts';
 
 test('attachments: a chat message’s image is folded into the next prompt as an image block, an approved request’s text file is inlined; older pages keep them', async ({ as }) => {
 	const bob = as('bob');
-	const t = await as('alice').create();
+	const t = await (await as('alice').apiKey()).create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const bobs = t.as(bob);
 	await bobs.send('nice, carol what do you think?', { attachments: [{ id: await bob.attach('dot.png', 'image/png', png) }] });

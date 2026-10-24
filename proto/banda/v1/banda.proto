@@ -325,6 +325,9 @@ message Thread {
   // The owner has a token for the forge, so Banda can open and manage the
   // pull request. Set by GetThread only.
   bool forge_ready = 38;
+  // The owner runs Claude Code on an API key, so teammates may request turns
+  // and be trusted. On a subscription only the owner runs the agent.
+  bool teammate_turns = 39;
 }
 
 // Another thread that changes some of the same files (see Thread.overlaps).

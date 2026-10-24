@@ -12,6 +12,7 @@ import { openSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import {
+	AuthMethod,
 	CreateThreadRequestSchema,
 	EventSchema,
 	MessageSchema,
@@ -151,6 +152,11 @@ function newUser(id: string, browser: () => Promise<Browser>, api = API) {
 		},
 		/** A thread as this user sees it. */
 		thread: (threadId: string) => new Thread(user, threadId),
+		/** Runs Claude Code on an API key: only then may teammates request turns or be trusted. */
+		async apiKey() {
+			await user.settings.setAuthMethod({ harness: 'claude', authMethod: AuthMethod.API_KEY, apiKey: 'key-e2e' });
+			return user;
+		},
 		/** POST /files: the response, its JSON is the attachment. */
 		upload: (name: string, type: string, body: Uint8Array | string) =>
 			fetch(`${api}/files?name=${encodeURIComponent(name)}`, {

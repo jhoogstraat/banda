@@ -195,10 +195,12 @@ func (s *Store) DropRunnerToken(ctx context.Context, id string) error {
 	return err
 }
 
-// NewRunnerToken gives the thread a new runner token. Only its hash is kept.
-func (s *Store) NewRunnerToken(ctx context.Context, id string) (string, error) {
+// NewRunnerToken gives the thread a new runner token, for a pod started
+// with the API key or not. Only its hash is kept; with it, whether that pod,
+// the only one whose runner can connect, has the key (State.EnvAPIKey).
+func (s *Store) NewRunnerToken(ctx context.Context, id string, apiKey bool) (string, error) {
 	token := rand.Text()
-	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = $2 WHERE id = $1`, id, TokenHash(token))
+	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = $2, env_api_key = $3 WHERE id = $1`, id, TokenHash(token), apiKey)
 	return token, err
 }
 

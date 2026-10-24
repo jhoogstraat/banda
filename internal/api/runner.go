@@ -133,6 +133,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if err := s.ready(bg, id, r); err != nil {
 				return err
 			}
+			go s.restartOnKey(bg, id) // started on the subscription just before a switch to the key
 		case *bandav1.ConnectRequest_Event:
 			e := k.Event
 			e.Actor = "agent"
@@ -181,6 +182,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if e.GetTurnEnded() != nil { // a request the turn left behind can't be answered any more
 				s.settlePermissions(bg, id, bandav1.PermissionDecision_PERMISSION_DECISION_CANCELED)
 				go s.park(bg, id) // not here: suspending waits for this stream
+				go s.restartOnKey(bg, id)
 			}
 		case *bandav1.ConnectRequest_TerminalOutput:
 			s.mu.Lock()
@@ -261,6 +263,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	names := s.names(ctx)
 	var prompt string
 	var images []string
+	var teammate bool
 	defer s.lockDelivery(id)()
 	var t store.Thread
 	var events []*bandav1.Event
@@ -270,8 +273,15 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 			return err
 		}
 		t, events, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
-			next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 			events := lostTurns(t.State, 0) // e.g. the API restarted mid-turn
+			if t.PendingTeammate && !t.EnvAPIKey {
+				// The owner switched to their subscription since: a teammate's
+				// turn never runs on it (Anthropic's terms).
+				events = append(events, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: "The waiting prompt didn't run: it held a teammate's turn, and " +
+					or(names[t.OwnerID], t.OwnerID) + " runs the agent on their Claude subscription now, so only they can."}}})
+				t.PendingPrompt, t.PendingImages, t.PendingTeammate = "", nil, false
+			}
+			next, effect, _ := thread.Apply(t.State, thread.EnvReady{Pending: t.PendingPrompt != ""})
 			if effect == thread.StartTurn {
 				// The pending prompt covers the events through DeliveredSeq.
 				if err := u.fresh(t); err != nil {
@@ -282,7 +292,8 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 				if posted != "" {
 					prompt += "\n\nMessages posted in this thread since:\n" + posted
 				}
-				t.PendingPrompt, t.PendingImages = "", nil
+				teammate = t.PendingTeammate
+				t.PendingPrompt, t.PendingImages, t.PendingTeammate = "", nil, false
 				t.DeliveredSeq = t.LastSeq
 			}
 			events = append(events, stateEvents(t.State, next)...)
@@ -297,7 +308,7 @@ func (s *Service) ready(ctx context.Context, id string, r *runner) error {
 	s.broadcast(id, events)
 	s.configure(t) // before the prompt, so its first tool call already asks as it should
 	if prompt != "" {
-		s.deliver(ctx, id, prompt, images)
+		s.deliver(ctx, id, prompt, images, teammate)
 	}
 	return nil
 }

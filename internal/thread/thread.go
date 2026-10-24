@@ -34,6 +34,14 @@ type State struct {
 	// runs on the owner's subscription, in a pod holding their credentials.
 	Requests int
 	Trusted  bool
+	// APIKey: the owner runs Claude Code on an API key. On a subscription
+	// only the owner runs the agent (Anthropic's terms): a teammate's post
+	// never becomes a turn or a request, and there is no trust.
+	APIKey bool
+	// EnvAPIKey: the environment started with the owner's API key. A claude
+	// process keeps the login it started with, so after a switch from a
+	// subscription teammates wait until it restarts (TeammateTurns).
+	EnvAPIKey bool
 	// HandoffTo is the teammate the owner offered the thread to, until they
 	// accept or decline or the owner cancels.
 	HandoffTo string
@@ -59,6 +67,8 @@ var (
 	ErrHandoff   = errors.New("hand the thread to a teammate, one at a time")
 	ErrBusy      = errors.New("the agent is working: try again once its turn has ended")
 	ErrRepoKept  = errors.New("the thread's repository was checked out: it can't be changed")
+	ErrNoTrust   = errors.New("the owner runs the agent on their Claude subscription: only they can run it")
+	ErrOnLogin   = errors.New("the agent still runs on your Claude subscription: it restarts on your API key once no turn runs, then teammates can run it")
 )
 
 // CheckOwner returns ErrForbidden unless by owns the thread.
@@ -70,8 +80,13 @@ func (s State) CheckOwner(by string) error {
 }
 
 // Trusts reports whether by may run the agent without the owner's approval:
-// the owner, or anyone once the owner trusts teammates.
-func (s State) Trusts(by string) bool { return by == s.OwnerID || s.Trusted }
+// the owner, or anyone once the owner, on an API key, trusts teammates.
+func (s State) Trusts(by string) bool { return by == s.OwnerID || s.TeammateTurns() && s.Trusted }
+
+// TeammateTurns reports whether a teammate's turn may run now: the owner is
+// on an API key, and the environment started with it or starts anew. A
+// teammate's turn never runs in a claude process started on a subscription.
+func (s State) TeammateTurns() bool { return s.APIKey && (s.EnvAPIKey || s.Status == Suspended) }
 
 type Action interface{ action() }
 
@@ -131,8 +146,10 @@ type TurnEnded struct{ Prompts int }
 type EnvLost struct{}
 
 // Suspend: the thread has been idle for a while, or its owner snoozed or
-// settled it.
-type Suspend struct{}
+// settled it. ToKey suspends only an idle environment that started on the
+// owner's subscription while they are on an API key now: it resumes on the
+// key with the next prompt.
+type Suspend struct{ ToKey bool }
 
 // Wake resumes a suspended environment without a prompt, e.g. to open a terminal.
 type Wake struct{ By string }
@@ -177,6 +194,10 @@ func Apply(s State, a Action) (State, Effect, error) {
 			return s, None, nil
 		}
 		if !s.Trusts(a.By) && !a.OwnersAgent {
+			if !s.APIKey { // a plain post: the owner's next prompt includes it
+				s.Mode = ChatMode
+				return s, None, nil
+			}
 			s.Requests++
 			return s, RequestTurn, nil
 		}
@@ -188,6 +209,12 @@ func Apply(s State, a Action) (State, Effect, error) {
 		}
 		if s.Requests == 0 {
 			return s, None, ErrNoRequest
+		}
+		if !s.APIKey { // switched to a subscription; the requests are being withdrawn
+			return s, None, ErrNoTrust
+		}
+		if !s.TeammateTurns() {
+			return s, None, ErrOnLogin
 		}
 		next, eff, err := startTurn(s)
 		if err == nil {
@@ -208,6 +235,12 @@ func Apply(s State, a Action) (State, Effect, error) {
 	case Trust:
 		if err := s.CheckOwner(a.By); err != nil {
 			return s, None, err
+		}
+		if a.Trusted && !s.APIKey {
+			return s, None, ErrNoTrust
+		}
+		if a.Trusted && !s.TeammateTurns() {
+			return s, None, ErrOnLogin
 		}
 		s.Trusted = a.Trusted
 		return s, None, nil
@@ -307,6 +340,9 @@ func Apply(s State, a Action) (State, Effect, error) {
 		return s, None, nil
 
 	case Suspend:
+		if a.ToKey && (s.Status != AwaitingInput || !s.APIKey || s.EnvAPIKey) {
+			return s, None, nil
+		}
 		if s.Status == Working || s.Status == Suspended {
 			return s, None, nil
 		}

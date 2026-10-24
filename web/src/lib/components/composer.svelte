@@ -64,10 +64,13 @@
 		return `${why} · retrying ${r.attempt}/${r.maxRetries}`;
 	});
 	// Says what a post does here: the owner's starts a turn in agent mode; in chat mode, and for teammates, only @agent does.
+	// On a subscription only the owner runs the agent (Anthropic's terms): teammates fork to run it on theirs.
 	const placeholder = $derived(
 		!thread
 			? 'Message…'
-			: !owner
+			: !owner && !thread.teammateTurns
+				? `Only ${userName(thread.ownerId)} runs the agent (their Claude subscription). Fork to run it on yours.`
+				: !owner
 				? `Reply to ${userName(thread.ownerId)} — @agent to ${thread.trusted ? 'ask the agent' : 'request a turn'}`
 				: chatMode
 					? 'Message the team — @agent to ask the agent'

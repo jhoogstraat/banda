@@ -14,6 +14,7 @@ import (
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
 	"github.com/jhoogstraat/banda/internal/store"
+	"github.com/jhoogstraat/banda/internal/thread"
 )
 
 // Secret and API key values go straight to Kubernetes Secrets: they are never
@@ -106,7 +107,36 @@ func (s *Service) SetAuthMethod(ctx context.Context, req *bandav1.SetAuthMethodR
 			return nil, err
 		}
 	}
-	return &bandav1.SetAuthMethodResponse{}, s.store.SetAuthMethod(ctx, u, harness, method, key != "")
+	if err := s.store.SetAuthMethod(ctx, u, harness, method, key != ""); err != nil {
+		return nil, err
+	}
+	threads, err := s.store.List(ctx, u, u)
+	if err != nil {
+		return nil, err
+	}
+	if method == "api_key" { // environments started on the subscription restart on the key
+		for _, t := range threads {
+			if !t.EnvAPIKey && t.Status == thread.AwaitingInput { // a working one at its turn's end
+				go s.restartOnKey(context.WithoutCancel(ctx), t.ID)
+			}
+		}
+		return &bandav1.SetAuthMethodResponse{}, nil
+	}
+	name := or(s.names(ctx)[u], u)
+	for _, t := range threads {
+		if t.Requests == 0 && !t.Trusted {
+			continue
+		}
+		_, stored, err := s.store.Update(ctx, t.ID, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+			return withdrawTurns(ctx, tx, t, name)
+		})
+		if err != nil {
+			return nil, err
+		}
+		s.broadcast(t.ID, stored)
+	}
+	s.wakeInboxes()
+	return &bandav1.SetAuthMethodResponse{}, nil
 }
 
 func (s *Service) SetSecret(ctx context.Context, req *bandav1.SetSecretRequest) (*bandav1.SetSecretResponse, error) {

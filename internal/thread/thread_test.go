@@ -3,9 +3,13 @@ package thread
 import "testing"
 
 func TestApply(t *testing.T) {
-	idle := State{OwnerID: "ann", Status: AwaitingInput, Mode: AgentMode}
-	chat := State{OwnerID: "ann", Status: AwaitingInput, Mode: ChatMode}
+	// The owner runs Claude Code on an API key; on a subscription (sub) only they run the agent.
+	idle := State{OwnerID: "ann", Status: AwaitingInput, Mode: AgentMode, APIKey: true, EnvAPIKey: true}
+	chat := State{OwnerID: "ann", Status: AwaitingInput, Mode: ChatMode, APIKey: true, EnvAPIKey: true}
+	sub := State{OwnerID: "ann", Status: AwaitingInput, Mode: AgentMode}
 	with := func(s State, f func(*State)) State { f(&s); return s }
+	// Switched to an API key, the environment still on the subscription it started with.
+	onLogin := with(idle, func(s *State) { s.EnvAPIKey = false })
 	working := func(s State, turns int) State { s.Status, s.Turns = Working, turns; return s }
 
 	tests := []struct {
@@ -30,6 +34,36 @@ func TestApply(t *testing.T) {
 			with(working(idle, 1), func(s *State) { s.Trusted = true }), StartTurn, nil},
 		{"the owner's agents start turns without approval", idle, Send{By: "agent:t2", MentionsAgent: true, OwnersAgent: true},
 			working(idle, 1), StartTurn, nil},
+		{"subscription: a teammate mentioning the agent posts, no request", sub, Send{By: "bob", MentionsAgent: true},
+			with(sub, func(s *State) { s.Mode = ChatMode }), None, nil},
+		{"subscription: another owner's agent mentioning the agent posts", sub, Send{By: "agent:t2", MentionsAgent: true},
+			with(sub, func(s *State) { s.Mode = ChatMode }), None, nil},
+		{"subscription: the owner's agents start turns", sub, Send{By: "agent:t2", MentionsAgent: true, OwnersAgent: true},
+			working(sub, 1), StartTurn, nil},
+		{"subscription: trust left on doesn't let teammates run it", with(sub, func(s *State) { s.Trusted = true }), Send{By: "bob", MentionsAgent: true},
+			with(sub, func(s *State) { s.Trusted, s.Mode = true, ChatMode }), None, nil},
+		{"subscription: no trust", sub, Trust{By: "ann", Trusted: true},
+			sub, None, ErrNoTrust},
+		{"subscription: a request left from an API key isn't approved", with(sub, func(s *State) { s.Requests = 1 }), Approve{By: "ann"},
+			with(sub, func(s *State) { s.Requests = 1 }), None, ErrNoTrust},
+		{"switched to a key: a teammate's request waits for the restart", onLogin, Send{By: "bob", MentionsAgent: true},
+			with(onLogin, func(s *State) { s.Requests = 1 }), RequestTurn, nil},
+		{"switched to a key: trust waits for the restart", onLogin, Trust{By: "ann", Trusted: true},
+			onLogin, None, ErrOnLogin},
+		{"switched to a key: trust left on waits too", with(onLogin, func(s *State) { s.Trusted = true }), Send{By: "bob", MentionsAgent: true},
+			with(onLogin, func(s *State) { s.Trusted, s.Requests = true, 1 }), RequestTurn, nil},
+		{"switched to a key: approving waits for the restart", with(onLogin, func(s *State) { s.Requests = 1 }), Approve{By: "ann"},
+			with(onLogin, func(s *State) { s.Requests = 1 }), None, ErrOnLogin},
+		{"switched to a key: approving a suspended thread starts it on the key", with(onLogin, func(s *State) { s.Status, s.Requests = Suspended, 1 }), Approve{By: "ann"},
+			with(onLogin, func(s *State) { s.Status = Starting }), Provision, nil},
+		{"switched to a key: the idle environment restarts", onLogin, Suspend{ToKey: true},
+			with(onLogin, func(s *State) { s.Status = Suspended }), SuspendEnv, nil},
+		{"switched to a key: a working one finishes its turn first", working(onLogin, 1), Suspend{ToKey: true},
+			working(onLogin, 1), None, nil},
+		{"on the key already: no restart", idle, Suspend{ToKey: true},
+			idle, None, nil},
+		{"on a subscription: no restart", sub, Suspend{ToKey: true},
+			sub, None, nil},
 		{"owner approves a request", with(chat, func(s *State) { s.Requests = 2 }), Approve{By: "ann"},
 			with(working(chat, 1), func(s *State) { s.Requests = 1 }), StartTurn, nil},
 		{"approving while working queues the turn", with(working(idle, 1), func(s *State) { s.Requests = 1 }), Approve{By: "ann"},
@@ -70,7 +104,7 @@ func TestApply(t *testing.T) {
 			idle, None, ErrHandoff},
 		{"accepting makes the recipient the owner and restarts the environment",
 			with(idle, func(s *State) { s.HandoffTo, s.Trusted, s.Requests = "bob", true, 1 }), Accept{By: "bob"},
-			State{OwnerID: "bob", Status: Starting, Mode: AgentMode, Requests: 1}, Provision, nil},
+			State{OwnerID: "bob", Status: Starting, Mode: AgentMode, Requests: 1, APIKey: true, EnvAPIKey: true}, Provision, nil},
 		{"only the recipient accepts", with(idle, func(s *State) { s.HandoffTo = "bob" }), Accept{By: "ann"},
 			with(idle, func(s *State) { s.HandoffTo = "bob" }), None, ErrForbidden},
 		{"accepting waits for the briefing", with(working(idle, 1), func(s *State) { s.HandoffTo = "bob" }), Accept{By: "bob"},

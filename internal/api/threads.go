@@ -152,7 +152,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	}
 	var token string // a new one for every pod: an old pod's can't connect any more
 	if err == nil {
-		token, err = s.store.NewRunnerToken(ctx, t.ID)
+		token, err = s.store.NewRunnerToken(ctx, t.ID, st.AuthMethod == "api_key")
 	}
 	if err == nil {
 		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets, git)
@@ -197,12 +197,18 @@ func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav
 	}
 	_, err := s.apply(ctx, req.ThreadId, thread.Trust{By: user(ctx), Trusted: req.Trusted},
 		&bandav1.Event{Actor: user(ctx), Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
+	s.wakeInboxes()
+	return &bandav1.TrustResponse{}, err
+}
+
+// wakeInboxes refreshes every inbox: trust changed, so pending permission
+// requests became teammates' decisions or stopped being theirs.
+func (s *Service) wakeInboxes() {
 	s.mu.Lock()
-	for w := range s.inbox { // its pending permission requests become teammates' decisions, or stop being theirs
+	for w := range s.inbox {
 		w.wake()
 	}
 	s.mu.Unlock()
-	return &bandav1.TrustResponse{}, err
 }
 
 func (s *Service) Interrupt(ctx context.Context, req *bandav1.InterruptRequest) (*bandav1.InterruptResponse, error) {

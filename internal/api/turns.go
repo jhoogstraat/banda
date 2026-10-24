@@ -30,10 +30,22 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		return nil, err
 	}
 	names := s.names(ctx)
+	// An agent posting through MCP (as "agent:<thread>") acts for its
+	// thread's owner: e.g. a sub-thread handed to a teammate no longer wakes
+	// its parent without the parent's owner.
+	agentOwner := ""
+	if src, ok := strings.CutPrefix(by, "agent:"); ok {
+		t, err := s.store.Get(ctx, src)
+		if err != nil {
+			return nil, err
+		}
+		agentOwner = t.OwnerID
+	}
 
 	var effect thread.Effect
 	var prompt string
 	var images []string
+	var teammate bool
 	unlock := s.lockDelivery(id)
 	var stored []*bandav1.Event
 	err := retryStale(func() error {
@@ -42,10 +54,8 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 			return err
 		}
 		_, stored, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
-			// Only MCP posts as "agent:<thread>", and it lets an agent start turns
-			// only in threads of its own owner.
 			next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
-				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: strings.HasPrefix(by, "agent:"), Review: len(m.Review) > 0})
+				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: agentOwner == t.OwnerID, Review: len(m.Review) > 0})
 			if err != nil {
 				return nil, err
 			}
@@ -58,7 +68,8 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 				if err := u.fresh(t); err != nil {
 					return nil, err
 				}
-				prompt, images = turnPrompt(t, eff, names, u.events, by, m, u.texts)
+				teammate = by != t.OwnerID && agentOwner != t.OwnerID
+				prompt, images = turnPrompt(t, eff, names, u.events, by, teammate, m, u.texts)
 			}
 			events := append([]*bandav1.Event{posted}, stateEvents(t.State, next)...)
 			for _, e := range events[1:] {
@@ -80,7 +91,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, id, prompt, images)
+		s.deliver(ctx, id, prompt, images, teammate)
 	}
 	unlock()
 	if err := s.store.Mention(ctx, id, stored[0].Seq, by, m.MentionedUserIds); err != nil {
@@ -100,9 +111,10 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 // turnPrompt is the prompt for a turn by `by` that starts with the next
 // stored event, given the thread's events since at least its delivered seq.
 // It marks them delivered, and for a suspended thread (Provision) keeps the
-// prompt and its images as pending. Other effects start no turn: it returns
-// "". texts holds the attached text files (see agentPrompt).
-func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by string, m *bandav1.Message, texts map[string]string) (string, []string) {
+// prompt and its images as pending, noting a teammate's turn. Other effects
+// start no turn: it returns "". texts holds the attached text files (see
+// agentPrompt).
+func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, unseen []*bandav1.Event, by string, teammate bool, m *bandav1.Message, texts map[string]string) (string, []string) {
 	if eff != thread.StartTurn && eff != thread.Provision {
 		return "", nil
 	}
@@ -117,6 +129,7 @@ func turnPrompt(t *store.Thread, eff thread.Effect, names map[string]string, uns
 	if eff == thread.Provision {   // suspended: deliver once the environment is back
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
 		t.PendingImages = lastImages(append(t.PendingImages, images...))
+		t.PendingTeammate = t.PendingTeammate || teammate
 	}
 	return prompt, images
 }
@@ -161,7 +174,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 		if err != nil {
 			return nil, err
 		}
-		prompt, images = turnPrompt(t, eff, names, events, r.Actor, m, texts)
+		prompt, images = turnPrompt(t, eff, names, events, r.Actor, true, m, texts)
 		out := append([]*bandav1.Event{{Actor: by, Kind: &bandav1.Event_TurnRequestResolved{
 			TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: seq, Approved: approve, Note: note}}}},
 			stateEvents(t.State, next)...)
@@ -174,7 +187,7 @@ func (s *Service) resolveTurn(ctx context.Context, id string, seq int64, approve
 	}
 	s.broadcast(id, stored)
 	if effect == thread.StartTurn {
-		s.deliver(ctx, id, prompt, images)
+		s.deliver(ctx, id, prompt, images, true)
 	}
 	unlock()
 	s.do(ctx, id, effect)
@@ -258,8 +271,8 @@ func (s *Service) lockDelivery(id string) func() {
 
 // deliver hands a prompt and its images (attachment ids) to the runner.
 // Without one the environment is gone: keep the prompt for the next runner,
-// which delivers it once it is ready.
-func (s *Service) deliver(ctx context.Context, id, prompt string, images []string) {
+// which delivers it once it is ready, if it may run a teammate's turn.
+func (s *Service) deliver(ctx context.Context, id, prompt string, images []string, teammate bool) {
 	p := &bandav1.Prompt{Text: prompt}
 	files, err := s.store.Attachments(ctx, images, true)
 	if err != nil {
@@ -274,6 +287,7 @@ func (s *Service) deliver(ctx context.Context, id, prompt string, images []strin
 	_, events, err := s.store.Update(context.WithoutCancel(ctx), id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
 		t.PendingPrompt = strings.TrimSpace(t.PendingPrompt + "\n\n" + prompt)
 		t.PendingImages = lastImages(append(t.PendingImages, images...))
+		t.PendingTeammate = t.PendingTeammate || teammate
 		return envLost(t, 1, reasonUnreachable), nil
 	})
 	if err != nil {
@@ -297,4 +311,29 @@ func messages(events []*bandav1.Event) []*bandav1.Message {
 		}
 	}
 	return out
+}
+
+// withdrawTurns withdraws t's open turn requests, with a line saying why,
+// and turns its trust off: its owner (name) runs Claude Code on a
+// subscription, so only they run the agent. Trust stays off if they switch
+// back. Call it inside the thread's Update.
+func withdrawTurns(ctx context.Context, tx *store.Store, t *store.Thread, name string) ([]*bandav1.Event, error) {
+	t.Trusted = false
+	if t.Requests == 0 {
+		return nil, nil
+	}
+	events, err := tx.EventsOf(ctx, t.ID, 0, "turnRequest", "turnRequestResolved")
+	if err != nil {
+		return nil, err
+	}
+	note := name + " runs the agent on their Claude subscription now, so only they can. Fork to run it on yours."
+	var out []*bandav1.Event
+	for _, e := range events {
+		if e.GetTurnRequest() != nil && openRequest(events, e.Seq) != nil { // ponytail: quadratic in requests, a handful
+			out = append(out, &bandav1.Event{Actor: "system", Kind: &bandav1.Event_TurnRequestResolved{
+				TurnRequestResolved: &bandav1.TurnRequestResolved{RequestSeq: e.Seq, Note: note}}})
+		}
+	}
+	t.Requests = 0
+	return out, nil
 }

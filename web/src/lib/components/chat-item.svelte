@@ -150,17 +150,17 @@
 			<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			{#if item.resolved}
 				<span class="ml-auto text-xs text-muted-foreground">
-					{item.resolved.approved ? 'Approved' : 'Declined'} by {userName(item.resolved.by)}{item.resolved.note ? `: ${item.resolved.note}` : ''}
+					{item.resolved.by === 'system' ? 'Withdrawn' : `${item.resolved.approved ? 'Approved' : 'Declined'} by ${userName(item.resolved.by)}`}{item.resolved.note ? `: ${item.resolved.note}` : ''}
 				</span>
 			{:else if owner}
 				<div class="ml-auto flex items-center gap-1">
 					<Tooltip>
 						<TooltipTrigger>
 							{#snippet child({ props })}
-								<button {...props} type="button" aria-label="Runs on your Claude subscription" class="rounded p-1 text-muted-foreground hover:text-foreground"><InfoIcon class="size-3.5" /></button>
+								<button {...props} type="button" aria-label="Runs on your API key" class="rounded p-1 text-muted-foreground hover:text-foreground"><InfoIcon class="size-3.5" /></button>
 							{/snippet}
 						</TooltipTrigger>
-						<TooltipContent>Runs on your Claude subscription, in this thread's environment.</TooltipContent>
+						<TooltipContent>Runs on your API key, in this thread's environment.</TooltipContent>
 					</Tooltip>
 					{#if waiting.length > 1 && item === waiting.at(-1)}
 						<Button size="xs" variant="outline" onclick={approveAll}>Approve all ({waiting.length})</Button>
