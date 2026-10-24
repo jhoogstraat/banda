@@ -24,10 +24,15 @@ func (s *Service) WatchThread(ctx context.Context, req *bandav1.WatchThreadReque
 	if last == 0 && req.Tail > 0 {
 		stored, err = s.store.Before(ctx, req.ThreadId, math.MaxInt64, int(req.Tail))
 		if err == nil && len(stored) > 0 && stored[0].Seq > 1 {
-			var plan []*bandav1.Event
-			if plan, err = s.store.LatestOf(ctx, req.ThreadId, stored[0].Seq, 1, "planChanged"); len(plan) > 0 {
-				plan[0].Context = true
-				stored = append(plan, stored...)
+			for _, kind := range []string{"planChanged", "slashCommands"} {
+				var latest []*bandav1.Event
+				if latest, err = s.store.LatestOf(ctx, req.ThreadId, stored[0].Seq, 1, kind); err != nil {
+					break
+				}
+				for _, e := range latest {
+					e.Context = true
+				}
+				stored = append(latest, stored...)
 			}
 		}
 	} else {

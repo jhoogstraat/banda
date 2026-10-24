@@ -77,6 +77,10 @@ func scrub(e *bandav1.Event) {
 		for _, i := range k.PlanChanged.Items {
 			i.Content, i.ActiveForm = redact(i.Content), redact(i.ActiveForm)
 		}
+	case *bandav1.Event_SlashCommands:
+		for _, c := range k.SlashCommands.Commands {
+			c.Description = redact(c.Description)
+		}
 	case *bandav1.Event_PermissionRequested:
 		k.PermissionRequested.InputJson = redact(k.PermissionRequested.InputJson)
 		k.PermissionRequested.Reason = redact(k.PermissionRequested.Reason)

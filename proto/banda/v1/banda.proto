@@ -384,7 +384,8 @@ message Event {
   // User id, "agent" or "system".
   string actor = 4;
   // Sent before a tail for its context, not in seq order: the latest plan
-  // (PlanChanged) from before the tail. Not part of the chat.
+  // (PlanChanged) and the latest slash commands (SlashCommands) from before
+  // the tail. Not part of the chat.
   bool context = 5;
   // A large payload (a tool call's input strings, a tool result's output) was
   // cut to a few KB. History with full loads the whole event.
@@ -449,7 +450,23 @@ message Event {
     // limited, a server or network error) and Claude Code retries it.
     // Agent output that follows means the retry worked.
     AgentRetrying agent_retrying = 51;
+    // What Claude Code offers as slash commands (its own, the repo's and the
+    // user's commands and skills), sent at each start. Not part of the chat;
+    // the latest is offered in the owner's composer.
+    SlashCommands slash_commands = 52;
   }
+}
+
+message SlashCommands {
+  repeated SlashCommand commands = 1;
+}
+
+message SlashCommand {
+  // Without the slash: "compact", "review".
+  string name = 1;
+  string description = 2;
+  // What goes after the name, e.g. "<file>"; empty if nothing does.
+  string argument_hint = 3;
 }
 
 message AgentRetrying {

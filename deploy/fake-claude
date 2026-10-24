@@ -17,7 +17,8 @@
 # (EnterPlanMode, which the real CLI allows without asking). Each turn plans
 # with the task tools (TaskCreate, TaskUpdate), keeping the tasks in the CLI's
 # files; "e2e-tasks" leaves one open. The prompt "/compact" compacts, as the
-# real CLI does with its slash command.
+# real CLI does with its slash command. Its reply to initialize lists two of
+# the real CLI's commands.
 #
 # Directives a test puts anywhere in a prompt, one case each in the loop below
 # (web/e2e/fixtures.ts has helpers for them):
@@ -227,6 +228,10 @@ while next; do
   fi
   case "$line" in
     *'"subtype":"interrupt"'*) ack "$line" ;; # idle: no turn to end
+    *'"subtype":"initialize"'*)
+      id=$(sed -n 's/.*"request_id":"\([^"]*\)".*/\1/p' <<<"$line")
+      echo '{"type":"control_response","response":{"subtype":"success","request_id":"'$id'","response":{"commands":[{"name":"compact","description":"Free up context by summarizing the conversation so far","argumentHint":"<optional custom summarization instructions>","builtin":true},{"name":"init","description":"Initialize a new CLAUDE.md file with codebase documentation","argumentHint":"","builtin":true}],"agents":[],"pid":1}}}'
+      ;;
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;

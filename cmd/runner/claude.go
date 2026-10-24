@@ -56,6 +56,16 @@ type line struct {
 	Attempt     int32  `json:"attempt"`
 	MaxRetries  int32  `json:"max_retries"`
 	ErrorStatus int32  `json:"error_status"`
+	// control_response to initialize: the slash commands
+	Response struct {
+		Response struct {
+			Commands []struct {
+				Name         string `json:"name"`
+				Description  string `json:"description"`
+				ArgumentHint string `json:"argumentHint"`
+			} `json:"commands"`
+		} `json:"response"`
+	} `json:"response"`
 	// control_request (can_use_tool) and control_cancel_request
 	RequestID string `json:"request_id"`
 	Request   struct {
@@ -166,6 +176,14 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 		if r := l.Request; r.Subtype == "can_use_tool" {
 			events = append(events, &bandav1.Event{Kind: &bandav1.Event_PermissionRequested{PermissionRequested: &bandav1.PermissionRequested{
 				Id: l.RequestID, ToolCallId: r.ToolUseID, ToolName: r.ToolName, InputJson: string(r.Input), Reason: cmp.Or(r.DecisionReason, r.Description)}}})
+		}
+	case "control_response":
+		if cs := l.Response.Response.Commands; cs != nil { // initialize's reply
+			sc := &bandav1.SlashCommands{}
+			for _, c := range cs {
+				sc.Commands = append(sc.Commands, &bandav1.SlashCommand{Name: c.Name, Description: c.Description, ArgumentHint: c.ArgumentHint})
+			}
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_SlashCommands{SlashCommands: sc}})
 		}
 	case "control_cancel_request":
 		events = append(events, &bandav1.Event{Kind: &bandav1.Event_PermissionResolved{PermissionResolved: &bandav1.PermissionResolved{
@@ -316,7 +334,12 @@ func startClaude(ctx context.Context, s settings) (*claudeProc, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &claudeProc{cmd: cmd, stdout: stdout, stdin: stdin}, cmd.Start()
+	c := &claudeProc{cmd: cmd, stdout: stdout, stdin: stdin}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	// Its reply lists the slash commands, for the owner's composer (translate).
+	return c, c.write(controlRequest(map[string]any{"subtype": "initialize", "hooks": nil}))
 }
 
 //go:embed profiles

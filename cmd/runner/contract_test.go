@@ -534,6 +534,37 @@ func TestContractCompact(t *testing.T) {
 	}
 }
 
+// At start the runner asks for the slash commands (initialize): the CLI's own,
+// the repo's commands and its skills. Sent as plain prompt text, a command
+// and a skill run: the model gets their text, with the arguments.
+func TestContractSlashCommands(t *testing.T) {
+	contractEnv(t)
+	os.MkdirAll(work+"/.claude/commands", 0o755)
+	os.MkdirAll(work+"/.claude/skills/greet", 0o755)
+	os.WriteFile(work+"/.claude/commands/hello.md", []byte("---\ndescription: Say hello to someone\nargument-hint: <name>\n---\nSay HELLO-CMD to $ARGUMENTS.\n"), 0o644)
+	os.WriteFile(work+"/.claude/skills/greet/SKILL.md", []byte("---\nname: greet\ndescription: Greets warmly\n---\nGREET-SKILL-BODY: greet warmly.\n"), 0o644)
+	api := newFakeAPI(t, nil)
+	s := start(t, settings{})
+	events := s.turn("/hello Bob", nil)
+	var cmds map[string]*bandav1.SlashCommand
+	for _, e := range events {
+		if sc := e.GetSlashCommands(); sc != nil {
+			cmds = map[string]*bandav1.SlashCommand{}
+			for _, c := range sc.Commands {
+				cmds[c.Name] = c
+			}
+		}
+	}
+	if c := cmds["hello"]; c == nil || c.Description != "Say hello to someone (project)" || c.ArgumentHint != "<name>" || cmds["greet"] == nil || cmds["compact"] == nil {
+		t.Errorf("slash commands: %v", cmds)
+	}
+	s.turn("/greet", nil)
+	reqs := api.requests()
+	if reqs[0].last() == "/hello Bob" || !strings.Contains(reqs[0].last(), "Say HELLO-CMD to Bob.") || !strings.Contains(reqs[1].last(), "GREET-SKILL-BODY") {
+		t.Errorf("the command's or the skill's text didn't reach the model:\n%.300q\n%.300q", reqs[0].last(), reqs[1].last())
+	}
+}
+
 func TestContractPermissions(t *testing.T) {
 	allow := func(r *bandav1.PermissionRequested) *bandav1.PermissionCommand {
 		return &bandav1.PermissionCommand{Decision: bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW}

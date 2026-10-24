@@ -117,7 +117,7 @@
 				{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
 			</PromptInput.Attachments>
 			<PromptInput.Body>
-				<MentionInput {placeholder} />
+				<MentionInput {placeholder} commands={owner ? chat.commands : []} />
 			</PromptInput.Body>
 			<PromptInput.Toolbar>
 				<!-- The chips wrap on a phone, as on the new thread page, so the send button stays in reach. -->

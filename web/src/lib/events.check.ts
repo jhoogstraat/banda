@@ -205,7 +205,9 @@ for (let tail = 1; tail <= history.length; tail++) {
 const tailOnly = newChat();
 apply(tailOnly, { ...history[history.findLastIndex((e) => e.kind.case === 'planChanged')], context: true } as Event);
 for (const e of history.slice(-3)) apply(tailOnly, e);
-if (!tailOnly.plan.length || tailOnly.items.length !== 2) throw new Error('a context plan sets the plan without adding an item');
+apply(tailOnly, { ...ev({ case: 'slashCommands', value: { commands: [{ name: 'compact', description: '', argumentHint: '' }] } }), context: true } as Event);
+if (!tailOnly.plan.length || tailOnly.commands[0]?.name !== 'compact' || tailOnly.items.length !== 2)
+	throw new Error('a context plan and slash commands set them without adding an item');
 {
 	// A permission request becomes its own item next to its tool call, and its answer resolves it.
 	const c = newChat();

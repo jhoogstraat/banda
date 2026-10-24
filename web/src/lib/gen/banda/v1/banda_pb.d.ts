@@ -381,7 +381,8 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
 
   /**
    * Sent before a tail for its context, not in seq order: the latest plan
-   * (PlanChanged) from before the tail. Not part of the chat.
+   * (PlanChanged) and the latest slash commands (SlashCommands) from before
+   * the tail. Not part of the chat.
    *
    * @generated from field: bool context = 5;
    */
@@ -637,6 +638,16 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: AgentRetrying;
     case: "agentRetrying";
+  } | {
+    /**
+     * What Claude Code offers as slash commands (its own, the repo's and the
+     * user's commands and skills), sent at each start. Not part of the chat;
+     * the latest is offered in the owner's composer.
+     *
+     * @generated from field: banda.v1.SlashCommands slash_commands = 52;
+     */
+    value: SlashCommands;
+    case: "slashCommands";
   } | { case: undefined; value?: undefined };
 };
 
@@ -645,6 +656,52 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export declare const EventSchema: GenMessage<Event>;
+
+/**
+ * @generated from message banda.v1.SlashCommands
+ */
+export declare type SlashCommands = Message$1<"banda.v1.SlashCommands"> & {
+  /**
+   * @generated from field: repeated banda.v1.SlashCommand commands = 1;
+   */
+  commands: SlashCommand[];
+};
+
+/**
+ * Describes the message banda.v1.SlashCommands.
+ * Use `create(SlashCommandsSchema)` to create a new message.
+ */
+export declare const SlashCommandsSchema: GenMessage<SlashCommands>;
+
+/**
+ * @generated from message banda.v1.SlashCommand
+ */
+export declare type SlashCommand = Message$1<"banda.v1.SlashCommand"> & {
+  /**
+   * Without the slash: "compact", "review".
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 2;
+   */
+  description: string;
+
+  /**
+   * What goes after the name, e.g. "<file>"; empty if nothing does.
+   *
+   * @generated from field: string argument_hint = 3;
+   */
+  argumentHint: string;
+};
+
+/**
+ * Describes the message banda.v1.SlashCommand.
+ * Use `create(SlashCommandSchema)` to create a new message.
+ */
+export declare const SlashCommandSchema: GenMessage<SlashCommand>;
 
 /**
  * @generated from message banda.v1.AgentRetrying

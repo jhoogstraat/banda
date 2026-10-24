@@ -37,6 +37,9 @@ func TestTranslate(t *testing.T) {
 		{`{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}`, "turn_ended:true Not logged in · Please run /login", true, false},
 		{`{"type":"system","subtype":"api_retry","attempt":1,"max_retries":10,"error_status":401,"error":"authentication_failed"}`, "", false, true},
 		{`{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-5-5"}`, "", false, false},
+		// Verbatim from mise run contract (shortened): initialize's reply, and another control_response.
+		{`{"type":"control_response","response":{"subtype":"success","request_id":"R1","response":{"commands":[{"name":"compact","description":"Free up context by summarizing the conversation so far","argumentHint":"<optional custom summarization instructions>","builtin":true},{"name":"hello","description":"Say hello to someone (project)","argumentHint":"<name>"}],"agents":[],"pid":7}}}`, "slash_commands:compact <optional custom summarization instructions>, hello <name>", false, false},
+		{`{"type":"control_response","response":{"subtype":"success","request_id":"R2","response":{"mode":"bypassPermissions"}}}`, "", false, false},
 		// Verbatim from mise run contract (shortened).
 		{`{"type":"system","subtype":"compact_boundary","session_id":"s","compact_metadata":{"trigger":"manual","pre_tokens":15,"post_tokens":1133}}`, "notice:Context compacted: the agent now works from a summary of the conversation before this point.", false, false},
 		{`{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"auto"}}`, "notice:Context compacted (it was full): the agent now works from a summary of the conversation before this point.", false, false},
@@ -173,6 +176,12 @@ func describe(e *bandav1.Event) string {
 		return "permission_resolved:" + e.GetPermissionResolved().Decision.String()
 	case e.GetPermissionModeChanged() != nil:
 		return "permission_mode_changed:" + e.GetPermissionModeChanged().Mode.String()
+	case e.GetSlashCommands() != nil:
+		var cs []string
+		for _, c := range e.GetSlashCommands().Commands {
+			cs = append(cs, strings.TrimSpace(c.Name+" "+c.ArgumentHint))
+		}
+		return "slash_commands:" + strings.Join(cs, ", ")
 	case e.GetNotice() != nil:
 		return "notice:" + e.GetNotice().Text
 	case e.GetAgentRetrying() != nil:

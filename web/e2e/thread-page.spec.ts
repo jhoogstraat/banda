@@ -149,6 +149,25 @@ test('compacting the agent’s context (/compact) is one quiet stored line in th
 	expect((await t.of('notice')).map((n) => n.text)).toContainEqual(expect.stringMatching(/^Context compacted:/));
 });
 
+test('the owner’s composer offers Claude Code’s slash commands after a "/" and sends the choice as text; a teammate’s doesn’t', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await composer(page).pressSequentially('/com');
+	const option = page.getByRole('option', { name: /\/compact/ });
+	await expect(option).toContainText('Free up context by summarizing the conversation so far');
+	await expect(page.getByRole('option', { name: /\/init/ })).toHaveCount(0);
+	await composer(page).press('Enter');
+	await expect(composer(page)).toHaveValue('/compact ');
+	await composer(page).press('Enter');
+	await expect(page.getByText(/^Context compacted:/)).toBeVisible();
+
+	const bobPage = await open(bob, t);
+	await composer(bobPage).pressSequentially('/com');
+	await expect(bobPage.getByRole('listbox')).toHaveCount(0);
+});
+
 test('the agent’s task list is the plan pinned above the composer while a task is open', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create();

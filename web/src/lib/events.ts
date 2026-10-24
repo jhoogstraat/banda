@@ -21,6 +21,7 @@ import {
 	type RepoAdded,
 	type ReviewComment,
 	type SetupStep,
+	type SlashCommand,
 	type ToolCall,
 	type ToolResult,
 	type TurnEnded,
@@ -74,6 +75,7 @@ export type Item = { key: number } & (
 // subagent calls by parent id, turn request and handoff resolutions by their seq, permission answers and votes by request id,
 // and live permission cards whose call comes next, by call id. `planSeq` is the seq of the PlanChanged behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
+// `commands` are the slash commands Claude Code offers (the latest SlashCommands).
 // `retry` is Claude Code retrying a failed request, until the agent's next output.
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
@@ -92,6 +94,7 @@ export type Chat = {
 		votes: Map<string, Record<string, Record<string, string>>>;
 		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
 	};
+	commands: SlashCommand[];
 	retry?: AgentRetrying;
 	present: string[];
 	typing: Record<string, number>;
@@ -104,6 +107,7 @@ export const newChat = (): Chat => ({
 	streaming: '',
 	plan: [],
 	planSeq: 0n,
+	commands: [],
 	seq: 0n,
 	tools: new Map(),
 	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), handoffs: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
@@ -153,6 +157,7 @@ export function apply(chat: Chat, e: Event) {
 	if (e.context) {
 		// The plan from before a tail; everything else in it belongs to older history.
 		if (k.case === 'planChanged') setPlan(chat, k.value.items, e.seq);
+		if (k.case === 'slashCommands') chat.commands = k.value.commands;
 		return;
 	}
 	if (e.seq > chat.seq) chat.seq = e.seq;
@@ -219,6 +224,9 @@ export function apply(chat: Chat, e: Event) {
 		}
 		case 'planChanged':
 			setPlan(chat, k.value.items, e.seq);
+			break;
+		case 'slashCommands':
+			chat.commands = k.value.commands;
 			break;
 		case 'toolResult': {
 			const tool = chat.tools.get(k.value.toolCallId);
