@@ -2,6 +2,7 @@ import type { Timestamp } from '@bufbuild/protobuf/wkt';
 import {
 	AutoPushState,
 	SetupState,
+	type AgentRetrying,
 	type AgentSettings,
 	type Attachment,
 	type Event,
@@ -73,6 +74,7 @@ export type Item = { key: number } & (
 // subagent calls by parent id, turn request and handoff resolutions by their seq, permission answers and votes by request id,
 // and live permission cards whose call comes next, by call id. `planSeq` is the seq of the PlanChanged behind `plan`.
 // `seq` is the latest stored event applied (see itemAt).
+// `retry` is Claude Code retrying a failed request, until the agent's next output.
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
 	items: Item[];
@@ -90,6 +92,7 @@ export type Chat = {
 		votes: Map<string, Record<string, Record<string, string>>>;
 		cards: Map<string, Extract<Item, { kind: 'permission' }>>;
 	};
+	retry?: AgentRetrying;
 	present: string[];
 	typing: Record<string, number>;
 	// A diffChanged waiting for the turn it belongs to.
@@ -153,6 +156,7 @@ export function apply(chat: Chat, e: Event) {
 		return;
 	}
 	if (e.seq > chat.seq) chat.seq = e.seq;
+	if (e.actor === 'agent') chat.retry = k.case === 'agentRetrying' ? k.value : undefined; // any output means the retry worked
 	const key = keyOf(e);
 	switch (k.case) {
 		case 'message':

@@ -139,7 +139,7 @@ func (s *Service) Connect(ctx context.Context, stream bandav1connect.RunnerServi
 			if e.GetNotice() != nil {
 				e.Actor = "system"
 			}
-			if e.GetAgentTextDelta() != nil {
+			if e.GetAgentTextDelta() != nil || e.GetAgentRetrying() != nil { // ephemeral
 				e.ThreadId, e.Seq, e.Time = id, 0, timestamppb.Now()
 				s.broadcast(id, []*bandav1.Event{e})
 				continue

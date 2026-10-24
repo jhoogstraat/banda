@@ -221,7 +221,10 @@ Banda keeps only the subagent's tool calls (tagged with `parent_tool_call_id`) a
 ### Other frames worth handling
 
 - `{"type":"system","subtype":"status","status":"requesting",…}`: a model request is in flight [obs].
-- `system/api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error_status`, `error` category) [doc][obs]. See §6 for auth.
+- `system/api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error_status`, `error` category) [doc][obs]. See §6 for auth. Observed categories with 2.1.301 [contract]: a 529 is `overloaded`, a plain 429 `rate_limit`, a 500 `server_error`, a dropped connection `unknown` with `error_status` 0; `max_retries` is 10 and the delay grows from about 0.5 s. Nothing marks the retry's success: the next output is the request that worked. The runner turns each non-auth retry into an ephemeral `AgentRetrying` event; the web shows it in the line above the composer until the agent's next output:
+  ```json
+  {"type":"system","subtype":"api_retry","attempt":1,"max_retries":10,"retry_delay_ms":562,"error_status":529,"error":"overloaded","session_id":"…","uuid":"…"}
+  ```
 - `system/session_state_changed`, emitted with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1` [doc]. It is the authoritative turn-over signal [sdk]: `{"type":"system","subtype":"session_state_changed","state":"idle","uuid":"7fd77dda-617f-425f-aa9c-19db38bc697d","session_id":"e9fca623-ff3b-49e7-bc24-ff6f95d72ad5"}`. States are `running`, `idle`, `requires_action`.
 - `system/thinking_tokens` (estimate while thinking) [obs], `system/permission_denied` [sdk], `system/compact_boundary`, `system/task_*` (subagents), `system/hook_*`, `rate_limit_event` (seen on a subscription session) [obs]. Ignore unknown types.
 - `control_request` **from** the CLI: `can_use_tool` (§4). With hooks or SDK MCP servers also `hook_callback` and `mcp_message`, which Banda doesn't use.

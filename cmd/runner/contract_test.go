@@ -87,7 +87,8 @@ func thinkingBlock(s string) map[string]any {
 	return map[string]any{"type": "thinking", "thinking": s}
 }
 
-// apiError is a script reply that fails the request with this status and error type.
+// apiError is a script reply that fails the request with this status and
+// error type; status 0 drops the connection instead.
 func apiError(status int, typ string) map[string]any {
 	return map[string]any{"status": status, "error": typ}
 }
@@ -172,7 +173,11 @@ func (f *fakeAPI) messages(w http.ResponseWriter, r *http.Request) {
 	if content == nil {
 		content = []map[string]any{textBlock("ok")}
 	}
-	if status, ok := content[0]["status"].(int); ok { // an error reply: see apiError
+	if status, ok := content[0]["status"].(int); ok && status == 0 {
+		conn, _, _ := w.(http.Hijacker).Hijack()
+		conn.Close()
+		return
+	} else if ok { // an error reply: see apiError
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]any{"type": content[0]["error"], "message": content[0]["error"]}})
@@ -484,6 +489,24 @@ func TestContractPlan(t *testing.T) {
 	s = start(t, settings{})
 	s.setMode(bandav1.PermissionMode_PERMISSION_MODE_BYPASS)
 	want(t, s.turn("drop it", nil), "tool_call:TaskUpdate", "plan_changed:completed Fix the parser (Fixing the parser)", "turn_ended:false")
+}
+
+// Failed requests that aren't about the login are retried; each retry is a
+// line the chat shows until output resumes. Auth errors keep their own path.
+func TestContractRetry(t *testing.T) {
+	contractEnv(t)
+	failures := []map[string]any{apiError(529, "overloaded_error"), apiError(429, "rate_limit_error"), apiError(500, "api_error"), apiError(0, "")}
+	n := 0
+	newFakeAPI(t, func(r *apiReq) []map[string]any {
+		if n++; n <= len(failures) {
+			return failures[n-1 : n]
+		}
+		return nil
+	})
+	s := start(t, settings{})
+	events := s.turn("retry", nil)
+	want(t, events, "agent_retrying:1/10 overloaded 529", "agent_retrying:2/10 rate_limit 429", "agent_retrying:3/10 server_error 500",
+		"agent_retrying:4/10 unknown 0", "agent_text:ok", "turn_ended:false")
 }
 
 func TestContractPermissions(t *testing.T) {

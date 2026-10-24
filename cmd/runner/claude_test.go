@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,6 +37,8 @@ func TestTranslate(t *testing.T) {
 		{`{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}`, "turn_ended:true Not logged in · Please run /login", true, false},
 		{`{"type":"system","subtype":"api_retry","attempt":1,"max_retries":10,"error_status":401,"error":"authentication_failed"}`, "", false, true},
 		{`{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-5-5"}`, "", false, false},
+		// Verbatim from mise run contract.
+		{`{"type":"system","subtype":"api_retry","attempt":3,"max_retries":10,"retry_delay_ms":2049,"error_status":529,"error":"overloaded","session_id":"s"}`, "agent_retrying:3/10 overloaded 529", false, false},
 	}
 	for _, tt := range tests {
 		events, ended, auth := translate([]byte(tt.line))
@@ -166,6 +169,9 @@ func describe(e *bandav1.Event) string {
 		return "permission_resolved:" + e.GetPermissionResolved().Decision.String()
 	case e.GetPermissionModeChanged() != nil:
 		return "permission_mode_changed:" + e.GetPermissionModeChanged().Mode.String()
+	case e.GetAgentRetrying() != nil:
+		r := e.GetAgentRetrying()
+		return fmt.Sprintf("agent_retrying:%d/%d %s %d", r.Attempt, r.MaxRetries, r.Error, r.ErrorStatus)
 	case e.GetPlanChanged() != nil:
 		var items []string
 		for _, i := range e.GetPlanChanged().Items {

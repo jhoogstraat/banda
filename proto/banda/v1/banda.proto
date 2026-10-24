@@ -445,7 +445,20 @@ message Event {
     // The agent's task list changed (TaskCreate, TaskUpdate): the whole list.
     // Not part of the chat; the latest is the plan pinned above the composer.
     PlanChanged plan_changed = 50;
+    // Ephemeral (seq 0): a request to Anthropic failed (overloaded, rate
+    // limited, a server or network error) and Claude Code retries it.
+    // Agent output that follows means the retry worked.
+    AgentRetrying agent_retrying = 51;
   }
+}
+
+message AgentRetrying {
+  int32 attempt = 1;
+  int32 max_retries = 2;
+  // The CLI's category: "overloaded", "rate_limit", "server_error", ...
+  string error = 3;
+  // The HTTP status, 0 without a response.
+  int32 error_status = 4;
 }
 
 message PlanChanged {

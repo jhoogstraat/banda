@@ -627,6 +627,16 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: PlanChanged;
     case: "planChanged";
+  } | {
+    /**
+     * Ephemeral (seq 0): a request to Anthropic failed (overloaded, rate
+     * limited, a server or network error) and Claude Code retries it.
+     * Agent output that follows means the retry worked.
+     *
+     * @generated from field: banda.v1.AgentRetrying agent_retrying = 51;
+     */
+    value: AgentRetrying;
+    case: "agentRetrying";
   } | { case: undefined; value?: undefined };
 };
 
@@ -635,6 +645,41 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export declare const EventSchema: GenMessage<Event>;
+
+/**
+ * @generated from message banda.v1.AgentRetrying
+ */
+export declare type AgentRetrying = Message$1<"banda.v1.AgentRetrying"> & {
+  /**
+   * @generated from field: int32 attempt = 1;
+   */
+  attempt: number;
+
+  /**
+   * @generated from field: int32 max_retries = 2;
+   */
+  maxRetries: number;
+
+  /**
+   * The CLI's category: "overloaded", "rate_limit", "server_error", ...
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+
+  /**
+   * The HTTP status, 0 without a response.
+   *
+   * @generated from field: int32 error_status = 4;
+   */
+  errorStatus: number;
+};
+
+/**
+ * Describes the message banda.v1.AgentRetrying.
+ * Use `create(AgentRetryingSchema)` to create a new message.
+ */
+export declare const AgentRetryingSchema: GenMessage<AgentRetrying>;
 
 /**
  * @generated from message banda.v1.PlanChanged

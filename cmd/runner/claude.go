@@ -48,7 +48,10 @@ type line struct {
 	// The prompts this turn ended (their uuid): its own and those folded into it.
 	UserMessageUUIDs []string `json:"user_message_uuids"`
 	// system/api_retry
-	Error string `json:"error"`
+	Error       string `json:"error"`
+	Attempt     int32  `json:"attempt"`
+	MaxRetries  int32  `json:"max_retries"`
+	ErrorStatus int32  `json:"error_status"`
 	// control_request (can_use_tool) and control_cancel_request
 	RequestID string `json:"request_id"`
 	Request   struct {
@@ -135,7 +138,13 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 		}
 		return []*bandav1.Event{{Kind: &bandav1.Event_TurnEnded{TurnEnded: te}}}, true, false
 	case "system":
-		return nil, false, l.Subtype == "api_retry" && authErrors[l.Error]
+		if l.Subtype == "api_retry" && authErrors[l.Error] {
+			return nil, false, true
+		}
+		if l.Subtype == "api_retry" {
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentRetrying{AgentRetrying: &bandav1.AgentRetrying{
+				Attempt: l.Attempt, MaxRetries: l.MaxRetries, Error: l.Error, ErrorStatus: l.ErrorStatus}}})
+		}
 	case "rate_limit_event":
 		// ponytail: logged, not mapped. Only a subscription session sends it and none has
 		// been seen at a rejection yet (docs/research/claude-headless.md §6): map it to a

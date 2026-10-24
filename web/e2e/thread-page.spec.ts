@@ -126,6 +126,19 @@ test('question, edit and rule cards: bob votes and alice answers; alice edits a 
 	});
 });
 
+test('Claude Code retrying an overloaded API is one calm line above the composer until output resumes, never stored', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await post(page, 'e2e-retry:overload');
+	await expect(page.getByText('Anthropic is overloaded · retrying 3/10')).toBeVisible();
+	await t.release('overload');
+	await expect(page.getByText('Created hello2.txt')).toBeVisible();
+	await expect(page.getByText(/retrying/)).toHaveCount(0);
+	expect(await t.of('agentRetrying')).toHaveLength(0);
+});
+
 test('the agent’s task list is the plan pinned above the composer while a task is open', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create();

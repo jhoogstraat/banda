@@ -54,6 +54,15 @@
 		typing.length > 2 ? `${typing.length} people are typing…` : typing.length ? `${typing.join(' and ')} ${typing.length > 1 ? 'are' : 'is'} typing…` : ''
 	);
 	const chatMode = $derived(thread?.mode === Mode.CHAT);
+	// Claude Code retrying a failed request to Anthropic, in the CLI's own categories.
+	const retrying = $derived.by(() => {
+		const r = chat.retry;
+		if (!r) return '';
+		const why =
+			{ overloaded: 'Anthropic is overloaded', rate_limit: 'Anthropic is rate limiting requests', server_error: `Anthropic had a server error (${r.errorStatus})` }[r.error] ??
+			(r.errorStatus ? `Anthropic answered ${r.errorStatus}` : 'Can’t reach Anthropic');
+		return `${why} · retrying ${r.attempt}/${r.maxRetries}`;
+	});
 	// Says what a post does here: the owner's starts a turn in agent mode; in chat mode, and for teammates, only @agent does.
 	const placeholder = $derived(
 		!thread
@@ -73,6 +82,8 @@
 		<div class="flex min-w-0 flex-1 items-center gap-2" aria-live="polite">
 			{#if thread?.permissionPending}
 				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
+			{:else if thread?.status === Status.WORKING && retrying}
+				<Loader size={12} /><span>{retrying}</span>
 			{:else if thread?.status === Status.WORKING}
 				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 			{/if}

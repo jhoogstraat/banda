@@ -141,6 +141,16 @@ const pushes = count();
 apply(chat, ev({ case: 'autoPush', value: { state: AutoPushState.UNAVAILABLE, detail: 'origin cannot be pushed to' } }));
 if (count() !== pushes) throw new Error('a thread should say once that origin cannot be pushed to');
 
+// A retry shows until the agent's next output; it starts no item.
+{
+	const c = newChat();
+	apply(c, { ...ev({ case: 'agentRetrying', value: { attempt: 2, maxRetries: 10, error: 'overloaded', errorStatus: 529 } }, 0n), actor: 'agent' } as Event);
+	apply(c, { ...ev({ case: 'typing', value: {} }, 0n), actor: 'bob' } as Event);
+	if (c.retry?.attempt !== 2 || c.items.length) throw new Error('a retry should be kept, without an item, through others typing');
+	apply(c, { ...ev({ case: 'agentTextDelta', value: { text: 'x' } }, 0n), actor: 'agent' } as Event);
+	if (c.retry) throw new Error('output should clear the retry');
+}
+
 // Paging: a tail plus older pages prepended one by one gives the same chat as the full replay,
 // wherever the page edges fall (inside groups, between a call and its result, inside a subagent).
 const history: Event[] = [];

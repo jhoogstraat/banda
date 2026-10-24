@@ -27,6 +27,8 @@
 #                     exists, then goes on with the prompt. It keeps reading
 #                     stdin: messages queue, permission modes apply, and an
 #                     interrupt ends the turn.
+#   e2e-retry:<name>  first reports a retry (system/api_retry: overloaded,
+#                     3/10) and waits, silent, until ~/e2e-release/<name> exists.
 #   e2e-fold          on a held turn: the messages that arrived while it was
 #                     held join the turn (each says "Folded a message into this
 #                     turn", and with e2e-echo "Received: …"), and only one
@@ -211,6 +213,10 @@ while next; do
       exit 1
     fi
     fold=; [[ $line == *e2e-fold* ]] && fold=1
+    if [[ $line =~ e2e-retry:([A-Za-z0-9_-]+) ]]; then
+      echo '{"type":"system","subtype":"api_retry","attempt":3,"max_retries":10,"retry_delay_ms":2049,"error_status":529,"error":"overloaded","session_id":"s"}'
+      until [ -e ~/e2e-release/"${BASH_REMATCH[1]}" ]; do sleep 0.2; done
+    fi
     if [[ $line =~ e2e-hold:([A-Za-z0-9_-]+) ]]; then hold "${BASH_REMATCH[1]}" $fold || continue; fi
     if [[ $line =~ e2e-mcp:([a-z_]+):([A-Za-z0-9+/=]+) ]]; then
       mcp "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
