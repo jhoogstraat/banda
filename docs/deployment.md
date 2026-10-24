@@ -8,7 +8,7 @@ Settings are in [configuration.md](configuration.md).
 
 From an empty cluster to a signed-in team. You need:
 
-- A Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and a default StorageClass (`kubectl get storageclass`).
+- A Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and a default StorageClass (`kubectl get storageclass`). On more than one node, one whose volumes attach to any node (a cloud disk, Ceph RBD, Longhorn), with Banda's nodes in one zone: "Volumes" below.
 - An ingress controller, and its IngressClass name (`kubectl get ingressclass`).
 - Two hostnames pointing at the ingress controller, e.g. `banda.example.com` and `preview.banda.example.com` (the Browser tab; a sibling or subdomain of the first), and a TLS Secret covering both in the namespace `banda` (`kubectl create namespace banda` first), from cert-manager or `kubectl -n banda create secret tls banda-tls --cert=... --key=...`.
 - Your cluster's pod network, e.g. `kubectl cluster-info dump | grep -m1 -o -- '--cluster-cidr=[^"]*'` (a node's `spec.podCIDR` is only its slice).
@@ -212,12 +212,21 @@ Deleting the Secret makes the API create a new key on its next start, which sign
 
 A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api` and `banda-sandbox` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and both image builds on every pull request and push to `main`, and the whole e2e suite on kind with Docker (about 30 minutes) on `main` only.
 
+## Volumes
+
+Banda creates ReadWriteOnce volumes in the default StorageClass: one per thread (`home-t-<thread>`, the checkout) and one per person (`claude-<hash>`, their Claude Code login, config and transcripts). Each person's Claude volume is mounted by all of their pods at once, threads and login environment alike, so the API asks Kubernetes to run all of one person's pods on one node (a required pod affinity on the label `banda.dev/user`). The first of them goes wherever it fits and the rest follow it. Different people's pods spread over the nodes. Nothing to set. What follows from it:
+
+- **Storage:** with volumes that attach to any node (a cloud disk, Ceph RBD, Longhorn), everything works on any number of nodes. Cloud disks live in one zone, so keep Banda's nodes in one zone (a node pool in one zone): a pod can't use a disk in another zone. Node-local storage (local-path, kind's default, many on-prem clusters) keeps each volume on the node it was first used on. A handoff then works only if the recipient's pods run on the same node as the thread's volume, or the recipient has no Claude volume yet. Otherwise the thread's environment never starts: its pod stays `Pending` ("didn't match PersistentVolume's node affinity") and the thread stays starting. Hand it back, or have the recipient fork it instead (a fork starts on a new volume). A node lost with node-local storage takes its volumes with it: pushed work is on the forge, the rest is gone.
+- **Capacity:** one person's running threads share one node. Their requests are small (50m CPU, 128 MiB each; [sizes](configuration.md)), so the ceiling is usually the node's pod limit (110 by default) or their combined real use. When the node is full, their next environment waits for room.
+- **Draining a node:** with attachable storage, each person's pods come back on another node once the last of their pods on the drained node is gone. Kubernetes retries a pod waiting for its group only every 5 minutes, so expect up to 5 minutes for the first of them. With node-local storage they wait for the node to come back.
+- **Forks** start on a new volume, wherever the forker's pods are. They copy nothing from the source's volume (the diff comes from Postgres).
+- An RWX Claude volume (NFS, CephFS) would let one person's pods spread over nodes. Banda has no setting for it yet, since no team has needed it.
+
 ## Gaps before a team cluster
 
 Also in [todo.md](../todo.md).
 
 - **Postgres:** the bundled one has a non-superuser role for the API and nightly dumps on a volume in the same cluster ("Postgres" above): copy them off the cluster, or use CloudNativePG or a managed database for point-in-time recovery and failover.
-- **Volumes:** sandbox PVCs are RWO (`internal/sandbox/sandbox.go`: "multi-node needs RWX or node pinning"). The per-user Claude volume is mounted by all of a user's pods, so on a multi-node cluster those pods must land on one node, or the volume must be RWX.
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
 - **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists.
 - **Sizes:** each thread's pod may take 4 CPU, 8 GiB and 10 GiB scratch, plus a 10 GiB volume, by default; the chart's `sandboxes` values change them ([configuration](configuration.md)). Plan nodes for the number of threads running at once, not threads in total (suspended threads cost only disk).

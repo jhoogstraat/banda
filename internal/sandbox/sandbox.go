@@ -457,8 +457,9 @@ func (c *Client) patchSecret(ctx context.Context, name, label string, data map[s
 	return err
 }
 
-// ensureClaudeVolume creates the owner's Claude Code config volume.
-// ponytail: RWO works while all pods run on one node (kind); multi-node needs RWX or node pinning.
+// ensureClaudeVolume creates the owner's Claude Code config volume. It is
+// ReadWriteOnce, which every cluster has, and mounted by all of the owner's
+// pods at once, so sameNode keeps those on one node.
 func (c *Client) ensureClaudeVolume(ctx context.Context, owner string) (string, error) {
 	name := "claude-" + hash(owner)
 	_, err := c.kube.CoreV1().PersistentVolumeClaims(c.cfg.Namespace).Create(ctx, &corev1.PersistentVolumeClaim{
@@ -554,8 +555,9 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 	}
 	uid := int64(1000)
 	grace := int64(90)                                                                   // the runner stops claude gracefully; killing it mid token refresh logs the user out
-	labels := map[string]string{"banda.dev/thread": t.ID, "banda.dev/sandbox": "thread"} // see deploy/helm/banda/templates/policies.yaml
-	no := false                                                                          // runners never call the Kubernetes API
+	labels := map[string]string{"banda.dev/thread": t.ID, "banda.dev/sandbox": "thread", // see deploy/helm/banda/templates/policies.yaml
+		userLabel: hash(t.OwnerID)}
+	no := false // runners never call the Kubernetes API
 
 	return &sbv1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
@@ -567,6 +569,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
 						AutomountServiceAccountToken:  &no,
+						Affinity:                      sameNode(t.OwnerID),
 						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim), idTokenVolume},
 						Containers: []corev1.Container{{
 							Name:            "runner",
@@ -597,7 +600,7 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 	grace := int64(90)
 	no := false
 	name := "login-" + hash(owner)
-	labels := map[string]string{"banda.dev/login": hash(owner), "banda.dev/sandbox": "login"}
+	labels := map[string]string{"banda.dev/login": hash(owner), "banda.dev/sandbox": "login", userLabel: hash(owner)}
 	return &sbv1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
 		Spec: sbv1.SandboxSpec{
@@ -608,6 +611,7 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 						SecurityContext:               &corev1.PodSecurityContext{RunAsUser: &uid, RunAsGroup: &uid, FSGroup: &uid},
 						TerminationGracePeriodSeconds: &grace,
 						AutomountServiceAccountToken:  &no,
+						Affinity:                      sameNode(owner),
 						Volumes: []corev1.Volume{claudeVolume(claudeClaim),
 							{Name: "home", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
 						Containers: []corev1.Container{{
@@ -661,6 +665,28 @@ func (c *Client) IdentityKeys(ctx context.Context, first func() (map[string][]by
 		return c.IdentityKeys(ctx, first)
 	}
 	return data, err
+}
+
+// userLabel marks each pod with its owner's hash, for sameNode.
+const userLabel = "banda.dev/user"
+
+// sameNode schedules a pod onto the node where the owner's other pods run,
+// so they can all mount the owner's ReadWriteOnce Claude volume. The first
+// of them goes anywhere: Kubernetes lets a pod that matches its own term
+// start the group. Node-local storage (local-path) pins the volume to its
+// node anyway; network storage (EBS, Ceph RBD, Longhorn) would otherwise
+// fail to attach it on a second node.
+// Node-local storage can't follow a handoff to someone on another node
+// (docs/deployment.md "Volumes").
+// ponytail: one user's running pods are bounded by one node, and after a drain the scheduler
+// retries them only every 5 min; an RWX Claude volume setting lifts both, add it when a team needs it.
+func sameNode(owner string) *corev1.Affinity {
+	return &corev1.Affinity{PodAffinity: &corev1.PodAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{{
+			LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{userLabel: hash(owner)}},
+			TopologyKey:   "kubernetes.io/hostname",
+		}},
+	}}
 }
 
 func claudeVolume(claim string) corev1.Volume {

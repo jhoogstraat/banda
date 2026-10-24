@@ -294,3 +294,37 @@ func TestPodsDontMountForgeSecrets(t *testing.T) {
 		}
 	}
 }
+
+// All of a user's pods, threads and login, ask for the node of each other,
+// where their ReadWriteOnce Claude volume is; another user's don't.
+func TestUsersPodsShareANode(t *testing.T) {
+	c := &Client{}
+	pods := []sbv1.PodTemplate{
+		c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "subscription", nil, store.GitIdentity{}).Spec.PodTemplate,
+		c.sandbox("t-2", "claude", store.Thread{ID: "2", OwnerID: "alice"}, "api_key", nil, store.GitIdentity{}).Spec.PodTemplate,
+		c.loginSandbox("alice", "claude").Spec.PodTemplate,
+	}
+	bob := c.sandbox("t-3", "claude", store.Thread{ID: "3", OwnerID: "bob"}, "subscription", nil, store.GitIdentity{}).Spec.PodTemplate
+	selects := func(p, of sbv1.PodTemplate) bool {
+		terms := p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		if len(terms) != 1 || terms[0].TopologyKey != "kubernetes.io/hostname" {
+			t.Fatalf("affinity: %+v", terms)
+		}
+		for k, v := range terms[0].LabelSelector.MatchLabels {
+			if of.ObjectMeta.Labels[k] != v {
+				return false
+			}
+		}
+		return true
+	}
+	for i, p := range pods {
+		for j, q := range pods {
+			if !selects(p, q) {
+				t.Errorf("pod %d doesn't select pod %d", i, j)
+			}
+		}
+		if selects(p, bob) || selects(bob, p) {
+			t.Errorf("pod %d and bob's select each other", i)
+		}
+	}
+}
