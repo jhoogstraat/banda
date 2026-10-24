@@ -139,6 +139,16 @@ test('Claude Code retrying an overloaded API is one calm line above the composer
 	expect(await t.of('agentRetrying')).toHaveLength(0);
 });
 
+test('compacting the agent’s context (/compact) is one quiet stored line in the chat', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const page = await open(alice, t);
+	await post(page, '/compact');
+	await expect(page.getByText('Context compacted: the agent now works from a summary of the conversation before this point.')).toBeVisible();
+	expect((await t.of('notice')).map((n) => n.text)).toContainEqual(expect.stringMatching(/^Context compacted:/));
+});
+
 test('the agent’s task list is the plan pinned above the composer while a task is open', async ({ as }) => {
 	const alice = as('alice');
 	const t = await alice.create();

@@ -15,6 +15,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleMinusIcon from '@lucide/svelte/icons/circle-minus';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
+	import FoldVerticalIcon from '@lucide/svelte/icons/fold-vertical';
 	import GitBranchPlusIcon from '@lucide/svelte/icons/git-branch-plus';
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import GitMergeConflictIcon from '@lucide/svelte/icons/git-merge-conflict';
@@ -259,6 +260,12 @@
 	<!-- Workload identity refused for the owner (internal/api/identity.go): a calm line, as for a push that can't happen. -->
 	<div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
 		<KeyRoundIcon class="mt-px size-3.5 shrink-0" />
+		<span class="min-w-0 flex-1">{item.text}</span>
+	</div>
+{:else if item.kind === 'notice' && item.text.startsWith('Context compacted')}
+	<!-- Claude Code summarized the conversation (cmd/runner/claude.go, compact_boundary): a quiet line, nothing to do. -->
+	<div class="flex items-center gap-2 text-xs text-muted-foreground">
+		<FoldVerticalIcon class="size-3.5 shrink-0" />
 		<span class="min-w-0 flex-1">{item.text}</span>
 	</div>
 {:else if item.kind === 'notice'}

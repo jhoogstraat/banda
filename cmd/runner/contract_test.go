@@ -509,6 +509,31 @@ func TestContractRetry(t *testing.T) {
 		"agent_retrying:4/10 unknown 0", "agent_text:ok", "turn_ended:false")
 }
 
+// "/compact" sent as a prompt compacts: one notice, a result that ends the
+// prompt, and the next request starts from the summary.
+func TestContractCompact(t *testing.T) {
+	contractEnv(t)
+	api := newFakeAPI(t, func(r *apiReq) []map[string]any {
+		if b, _ := json.Marshal(r.Messages); strings.Contains(string(b), "summary of the conversation so far") || strings.Contains(string(b), "Please provide your summary") {
+			return []map[string]any{textBlock("<summary>SUMMARY-OF-EARLIER</summary>")}
+		}
+		return nil
+	})
+	s := start(t, settings{})
+	s.turn("first prompt", nil)
+	s.prompt("/compact")
+	events, results := s.until(1, nil)
+	want(t, events, "notice:Context compacted: the agent now works from a summary", "turn_ended:false")
+	if endedPrompts([]byte(results[0])) != 1 || !strings.Contains(results[0], `"num_turns":0`) {
+		t.Errorf("the compaction's result: %s", results[0])
+	}
+	want(t, s.turn("after", nil), "agent_text:ok", "turn_ended:false")
+	reqs := api.requests()
+	if b, _ := json.Marshal(reqs[len(reqs)-1].Messages); !strings.Contains(string(b), "SUMMARY-OF-EARLIER") || strings.Contains(string(b), "first prompt") {
+		t.Errorf("the request after compaction: %.600s", b)
+	}
+}
+
 func TestContractPermissions(t *testing.T) {
 	allow := func(r *bandav1.PermissionRequested) *bandav1.PermissionCommand {
 		return &bandav1.PermissionCommand{Decision: bandav1.PermissionDecision_PERMISSION_DECISION_ALLOW}

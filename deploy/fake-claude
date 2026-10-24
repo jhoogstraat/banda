@@ -16,7 +16,8 @@
 # "Answers: <the answers' JSON>". "e2e-enter-plan" enters plan mode itself
 # (EnterPlanMode, which the real CLI allows without asking). Each turn plans
 # with the task tools (TaskCreate, TaskUpdate), keeping the tasks in the CLI's
-# files; "e2e-tasks" leaves one open.
+# files; "e2e-tasks" leaves one open. The prompt "/compact" compacts, as the
+# real CLI does with its slash command.
 #
 # Directives a test puts anywhere in a prompt, one case each in the loop below
 # (web/e2e/fixtures.ts has helpers for them):
@@ -229,6 +230,14 @@ while next; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;
+    *'"content":"/compact'*'"type":"user"'*)
+      echo '{"type":"system","subtype":"status","status":"compacting","session_id":"s"}'
+      echo '{"type":"system","subtype":"status","status":null,"compact_result":"success","session_id":"s"}'
+      echo '{"type":"system","subtype":"compact_boundary","session_id":"s","compact_metadata":{"trigger":"manual","pre_tokens":15,"post_tokens":1133}}'
+      echo '{"type":"user","message":{"role":"user","content":"<local-command-stdout>Compacted </local-command-stdout>"},"session_id":"s","parent_tool_use_id":null,"isReplay":true}'
+      queued
+      echo '{"type":"result","subtype":"success","is_error":false,"result":"","num_turns":0,"duration_ms":10,"total_cost_usd":0.01,"user_message_uuids":['$uuids']}'
+      ;;
     *e2e-tasks*'"type":"user"'*)
       task_create "Read the code" "Reading the code"; a=$task
       task_create "Write the fix" "Writing the fix"; b=$task

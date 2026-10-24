@@ -47,6 +47,10 @@ type line struct {
 	ToolUseResult json.RawMessage `json:"tool_use_result"`
 	// The prompts this turn ended (their uuid): its own and those folded into it.
 	UserMessageUUIDs []string `json:"user_message_uuids"`
+	// system/compact_boundary: "manual" (/compact) or "auto" (the context was full)
+	CompactMetadata struct {
+		Trigger string `json:"trigger"`
+	} `json:"compact_metadata"`
 	// system/api_retry
 	Error       string `json:"error"`
 	Attempt     int32  `json:"attempt"`
@@ -140,6 +144,14 @@ func translate(raw []byte) (events []*bandav1.Event, turnEnded, authFailed bool)
 	case "system":
 		if l.Subtype == "api_retry" && authErrors[l.Error] {
 			return nil, false, true
+		}
+		if l.Subtype == "compact_boundary" {
+			why := ""
+			if l.CompactMetadata.Trigger == "auto" {
+				why = " (it was full)"
+			}
+			events = append(events, &bandav1.Event{Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{
+				Text: "Context compacted" + why + ": the agent now works from a summary of the conversation before this point."}}})
 		}
 		if l.Subtype == "api_retry" {
 			events = append(events, &bandav1.Event{Kind: &bandav1.Event_AgentRetrying{AgentRetrying: &bandav1.AgentRetrying{
