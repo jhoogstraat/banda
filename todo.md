@@ -48,13 +48,13 @@ The cluster `banda` already runs in `podman-machine-default` (agent-sandbox, Pos
 - [ ] Pull requests against the real forges (only the fake is tested): create, checks from GitHub Actions, a review, a merge on github.com; the same on a GitLab with `FORGE_HOSTS`; check the token scopes in docs/usage.md are enough and no more.
 - [ ] Verify against the real CLI what is only sourced from docs (PLAN.md, "Verified only partly" and "Not yet"):
   - [x] a real turn streams correctly (tool calls, thinking, subagents): `mise run contract`. The subagent tool is `Agent`; background tasks are now off, or a subagent would start a turn of its own after the turn.
-  - [ ] the TodoWrite plan: the pinned CLI offers no `TodoWrite` in `-p`, so the plan never shows. Decide: map `TaskCreate`/`TaskUpdate` (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`) to the plan, or drop it.
+  - [ ] the TodoWrite plan: the pinned CLI offers no `TodoWrite` in `-p`, so the plan never shows. Decided: map the CLI's task tools (`TaskCreate`/`TaskUpdate`, `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`) to the plan (agents, with the features below).
   - [x] folding a prompt into a running turn: `queued_turn_count` stays 0 even with a prompt queued, so the runner counts by `user_message_uuids` (a thread showed `awaiting_input` during a queued turn).
   - [x] permission modes: `ask`, `accept edits`, `plan` with a real `ExitPlanMode`, `AskUserQuestion` answers, `EnterPlanMode` (contract).
   - [x] switching profile, model and effort mid-thread with `--resume` and `--system-prompt-snapshot off` (contract: the resumed CLI sends them).
   - [x] the Banda MCP tools reached from the real CLI through the runner's `--mcp-config` (contract, a stub server with their names); the real server with a real model still comes with dogfooding.
 - [ ] A second person on the LAN (bob) posts, mentions, requests a turn, forks; a handoff to bob with bob's own Claude login.
-- [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR.
+- [ ] Run a repo with `.banda/setup.sh` and a dev server; check the Browser tab and HMR. The runner turns the CLI's background tasks off (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`, so no turn starts after its end), which also takes Bash's `run_in_background`: check the agent still starts a dev server the Browser tab finds, and turn them back on (with a status for background work) if it doesn't.
 - [ ] Use it for a week; write down what's annoying.
 - [x] Run the API in the cluster instead of on the Mac (`mise run deploy`): signs in with Dex at `/dex` through the API.
 
