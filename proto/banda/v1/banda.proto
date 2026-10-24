@@ -457,7 +457,17 @@ message Event {
     // user's commands and skills), sent at each start. Not part of the chat;
     // the latest is offered in the owner's composer.
     SlashCommands slash_commands = 52;
+    // Ephemeral (seq 0), every few seconds while the environment is starting
+    // and Kubernetes says why its pod isn't up: unschedulable, an image
+    // pull that fails and is retried. A status change ends it.
+    EnvWaiting env_waiting = 53;
   }
+}
+
+message EnvWaiting {
+  // In Banda's words with Kubernetes' message, e.g. "Waiting for room on a
+  // node: 0/1 nodes are available: …". Empty: nothing in the way any more.
+  string reason = 1;
 }
 
 message SlashCommands {
@@ -871,6 +881,9 @@ message OpenTerminalResponse {
   // Empty and not exited: a keepalive.
   bytes data = 1;
   bool exited = 2;
+  // Before any data: the environment is still starting, and why (see
+  // EnvWaiting). If it can't start, the stream ends with that error.
+  string waiting = 3;
 }
 
 message WriteTerminalRequest {

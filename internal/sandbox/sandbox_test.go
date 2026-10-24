@@ -328,3 +328,36 @@ func TestUsersPodsShareANode(t *testing.T) {
 		}
 	}
 }
+
+// Only what can't resolve by itself fails a start; the rest is shown.
+func TestPodWaiting(t *testing.T) {
+	unschedulable := func(msg string) *corev1.Pod {
+		return &corev1.Pod{Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodScheduled,
+			Status: corev1.ConditionFalse, Reason: corev1.PodReasonUnschedulable, Message: msg}}}}
+	}
+	waiting := func(reason, msg string) *corev1.Pod {
+		return &corev1.Pod{Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			State:                corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: reason, Message: msg}},
+			LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"}}}}}}
+	}
+	for _, c := range []struct {
+		pod    *corev1.Pod
+		why    string
+		failed bool
+	}{
+		{&corev1.Pod{}, "", false},
+		{waiting("ContainerCreating", ""), "", false},
+		{unschedulable("0/1 nodes are available: 1 Insufficient cpu."), "Waiting for room on a node: 0/1 nodes are available: 1 Insufficient cpu.", false},
+		{unschedulable("0/2 nodes are available: 1 node(s) didn't match PersistentVolume's node affinity."), "hand the thread back or fork it", false},
+		{waiting("ErrImagePull", "not found"), "Can't pull the sandbox image, retrying: not found", false},
+		{waiting("ImagePullBackOff", `Back-off pulling image "x"`), `Can't pull the sandbox image: Back-off pulling image "x"`, true},
+		{waiting("CreateContainerConfigError", `secret "t-1-token" not found`), `Can't configure the sandbox's container: secret "t-1-token" not found`, true},
+		{waiting("CrashLoopBackOff", "back-off 10s"), "The runner keeps exiting before it connects (exit code 1, Error)", true},
+		{waiting("Something", "new"), "Something: new", false},
+	} {
+		why, failed := podWaiting(c.pod)
+		if !strings.Contains(why, c.why) || (c.why == "" && why != "") || failed != c.failed {
+			t.Errorf("podWaiting = %q, %v; want %q, %v", why, failed, c.why, c.failed)
+		}
+	}
+}

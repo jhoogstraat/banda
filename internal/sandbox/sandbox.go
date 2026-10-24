@@ -693,3 +693,72 @@ func claudeVolume(claim string) corev1.Volume {
 	return corev1.Volume{Name: "claude", VolumeSource: corev1.VolumeSource{
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claim}}}
 }
+
+// Waiting says what a starting thread environment's pod waits on, in
+// Banda's words with Kubernetes' message, and whether it can't start by
+// itself (failed). Empty when Kubernetes reports nothing in the way: no pod
+// yet, pulling the image, creating the container, the runner connecting.
+func (c *Client) Waiting(ctx context.Context, threadID string) (why string, failed bool, err error) {
+	return c.waiting(ctx, "t-"+threadID)
+}
+
+func (c *Client) WaitingLogin(ctx context.Context, owner string) (string, bool, error) {
+	return c.waiting(ctx, "login-"+hash(owner))
+}
+
+func (c *Client) waiting(ctx context.Context, name string) (string, bool, error) {
+	pod, err := c.kube.CoreV1().Pods(c.cfg.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return "", false, nil
+	} else if err != nil {
+		return "", false, err
+	}
+	if pod.DeletionTimestamp != nil { // the one before, on its way out
+		return "", false, nil
+	}
+	why, failed := podWaiting(pod)
+	return why, failed, nil
+}
+
+// podWaiting reads a pod's status. Only what can't change without someone
+// acting fails: an image Kubernetes already failed to pull and backs off
+// from, a container it can't configure (a missing Secret), a runner that
+// keeps exiting. Retry recreates the pod, which tries again. The rest is
+// shown and waited for, however long: the scheduler finds room once a node
+// frees up, and a big image takes minutes to pull.
+func podWaiting(p *corev1.Pod) (string, bool) {
+	for _, c := range p.Status.Conditions {
+		if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse && c.Reason == corev1.PodReasonUnschedulable {
+			why := "Waiting for room on a node: " + c.Message
+			if strings.Contains(c.Message, "volume node affinity") || strings.Contains(c.Message, "PersistentVolume's node affinity") {
+				// Node-local storage: the home volume is on another node than its owner's other pods (sameNode).
+				why += " Its volume is on another node than its owner's other environments: hand the thread back or fork it."
+			}
+			return why, false
+		}
+	}
+	for _, s := range p.Status.ContainerStatuses {
+		w := s.State.Waiting
+		if w == nil {
+			continue
+		}
+		switch w.Reason {
+		case "ErrImagePull":
+			return "Can't pull the sandbox image, retrying: " + w.Message, false
+		case "ImagePullBackOff", "InvalidImageName":
+			return "Can't pull the sandbox image: " + w.Message, true
+		case "CreateContainerConfigError":
+			return "Can't configure the sandbox's container: " + w.Message, true
+		case "CrashLoopBackOff":
+			why := "The runner keeps exiting before it connects"
+			if t := s.LastTerminationState.Terminated; t != nil {
+				why += fmt.Sprintf(" (exit code %d, %s)", t.ExitCode, t.Reason)
+			}
+			return why, true
+		}
+		if w.Message != "" {
+			return w.Reason + ": " + w.Message, false
+		}
+	}
+	return "", false
+}

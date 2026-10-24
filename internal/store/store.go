@@ -597,6 +597,15 @@ func (s *Store) IdlePushed(ctx context.Context, before time.Time) ([]string, err
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
+// Starting returns the threads whose environment is starting.
+func (s *Store) Starting(ctx context.Context) ([]string, error) {
+	rows, err := s.db.Query(ctx, `SELECT id FROM threads WHERE status = 'starting'`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
 // ClaimDeleted returns the threads whose environment was deleted since the
 // last call, by any API.
 func (s *Store) ClaimDeleted(ctx context.Context) ([]string, error) {

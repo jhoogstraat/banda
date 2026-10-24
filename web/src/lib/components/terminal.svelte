@@ -24,23 +24,34 @@
 	let ctrl: AbortController;
 	let ended = $state(false);
 	let error = $state('');
+	// What the environment waits on before the terminal opens (OpenTerminalResponse.waiting).
+	let waiting = $state('');
 
 	async function open() {
 		ctrl?.abort();
 		const mine = (ctrl = new AbortController());
 		ended = false;
 		error = '';
+		waiting = '';
 		term.reset();
 		term.focus();
 		try {
 			for await (const r of start(term.cols, term.rows, mine.signal)) {
+				if (r.waiting) {
+					waiting = r.waiting;
+					continue;
+				}
+				if (r.data.length) waiting = '';
 				term.write(r.data);
 				if (r.exited) break;
 			}
 		} catch (e) {
 			if (!mine.signal.aborted) error = ConnectError.from(e).rawMessage;
 		}
-		if (!mine.signal.aborted) ended = true;
+		if (!mine.signal.aborted) {
+			ended = true;
+			waiting = '';
+		}
 	}
 
 	onMount(() => {
@@ -79,9 +90,12 @@
 
 <div class="relative h-full bg-[#0a0a0a] p-2">
 	<div bind:this={el} class="h-full"></div>
+	{#if waiting}
+		<div class="absolute inset-x-0 top-0 border-b bg-background/95 px-3 py-2 text-sm text-muted-foreground" aria-live="polite">{waiting}</div>
+	{/if}
 	{#if ended}
 		<div class="absolute inset-x-0 bottom-0 flex items-center gap-3 border-t bg-background/95 px-3 py-2 text-sm">
-			<span class="min-w-0 flex-1 truncate text-muted-foreground">{error || 'Terminal exited.'}</span>
+			<span class="min-w-0 flex-1 break-words text-muted-foreground">{error || 'Terminal exited.'}</span>
 			<Button size="sm" variant="outline" onclick={open}>Reopen</Button>
 		</div>
 	{/if}

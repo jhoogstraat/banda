@@ -145,6 +145,7 @@ starting ──EnvReady──▶ working ──TurnEnded──▶ awaiting_input
    └──EnvReady (no prompt)──▶ awaiting_input
 working ──Interrupt──▶ (stop sent; TurnEnded follows)
 any ──EnvLost──▶ errored ──Retry / runner reconnects──▶ starting / awaiting_input
+starting ──its pod can't start by itself (EnvLost, the reason from Kubernetes)──▶ errored
 working ──EnvLost / runner reconnects (API restarted)──▶ the lost turn is noted and ends as failed
 awaiting_input / starting / errored ──Suspend (idle, owner snooze/settle)──▶ suspended
 suspended ──turn-starting post (kept as pending prompt) / owner Wake──▶ starting
@@ -175,7 +176,7 @@ Only the owner's own actions drive the environment. Implemented as below.
 
 | Thread state | Environment action |
 |---|---|
-| `starting` | create the `Sandbox` (plus the owner's Claude volume if it is missing) |
+| `starting` | create the `Sandbox` (plus the owner's Claude volume if it is missing); until the runner connects, the API reads the pod every 2 s (one goroutine per starting thread, from provision or the idle sweep after a restart): what Kubernetes says it waits on (unschedulable, an image pull it retries) goes to viewers as an ephemeral `EnvWaiting` line under "Starting environment…", never stored, like the retry line; what can't resolve by itself (`ImagePullBackOff`, `InvalidImageName`, `CreateContainerConfigError`, a runner in `CrashLoopBackOff`) ends the start as `errored` with that reason, so Retry recreates the pod. No timeout: a slow pull or a scheduler retry is waited for. The login terminal waits the same way (`OpenTerminalResponse.waiting`, the error ends its stream) |
 | `working` | keep running, never suspend |
 | `awaiting_input`, idle < 30 min | keep running |
 | `awaiting_input`, idle ≥ 30 min | `operatingMode: Suspended`: the pod is deleted, the PVCs stay (a one-minute ticker in banda-api) |
@@ -199,7 +200,7 @@ Everything below is implemented on `main` and checked by `mise run e2e` against 
 - Threads: create (repo, base branch, model, effort, prompt), one sandbox per thread, branch `banda/<id>`, streaming chat with tool calls, interrupt, retry, diff after every turn.
 - State machine: `starting`, `working`, `awaiting_input`, `errored`, `suspended`; agent/chat mode with the posting rules from the Decisions table.
 - Teammate turn requests: compact approve/decline cards in the chat (the decline note and the subscription note behind small buttons), "Approve all (n)" approving the waiting ones in the order they were posted, Needs input for the owner, a per-thread trust toggle in the header.
-- Honest failure states: a missing thread is a not-found page with a way home (no header, composer or pane), a failed load says why with Try again; an errored thread's card names the cause (the failed setup step and the end of its output, a lost runner, an environment that couldn't be created), with Retry and, after a failed step, Open terminal for the owner, and who can fix it for teammates. A thread that can't push tells its owner once, compactly, with a link that opens Settings with GIT_TOKEN filled in.
+- Honest failure states: a missing thread is a not-found page with a way home (no header, composer or pane), a failed load says why with Try again; an errored thread's card names the cause (the failed setup step and the end of its output, a lost runner, an environment that couldn't be created, a pod that can't start: an image that can't be pulled, a container config error, a runner that keeps exiting); while it starts, the thread says what Kubernetes waits on (no room on a node, a volume on another node, an image pull retried), with Retry and, after a failed step, Open terminal for the owner, and who can fix it for teammates. A thread that can't push tells its owner once, compactly, with a link that opens Settings with GIT_TOKEN filled in.
 - Sign-in with OIDC (Dex locally), users, display names; Banda's sign-in page and a Dex in Banda's look.
 - Sidebar: search, project filter (by repository) and new-thread button on top; Decisions with its count; Mentioned, Needs input (only what blocks on me), Ready, then collapsed Working, Earlier, Snoozed, Settled; a race is one row; mentions-only toggle; browse other people's threads; an account menu on my name in the footer (my page, Settings, notifications, shortcuts, sign out).
 - Decisions (`/decisions`, `G D`, the palette): every pending permission request, plan and turn request I can answer, live, answered with the keyboard (`j`/`k`, `y`, `n`, `a`, `o`) or the cards' buttons on a phone. Blocked threads show "Waiting for you · Bash" everywhere.

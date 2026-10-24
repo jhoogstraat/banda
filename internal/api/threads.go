@@ -8,8 +8,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect/v2"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/store"
@@ -160,6 +162,75 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
 		s.applyBecause(context.WithoutCancel(ctx), t.ID, thread.EnvLost{}, reasonProvision)
+		return
+	}
+	s.watchStart(t.ID)
+}
+
+// watchStart looks at a starting thread's pod every StartPoll until the
+// runner connects or the thread leaves starting: viewers get what
+// Kubernetes says it waits on (EnvWaiting, ephemeral like the agent's
+// retries), and a start that can't succeed by itself ends as errored with
+// that reason (see sandbox.Waiting). No timer: a slow start is waited for.
+// One watch per thread; a new start resets its clock, so the pod from
+// before it isn't judged.
+func (s *Service) watchStart(id string) {
+	s.mu.Lock()
+	_, watched := s.starts[id]
+	s.starts[id] = time.Now()
+	s.mu.Unlock()
+	if !watched {
+		go s.watchStarting(context.Background(), id)
+	}
+}
+
+func (s *Service) watchStarting(ctx context.Context, id string) {
+	shown := ""
+	for {
+		time.Sleep(s.StartPoll)
+		s.mu.Lock()
+		since := s.starts[id]
+		_, up := s.runners[id]
+		s.mu.Unlock()
+		t, err := s.store.Get(ctx, id)
+		if err != nil || t.Status != thread.Starting {
+			s.mu.Lock()
+			done := s.starts[id].Equal(since) // else it started again since: look again
+			if done {
+				delete(s.starts, id)
+			}
+			s.mu.Unlock()
+			if done {
+				return
+			}
+			continue
+		}
+		if up || time.Since(since) < s.StartPoll {
+			continue
+		}
+		why, failed, err := s.sandboxes.Waiting(ctx, id)
+		if err != nil {
+			slog.Error("look at starting environment", "thread", id, "err", err)
+			continue
+		}
+		if failed {
+			_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+				if t.Status != thread.Starting {
+					return nil, errUnchanged
+				}
+				return envLost(t, 0, why), nil
+			})
+			if err != nil && err != errUnchanged {
+				slog.Error("store failed start", "thread", id, "err", err)
+			}
+			s.broadcast(id, events)
+			continue // the next look ends the watch
+		}
+		if why != "" || shown != "" { // again every time, for viewers who just came
+			s.broadcast(id, []*bandav1.Event{{ThreadId: id, Actor: "system", Time: timestamppb.Now(),
+				Kind: &bandav1.Event_EnvWaiting{EnvWaiting: &bandav1.EnvWaiting{Reason: why}}}})
+		}
+		shown = why
 	}
 }
 

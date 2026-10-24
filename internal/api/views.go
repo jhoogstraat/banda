@@ -206,8 +206,26 @@ func (s *Service) SuspendIdle(ctx context.Context, idle, every time.Duration) {
 			}
 		}
 		s.suspendIdleLogins(ctx)
+		s.watchStarts(ctx)
 		s.deleteIdle(ctx)
 		s.reportDeleted(ctx)
+	}
+}
+
+// watchStarts watches the starting threads no watchStart looks at, e.g.
+// after an API restart; one started in between waits StartPoll to be judged.
+func (s *Service) watchStarts(ctx context.Context) {
+	ids, err := s.store.Starting(ctx)
+	if err != nil {
+		slog.Error("find starting threads", "err", err)
+	}
+	for _, id := range ids {
+		s.mu.Lock()
+		_, watched := s.starts[id]
+		s.mu.Unlock()
+		if !watched {
+			s.watchStart(id)
+		}
 	}
 }
 

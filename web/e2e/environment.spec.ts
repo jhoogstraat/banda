@@ -1,5 +1,5 @@
 // A thread's environment over time: push, suspend and resume, settle, delete and recreate.
-import { AutoPushState, PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { AutoPushState, LoginAction, PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
 import { exists, expect, freePort, kexec, kube, png, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 test('push reports its result as a notice', async ({ as }) => {
@@ -28,6 +28,41 @@ test('snoozing suspends the environment; a prompt resumes it with the checkout i
 	await test.step('a prompt’s images wait with it while the environment resumes', async () => {
 		expect((await t.of('agentText')).map((a) => a.text)).toContain('Received 1 image blocks (image/png) and 0 text files');
 	});
+});
+
+test('a start that can’t succeed (an image that can’t be pulled) ends as errored with the reason and Retry; the login environment says the same', { tag: '@key' }, async ({ as, startApi }) => {
+	const api = await startApi({ SANDBOX_IMAGE: 'localhost/banda-sandbox:e2e-missing' }); // its own database: its threads only
+	const alice = as('alice', api);
+	const t = await alice.create({ prompt: 'e2e: never runs' });
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await t.waitForStatus(Status.ERRORED, 90_000);
+	const card = page.getByRole('alert').filter({ hasText: "Can't pull the sandbox image" });
+	await expect(card).toContainText('banda-sandbox:e2e-missing');
+	await expect(card.getByRole('button', { name: 'Retry' })).toBeVisible();
+	const login = alice.terminal((signal) => alice.settings.openLoginTerminal({ harness: 'claude', action: LoginAction.LOGIN, cols: 80, rows: 24 }, { signal }), 90_000);
+	expect(await refused(login)).toContain("Can't pull the sandbox image");
+});
+
+test('a start that waits on Kubernetes (no node fits) says why and keeps waiting; once a node fits it starts', async ({ as }) => {
+	const alice = as('alice');
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.snooze();
+	await t.podGone();
+	// Only this test's Sandbox: a start keeps fields of its pod template that Banda doesn't set.
+	await kube('patch', 'sandbox', t.pod, '--type', 'merge', '-p', '{"spec":{"podTemplate":{"spec":{"nodeSelector":{"banda.dev/e2e":"nowhere"}}}}}');
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await t.send('wake up');
+	await expect(page.getByText(/Waiting for room on a node: 0\/1 nodes are available/)).toBeVisible({ timeout: 30_000 });
+	await page.waitForTimeout(6000); // several looks at the pod: still waiting, not errored
+	expect((await t.get()).status).toBe(Status.STARTING);
+
+	await kube('patch', 'sandbox', t.pod, '--type', 'merge', '-p', '{"spec":{"podTemplate":{"spec":{"nodeSelector":null}}}}');
+	await kube('delete', 'pod', t.pod, '--wait=false');
+	await t.waitForStatus(Status.AWAITING_INPUT, 120_000);
+	await expect(page.getByText(/Waiting for room on a node/)).toHaveCount(0);
 });
 
 const sandbox = (id: string, field: string) => kube('get', 'sandbox', `t-${id}`, '-o', `jsonpath={.spec.${field}}`);

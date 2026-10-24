@@ -77,6 +77,7 @@ export type Item = { key: number } & (
 // `seq` is the latest stored event applied (see itemAt).
 // `commands` are the slash commands Claude Code offers (the latest SlashCommands).
 // `retry` is Claude Code retrying a failed request, until the agent's next output.
+// `waiting` is what a starting environment waits on (EnvWaiting), until the thread's status changes.
 // `present` is who watches the thread; `typing` is when each person last typed (Date.now()), until they post.
 export type Chat = {
 	items: Item[];
@@ -96,6 +97,7 @@ export type Chat = {
 	};
 	commands: SlashCommand[];
 	retry?: AgentRetrying;
+	waiting: string;
 	present: string[];
 	typing: Record<string, number>;
 	// A diffChanged waiting for the turn it belongs to.
@@ -108,6 +110,7 @@ export const newChat = (): Chat => ({
 	plan: [],
 	planSeq: 0n,
 	commands: [],
+	waiting: '',
 	seq: 0n,
 	tools: new Map(),
 	orphans: { results: new Map(), calls: new Map(), resolved: new Map(), handoffs: new Map(), answers: new Map(), votes: new Map(), cards: new Map() },
@@ -162,6 +165,8 @@ export function apply(chat: Chat, e: Event) {
 	}
 	if (e.seq > chat.seq) chat.seq = e.seq;
 	if (e.actor === 'agent') chat.retry = k.case === 'agentRetrying' ? k.value : undefined; // any output means the retry worked
+	if (k.case === 'envWaiting') chat.waiting = k.value.reason;
+	if (k.case === 'statusChanged') chat.waiting = '';
 	const key = keyOf(e);
 	switch (k.case) {
 		case 'message':

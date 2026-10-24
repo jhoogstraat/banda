@@ -84,6 +84,10 @@ For work without code, pick **No repository** in the composer's repository chip.
 
 The owner can add a repository later (**Add a repository** in the thread's **…** menu, or click **No repository** in the header), between turns. The environment restarts with the folder as a checkout of the thread's own branch: the files already there are kept as uncommitted changes on top of the base branch (the diff shows them; where the base has the same file, the folder's version stays), and from then on it is a thread like any other. If the checkout fails (a wrong URL or base branch), the folder is left as it was and the thread shows the error: **Change the repository** there (or in the **…** menu) corrects the URL or base branch, or removes the repository to go on without one. Once a checkout succeeded, the repository can't be changed.
 
+## When an environment doesn't start
+
+While a thread's environment starts, the chat says what Kubernetes is waiting on, if anything: "Waiting for room on a node: …" when no node has room (it starts once one does), or "Can't pull the sandbox image, retrying: …". A slow start is waited for, however long. A start that can't succeed by itself (the image can't be pulled, the container can't be configured, the runner keeps exiting) stops the thread with that reason and **Retry**, which usually needs an admin to fix the cause first. The login terminal in Settings shows the same. A handed-off thread that waits for a node because its volume is on another one won't start: hand it back, or fork it.
+
 ## Preparing a repo
 
 Before the agent starts, a thread installs the tools from the repo's `mise.toml`, `.mise.toml` or `.tool-versions` with [mise](https://mise.jdx.dev), then runs `.banda/setup.sh` with bash in the checkout (once per thread; again when the script changes; 15 min timeout). The chat shows each step. If one fails, the thread stops with its output; the terminal still works, and **Retry** runs the setup again.

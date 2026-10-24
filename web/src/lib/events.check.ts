@@ -151,6 +151,15 @@ if (count() !== pushes) throw new Error('a thread should say once that origin ca
 	if (c.retry) throw new Error('output should clear the retry');
 }
 
+// What a starting environment waits on shows until the status changes; it starts no item.
+{
+	const c = newChat();
+	apply(c, { ...ev({ case: 'envWaiting', value: { reason: 'Waiting for room on a node: 0/1 nodes are available' } }, 0n), actor: 'system' } as Event);
+	if (!c.waiting.startsWith('Waiting for room') || c.items.length) throw new Error('a start should show what it waits on, without an item');
+	apply(c, ev({ case: 'statusChanged', value: { status: Status.AWAITING_INPUT } }, 1n));
+	if (c.waiting) throw new Error('a status change should clear what the start waited on');
+}
+
 // Paging: a tail plus older pages prepended one by one gives the same chat as the full replay,
 // wherever the page edges fall (inside groups, between a call and its result, inside a subagent).
 const history: Event[] = [];

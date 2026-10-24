@@ -656,6 +656,16 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
      */
     value: SlashCommands;
     case: "slashCommands";
+  } | {
+    /**
+     * Ephemeral (seq 0), every few seconds while the environment is starting
+     * and Kubernetes says why its pod isn't up: unschedulable, an image
+     * pull that fails and is retried. A status change ends it.
+     *
+     * @generated from field: banda.v1.EnvWaiting env_waiting = 53;
+     */
+    value: EnvWaiting;
+    case: "envWaiting";
   } | { case: undefined; value?: undefined };
 };
 
@@ -664,6 +674,25 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export declare const EventSchema: GenMessage<Event>;
+
+/**
+ * @generated from message banda.v1.EnvWaiting
+ */
+export declare type EnvWaiting = Message$1<"banda.v1.EnvWaiting"> & {
+  /**
+   * In Banda's words with Kubernetes' message, e.g. "Waiting for room on a
+   * node: 0/1 nodes are available: …". Empty: nothing in the way any more.
+   *
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message banda.v1.EnvWaiting.
+ * Use `create(EnvWaitingSchema)` to create a new message.
+ */
+export declare const EnvWaitingSchema: GenMessage<EnvWaiting>;
 
 /**
  * @generated from message banda.v1.SlashCommands
@@ -2234,6 +2263,14 @@ export declare type OpenTerminalResponse = Message$1<"banda.v1.OpenTerminalRespo
    * @generated from field: bool exited = 2;
    */
   exited: boolean;
+
+  /**
+   * Before any data: the environment is still starting, and why (see
+   * EnvWaiting). If it can't start, the stream ends with that error.
+   *
+   * @generated from field: string waiting = 3;
+   */
+  waiting: string;
 };
 
 /**

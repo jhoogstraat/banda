@@ -423,7 +423,11 @@
 
 					{#if chat.streaming}{@render agentText(chat.streaming)}{/if}
 					{#if thread?.status === Status.STARTING}
-						<div class="flex items-center gap-2 text-sm text-muted-foreground"><Loader /> Starting environment…</div>
+						<!-- What Kubernetes says the start waits on (ephemeral, see EnvWaiting); a start that can't succeed turns errored. -->
+						<div class="flex items-start gap-2 text-sm text-muted-foreground" aria-live="polite">
+							<Loader class="mt-0.5 shrink-0" />
+							<span class="min-w-0">Starting environment…{#if chat.waiting}<span class="block text-xs break-words">{chat.waiting}</span>{/if}</span>
+						</div>
 					{:else if thread?.status === Status.SUSPENDED && thread.environmentDeleted}
 						<div class="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
 							<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" />

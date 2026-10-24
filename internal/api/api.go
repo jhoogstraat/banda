@@ -45,6 +45,8 @@ type Service struct {
 	// SuspendPause holds every suspend between the thread's status and its
 	// environment, so tests can race it. Zero outside tests.
 	SuspendPause time.Duration
+	// StartPoll is how often a starting environment's pod is looked at (watchStart).
+	StartPoll time.Duration
 	// WatchBuffer is how many events a WatchThread stream may lag behind
 	// before it catches up from the store.
 	WatchBuffer int
@@ -67,6 +69,9 @@ type Service struct {
 	runners map[string]*runner
 	// terminals holds each runner's single terminal subscriber (see terminal).
 	terminals map[string]chan *bandav1.TerminalOutput
+	// starts is when each starting thread's environment was last (re)created,
+	// while a watchStart looks at it.
+	starts map[string]time.Time
 	// loginLastUsed is when each user last had a login terminal.
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
@@ -133,6 +138,8 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		Keepalive:          25 * time.Second,
 		IDTokenRefresh:     5 * time.Minute,
 		loginLastUsed:      map[string]time.Time{},
+		starts:             map[string]time.Time{},
+		StartPoll:          2 * time.Second,
 		previewKey:         signer(rand.Text()),
 	}
 	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}

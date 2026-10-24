@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"connectrpc.com/connect/v2"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/gen/banda/v1/bandav1connect"
@@ -30,8 +33,8 @@ func (s *Service) OpenTerminal(ctx context.Context, req *bandav1.OpenTerminalReq
 // terminal opens a terminal on the runner connected as key and streams its
 // output until it exits or the client goes away.
 func (s *Service) terminal(ctx context.Context, key string, open *bandav1.TerminalOpen, send func(*bandav1.OpenTerminalResponse) error) error {
-	if !s.waitRunner(ctx, key) {
-		return errNotRunning
+	if err := s.waitRunner(ctx, key, func(why string) error { return send(&bandav1.OpenTerminalResponse{Waiting: why}) }); err != nil {
+		return err
 	}
 
 	// A new terminal replaces the previous one, whose stream then ends.
@@ -115,21 +118,42 @@ func (s *Service) toTerminal(key string, msg *bandav1.ConnectResponse) error {
 	return nil
 }
 
-// waitRunner waits for the runner connected as key to connect, up to 90 s: enough
-// for a suspended environment to resume.
-func (s *Service) waitRunner(ctx context.Context, key string) bool {
-	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); {
+// waitRunner waits for the runner connected as key to connect, telling
+// waiting what its environment waits on every StartPoll (see
+// sandbox.Waiting). No timer: it waits as long as the environment may still
+// start, and fails with the reason once it can't.
+func (s *Service) waitRunner(ctx context.Context, key string, waiting func(string) error) error {
+	for next := time.Now(); ; {
 		s.mu.Lock()
 		_, ok := s.runners[key]
 		s.mu.Unlock()
 		if ok {
-			return true
+			return nil
+		}
+		if time.Now().After(next) {
+			next = time.Now().Add(s.StartPoll)
+			var why string
+			var failed bool
+			var err error
+			if u, login := strings.CutPrefix(key, loginPrefix); login {
+				why, failed, err = s.sandboxes.WaitingLogin(ctx, u)
+			} else {
+				why, failed, err = s.sandboxes.Waiting(ctx, key)
+			}
+			if err != nil {
+				return err
+			}
+			if failed {
+				return connect.NewError(connect.CodeFailedPrecondition, why)
+			}
+			if err := waiting(or(why, "Starting the environment…")); err != nil {
+				return err
+			}
 		}
 		select {
 		case <-ctx.Done():
-			return false
+			return errNotRunning
 		case <-time.After(500 * time.Millisecond):
 		}
 	}
-	return false
 }
