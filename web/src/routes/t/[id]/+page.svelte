@@ -31,7 +31,7 @@
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import ChatItem, { agentText } from '#lib/components/chat-item.svelte';
-	import Composer from '#lib/components/composer.svelte';
+	import Composer, { useAsDraft } from '#lib/components/composer.svelte';
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import HandoffDialog from '#lib/components/handoff-dialog.svelte';
 	import RepoDialog from '#lib/components/repo-dialog.svelte';
@@ -366,6 +366,7 @@
 
 	async function send({ text, attachments: files }: PromptInputMessage) {
 		if (!text.trim() && !files.length) return;
+		const threadId = id; // the thread it was sent from, even if another opens during the upload
 		let attachments;
 		try {
 			attachments = await Promise.all(files.map((f) => upload(f.file)));
@@ -374,7 +375,7 @@
 			throw e;
 		}
 		// Throwing keeps the text and files in the prompt box so they can be retried.
-		if (!(await act(api.sendMessage({ threadId: id, message: { ...message(text), attachments } })))) throw new Error(error);
+		if (!(await act(api.sendMessage({ threadId, message: { ...message(text), attachments } })))) throw new Error(error);
 		typedAt = 0;
 	}
 
@@ -417,7 +418,7 @@
 								? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
 								: ''}"
 						>
-							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} />
+							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} ondraft={(text) => useAsDraft(id, text)} />
 						</div>
 					{/each}
 

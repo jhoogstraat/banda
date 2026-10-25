@@ -22,6 +22,7 @@
 	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+	import PencilLineIcon from '@lucide/svelte/icons/pencil-line';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
@@ -58,7 +59,8 @@
 		waiting = [],
 		onreveal,
 		onlogin,
-		onshow
+		onshow,
+		ondraft
 	}: {
 		item: Item;
 		threadId: string;
@@ -71,6 +73,8 @@
 		onlogin: () => void;
 		// Opens a tab of the right pane: "diff", or "browser" on a port. Without it (no pane) the chat has no such links.
 		onshow?: (tab: string, port?: number) => void;
+		// Puts text into the owner's composer. Without it (no composer) proposals have no "Use as draft".
+		ondraft?: (text: string) => void;
 	} = $props();
 
 	// The owner's optional note when declining a turn request, behind its note button.
@@ -119,6 +123,9 @@
 
 {#if item.kind === 'message'}
 	{@const name = userName(item.actor)}
+	<!-- On a subscription a teammate's @agent post starts nothing (Anthropic's terms): it proposes a prompt, which only the
+	     owner can put into their own composer to edit and send as theirs. Render-only: on an API key such a post is a request. -->
+	{@const proposal = item.mentionsAgent && thread && !thread.teammateTurns && item.actor !== thread.ownerId && !item.actor.startsWith('agent:')}
 	<div class="flex gap-3">
 		<UserAvatar {name} class="mt-0.5 size-7" />
 		<div class="min-w-0 flex-1 space-y-1">
@@ -128,11 +135,32 @@
 				{:else}
 					<a href="/u/{item.actor}" class="text-sm font-medium hover:underline">{name}</a>
 				{/if}
+				{#if proposal}<span class="text-xs text-muted-foreground">suggests a prompt</span>{/if}
 				<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			</div>
 			{#if item.text}
-				<Message from="user" class="ml-0 max-w-full">
-					<MessageContent class="group-[.is-user]:ml-0"><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+				{@const draftable = proposal && owner && ondraft}
+				<!-- A proposal hasn't gone to the agent yet, so for everyone it reads as a draft: dashed and unfilled. -->
+				{@const pending = 'border border-dashed border-muted-foreground/40 group-[.is-user]:bg-transparent'}
+				<!-- Padding, not margin: the chat clips each item at its box (content-visibility), and the chip hangs below the bubble. -->
+				<Message from="user" class="ml-0 max-w-full {draftable ? 'pb-5' : ''}">
+					<!-- The chip straddles the bubble's bottom border at its right edge, so it belongs to this message; pb-7 keeps the
+					     bubble's last line clear of the 14px it reaches inside. -->
+					<div class="relative w-fit max-w-full">
+						<MessageContent class="group-[.is-user]:ml-0 {proposal ? pending : ''} {draftable ? 'min-w-36 group-[.is-user]:pb-7' : ''}"
+							><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+						{#if draftable}
+							<Button
+								size="xs"
+								variant="outline"
+								class="absolute right-3 -bottom-3.5 h-7 rounded-full px-2.5 shadow-sm before:absolute before:-inset-x-2 before:-inset-y-1.5 dark:border-muted-foreground/30 dark:bg-background dark:hover:bg-muted"
+								title="Put it in your message box to edit and send as yours"
+								onclick={() => ondraft!(item.text)}
+							>
+								<PencilLineIcon /> Use as draft
+							</Button>
+						{/if}
+					</div>
 				</Message>
 			{/if}
 			{#if item.attachments.length}<MessageAttachments attachments={item.attachments} />{/if}

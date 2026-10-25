@@ -83,6 +83,77 @@ test('on a subscription only the owner runs the agent: a teammate’s @agent pos
 	expect(after.diff).toContain('e2e: from bob');
 });
 
+test('on a subscription a teammate’s @agent post is a proposal: only the owner uses it as a draft, edits it and sends it as their own', { tag: '@key' }, async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const [t, other] = [await alice.create(), await alice.create({ prompt: 'e2e: another thread' })];
+	await Promise.all([t.waitForStatus(Status.AWAITING_INPUT), other.waitForStatus(Status.AWAITING_INPUT)]);
+	const proposal = '@agent e2e-echo e2e-noop the login button should also show a spinner while it waits';
+	await t.as(bob).send(proposal, { mentionsAgent: true });
+	const [page, bobPage] = [await alice.page(), await bob.page()];
+	await Promise.all([page.goto(`/t/${t.id}`), bobPage.goto(`/t/${t.id}`)]);
+	const box = page.locator('textarea[name=message]');
+	await expect(page.getByText('suggests a prompt')).toBeVisible();
+	await expect(bobPage.getByText('suggests a prompt')).toBeVisible();
+	await expect(bobPage.getByRole('button', { name: 'Use as draft' })).toHaveCount(0);
+	const info = await t.get();
+	expect([info.status, info.turnRequests]).toEqual([Status.AWAITING_INPUT, 0]);
+
+	// What alice already typed stays; the proposal goes on a new line, focused, for her to edit.
+	await box.fill('e2e: alice first,');
+	// Each thread keeps its own draft across switching threads in the app.
+	await page.locator(`a[href="/t/${other.id}"]`).first().click();
+	await expect(page).toHaveURL(`/t/${other.id}`);
+	await expect(box).toHaveValue('');
+	await page.locator(`a[href="/t/${t.id}"]`).first().click();
+	await expect(box).toHaveValue('e2e: alice first,');
+	await page.getByRole('button', { name: 'Use as draft' }).click();
+	await expect(box).toHaveValue(`e2e: alice first,\n${proposal}`);
+	await expect(box).toBeFocused();
+	await page.keyboard.type(', and e2e: alice’s edit');
+	const sent = await t.turn(() => box.press('Enter'));
+	expect(sent.status).toBe(Status.AWAITING_INPUT);
+	const mine = (await t.events()).filter((e) => e.kind.case === 'message').at(-1)!;
+	expect([mine.actor, (mine.kind.value as { text: string }).text]).toEqual([alice.id, `e2e: alice first,\n${proposal}, and e2e: alice’s edit`]);
+	expect((await t.prompts()).at(-1)).toContain('e2e: alice first,');
+	expect((await t.prompts()).at(-1)).toContain('e2e: alice’s edit');
+	expect(await t.of('turnRequest')).toHaveLength(0);
+	await expect(box).toHaveValue('');
+
+	// The box clears in the thread a message was sent from, even when another is open by the time the send finishes.
+	let release!: () => void;
+	const held = new Promise<void>((r) => (release = r));
+	await page.route('**/banda.v1.ThreadService/SendMessage', async (route) => {
+		await held;
+		await route.continue();
+	});
+	await box.fill('@agent e2e-echo e2e-noop e2e: alice second');
+	await t.turn(async () => {
+		await box.press('Enter');
+		await page.locator(`a[href="/t/${other.id}"]`).first().click();
+		await expect(page).toHaveURL(`/t/${other.id}`);
+		await box.fill('e2e: other draft');
+		const sentNow = page.waitForResponse('**/banda.v1.ThreadService/SendMessage');
+		release();
+		await sentNow;
+	});
+	await page.unrouteAll();
+	await page.locator(`a[href="/t/${t.id}"]`).first().click();
+	await expect(box).toHaveValue('');
+	await page.locator(`a[href="/t/${other.id}"]`).first().click();
+	await expect(box).toHaveValue('e2e: other draft');
+
+	// On an API key the same post is still a turn request, with no draft button.
+	const carol = await as('carol').apiKey();
+	const k = await carol.create();
+	await k.waitForStatus(Status.AWAITING_INPUT);
+	await k.as(bob).send(proposal, { mentionsAgent: true });
+	expect(await k.of('turnRequest')).toHaveLength(1);
+	const carolPage = await carol.page();
+	await carolPage.goto(`/t/${k.id}`);
+	await expect(carolPage.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+	await expect(carolPage.getByRole('button', { name: 'Use as draft' })).toHaveCount(0);
+});
+
 test('switching to a subscription withdraws pending turn requests, saying why, and turns trust off for good', async ({ as }) => {
 	const bob = as('bob');
 	const alice = await as('alice').apiKey();

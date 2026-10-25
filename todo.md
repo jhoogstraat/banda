@@ -33,6 +33,7 @@ Every risk left is the same one: the real thing behaves differently from the fak
   - [x] retries and overload as one calm status line, not a spinner that says nothing (ephemeral `AgentRetrying`, contract);
   - [x] compaction as a line in the chat (a stored notice; `/compact` as a prompt works, contract);
   - [x] the CLI's own slash commands and skills offered in the composer (the `initialize` reply; a repo command and skill run as prompt text, contract).
+- [x] Use as draft: on a subscription a teammate's `@agent` post is a proposal the owner puts into their own composer to edit and send as theirs (docs/research/proposed-prompts.md, variant b). Text only; attachments and review comments later.
 - **Freeze** the forges (no new forge feature until github.com and a GitLab are verified) and workload identity (no new recipe until one has worked against a real vault).
 - **Cut** after the week whatever nobody used. Candidates: the Pull request tab's conversation and merging (the forge's page is one click away), person pages beside the board's columns, and whichever of the five "what needs me" views (Needs input, Decisions, the board's Needs them, the morning brief, notifications) nobody opens.
 

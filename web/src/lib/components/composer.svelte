@@ -1,3 +1,20 @@
+<script lang="ts" module>
+	import { tick } from 'svelte';
+
+	// The composer's text per thread: it survives switching threads, and "Use as draft" fills it.
+	const drafts = $state<Record<string, string>>({});
+	let input: HTMLTextAreaElement | null = null;
+
+	/** Puts a teammate's proposal into the owner's composer, after what they typed, and focuses it: they edit it and send it as their own. */
+	export async function useAsDraft(threadId: string, text: string) {
+		const typed = drafts[threadId]?.trimEnd();
+		drafts[threadId] = typed ? `${typed}\n${text}` : text;
+		await tick();
+		input?.focus();
+		input?.setSelectionRange(input.value.length, input.value.length);
+	}
+</script>
+
 <script lang="ts">
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
@@ -9,7 +26,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
-	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputAttachmentData, PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
@@ -64,12 +81,21 @@
 		return `${why} · retrying ${r.attempt}/${r.maxRetries}`;
 	});
 	// Says what a post does here: the owner's starts a turn in agent mode; in chat mode, and for teammates, only @agent does.
-	// On a subscription only the owner runs the agent (Anthropic's terms): teammates fork to run it on theirs.
+	// On a subscription only the owner runs the agent (Anthropic's terms): teammates propose prompts, which the owner may
+	// use as a draft of their own, and fork for their own work.
+	// The box clears after a successful send, from the thread it was sent from: by then another thread may be open.
+	let files = $state<PromptInputAttachmentData[]>();
+	async function submit(m: PromptInputMessage) {
+		const id = thread?.id ?? '';
+		await send(m);
+		drafts[id] = '';
+		files = [];
+	}
 	const placeholder = $derived(
 		!thread
 			? 'Message…'
 			: !owner && !thread.teammateTurns
-				? `Only ${userName(thread.ownerId)} runs the agent (their Claude subscription). Fork to run it on yours.`
+				? `Only ${userName(thread.ownerId)} runs the agent (their Claude subscription). Suggest a prompt with @agent, and ${userName(thread.ownerId)} decides; for your own task, Fork.`
 				: !owner
 				? `Reply to ${userName(thread.ownerId)} — @agent to ${thread.trusted ? 'ask the agent' : 'request a turn'}`
 				: chatMode
@@ -114,13 +140,18 @@
 	{#if error}<p role="alert" class="mb-2 text-sm text-destructive">{error}</p>{/if}
 	{#if thread}<ThreadBanners {thread} />{/if}
 	<Plan plan={chat.plan} />
-	<PromptInput.Root onSubmit={send} {...attachLimits} onError={(e) => (error = e.message)}>
+	<PromptInput.Root onSubmit={submit} clearOnSubmit={false} bind:attachments={files} {...attachLimits} onError={(e) => (error = e.message)}>
 		<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 			<PromptInput.Attachments class="px-2">
 				{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
 			</PromptInput.Attachments>
 			<PromptInput.Body>
-				<MentionInput {placeholder} commands={owner ? chat.commands : []} />
+				<MentionInput
+					{placeholder}
+					commands={owner ? chat.commands : []}
+					bind:value={() => drafts[thread?.id ?? ''] ?? '', (v) => (drafts[thread?.id ?? ''] = v)}
+					bind:ta={() => input, (r) => (input = r)}
+				/>
 			</PromptInput.Body>
 			<PromptInput.Toolbar>
 				<!-- The chips wrap on a phone, as on the new thread page, so the send button stays in reach. -->

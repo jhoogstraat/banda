@@ -7,10 +7,12 @@
 
 	// `commands` (the owner's, who alone talks to the agent): a "/" at the start offers them; the choice is sent as text.
 	type Option = { id?: string; name: string; slash?: SlashCommand };
-	let { placeholder, commands = [] }: { placeholder?: string; commands?: SlashCommand[] } = $props();
-
-	let value = $state('');
-	let ta = $state<HTMLTextAreaElement | null>(null);
+	let {
+		placeholder,
+		commands = [],
+		value = $bindable(''),
+		ta = $bindable(null)
+	}: { placeholder?: string; commands?: SlashCommand[]; value?: string; ta?: HTMLTextAreaElement | null } = $props();
 	let query = $state<string>(); // text after the "@" before the caret (names may contain spaces); undefined when closed
 	let slash = $state<string>(); // text after a leading "/" before the caret; undefined when closed
 	let sel = $state(0);

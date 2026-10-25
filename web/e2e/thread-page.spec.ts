@@ -473,12 +473,12 @@ test('the header keeps the title in view, on a phone too; the rest is in a label
 	await expect(trust).toHaveAttribute('aria-checked', 'true');
 });
 
-test('on a subscription the teammate’s composer says only the owner runs the agent and points to Fork; the owner’s menu has no trust switch', async ({ as }) => {
+test('on a subscription the teammate’s composer says only the owner runs the agent, that @agent suggests a prompt, and points to Fork; the owner’s menu has no trust switch', async ({ as }) => {
 	const [alice, bob] = [as('alice'), as('bob')];
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
-	await expect(bobPage.getByPlaceholder(`Only ${alice.id} runs the agent (their Claude subscription). Fork to run it on yours.`)).toBeVisible();
+	await expect(bobPage.getByPlaceholder(`Only ${alice.id} runs the agent (their Claude subscription). Suggest a prompt with @agent, and ${alice.id} decides; for your own task, Fork.`)).toBeVisible();
 	await page.getByRole('button', { name: 'More actions' }).click();
 	await expect(page.getByRole('menuitem', { name: /^Switch to chat mode/ })).toBeVisible();
 	await expect(page.getByRole('menuitemcheckbox', { name: /^Teammates can run the agent/ })).toHaveCount(0);
