@@ -111,6 +111,8 @@ Inference: Banda's runner drives `claude -p --input-format stream-json`. The sup
 
 > "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else or make your Account available to anyone else. You are responsible for all activity occurring under your Account and agree to notify us immediately if you become aware of any unauthorized access to your Account by sending an email to support@anthropic.com."
 
+Note (2026-10-25, [proposed-prompts.md](proposed-prompts.md#re-check-of-claude-termsmds-quotes)): anthropic.com serves the Consumer Terms by country (`x-middleware-rewrite: /legal/consumer-terms/DE`). The quote above is the EEA version (Anthropic Ireland, [/legal/consumer-terms/DE](https://www.anthropic.com/legal/consumer-terms/DE)). The US version ([/legal/consumer-terms/US](https://www.anthropic.com/legal/consumer-terms/US), Anthropic, PBC; same effective date) words the same rule as two sentences: "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else. You also may not make your Account available to anyone else." The EEA version also has, in §11, "**Non-commercial use only.** You agree that you will not use our Services for any commercial or business purposes", which the US version lacks. It rules out work use of Pro/Max in the EEA under the strict reading (Decision, 2026-10-25). The other Consumer Terms quotes here are the same in both versions.
+
 Same, §3:
 
 > "You are responsible for all activity under the account through which you access the Services."
@@ -237,6 +239,7 @@ No message goes to Anthropic. Banda complies with the text as written, and takes
 | Point | Strict reading | How Banda meets it |
 |---|---|---|
 | Hosting (1a) | Whoever runs Banda has agreed to Anthropic's Commercial Terms | A prerequisite on the install page (docs/deployment.md) and in the README; Banda can't check it |
+| Work use of Pro/Max in the EEA (added 2026-10-25) | The EEA Consumer Terms, §11: "you will not use our Services for any commercial or business purposes" | Banda is a work tool, so in the EEA and Switzerland each person runs Claude Code on a Team or Enterprise seat or an API key, not Pro/Max: a prerequisite on the install page and in the README; Banda can't check it |
 | Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription | Teammate turns and trust only when the owner runs Claude Code on an API key (PLAN.md, Teammate turns) |
 | The login code (1c) | Banda never collects, stores or reads a Claude credential, and sign-in completes in Anthropic's flow | The user runs the binary's own `claude auth login` and signs in on claude.ai in their own browser. The code they paste passes through the terminal stream as through an SSH session, which Anthropic's docs describe for containers; Banda neither logs nor stores it, and learns the login state from `claude auth status`, not the credentials file |
 | Offering login (3) | No Claude login form of Banda's own | Banda's buttons open a terminal running the binary's login, named as Claude Code's |

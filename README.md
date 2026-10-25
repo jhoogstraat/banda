@@ -41,7 +41,7 @@ The first `up` creates the cluster and builds the sandbox image, which takes sev
 
 ## Deploy it for your team
 
-Banda needs a Kubernetes cluster whose CNI enforces NetworkPolicy, the [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller and an OIDC provider, and whoever runs it agrees to Anthropic's Commercial Terms, which running Claude Code in hosted sandboxes requires. Each release publishes multi-arch images and a Helm chart to GHCR.
+Banda needs a Kubernetes cluster whose CNI enforces NetworkPolicy, the [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller and an OIDC provider, and whoever runs it agrees to Anthropic's Commercial Terms, which running Claude Code in hosted sandboxes requires; in the EEA and Switzerland, people log in with Team or Enterprise seats or API keys, not Pro or Max. Each release publishes multi-arch images and a Helm chart to GHCR.
 
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
