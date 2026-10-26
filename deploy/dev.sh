@@ -140,8 +140,7 @@ spec:
   egress: [{to: [{podSelector: {matchLabels: {run: e2e-git}}}], ports: [{port: 9418}]}]
 EOF
 	local p pp op opp dp
-	read -r p pp op opp dp < <(node -e 'const n = require("net"); Promise.all([1, 2, 3, 4, 5].map(() => new Promise((r) => { const s = n.createServer().listen(0, () => r(s)); })))
-		.then((ss) => { console.log(ss.map((s) => s.address().port).join(" ")); ss.forEach((s) => s.close()); })')
+	read -r p pp op opp dp < <(node web/e2e/ports.ts 5)
 	# The chart's sandbox policies and Dex, which the OIDC API serves at /dex as it would in a cluster.
 	helm template banda deploy/helm/banda -n "$ns" -f deploy/kustomize/kind/values.yaml --set api.enabled=false,postgres.enabled=false \
 		--set dex.nodePort=null,publicUrl=http://localhost:$op | kc -n "$ns" apply -f - >/dev/null

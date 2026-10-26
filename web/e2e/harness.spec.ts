@@ -1,7 +1,8 @@
 // The harness's own capabilities (deploy/fake-claude directives, fixture repos, test APIs), so a
 // broken capability fails here instead of in a scenario built on it.
 import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { expect, kube, mcpDirective, repo, Status, test } from './fixtures.ts';
+import { createServer, type AddressInfo, type Server } from 'node:net';
+import { expect, freePort, kube, mcpDirective, repo, Status, test } from './fixtures.ts';
 
 const said = (text: string) => (e: { kind: { case?: string; value?: unknown } }) =>
 	e.kind.case === 'agentText' && (e.kind.value as { text: string }).text === text;
@@ -71,6 +72,23 @@ test('a test’s own API restarts mid-test; the runner reconnects to it', async 
 	await api.restart();
 	await t.turn(() => t.send('after the restart'), 180_000);
 	expect(await t.reply()).toContain('Created hello2.txt');
+});
+
+// Before, listen(0) on :: could pick a port another process held on 127.0.0.1 (an editor's WebSocket server):
+// the test's API bound it anyway and its calls failed with HTTP 426 from that server.
+test('a free port is free where localhost reaches: never one another server holds on 127.0.0.1', async () => {
+	const held = await Promise.all(
+		Array.from({ length: 2000 }, () => new Promise<Server>((r) => { const s = createServer().listen(0, '127.0.0.1', () => r(s)); }))
+	);
+	const ports = new Set(held.map((s) => (s.address() as AddressInfo).port));
+	const hits: number[] = [];
+	// More picks than macOS's ephemeral range has ports, so they wrap around past the held ones.
+	for (let i = 0; i < 17_000; i++) {
+		const p = await freePort();
+		if (ports.has(p)) hits.push(p);
+	}
+	held.forEach((s) => s.close());
+	expect(hits).toEqual([]);
 });
 
 test('with its own database, a test’s API suspends idle threads within seconds', async ({ as, startApi }) => {

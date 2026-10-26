@@ -10,7 +10,6 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { openSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import {
 	AuthMethod,
 	CreateThreadRequestSchema,
@@ -23,9 +22,11 @@ import {
 	type Event,
 	type Thread as ThreadInfo
 } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { freePort } from './ports.ts';
 
 export { expect };
 export { Status };
+export { freePort };
 export const API = env('E2E_API');
 export const OIDC_API = env('E2E_OIDC_API');
 export const NAMESPACE = env('E2E_NAMESPACE');
@@ -416,14 +417,6 @@ export const png = Buffer.from(
 	'base64'
 );
 
-export const freePort = () =>
-	new Promise<number>((resolve) => {
-		const s = createServer().listen(0, () => {
-			const { port } = s.address() as { port: number };
-			s.close(() => resolve(port));
-		});
-	});
-
 /**
  * An API process of a test's own (see startApi), on the run's namespace, with extra env, e.g. { IDLE_SUSPEND_AFTER: '5s' }.
  * Stop and start it mid-test; the run's shared API serves the other tests and is never restarted.
@@ -459,7 +452,8 @@ export class Api {
 		});
 		const exited = new Promise((r) => this.proc!.once('exit', r));
 		await until(
-			() => Promise.race([fetch(this.url).then(() => true), exited.then(() => Promise.reject(new Error('exited')))]),
+			// A path only the API answers OK: not whatever else holds the port on localhost (see ports.ts).
+			() => Promise.race([fetch(`${this.url}/.well-known/openid-configuration`).then((r) => r.ok), exited.then(() => Promise.reject(new Error('exited')))]),
 			async () => `the API on ${this.url} did not start:\n${(await readFile(this.log, 'utf8')).slice(-2000)}`,
 			30_000
 		);
