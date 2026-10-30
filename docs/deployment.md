@@ -199,7 +199,7 @@ rm "$FROM.pem"
 kubectl -n $NS rollout restart deployment/banda-api   # publishes the new key at once
 ```
 
-The API reads the Secret only when it starts, so the restart is what publishes the key; without it the new key never signs. Verifiers that copied the keys (`jwt_validation_pubkeys` in OpenBao/Vault) need the new one before `$FROM`: Settings shows them. From `$FROM` on the new key signs. Keep the old key for at least 20 minutes after `$FROM`: its last tokens live 15 minutes, and verifiers may cache the key set for 5. Then remove it and restart the API again:
+The API reads the Secret only when it starts, so the restart is what publishes the key; without it the new key never signs. Each restart also restarts running threads' runners, which reconnect by themselves; tokens stay in the pods meanwhile. Verifiers that copied the keys (`jwt_validation_pubkeys` in OpenBao/Vault) need the new one before `$FROM`, or they refuse its tokens: Settings shows both, so run its step again. Verifiers that use discovery or `jwks_url` need nothing. From `$FROM` on the new key signs. Keep the old key for at least 20 minutes after `$FROM`: its last tokens live 15 minutes, and verifiers may cache the key set for 5. Then remove it, restart the API again, and run Settings' step once more for verifiers that copied the keys, so they stop trusting the old one:
 
 ```sh
 kubectl -n $NS patch secret banda-identity --type json -p '[{"op":"remove","path":"/data/<old>.pem"}]'

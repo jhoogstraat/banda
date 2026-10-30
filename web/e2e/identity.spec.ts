@@ -3,6 +3,7 @@
 import { createClient } from '@connectrpc/connect';
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { LoginAction, RunnerService } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { recipes } from '../src/lib/identity-recipes.ts';
 import { expect, kexec, kube, OIDC_API, sql, Status, test, until, userHash, type Api, type User } from './fixtures.ts';
 
 const dir = '/run/banda/id-tokens';
@@ -159,6 +160,26 @@ test('an http issuer is flagged, and without audiences Settings says it is off a
 	await expect(section.getByRole('button', { name: 'sts.amazonaws.com' })).toBeVisible();
 	await expect(section.getByRole('tab')).toHaveCount(0); // no recipes without an audience to fill in
 	await shots(as('alice'), 'off');
+});
+
+test('the recipes hold on a plain http origin: the vault keys are shown, and Settings takes their team secrets', async ({ as, startApi }) => {
+	const api = await startApi({ PUBLIC_URL: 'http://banda.lan:8080' });
+	const alice = await signedIn(as('alice', api), api);
+	await alice.settings.addIdTokenAudience({ audience: 'vault' });
+	const page = await alice.page();
+	await page.addInitScript(() => Object.defineProperty(crypto, 'subtle', { value: undefined })); // as on http://<lan address>
+	await page.goto('/settings#workload-identity');
+	const section = page.getByRole('region', { name: 'Workload identity' });
+	await section.getByRole('button', { name: /^Recipes/ }).click();
+	await expect(section.getByRole('tabpanel', { name: 'OpenBao / Vault' })).toContainText('jwt_validation_pubkeys=@banda-1.pem');
+
+	const notes = recipes({ issuer: 'https://b.example', audience: 'vault', path: '/p', repo: '', email: 'a@b.c', pems: [] }).flatMap((r) => r.steps.map((s) => s.note ?? ''));
+	const names = [...new Set(notes.flatMap((n) => [...n.matchAll(/team secret ([A-Z_]+)/g)].map((m) => m[1])))];
+	expect(names).toContain('KUBECONFIG_YAML');
+	for (const name of names) {
+		await alice.settings.setTeamSecret({ name, value: 'x' });
+		await alice.settings.deleteTeamSecret({ name });
+	}
 });
 
 test('the login environment gets no identity tokens', async ({ as, startApi }) => {

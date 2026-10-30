@@ -1,6 +1,7 @@
 // Run: node src/lib/identity-recipes.check.ts
 import { execFileSync } from 'node:child_process';
-import { marked, recipes, sh } from './identity-recipes.ts';
+import { generateKeyPairSync } from 'node:crypto';
+import { jwksToPem, marked, recipes, sh } from './identity-recipes.ts';
 
 const ok = (cond: boolean, msg: string) => {
 	if (!cond) throw new Error(msg);
@@ -55,6 +56,13 @@ for (const st of recipes(evil).flatMap((r) => r.steps.filter((s) => s.lang === '
 		}
 	}
 }
+for (const bits of [2048, 3072]) {
+	const { publicKey } = generateKeyPairSync('rsa', { modulusLength: bits });
+	const want = publicKey.export({ type: 'spki', format: 'pem' }).toString().trim();
+	ok(jwksToPem({ keys: [publicKey.export({ format: 'jwk' }) as { n: string; e: string }] })[0] === want, `a ${bits} bit key as the PEM OpenSSL writes`);
+}
+ok(!all(filled).includes('jq '), 'an admin needs no jq: the official images have none');
+for (const [, name] of all(filled).matchAll(/"\$([A-Z_][A-Z0-9_]*)"/g)) ok(!/^(ANTHROPIC_|CLAUDE_|BANDA_)/.test(name), `${name}: Settings refuses reserved names`);
 const runs = marked('jwt=@/run/banda/id-tokens/vault vault', [v.path, v.audience, '']);
 ok(JSON.stringify(runs.map((r) => [r.text, r.filled])) === JSON.stringify([['jwt=@', false], [v.path, true], [' ', false], ['vault', true]]), 'the longest value marks first');
 console.log('identity-recipes ok');

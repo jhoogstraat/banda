@@ -35,10 +35,10 @@ export function recipes(v: Values): Recipe[] {
 	const http = v.issuer.startsWith('http://') && v.pems.length > 0;
 	const discovery: Step = {
 		title: http ? 'Or trust its discovery URL: not over plain http' : 'Trust Banda',
-		...(http && {
-			optional: true,
-			note: 'Over plain http anyone on the network path can hand the vault their own keys and sign in as anyone. Use this only once PUBLIC_URL is https.'
-		}),
+		...(http && { optional: true }),
+		note: http
+			? 'Over plain http anyone on the network path can hand the vault their own keys and sign in as anyone. Use this only once PUBLIC_URL is https.'
+			: 'A certificate from a private CA: add oidc_discovery_ca_pem=@ca.pem, or the vault refuses it.',
 		lang: 'sh',
 		code: `bao auth enable jwt\nbao write auth/jwt/config \\\n    oidc_discovery_url=${sh(v.issuer)} \\\n    bound_issuer=${sh(v.issuer)}`
 	};
@@ -79,12 +79,13 @@ export function recipes(v: Values): Recipe[] {
 				},
 				{
 					title: 'A policy: each person’s own secrets, and the team’s',
+					note: 'For a KV v2 engine at secret/. Dev servers have one; otherwise: bao secrets enable -path=secret kv-v2',
 					lang: 'sh',
-					code: `ACCESSOR=$(bao auth list -format=json | jq -r '."jwt/".accessor')\nbao policy write banda - <<EOF\npath "secret/data/users/{{identity.entity.aliases.$ACCESSOR.name}}/*" {\n  capabilities = ["read"]\n}\npath "secret/data/team/*" {\n  capabilities = ["read"]\n}\nEOF`
+					code: `ACCESSOR=$(bao read -field=accessor sys/auth/jwt)\nbao policy write banda - <<EOF\npath "secret/data/users/{{identity.entity.aliases.$ACCESSOR.name}}/*" {\n  capabilities = ["read"]\n}\npath "secret/data/team/*" {\n  capabilities = ["read"]\n}\nEOF`
 				},
 				{
 					title: 'Sign in from a thread',
-					note: 'Set BAO_ADDR as a team secret; the agent can then fetch what it needs.',
+					note: 'Thread images have no bao: put mise use -g openbao in .banda/setup.sh (vault: mise use -g vault). Set BAO_ADDR as a team secret; a vault on a private address also needs SANDBOX_EGRESS_ALLOW (docs/configuration.md). The agent can then fetch what it needs.',
 					lang: 'sh',
 					code: `export BAO_TOKEN=$(bao write -field=token auth/jwt/login role=banda jwt=@${sh(v.path)})\nbao kv get ${sh(`secret/users/${v.email}/db`)}`
 				}
@@ -98,12 +99,12 @@ export function recipes(v: Values): Recipe[] {
 				{
 					title: 'OIDC Auth settings',
 					lang: 'text',
-					code: `OIDC Discovery URL  ${v.issuer}\nIssuer              ${v.issuer}\nSubject             ${sub}\nAudiences           ${v.audience}${v.repo ? `\nClaims              repo = ${v.repo}` : ''}`,
-					note: 'The subject is yours; one identity per person keeps everyone to their own projects.'
+					code: `OIDC Discovery URL  ${v.issuer}\nIssuer              ${v.issuer}\nSubject             ${sub}\nAudiences           ${v.audience}${v.repo ? `\nClaims              repo = ${v.repo}` : ''}\nAccess Token TTL    900\nAccess Token Max TTL  900`,
+					note: 'The subject is yours; one identity per person keeps everyone to their own projects. The default TTL is 30 days: keep it this short, as what the token buys should not outlive it. A certificate from a private CA goes in CA Certificate.'
 				},
 				{
 					title: 'Sign in from a thread',
-					note: 'Set INFISICAL_IDENTITY_ID as a personal secret and INFISICAL_PROJECT_ID as a team secret.',
+					note: 'Thread images have no infisical: put mise use -g infisical in .banda/setup.sh. Set INFISICAL_IDENTITY_ID as a personal secret and INFISICAL_PROJECT_ID as a team secret; for a self-hosted Infisical, INFISICAL_API_URL (https://<host>/api) too, and SANDBOX_EGRESS_ALLOW if it is on a private address.',
 					lang: 'sh',
 					code: `export INFISICAL_TOKEN=$(infisical login --method=oidc-auth \\\n    --machine-identity-id="$INFISICAL_IDENTITY_ID" --jwt="$(cat ${sh(v.path)})" --silent --plain)\ninfisical run --projectId="$INFISICAL_PROJECT_ID" -- npm test`
 				}
@@ -189,6 +190,7 @@ export function recipes(v: Values): Recipe[] {
 			steps: [
 				{
 					title: 'Authentication config (--authentication-config)',
+					note: `${v.issuer.startsWith('http://') ? 'Kubernetes refuses a plain http issuer: this needs PUBLIC_URL on https. ' : ''}The API server must reach the issuer. A certificate from a private CA goes in issuer.certificateAuthority, as PEM.`,
 					lang: 'yaml',
 					code: `apiVersion: apiserver.config.k8s.io/v1beta1\nkind: AuthenticationConfiguration\njwt:\n  - issuer:\n      url: ${JSON.stringify(v.issuer)}\n      audiences: [${JSON.stringify(v.audience)}]\n    claimMappings:\n      username:\n        claim: email\n        prefix: "banda:"\n    claimValidationRules:\n      - expression: "claims.email_verified == true"\n        message: the email must be verified${v.repo ? `\n      - expression: ${JSON.stringify(`claims.repo == '${v.repo}'`)}\n        message: ${JSON.stringify(`only threads on ${v.repo}`)}` : ''}`
 				},
@@ -199,15 +201,15 @@ export function recipes(v: Values): Recipe[] {
 				},
 				{
 					title: 'A kubeconfig that reads the token',
-					note: `It holds no secret, but keep it out of the repository: save its content as the team secret BANDA_KUBECONFIG, and set KUBECONFIG to ${conf}/kubeconfig as a team secret.`,
+					note: `It holds no secret, but keep it out of the repository: save its content as the team secret KUBECONFIG_YAML, and set KUBECONFIG to ${conf}/kubeconfig as a team secret.`,
 					lang: 'sh',
 					code: `SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')\nCA=$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')\ncat <<EOF\napiVersion: v1\nkind: Config\nclusters:\n  - name: cluster\n    cluster: {server: $SERVER, certificate-authority-data: $CA}\nusers:\n  - name: banda\n    user: {tokenFile: ${JSON.stringify(v.path)}}\ncontexts:\n  - name: banda\n    context: {cluster: cluster, user: banda}\ncurrent-context: banda\nEOF`
 				},
 				{
 					title: 'Write it in each thread, in .banda/setup.sh',
-					note: 'The script runs once per thread before the agent starts (and again when it changes); it holds no secret either.',
+					note: 'The script runs once per thread before the agent starts (and again when it changes); it holds no secret either. Thread images have no kubectl, so it installs one. An API server on a private address also needs SANDBOX_EGRESS_ALLOW (docs/configuration.md).',
 					lang: 'sh',
-					code: `mkdir -p ${conf}\nprintf '%s' "$BANDA_KUBECONFIG" > ${conf}/kubeconfig`
+					code: `mkdir -p ${conf}\nprintf '%s' "$KUBECONFIG_YAML" > ${conf}/kubeconfig\nmise use -g kubectl`
 				}
 			]
 		}
@@ -225,13 +227,29 @@ export function marked(code: string, values: string[]): { text: string; filled: 
 		.map((text) => ({ text, filled: vs.includes(text) }));
 }
 
-/** The JWKS's keys as PEM public keys (SPKI), through WebCrypto. */
-export async function jwksToPem(jwks: { keys: JsonWebKey[] }): Promise<string[]> {
-	return Promise.all(
-		jwks.keys.map(async (k) => {
-			const key = await crypto.subtle.importKey('jwk', { kty: k.kty, n: k.n, e: k.e }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, ['verify']);
-			const der = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.exportKey('spki', key))));
-			return `-----BEGIN PUBLIC KEY-----\n${der.match(/.{1,64}/g)!.join('\n')}\n-----END PUBLIC KEY-----`;
-		})
-	);
+/** A DER value: tag, length, body. */
+const der = (tag: number, body: number[]) => {
+	const n = body.length;
+	return [tag, ...(n < 128 ? [n] : n < 256 ? [0x81, n] : [0x82, n >> 8, n & 255]), ...body];
+};
+
+/** A base64url big-endian number as a DER INTEGER, which is signed: a high first bit takes a leading zero. */
+const derInt = (b64url: string) => {
+	const b = Array.from(atob(b64url.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+	return der(2, b[0] & 0x80 ? [0, ...b] : b);
+};
+
+/** AlgorithmIdentifier: rsaEncryption, no parameters. */
+const rsaEncryption = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00];
+
+/**
+ * The JWKS's keys as PEM public keys (SPKI). By hand, not WebCrypto: browsers have no crypto.subtle on a plain
+ * http origin, where the vault needs these keys most.
+ */
+export function jwksToPem(jwks: { keys: { n: string; e: string }[] }): string[] {
+	return jwks.keys.map((k) => {
+		const spki = der(0x30, [...rsaEncryption, ...der(3, [0, ...der(0x30, [...derInt(k.n), ...derInt(k.e)])])]);
+		const b64 = btoa(String.fromCharCode(...spki));
+		return `-----BEGIN PUBLIC KEY-----\n${b64.match(/.{1,64}/g)!.join('\n')}\n-----END PUBLIC KEY-----`;
+	});
 }
