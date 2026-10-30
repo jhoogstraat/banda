@@ -54,7 +54,7 @@ run = "buf generate"
 description = "Create the kind cluster with agent-sandbox, Postgres and Dex"
 run = """
 kind get clusters | grep -qx banda || kind create cluster --config deploy/kind.yaml
-kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+kubectl --context kind-banda apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.8/sandbox.yaml
 # Each volume takes a helper pod; 4 workers (the default) can't keep up with parallel e2e runs. Nor can
 # the provisioner's 5 requests a second (it polls each helper pod): a thread's volumes took 25 s, not 3.
 for f in --worker-threads=16 --kube-client-qps=50 --kube-client-burst=100; do

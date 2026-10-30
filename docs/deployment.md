@@ -18,7 +18,7 @@ From an empty cluster to a signed-in team. You need:
 1. The [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller, which is cluster-wide and not part of the chart:
 
    ```sh
-   kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.7/sandbox.yaml
+   kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.8/sandbox.yaml
    ```
 
 2. A values file, `banda.values.yaml` (every value: [values.yaml](../deploy/helm/banda/values.yaml); the API's settings: [configuration.md](configuration.md), through `api.env`):
@@ -81,7 +81,7 @@ The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` t
 | `banda-api` (Go, serves the SPA with `WEB_DIR`) | The chart; in dev `mise run api` on the Mac instead | Creates `Sandbox` CRs, PVCs, Secrets and NetworkPolicies through the Kubernetes API. One replica (in-memory fan-out), `strategy: Recreate`. |
 | Postgres | The chart (`postgres.enabled`, default), or your own database through `DATABASE_URL` | The API connects as `banda_api`, not a superuser; nightly dumps to a volume. See "Postgres" below. |
 | OIDC provider | Your provider (`oidc.*`), or the chart's Dex (`dex.enabled`) with static users for demos and dev | |
-| agent-sandbox controller | Upstream `sandbox.yaml` v1.0.7, applied once by hand | A third-party operator Banda depends on; not in the chart. |
+| agent-sandbox controller | Upstream `sandbox.yaml` v1.0.8, applied once by hand | A third-party operator Banda depends on; not in the chart. |
 | Sandbox image | `ghcr.io/<owner>/banda-sandbox`, released for amd64 and arm64; in kind `mise run image` | Must be pullable by every node. |
 | NetworkPolicies | The chart, plus `sandboxes-allow` written by the API | Need a CNI that enforces them. |
 
