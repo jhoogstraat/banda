@@ -78,8 +78,11 @@
 					<NativeSelectOption value="">All projects</NativeSelectOption>
 					{#each new Set([...projects(), ...(f.repo ? [f.repo] : [])]) as url (url)}<NativeSelectOption value={url}>{projectName(url)}</NativeSelectOption>{/each}
 				</NativeSelect>
-				<label class="flex items-center gap-1.5 text-muted-foreground">From <Input type="date" bind:value={f.after} class="h-8 w-auto" /></label>
-				<label class="flex items-center gap-1.5 text-muted-foreground">to <Input type="date" bind:value={f.before} class="h-8 w-auto" /></label>
+				<!-- The range wraps as one. -->
+				<div class="flex items-center gap-1.5 text-muted-foreground">
+					<label class="flex items-center gap-1.5">From <Input type="date" bind:value={f.after} class="h-8 w-auto" /></label>
+					<label class="flex items-center gap-1.5">to <Input type="date" bind:value={f.before} class="h-8 w-auto" /></label>
+				</div>
 			</div>
 
 			{#if error}

@@ -10,7 +10,6 @@
 	import ArrowDown from "@lucide/svelte/icons/arrow-down";
 	import { getStickToBottomContext } from "./stick-to-bottom-context.svelte.js";
 	import { fly } from "svelte/transition";
-	import { backOut } from "svelte/easing";
 
 	let { class: className, onclick, ...restProps }: ConversationScrollButtonProps = $props();
 
@@ -30,16 +29,7 @@
 
 {#if !context.isAtBottom}
 	<div
-		in:fly={{
-			duration: 300,
-			y: 10,
-			easing: backOut,
-		}}
-		out:fly={{
-			duration: 200,
-			y: 10,
-			easing: backOut,
-		}}
+		transition:fly={{ duration: 150, y: 10 }}
 		class="absolute bottom-4 left-[50%] translate-x-[-50%]"
 	>
 		<Button
@@ -48,6 +38,7 @@
 				className
 			)}
 			onclick={handleScrollToBottom}
+			aria-label="Scroll to the latest message"
 			size="icon"
 			type="button"
 			variant="outline"

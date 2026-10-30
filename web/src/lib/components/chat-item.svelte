@@ -86,8 +86,13 @@
 	}
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	const lineageVerb = { [Status.STARTING]: 'was spawned', [Status.AWAITING_INPUT]: 'finished', [Status.ERRORED]: 'failed' } as Partial<Record<Status, string>>;
-	const clock = (t?: Timestamp) =>
-		t ? timestampDate(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+	// The time, with the day once it isn't today.
+	function clock(t?: Timestamp) {
+		if (!t) return '';
+		const d = timestampDate(t);
+		const today = d.toDateString() === new Date().toDateString();
+		return d.toLocaleString([], { ...(today ? {} : { month: 'short', day: 'numeric' }), hour: 'numeric', minute: '2-digit' });
+	}
 </script>
 
 {#snippet reviewCards(review: Comment[])}
@@ -109,9 +114,9 @@
 
 {#snippet divider(text: string, tone = 'text-muted-foreground', link?: [string, () => void])}
 	<div class="flex items-center gap-3 text-xs {tone}">
-		<div class="h-px flex-1 bg-border"></div>
-		<span>{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={link[1]}>{link[0]}</button>{/if}</span>
-		<div class="h-px flex-1 bg-border"></div>
+		<div class="h-px min-w-4 flex-1 bg-border"></div>
+		<span class="text-center">{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={link[1]}>{link[0]}</button>{/if}</span>
+		<div class="h-px min-w-4 flex-1 bg-border"></div>
 	</div>
 {/snippet}
 
@@ -271,7 +276,7 @@
 {:else if item.kind === 'overlap'}
 	{@const o = item.overlap}
 	<a href="/t/{o.threadId}" class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
-		<GitMergeConflictIcon class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+		<GitMergeConflictIcon class="size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
 		<span class="truncate">Now overlaps with <span class="font-medium text-foreground">{o.title || 'Untitled thread'}</span> by {userName(o.ownerId)}: <span class="font-mono">{o.paths.join(', ')}</span></span>
 	</a>
 {:else if item.kind === 'pullRequest'}
@@ -310,9 +315,7 @@
 			<Tool class="group/tool mb-0 border-0" open={failed}>
 				<CollapsibleTrigger
 					disabled={!step.output}
-					class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {step.state === SetupState.SKIPPED
-						? 'text-muted-foreground'
-						: ''}"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {failed ? '' : 'text-muted-foreground'}"
 				>
 					{#if step.state === SetupState.DONE}
 						<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
@@ -355,7 +358,7 @@
 		</div>
 	{/if}
 {:else if item.kind === 'push'}
-	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
+	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}
 {:else if item.kind === 'mode'}
 	{@const name = userName(item.actor)}
 	{#if item.reason}

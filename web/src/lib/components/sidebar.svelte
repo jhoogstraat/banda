@@ -60,6 +60,7 @@
 	{@const wait = waiting(t)}
 	<a
 		href={race ? `/compare?race=${race.race}` : `/t/${t.id}`}
+			title={race ? raceTitle(t) : t.title || undefined}
 		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {!race && page.params.id === t.id
 			? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
 			: ''}"
@@ -111,7 +112,7 @@
 	{@const n = list.reduce((n, f) => n + size(f), 0)}
 	{#if text === 'Needs input' && threads.loginNeeded}
 		<section class="space-y-0.5" aria-label={text}>
-			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, n + 1)}</h2>
+			<h2 class="flex items-center px-2 py-1 text-xs font-medium text-muted-foreground">{@render title(text, n + 1)}</h2>
 			<a href="/settings" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-sidebar-accent/50">
 				<KeyRoundIcon class="size-3.5 text-amber-500" /> Log in to Claude
 			</a>
@@ -119,7 +120,7 @@
 		</section>
 	{:else if list.length && fold}
 		<details class="group space-y-0.5" aria-label={text}>
-			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+			<summary class="flex cursor-pointer list-none items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground">
 				<ChevronRightIcon class="size-3 transition-transform group-open:rotate-90" />
 				{@render title(text, n)}
 			</summary>
@@ -127,7 +128,7 @@
 		</details>
 	{:else if list.length}
 		<section class="space-y-0.5" aria-label={text}>
-			<h2 class="flex items-center px-2 py-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{@render title(text, n)}</h2>
+			<h2 class="flex items-center px-2 py-1 text-xs font-medium text-muted-foreground">{@render title(text, n)}</h2>
 			{#each list as f (f.race ?? f.thread.id)}{@render family(f, byline)}{/each}
 		</section>
 	{/if}
@@ -139,7 +140,7 @@
 		<div class="flex items-center gap-1">
 			<InputGroup.Root class="h-8">
 				<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
-				<InputGroup.Input placeholder="Search threads" aria-label="Search threads" bind:value={threads.search} />
+				<InputGroup.Input placeholder="Search" aria-label="Search threads" bind:value={threads.search} />
 			</InputGroup.Root>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>

@@ -7,7 +7,7 @@
 	import AppSidebar from '#lib/components/sidebar.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
-	import { onkeydown } from '#lib/shortcuts.svelte.js';
+	import { onkeydown, ui } from '#lib/shortcuts.svelte.js';
 	import { attention, loadThreads, threads, watchInbox } from '#lib/threads.svelte.js';
 	import type { LayoutProps } from './$types';
 
@@ -36,13 +36,13 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>{count ? `(${count}) ` : ''}Banda</title>
+	<title>{count ? `(${count}) ` : ''}{ui.title ? `${ui.title} · ` : ''}Banda</title>
 </svelte:head>
 
 <svelte:window {onkeydown} />
 
 <!-- The theme is chosen in Settings (System, Light or Dark), per browser; app.html applies it before the app loads. -->
-<ModeWatcher />
+<ModeWatcher themeColors={{ dark: '#0a0a0a', light: '#ffffff' }} />
 
 {#if bare}
 	{@render children()}

@@ -23,8 +23,8 @@ import {
 type Look = { label: string; icon: Component; class: string };
 
 export const pullStates: Record<PullState, Look> = {
-	[PullState.UNSPECIFIED]: { label: 'Open', icon: GitPullRequestIcon, class: 'text-emerald-600 dark:text-emerald-400' },
-	[PullState.OPEN]: { label: 'Open', icon: GitPullRequestIcon, class: 'text-emerald-600 dark:text-emerald-400' },
+	[PullState.UNSPECIFIED]: { label: 'Open', icon: GitPullRequestIcon, class: 'text-emerald-700 dark:text-emerald-400' },
+	[PullState.OPEN]: { label: 'Open', icon: GitPullRequestIcon, class: 'text-emerald-700 dark:text-emerald-400' },
 	[PullState.DRAFT]: { label: 'Draft', icon: GitPullRequestDraftIcon, class: 'text-zinc-500 dark:text-zinc-400' },
 	[PullState.MERGED]: { label: 'Merged', icon: GitMergeIcon, class: 'text-violet-600 dark:text-violet-400' },
 	[PullState.CLOSED]: { label: 'Closed', icon: GitPullRequestClosedIcon, class: 'text-red-600 dark:text-red-400' }
@@ -33,7 +33,7 @@ export const pullStates: Record<PullState, Look> = {
 export const checkStates: Record<ChecksState, Look> = {
 	[ChecksState.UNSPECIFIED]: { label: 'No checks', icon: CircleDashedIcon, class: 'text-muted-foreground' },
 	[ChecksState.PENDING]: { label: 'Running', icon: CircleDotIcon, class: 'text-amber-700 dark:text-amber-500' },
-	[ChecksState.PASSING]: { label: 'Passed', icon: CircleCheckIcon, class: 'text-emerald-600 dark:text-emerald-400' },
+	[ChecksState.PASSING]: { label: 'Passed', icon: CircleCheckIcon, class: 'text-emerald-700 dark:text-emerald-400' },
 	[ChecksState.FAILING]: { label: 'Failed', icon: CircleXIcon, class: 'text-destructive' },
 	[ChecksState.SKIPPED]: { label: 'Skipped', icon: CircleDashedIcon, class: 'text-muted-foreground' }
 };

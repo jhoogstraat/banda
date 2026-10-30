@@ -7,7 +7,7 @@ import { sidebarOrder } from './threads.svelte';
 export type Command = { label: string; icon?: Component; keys?: string; run: () => unknown };
 
 // `commands`: what the current page offers in the palette (the thread page's actions).
-export const ui = $state({ palette: false, help: false, commands: [] as Command[] });
+export const ui = $state({ palette: false, help: false, commands: [] as Command[], title: '' });
 
 export const mod = typeof navigator !== 'undefined' && /Mac|iP/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 

@@ -25,7 +25,7 @@
 
 {#if list.length}
 	<section aria-label={name} class="flex flex-col gap-2">
-		<h3 class="px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+		<h3 class="px-1 text-xs font-medium text-muted-foreground">
 			{name} <span class="tabular-nums">{list.length}</span>
 		</h3>
 		{#each more > 0 ? list.slice(0, max) : list as t (t.id)}{@render card(t)}{/each}
@@ -38,14 +38,9 @@
 {/if}
 
 {#snippet card(t: Thread)}
-	{@const working = t.status === Status.WORKING || t.status === Status.STARTING}
 	<a
 		href="/t/{t.id}"
-		class="block rounded-lg border bg-card p-3 text-sm transition-colors hover:border-foreground/25 {working
-			? 'border-l-2 border-l-sky-400'
-			: ''} {t.status === Status.ERRORED ? 'border-l-2 border-l-red-500' : ''} {t.status === Status.SUSPENDED
-			? 'opacity-60'
-			: ''}"
+		class="block rounded-lg border bg-card p-3 text-sm transition-colors hover:border-foreground/25 {t.status === Status.SUSPENDED ? 'opacity-60' : ''}"
 	>
 		<div class="flex items-center gap-2">
 			<StatusDot status={t.status} waiting={waiting(t)} />
@@ -61,7 +56,7 @@
 			{#if t.pullRequest}<PullRequestChip pr={t.pullRequest} small />{/if}
 			{#if t.overlaps.length}
 				{@const label = `Overlaps with ${t.overlaps.map((o) => o.title || 'Untitled thread').join(', ')}`}
-				<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-600 dark:text-amber-400" aria-label={label} title={label}>
+				<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-700 dark:text-amber-400" aria-label={label} title={label}>
 					<GitMergeConflictIcon class="size-3" />{t.overlaps.length}
 				</span>
 			{/if}

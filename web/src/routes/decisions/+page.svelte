@@ -87,9 +87,11 @@
 	<PageHeader>
 		<h1 class="text-sm font-medium">Decisions</h1>
 		{#if list.length}<span class="text-xs text-muted-foreground tabular-nums">{list.length} pending</span>{/if}
-		<span class="ml-auto hidden pr-2 text-xs text-muted-foreground md:block">
-			<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Y</kbd> allow · <kbd>N</kbd> deny · <kbd>A</kbd> always · <kbd>O</kbd> open
-		</span>
+		{#if list.length}
+			<span class="ml-auto hidden pr-2 text-xs text-muted-foreground md:block">
+				<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Y</kbd> allow · <kbd>N</kbd> deny · <kbd>A</kbd> always · <kbd>O</kbd> open
+			</span>
+		{/if}
 	</PageHeader>
 	<div class="min-h-0 flex-1 overflow-y-auto">
 		<div class="mx-auto max-w-3xl space-y-3 p-3 md:p-4">

@@ -13,7 +13,7 @@
 
 {#if overlaps.length}
 	<section class="shrink-0 border-b text-xs" aria-label="Overlaps">
-		<button class="flex w-full items-center gap-1.5 px-3 py-1.5 text-amber-600 hover:bg-muted/50 dark:text-amber-400" aria-expanded={open} onclick={() => (open = !open)}>
+		<button class="flex w-full items-center gap-1.5 px-3 py-1.5 text-amber-700 hover:bg-muted/50 dark:text-amber-400" aria-expanded={open} onclick={() => (open = !open)}>
 			<GitMergeConflictIcon class="size-3.5 shrink-0" />
 			Overlaps with {overlaps.length} thread{overlaps.length > 1 ? 's' : ''}
 			<span class="truncate text-muted-foreground">· {overlaps.map((o) => o.title || 'Untitled thread').join(', ')}</span>

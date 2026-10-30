@@ -2,13 +2,11 @@
 	import ForgeAction from '#lib/components/forge-action.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import SplitIcon from '@lucide/svelte/icons/split';
-	import { ConversationEmptyState } from '#lib/components/ai-elements/conversation/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
@@ -104,16 +102,14 @@
 <div class="flex min-w-0 flex-1 flex-col">
 	<PageHeader><h1 class="text-sm font-medium">New thread</h1></PageHeader>
 
-	<div class="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-		<ConversationEmptyState
-			title="What should the agent work on?"
-			description={`It works in its own sandbox, ${repoUrl === noRepo ? 'in an empty folder' : 'on its own branch'}. Teammates can follow along and join in.`}
-		>
-			{#snippet icon()}<BotIcon class="size-8" />{/snippet}
-		</ConversationEmptyState>
-	</div>
-
-	<div class="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+	<!-- The question sits on the box that answers it: centered on a desktop, at the thumb on a phone. -->
+	<div class="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col justify-end overflow-y-auto px-4 pb-4 md:justify-center md:pb-[12dvh]">
+		<div class="mb-6 space-y-1 text-center">
+			<h2 class="text-2xl font-semibold tracking-tight">What should the agent work on?</h2>
+			<p class="text-sm text-pretty text-muted-foreground">
+				It works in its own sandbox, {repoUrl === noRepo ? 'in an empty folder' : 'on its own branch'}. Teammates can follow along and join in.
+			</p>
+		</div>
 		{#if connect}
 			<div class="mb-2 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3 text-sm">
 				<PlugIcon class="size-4 shrink-0 text-muted-foreground" />
@@ -140,7 +136,7 @@
 				<PromptInput.Body>
 					<PromptInput.Textarea placeholder="Describe the task. Enter sends, Shift+Enter adds a line." />
 				</PromptInput.Body>
-				<PromptInput.Toolbar>
+				<PromptInput.Toolbar class="items-end">
 					<PromptInput.Tools class="min-w-0 flex-wrap">
 						<AttachButton />
 						<RepoPicker bind:repoUrl bind:baseBranch />

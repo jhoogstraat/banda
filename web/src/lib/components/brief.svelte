@@ -36,10 +36,10 @@
 		{#if !sections.length}
 			<p class="mt-1 text-xs text-muted-foreground">Nothing new.</p>
 		{/if}
-		<div class="mt-2 grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-4">
+		<div class="mt-2 grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-x-6 gap-y-3">
 			{#each sections as [name, list] (name)}
 				<section aria-label={name} class="min-w-0">
-					<h3 class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+					<h3 class="text-xs font-medium text-muted-foreground">
 						{name} <span class="tabular-nums">{list.length}</span>
 					</h3>
 					<ul class="mt-1 space-y-0.5">

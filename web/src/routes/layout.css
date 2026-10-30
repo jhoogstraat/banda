@@ -30,6 +30,7 @@
 	--chart-4: oklch(0.371 0 0);
 	--chart-5: oklch(0.269 0 0);
 	--radius: 0.625rem;
+	color-scheme: light;
 	--sidebar: oklch(0.985 0 0);
 	--sidebar-foreground: oklch(0.145 0 0);
 	--sidebar-primary: oklch(0.205 0 0);
@@ -41,6 +42,7 @@
 }
 
 .dark {
+	color-scheme: dark;
 	--background: oklch(0.145 0 0);
 	--foreground: oklch(0.985 0 0);
 	--card: oklch(0.205 0 0);
@@ -124,7 +126,14 @@
 		@apply bg-background text-foreground;
 	}
 	html {
-		@apply font-sans;
+		@apply font-sans antialiased;
+		/* A long URL or branch wraps instead of leaving its box. */
+		overflow-wrap: break-word;
+	}
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
 	}
 }
 
@@ -134,5 +143,17 @@
 	textarea,
 	select {
 		font-size: 16px;
+	}
+}
+
+/* Spinners stay: they are the only sign that something is running. */
+@media (prefers-reduced-motion: reduce) {
+	*:not(.animate-spin),
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }

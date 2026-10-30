@@ -75,7 +75,7 @@
 	let previewPort = $state<number>();
 	let autoOpened = false;
 	// Events after the replay: the first presence event follows it (the server sends it on joining).
-	let live = false;
+	let live = $state(false);
 	const mobile = new IsMobile();
 	let loginOpen = $state(false);
 	let forkOpen = $state(false);
@@ -315,6 +315,14 @@
 		diffOpen = true;
 	};
 
+	// The tab's title, so several open threads can be told apart. As with the commands below, the next thread may already have set its own.
+	$effect(() => {
+		ui.title = thread?.title ?? '';
+		return () => {
+			if (!page.params.id || page.params.id === id) ui.title = '';
+		};
+	});
+
 	// The palette's "This thread" actions, each only where it applies.
 	$effect(() => {
 		const t = thread;
@@ -458,7 +466,7 @@
 						<div class="flex items-center gap-2 text-sm text-muted-foreground"><PauseIcon class="size-4" /> Environment paused. Sending a message resumes it.</div>
 					{:else if thread?.status === Status.ERRORED}
 						<ThreadError {thread} {owner} {reason} {chat} {retry} onterminal={() => show('terminal')} onrepo={repoFixable ? () => (repoOpen = true) : undefined} />
-					{:else if !chat.items.length}
+					{:else if live && !chat.items.length}
 						<ConversationEmptyState title="No messages yet" description="" />
 					{/if}
 				</div>

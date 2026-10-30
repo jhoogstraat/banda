@@ -88,7 +88,7 @@
 
 	<div class="min-h-0 flex-1 overflow-y-auto">
 		<Brief />
-		<div class="flex flex-col gap-3 p-4 md:snap-x md:flex-row md:items-start md:gap-4 md:overflow-x-auto">
+		<div class="flex flex-col gap-3 p-4 md:snap-x md:scroll-pl-4 md:flex-row md:items-start md:gap-4 md:overflow-x-auto">
 			{#each people.filter((p) => everyone || !p.quiet) as p (p.id)}
 				{@const unfolded = open[p.id] ?? (wide || p.id === me)}
 				<section class="flex shrink-0 flex-col gap-2 md:w-72 md:snap-start">

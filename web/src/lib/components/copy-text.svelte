@@ -10,6 +10,6 @@
 </script>
 
 <Button size="icon-xs" variant="ghost" class={className} aria-label={label} title={label} onclick={() => clipboard.copy(text)}>
-	{#if clipboard.status === 'success'}<CheckIcon class="text-emerald-600 dark:text-emerald-400" />{:else}<CopyIcon />{/if}
+	{#if clipboard.status === 'success'}<CheckIcon class="text-emerald-700 dark:text-emerald-400" />{:else}<CopyIcon />{/if}
 </Button>
 <span class="sr-only" aria-live="polite">{clipboard.status === 'success' ? 'Copied' : clipboard.status === 'failure' ? 'Copying failed' : ''}</span>

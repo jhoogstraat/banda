@@ -136,7 +136,7 @@
 			{:else if thread?.status === Status.WORKING && retrying}
 				<Loader size={12} /><span>{retrying}</span>
 			{:else if thread?.status === Status.WORKING}
-				<Loader size={12} /><span class="animate-pulse">Agent is {chat.streaming ? 'writing' : 'working'}…</span>
+				<Loader size={12} /><span>Agent is {chat.streaming ? 'writing' : 'working'}…</span>
 			{/if}
 			{#if typingText}
 				{#if thread?.status === Status.WORKING}<span>·</span>{/if}
@@ -148,7 +148,7 @@
 			{@const label = chatMode ? 'Chat · @agent to ask' : 'Agent'}
 			<!-- The owner switches the mode here; for everyone else it only says what a post does. -->
 			<button
-				class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 enabled:hover:bg-muted enabled:hover:text-foreground {chatMode ? 'border-sky-500/40 text-sky-600 dark:text-sky-400' : ''}"
+				class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 enabled:hover:bg-muted enabled:hover:text-foreground {chatMode ? 'border-sky-500/40 text-sky-700 dark:text-sky-400' : ''}"
 				disabled={!owner}
 				aria-label={owner ? `${chatMode ? 'Chat mode' : 'Agent mode'}: switch to ${chatMode ? 'agent' : 'chat'} mode` : `${chatMode ? 'Chat mode' : 'Agent mode'}`}
 				title={owner ? `Switch to ${chatMode ? 'agent mode: your posts go to the agent' : 'chat mode: only @agent starts a turn'}` : undefined}
@@ -193,7 +193,7 @@
 					bind:ta={() => input, (r) => (input = r)}
 				/>
 			</PromptInput.Body>
-			<PromptInput.Toolbar>
+			<PromptInput.Toolbar class="items-end">
 				<!-- The chips wrap on a phone, as on the new thread page, so the send button stays in reach. -->
 				<div class="flex min-w-0 flex-wrap items-center gap-1.5 pl-1">
 					<AttachButton />

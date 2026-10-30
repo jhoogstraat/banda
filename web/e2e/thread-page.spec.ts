@@ -367,6 +367,19 @@ test('a thread page whose first loads fail (the thread, who is signed in) shows 
 	expect(failed).toBeGreaterThan(0);
 });
 
+test('a thread’s tab is named after it, and a long unbroken line wraps inside its bubble', async ({ as }) => {
+	const alice = as('alice');
+	const token = '0123456789abcdef'.repeat(30); // a hash or a token: no place to break
+	const t = await alice.create({ prompt: `e2e-noop ${token}` });
+	const page = await open(alice, t);
+	await expect(page).toHaveTitle(`${(await t.get()).title} · Banda`);
+	const bubble = page.locator('.is-user p', { hasText: token }).first();
+	await expect(bubble).toBeVisible();
+	expect(await bubble.evaluate((el) => el.parentElement!.scrollWidth <= el.parentElement!.clientWidth)).toBe(true);
+	await page.goto('/');
+	await expect(page).toHaveTitle('Banda');
+});
+
 test('a thread that doesn’t exist says so, with no composer to post into (B21), no empty thread or pane, and a way home', async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/t/nosuchthread');
