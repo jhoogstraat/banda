@@ -1,16 +1,15 @@
 # Claude terms: hosting, teammate turns, open-sourcing
 
-Researched 2026-10-24 for roadmap milestone 4 ("Terms, then launch") and PLAN.md open question 3. Every quote below was retrieved on 2026-10-24 and is copied word for word. All sources are primary: Anthropic's legal pages, the Claude Code docs on code.claude.com, Anthropic support articles and the `anthropics/claude-code` repo. Wayback Machine snapshots of those pages are used only to date changes. Two kinds of statement are kept apart:
+Researched 2026-10-24. Every quote below was retrieved on 2026-10-24 and is copied word for word. All sources are primary: Anthropic's legal pages, the Claude Code docs on code.claude.com, Anthropic support articles and the `anthropics/claude-code` repo. Wayback Machine snapshots of those pages are used only to date changes. Two kinds of statement are kept apart:
 - **Text:** what a page says, quoted.
 - **Inference:** marked as such. This is how the text reads onto Banda, not a legal conclusion. Only Anthropic can settle these points.
 
 ## TL;DR
 
-- Hosting the unmodified `claude` binary, with each user signing in to their own subscription, is named as allowed in the text. The condition is agreeing to the Commercial Terms, and PLAN.md leaves that out. No text covers keeping that login on a per-user volume on a hosted platform. The closest texts are Anthropic's own devcontainer docs and the authentication docs, which describe exactly that for one engineer's container.
+- Hosting the unmodified `claude` binary, with each user signing in to their own subscription, is named as allowed in the text. The condition is agreeing to the Commercial Terms. No text covers keeping that login on a per-user volume on a hosted platform. The closest texts are Anthropic's own devcontainer docs and the authentication docs, which describe exactly that for one engineer's container.
 - Teammate turns are the weak point. Four texts speak against someone else using an account: "make your Account available to anyone else" (Consumer Terms), "Users can't route their work through another user's account to use that user's remaining usage" (Team seats), "only that person may use it" (Team and Enterprise seats), and, **from 2026-11-12**, a Usage Policy line against "services that route requests through consumer subscriptions". The owner's approval doesn't change whose account the turn runs on.
 - The Agent SDK sentence is about more than the SDK: "does not allow third party developers to offer claude.ai login or rate limits for their products, *including* agents built on the Claude Agent SDK". The legal page then exempts "an end user signing in to the unmodified Claude Code binary with their own Claude subscription, including where a platform hosts Claude Code". On its face Banda falls in that exemption. Two points are open: whether Banda's "log in" screens count as "offering" login, and whether relaying the login code through Banda's terminal stream counts as "intermediating" it.
 - The text explicitly allows API keys, Bedrock, Vertex AI and Foundry for a team's "own authorized users". It also allows Team and Enterprise seats, but those still belong to one person each. Claude Code's self-hosted environments are a Team/Enterprise beta.
-- None of this is new to PLAN.md except the dates and the exact scope. The 2026-11-12 Usage Policy line is new since the last check (2026-10-19), and so is the full Consumer Terms sentence.
 
 ## Summary
 
@@ -61,7 +60,7 @@ Dated with Wayback snapshots of the legal page: the "Can customers offer Claude 
 Inference:
 - The texts name Banda's case: the unmodified binary on a hosted platform, each user on their own subscription, Banda paying for nothing.
 - The condition is the Commercial Terms. The text doesn't say who "you" is when an open-source tool is self-hosted by a team. The likely reading is the team or company that runs it, not Banda's authors. That party would agree to the Commercial Terms even if every user signs in with a Pro or Max plan, which falls under the Consumer Terms.
-- The binary must not be restricted in "any authentication method built into it". Banda takes nothing away from the binary, but it refuses Secrets named `ANTHROPIC_API_KEY` and its like outside API key mode (PLAN.md, Constraint, point 3). That is a choice about Banda's own UI, not a change to the binary. Worth one line in the question anyway.
+- The binary must not be restricted in "any authentication method built into it". Banda takes nothing away from the binary, but it refuses Secrets named `ANTHROPIC_API_KEY` and its like outside API key mode (PLAN.md, Constraint, point 3). That is a choice about Banda's own UI, not a change to the binary.
 
 **The login flow.** Legal and compliance, "Authentication and credential use":
 
@@ -115,7 +114,7 @@ Inference: Banda's runner drives `claude -p --input-format stream-json`. The sup
 
 > "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else or make your Account available to anyone else. You are responsible for all activity occurring under your Account and agree to notify us immediately if you become aware of any unauthorized access to your Account by sending an email to support@anthropic.com."
 
-Note (2026-10-25, [proposed-prompts.md](proposed-prompts.md#re-check-of-claude-termsmds-quotes)): anthropic.com serves the Consumer Terms by country (`x-middleware-rewrite: /legal/consumer-terms/DE`). The quote above is the EEA version (Anthropic Ireland, [/legal/consumer-terms/DE](https://www.anthropic.com/legal/consumer-terms/DE)). The US version ([/legal/consumer-terms/US](https://www.anthropic.com/legal/consumer-terms/US), Anthropic, PBC; same effective date) words the same rule as two sentences: "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else. You also may not make your Account available to anyone else." The EEA version also has, in §11, "**Non-commercial use only.** You agree that you will not use our Services for any commercial or business purposes", which the US version lacks. It rules out work use of Pro/Max in the EEA under the strict reading (Decision, 2026-10-25). The other Consumer Terms quotes here are the same in both versions.
+Note (2026-10-25): anthropic.com serves the Consumer Terms by country (`x-middleware-rewrite: /legal/consumer-terms/DE`). The quote above is the EEA version (Anthropic Ireland, [/legal/consumer-terms/DE](https://www.anthropic.com/legal/consumer-terms/DE)). The US version ([/legal/consumer-terms/US](https://www.anthropic.com/legal/consumer-terms/US), Anthropic, PBC; same effective date) words the same rule as two sentences: "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else. You also may not make your Account available to anyone else." The EEA version also has, in §11, "**Non-commercial use only.** You agree that you will not use our Services for any commercial or business purposes", which the US version lacks. It defines a consumer as someone "acting wholly or mainly outside your trade, business, craft or profession in using our Services". The clause rules out work use of Pro/Max in the EEA under the strict reading (Decision, 2026-10-25). The other Consumer Terms quotes here are the same in both versions.
 
 Same, §3:
 
@@ -221,20 +220,6 @@ Legal and compliance:
 Inference: only the team-key row makes teammate turns plainly allowed by the text, and it is the one that departs from principle 1.
 
 ---
-
-## Where PLAN.md's "Constraint: Claude subscriptions" doesn't match the text
-
-1. **The Commercial Terms condition is missing.** PLAN.md: "Hosting Claude Code in sandboxes is allowed if the binary is unmodified and each end user authenticates with their own credentials." The text adds that it "requires agreeing to our Commercial Terms of Service", "unless we've mutually agreed otherwise".
-2. **The API key rule is broader than the SDK.** PLAN.md: "Products built on the Agent SDK must use API keys." The text: "Developers building products or services that interact with Claude's capabilities, including those using the Agent SDK, should use API key authentication". The SDK page's ban on offering claude.ai login is for "their products, including agents built on the Claude Agent SDK". Banda is outside it only through the hosted-binary exemption, not because it doesn't use the SDK.
-3. **The exemption is quoted without its condition.** PLAN.md stops at "…including where a platform hosts Claude Code". The text goes on: "as described under *Can customers offer Claude Code in their products?* above", which brings in the Commercial Terms and the conditions of point 1.
-4. **"Ordinary, individual usage" is weaker than the texts that matter.** PLAN.md point 5: "the terms assume 'ordinary, individual usage' by the subscriber". That sentence is about how "advertised usage limits" are sized. The texts that speak to teammate turns are elsewhere and stronger, and PLAN.md doesn't cite them: the full Consumer Terms sentence ("or make your Account available to anyone else"), the Team seat rule ("Users can't route their work through another user's account to use that user's remaining usage") and the Usage Policy line in force from 2026-11-12.
-5. **"Banda's code never sees a token"** (point 2). It is true for tokens. But the login code the user pastes travels through Banda's API and runner stream to the PTY. Whether that code is a "credential" under "may not … intermediate" is open (Q1).
-6. **Team/Enterprise users fall under the Commercial Terms, Pro/Max under the Consumer Terms.** PLAN.md cites only the legal page and treats subscriptions as one case. The Team and Enterprise seat rules are the strictest on shared use.
-7. **The source date.** PLAN.md cites the legal page "checked 2026-10-19". It is unchanged on 2026-10-24, but the Usage Policy changed in the meantime: the new version is published and in force from 2026-11-12. Re-check the pages when they change.
-8. In `docs/research/claude-login.md`, §5:
-   - The Consumer Terms quote stops before "or make your Account available to anyone else".
-   - The new legal sections are dated to "between 2026-08-04 and 2026-10-19". They narrow to 2026-08-16 to 2026-08-30.
-   - The Recommendation refers to "PLAN.md open question 6", which is now question 3.
 
 ## Decision (2026-10-24)
 

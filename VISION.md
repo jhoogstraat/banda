@@ -30,7 +30,7 @@ Around threads, Banda adds what a team needs and a terminal lacks:
 |---|---|
 | See each other's work | Every thread is readable by everyone: chat, tool calls, diff, files, the running app. The team board and search span all of it. |
 | Help each other | Anyone posts into any thread, mentions people, reviews the diff line by line, forks a thread to try another way. |
-| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts. On a subscription nobody else ever does (Anthropic's terms); teammates talk to the owner and fork to run it on their own. On an API key, a teammate's request is a card the owner approves, or the owner trusts teammates. |
+| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts. On a subscription nobody else ever does (Anthropic's terms); teammates talk to the owner, suggest prompts, and fork to run it on their own. On an API key, a teammate's request is a card the owner approves, or the owner trusts teammates. |
 | Run many agents without chaos | One sandbox per thread: no shared checkout, ports or dependencies. Races run 2–4 tries of one prompt and compare them. Sub-threads split work. |
 | Know what needs you | The sidebar and `/decisions` show only what blocks on you; "the agent is done" is news, not a demand. Overlaps warn when two threads touch the same files. |
 | Never lose work | Auto-push after every turn, a push before every suspend, nothing deleted that isn't on origin. |

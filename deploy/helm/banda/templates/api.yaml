@@ -48,7 +48,7 @@ metadata:
   name: banda-api
   labels: {{- include "banda.labels" . | nindent 4 }}
 spec:
-  # One API per database: events fan out in memory (PLAN.md, "Not yet"), so a
+  # One API per database: events fan out in memory (PLAN.md, "Known limits"), so a
   # rollout stops the old pod before it starts the new one.
   replicas: 1
   strategy: {type: Recreate}

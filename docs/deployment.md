@@ -1,8 +1,8 @@
 # Deployment
 
-Checked against the repo on 2026-10-24; "Install" followed word for word on a fresh kind cluster. Rehearsed for real on 2026-10-30 on a 2-node kind cluster: Calico with `podCIDR` set, ingress-nginx and Traefik, kube-prometheus-stack, the fake agent. Banda runs on one Mac in Podman (kind) for development, and on a cluster a team shares. It is open source under MIT, so strangers install it with values nobody can predict.
+How to install Banda on a cluster a team shares, and what running it takes. Settings are in [configuration.md](configuration.md).
 
-Settings are in [configuration.md](configuration.md).
+"Install" was followed word for word on a fresh kind cluster, and the rest was rehearsed on a 2-node kind cluster (Calico with `podCIDR` set, ingress-nginx and Traefik, kube-prometheus-stack, the fake agent), not on a team's own cluster.
 
 ## Install
 
@@ -87,21 +87,16 @@ The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` t
 
 The important fact: **Banda is Kubernetes-native by design.** The API's main job is to create and suspend pods; sandboxes, volumes, secrets and isolation are Kubernetes objects. Any strategy that removes Kubernetes removes the product.
 
-## Chosen: one Helm chart, Kustomize on top
+## One Helm chart, Kustomize on top
 
-`deploy/helm/banda` is the single source of every manifest. Everything else renders it:
+`deploy/helm/banda` is the single source of every manifest. Helm is for installing a release, with values for everything that differs between clusters; Kustomize is for people who prefer patching ("Without Helm"); `banda.yaml` on every release is what the base renders, for `kubectl apply` with neither tool. The dev loop installs the same chart: `mise run dex` (Postgres, Dex, policies; no API), `mise run deploy` (with the API), and the e2e world renders its Dex and policies from it.
 
-- **Helm** for people installing a release: `helm install banda oci://ghcr.io/jhoogstraat/charts/banda`, values for everything that differs between clusters (images, hosts, OIDC, the pod network, bundled or external Postgres and Dex).
-- **Kustomize** for people who prefer patching over values: `deploy/kustomize/base` inflates the chart (`helmCharts:`, built with `kubectl kustomize --enable-helm`, which runs `helm`), overlays patch what comes out. `example` shows a real cluster (images, an Ingress with TLS, the settings Secret, the pod network); `kind` is the dev install. Kustomize can't change the values of a chart a base inflates, so `kind` inflates the chart itself with its values.
-- **A rendered manifest** on every GitHub release (`banda.yaml`, what the base renders) for `kubectl apply` without either tool.
-- **The dev loop** installs the same chart: `mise run dex` (Postgres, Dex, policies; no API), `mise run deploy` (with the API), and the e2e world renders its Dex and policies from it. The kind values live in `deploy/kustomize/kind/values.yaml`, shared by the overlay and the tasks.
-
-Generated secrets (session secret, Postgres passwords, Dex client secret) survive `helm upgrade` through `lookup`; `helm template` and Kustomize can't look anything up, so the base and the release manifest take every secret from a Secret `banda-api` you create.
+Kustomize can't change the values of a chart a base inflates, so the `kind` overlay inflates the chart itself with its values (`deploy/kustomize/kind/values.yaml`, shared with the tasks). Generated secrets survive `helm upgrade` through `lookup`; `helm template` and Kustomize can't look anything up, so the base and the release manifest take every secret from a Secret `banda-api` you create.
 
 ### Not chosen
 
 - **Docker/Podman Compose:** the sandboxes still need a cluster with the agent-sandbox controller, so the API would need a kubeconfig into one anyway. Compose doesn't run the part that matters.
-- **Plain manifests:** what `deploy/*.yaml` were until the chart. Fine for kind, but image names, hosts, storage, the pod network and passwords differ per cluster, and `sed` doesn't scale.
+- **Plain manifests:** fine for kind, but image names, hosts, storage, the pod network and passwords differ per cluster, and `sed` doesn't scale.
 - **Kustomize alone:** enough for one team, but an open-source install needs values a stranger can set without learning the manifests. Helm gives them; Kustomize stays available on top.
 - **An operator (a `Banda` CRD):** Banda has one instance per team, and its dynamic part (one sandbox per thread) is already reconciled by agent-sandbox and the API. For Postgres use CloudNativePG or a managed database if backups and failover are needed; don't write one.
 - **The controller in the chart, or a pre-install hook applying it:** it's cluster-wide (CRDs, its own namespace) and shared with anything else using agent-sandbox; a hook would need cluster-admin from a release that otherwise needs a namespace. One documented `kubectl apply` is simpler and honest.
@@ -126,7 +121,7 @@ kubectl -n banda create secret generic banda-github-app --from-literal=app-id=12
 
 Give the app the permissions Settings asks for (contents and workflows read and write, metadata read, pull requests read and write, checks and commit statuses read), the callback URL `$PUBLIC_URL/github/callback`, "Expire user authorization tokens" on, and no webhook. Banda reads the Secret within 30 seconds of a change; Settings then shows it as set up by the deployment, and nobody can replace it from Settings. Another app in the Secret (a new `app-id` or `host`) ends every connection to the old one: Banda revokes each with the old app's keys and deletes its tokens, and everyone connects again. No pod mounts it: the private key is the one long-lived credential left, and only the API holds it. Users' tokens are in `banda-forge-<hash>` Secrets beside it, likewise.
 
-Make the app an organization's. Whoever owns it can install it anywhere they administer and, through its keys on GitHub, reach every repository it is installed on, whatever their own access. One created under a personal account moves on GitHub: the app's settings → **Advanced** → **Transfer ownership**, to an organization (the person needs to own it). The id, keys and installations stay, so the Secret doesn't change.
+Make the app an organization's: whoever owns it reaches every repository it is installed on, whatever their own access. One under a personal account [can move](usage.md#the-github-app); its id, keys and installations stay, so the Secret doesn't change.
 
 ## GitLab application
 
@@ -175,15 +170,9 @@ Drop `banda_old` once the restored one is right. A dump copied in from elsewhere
 
 ## Sign-in with the bundled Dex
 
-In dev, Vite proxies `/dex` to Dex, whose issuer is `http://<host>:5173/dex`: browsers and the API on the Mac reach the same URL. In the cluster the API serves the SPA itself, so nothing served `/dex`, and the API pod can't reach a browser-facing URL such as `http://localhost:8787/dex` (a port-forward) or, behind an ingress, may not reach its own public host.
+In dev, Vite proxies `/dex` to Dex, whose issuer is `http://<host>:5173/dex`: browsers and the API on the Mac reach the same URL. In the cluster the API does the same: it serves `/dex/` from `DEX_URL`, and sends its own provider requests for the issuer's origin straight there, since a pod may not reach its own public host. So there is one public origin and no ingress rule, and it works behind a port-forward.
 
-Options:
-
-1. **The API proxies `/dex/` to Dex (`DEX_URL`), and sends its own provider requests for the issuer's origin straight to `DEX_URL`.** One public origin, as in dev; no ingress rule; works behind a port-forward. Chosen.
-2. **An ingress route for `/dex` to Dex.** Needs an ingress (not in kind or behind a port-forward), and the API still has to reach the public issuer from inside, hairpinning through the load balancer, which many clusters don't allow.
-3. **A split discovery URL** (`oidc.InsecureIssuerURLContext`: discover at the internal URL, accept the public issuer). Discovery then hands out the public token and keys endpoints, so the API still has to reach the public URL for the token exchange and keys.
-
-With `dex.enabled` the chart sets the issuer to `$PUBLIC_URL/dex`, `DEX_URL` to the Dex service and Dex's redirect URI to `$PUBLIC_URL/auth/callback`. Requests to the issuer's origin are only the provider's, as only the OIDC client uses that transport, so the API matches on origin alone. Real OIDC providers need none of this. The e2e world signs in the same way: its OIDC API serves the run's Dex at `/dex`.
+With `dex.enabled` the chart sets the issuer to `$PUBLIC_URL/dex`, `DEX_URL` to the Dex service and Dex's redirect URI to `$PUBLIC_URL/auth/callback`. Real OIDC providers need none of this. The e2e world signs in the same way: its OIDC API serves the run's Dex at `/dex`.
 
 ## Rotating the identity keys
 
@@ -210,11 +199,11 @@ Deleting the Secret makes the API create a new key on its next start, which sign
 
 ## Releases
 
-A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api` and `banda-sandbox` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and both image builds on every pull request and push to `main`, and the whole e2e suite on kind with Docker (about 30 minutes) on `main` only.
+A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api` and `banda-sandbox` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and both image builds on every pull request and push to `main`, and the `@key` e2e tests on kind with Docker on `main` only.
 
 ## Sizing
 
-Rule of thumb: **4 GiB of memory and 2 CPU per thread that builds at the same time**, and only disk for the rest. A 16 CPU, 32 GiB node carries about 6 such threads with room for the system. Count threads running at once, not threads in total: an idle running thread costs next to nothing and a suspended one only disk. A real model's turn was not measured: what the real `claude` process takes comes on top of these numbers, so check them during the first dogfood week.
+Rule of thumb: **4 GiB of memory and 2 CPU per thread that builds at the same time**, and only disk for the rest. A 16 CPU, 32 GiB node carries about 6 such threads with room for the system. Count threads running at once, not threads in total: an idle running thread costs next to nothing and a suspended one only disk. A real model's turn was not measured: what the real `claude` process takes comes on top of these numbers, so check them in your first week of real use.
 
 Measured in one sandbox pod (arm64, 8 CPU VM shared with other work) with the fake agent and Banda's own checkout, on the default limits:
 
@@ -248,25 +237,29 @@ Banda creates ReadWriteOnce volumes in the default StorageClass: one per thread 
 - **Capacity:** one person's running threads share one node. Their requests are small (50m CPU, 128 MiB each; [sizes](configuration.md)), so the ceiling is usually the node's pod limit (110 by default) or their combined real use. When the node is full, their next environment waits for room.
 - **Draining a node:** with attachable storage, each person's pods come back on another node once the last of their pods on the drained node is gone. Kubernetes retries a pod waiting for its group only every 5 minutes, so expect up to 5 minutes for the first of them. With node-local storage they wait for the node to come back.
 - **Forks** start on a new volume, wherever the forker's pods are. They copy nothing from the source's volume (the diff comes from Postgres).
-- An RWX Claude volume (NFS, CephFS) would let one person's pods spread over nodes. Banda has no setting for it yet, since no team has needed it.
+- An RWX Claude volume (NFS, CephFS) would let one person's pods spread over nodes. Banda has no setting for it.
 
-## Gaps before a team cluster
+## Before a team relies on it
 
-Also in [todo.md](../todo.md).
-
-- **Postgres:** the bundled one has a non-superuser role for the API and nightly dumps on a volume in the same cluster ("Postgres" above): copy them off the cluster, or use CloudNativePG or a managed database for point-in-time recovery and failover.
+- **Postgres:** the bundled one keeps its nightly dumps on a volume in the same cluster ("Postgres" above): copy them off the cluster, or use CloudNativePG or a managed database for point-in-time recovery and failover.
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
 - **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists. An API restart also restarts every thread's runner, which resumes on its own. Several in a row trip Kubernetes' back-off: a thread can then show its last status with no runner behind it for up to 5 minutes.
-- **Sizes:** "Sizing" below.
-- **Ingress:** thread streams are long-lived; controllers cut a stream quiet for their read timeout. The API sends a keepalive on every stream every 25 s, so for Banda's own streams any timeout above that works: a quiet thread page stayed on one stream for 11 minutes behind ingress-nginx (60 s) and Traefik, and a teammate's post reached it in under 200 ms without a reload. With a 20 s timeout ingress-nginx cuts it every 20 s. The preview and the terminal work through both. A previewed app's own WebSockets have no such keepalive, so the chart sets ingress-nginx's read and send timeouts to an hour. It also sets `proxy-body-size` to `64m` (its 1 MiB default refused attachments over 1 MiB); other controllers ignore that annotation, and a limit of your own must let through 5 MB attachments and 64 MB preview requests.
-- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job at it, or use the Prometheus operator:
+- **Sizes and volumes:** "Sizing" and "Volumes" above.
 
-  ```yaml
-  monitoring:
-    serviceMonitor: {enabled: true, labels: {release: kube-prometheus-stack}}
-    prometheusRule: {enabled: true, labels: {release: kube-prometheus-stack}}
-  ```
+## Ingress
 
-  `release` is what your Prometheus selects, by default the Helm release of kube-prometheus-stack; check with `kubectl get prometheus -A -o jsonpath='{.items[*].spec.serviceMonitorSelector}{.items[*].spec.ruleSelector}'`. Without a matching label the operator skips both resources and nothing says so. Prometheus's Targets page then has no `banda-api`.
+Thread streams are long-lived; controllers cut a stream quiet for their read timeout. The API sends a keepalive on every stream every 25 s, so for Banda's own streams any timeout above that works: a quiet thread page stayed on one stream for 11 minutes behind ingress-nginx (60 s) and Traefik, and a teammate's post reached it in under 200 ms without a reload. With a 20 s timeout ingress-nginx cuts it every 20 s. The preview and the terminal work through both. A previewed app's own WebSockets have no such keepalive, so the chart sets ingress-nginx's read and send timeouts to an hour. It also sets `proxy-body-size` to `64m` (its 1 MiB default refused attachments over 1 MiB); other controllers ignore that annotation, and a limit of your own must let through 5 MB attachments and 64 MB preview requests.
 
-  Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume), not Banda's, and kube-prometheus-stack scrapes it by default. `monitoring.prometheusRule.enabled` adds two alerts: `BandaInternalErrors` when `banda_internal_errors_total` rose in the last 10 minutes, and `BandaVolumeFull` when a thread's, a user's Claude or Postgres's volume is fuller than `volumeFull` (0.9) for 15 minutes, from the kubelet's numbers. Both fired for real in the rehearsal and reached Alertmanager. `BandaVolumeFull` needs a volume type that reports those numbers: kind's `local-path` (hostPath) reports none, so the alert can't fire there; a `local` PersistentVolume does. Check yours with `count(kubelet_volume_stats_used_bytes)`. Logs go to stdout.
+## Monitoring
+
+The API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job at it, or use the Prometheus operator:
+
+```yaml
+monitoring:
+  serviceMonitor: {enabled: true, labels: {release: kube-prometheus-stack}}
+  prometheusRule: {enabled: true, labels: {release: kube-prometheus-stack}}
+```
+
+`release` is what your Prometheus selects, by default the Helm release of kube-prometheus-stack; check with `kubectl get prometheus -A -o jsonpath='{.items[*].spec.serviceMonitorSelector}{.items[*].spec.ruleSelector}'`. Without a matching label the operator skips both resources and nothing says so. Prometheus's Targets page then has no `banda-api`.
+
+Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume), not Banda's, and kube-prometheus-stack scrapes it by default. `monitoring.prometheusRule.enabled` adds two alerts: `BandaInternalErrors` when `banda_internal_errors_total` rose in the last 10 minutes, and `BandaVolumeFull` when a thread's, a user's Claude or Postgres's volume is fuller than `volumeFull` (0.9) for 15 minutes, from the kubelet's numbers. Both fired for real in the rehearsal and reached Alertmanager. `BandaVolumeFull` needs a volume type that reports those numbers: kind's `local-path` (hostPath) reports none, so the alert can't fire there; a `local` PersistentVolume does. Check yours with `count(kubelet_volume_stats_used_bytes)`. Logs go to stdout.

@@ -1,6 +1,6 @@
 # Sandbox environment lifecycle: research
 
-Checked 2026-10-19. Sources are primary (repos at the tags named, official docs, KEPs) unless marked otherwise. Line links point at `kubernetes-sigs/agent-sandbox` tag `v1.0.7`. The only change on `main` since then (2026-10-18) is creation metrics.
+Checked 2026-10-19. Sources are primary (repos at the tags named, official docs, KEPs) unless marked otherwise. Line links point at `kubernetes-sigs/agent-sandbox` tag `v1.0.7`. Banda now pins v1.0.8.
 
 ## TL;DR
 
@@ -8,7 +8,7 @@ Checked 2026-10-19. Sources are primary (repos at the tags named, official docs,
 - **No upstream idle auto-suspend and no upstream memory snapshot.** Idle policy is still open ([#849](https://github.com/kubernetes-sigs/agent-sandbox/issues/849), [#968](https://github.com/kubernetes-sigs/agent-sandbox/issues/968)). Memory snapshots exist only as **GKE Pod Snapshots** (GKE with gVisor and GCS) or in **Agent Substrate** (pre-1.0). Banda drives suspend from its own state machine.
 - **"Agent substrate" is real**: [agent-substrate/substrate](https://github.com/agent-substrate/substrate), led by Google with Solo.io, v0.5.0 (2026-10-14), pre-1.0. It does true memory+disk suspend/resume with a claimed resume time under 500 ms. It is too young and too heavy for Banda v1, but worth watching; see [agent-substrate.md](agent-substrate.md).
 - **kagent** now (v1.0.0-alpha) runs on Agent Substrate and even has a Claude Code harness. It only supports API-key/Bedrock/Vertex credentials injected by its gateway, and its model is declarative agents, sessions and the A2A protocol. **It is a poor fit for Banda**, but its Claude harness is a useful reference.
-- **Recommendation**: core `Sandbox` only (no templates, claims or warm pools). Put one PVC at `$HOME`, so the repo, `~/.claude/` and `~/.claude.json` all persist. Suspend after N minutes in `awaiting_input` and on owner snooze or settle. Resume on owner activity and restart `claude -p --resume <session-id>`. Delete settled threads after a grace period via `shutdownTime` + `shutdownPolicy: Delete`. Expect resume in seconds, not milliseconds.
+- **What Banda took**: core `Sandbox` only (no templates, claims or warm pools), suspending after 30 minutes idle and on owner snooze or settle, resuming with `claude --resume`, and deleting after a grace period through `shutdownTime`. The login is on a volume of its own, not in the thread's ([claude-login.md](claude-login.md)).
 
 ---
 
@@ -161,89 +161,25 @@ Fit for Banda: not for v1.
 
 ---
 
-## Recommendation
+## What Banda took
 
-### Shape (M1, then M4)
+One `Sandbox` per thread, created directly by the API, with its timers in the API: upstream has no idle policy, so the only controller-side timer is `shutdownTime`. What it does in each state is in [PLAN.md](../../PLAN.md), "Environment lifecycle".
 
-1. Install **core only** (`sandbox.yaml` v1.0.7). Create **one `Sandbox` per thread directly** from banda-api, with no templates, claims, warm pools, router or SDK. Env vars for the thread ID and API token go straight into `podTemplate`, which a direct Sandbox allows freely.
-2. Use **one PVC per thread mounted at `$HOME`** (`/home/banda`) with the repo at `$HOME/work`. That single volume persists the git checkout, `~/.claude/` (credentials, transcripts, settings), and `~/.claude.json`.
-3. Ship `cleanupPeriodDays` set high, for example 3650, in the image's `~/.claude/settings.json`, which gets copied onto the PVC on first start. Otherwise a long-snoozed thread loses its transcript.
-4. The runner stores the Claude `session_id`. Banda already has it in events; also write it to `$HOME/.banda/session`. On every start the runner runs `claude -p --resume <id> --input-format stream-json --output-format stream-json …` when a session exists. `cwd` is always `$HOME/work`, so the project dir resolves.
-5. banda-api owns the timers. Upstream has no idle policy, so a one-minute ticker in the API does it. The only controller-side timer used is `shutdownTime` for delayed deletion.
-
-### State → environment mapping
-
-Snooze and Settle are per-viewer in PLAN.md, so **only the owner's ThreadView drives the environment**. Teammates browsing a thread never wake or suspend it.
-
-| Thread state / event | Environment action | agent-sandbox operation | Env state |
-|---|---|---|---|
-| `starting` (CreateThread) | create | create `Sandbox` (`operatingMode: Running`, no `shutdownTime`) | `provisioning` → `ready` when the runner dials in |
-| `working` | keep running, **never suspend** | none | `ready` |
-| `awaiting_input`, idle for less than T (default 30 min) | keep running | none | `ready` |
-| `awaiting_input`, idle for at least T | pause | patch `spec.operatingMode: Suspended`. Wait for `Suspended=True` | `paused` |
-| owner sends a message, answers a permission, or opens the terminal/diff on a paused env | resume | patch `spec.operatingMode: Running`. Ready means the runner reconnected and `claude --resume` started | `provisioning` → `ready` |
-| owner snoozes | pause now unless `working`. No auto-resume when the snooze ends; resume lazily on the next owner action | `Suspended` | `paused` |
-| owner settles | pause now and schedule deletion (grace period, for example 7 d) | `Suspended` + `shutdownTime: now+7d`, `shutdownPolicy: Delete` | `paused` → `gone` |
-| owner unsettles within the grace period | cancel deletion | remove `shutdownTime` (and `shutdownPolicy`) | `paused` |
-| `errored` via EnvLost (Pod `Failed`, `Ready=False/PodFailed`, runner gone) → Retry | recreate the Pod, keep the PVC | delete the Pod (the controller recreates it) or toggle Suspended→Running | `provisioning` |
-| `errored` via TurnFailed | none | none | `ready` |
-| thread deleted | delete everything | delete `Sandbox` (PVC is GC'd by ownerRef) | `gone` |
-
-Minimal manifest banda-api creates:
-
-```yaml
-apiVersion: agents.x-k8s.io/v1beta1
-kind: Sandbox
-metadata:
-  name: t-<thread-id-short>          # Pod name = this; keep it short
-  labels: {banda.dev/thread: <id>}
-spec:
-  operatingMode: Running             # banda-api flips to Suspended / back
-  # shutdownTime: "<RFC3339>"        # set only on settle
-  # shutdownPolicy: Delete
-  podTemplate:
-    spec:
-      automountServiceAccountToken: false   # runner talks to banda-api, not the K8s API
-      securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
-      containers:
-      - name: runner
-        image: banda-sandbox:<tag>   # runner + git + claude
-        env:
-        - {name: HOME, value: /home/banda}
-        - {name: BANDA_THREAD_ID, value: <id>}
-        - {name: BANDA_API_URL, value: http://banda-api.banda.svc:8080}
-        volumeMounts: [{name: home, mountPath: /home/banda}]
-  volumeClaimTemplates:              # PVC "home-t-<id>"; immutable; GC'd with the Sandbox
-  - metadata: {name: home}
-    spec:
-      accessModes: [ReadWriteOnce]
-      resources: {requests: {storage: 10Gi}}
-```
-
-Suspend and resume are a merge patch, for example `kubectl patch sandbox t-abc --type merge -p '{"spec":{"operatingMode":"Suspended"}}'`. In Go, use `cs.AgentsV1beta1().Sandboxes(ns).Patch(...)` or a controller-runtime client with `v1beta1.AddToScheme`.
-
-### What persists, and what doesn't
-
-- **Persists across pause** (on the PVC): the git working tree, including uncommitted changes, and the branch; `~/.claude/.credentials.json`, so **no re-login after resume** (still one login per environment, as in PLAN.md); `~/.claude.json`; transcripts, so the conversation continues via `--resume`.
-- **Lost on pause**: anything in memory. That includes the running `claude` process (never pause mid-turn), terminal shells, background jobs, dev servers (relevant for the browser pane in M6), and `/tmp`.
-- **Lost on delete** (settled past the grace period, or thread deleted): everything, including the login. Push the branch (M4) before deleting.
-
-### Expected resume latency (estimates, measure in M4)
+### Expected resume latency (estimates)
 
 On kind with the image already on the node:
 - Pod create to container running: about 1–3 s.
 - Runner dial-in plus `claude -p --resume` startup: a few seconds.
 - Total: **about 3–10 s** to the first token of a new turn.
 
-A cold create also includes the git clone. The first image pull adds 10–30 s, per the agent-sandbox quickstart. Show "Waking environment…" in the UI. A diff snapshot stored as an event at `TurnEnded` lets people browse paused threads without waking them.
+A cold create also includes the git clone. The first image pull adds 10–30 s, per the agent-sandbox quickstart.
 
 Cost: a suspended thread costs only its PVC disk. A running idle thread costs the memory of `claude` plus the runner, so set low requests and measure.
 
-### Defer
+### Deferred
 
 - **Warm pools, SandboxTemplate, SandboxClaim**: per-thread env and PVC force cold starts anyway. Revisit if cold create time hurts.
 - **Memory snapshots** (GKE Pod Snapshots, Agent Substrate, KEP-5823): none of them work on kind with upstream components today. Revisit when Banda needs processes to survive a pause, or wants resume under a second.
 - **gVisor/Kata**: the documented kind path needs a Linux host. Add `runtimeClassName` on a Linux cluster later, before untrusted multi-tenant use.
-- **Pausing with a permission prompt pending (M2+)**: either skip threads with an open permission request in the idle sweep, or adopt kagent's PreToolUse `defer` + `--resume` pattern.
-- **Auto-resume on traffic, router, NetworkPolicy, per-user login volume** (the grey area in PLAN.md).
+- **Auto-resume on traffic, router.**
 - Watch upstream [#849](https://github.com/kubernetes-sigs/agent-sandbox/issues/849) and [#968](https://github.com/kubernetes-sigs/agent-sandbox/issues/968): when an idle policy lands, delete the API ticker.

@@ -250,7 +250,7 @@ What only a real model can show, in dogfooding: whether it backgrounds the dev s
 
 ## 4. Permissions
 
-### M1: the pod is the boundary
+### Bypass: the pod is the boundary
 
 Use `--dangerously-skip-permissions` (or `--permission-mode bypassPermissions`).
 
@@ -258,7 +258,7 @@ Use `--dangerously-skip-permissions` (or `--permission-mode bypassPermissions`).
 - A few calls still prompt under bypass, for example `rm` on critical paths. In `-p` with no prompt host, these are **denied** and the turn continues [doc].
 - In the tool result, approved calls show `"permission_decision":{"decision":"accept","source":"config","reason_type":"mode"}` [obs].
 
-### M2 option A (recommended): control protocol over stdio
+### Asking: control protocol over stdio
 
 Launch with `--permission-mode default --permission-prompt-tool stdio`. Swap `default` for `acceptEdits` or `auto` to cut down on prompts. The CLI then writes this and **blocks the turn until answered** (no timeout seen in 30 s) [obs]:
 
@@ -289,7 +289,7 @@ Notes:
 
 ### What Banda does (checked 2026-10-21)
 
-Banda took option A. Sources for this part: the [Agent SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions), [user input](https://code.claude.com/docs/en/agent-sdk/user-input) and [permission modes](https://code.claude.com/docs/en/permission-modes) pages [doc], and `sdk.d.ts`/`sdk-tools.d.ts` of `@anthropic-ai/claude-agent-sdk@0.3.306` [sdk]. Since 2026-10-24 [contract] checks against the real binary: ask (allow runs the call, deny's message is the tool result), accept edits (a Write runs unasked, `python3 -c …` asks), plan with `ExitPlanMode` and the switch to accept edits on approval, `AskUserQuestion` answers, `EnterPlanMode` (unasked; a Write then asks), and an MCP tool asking in ask mode.
+Sources for this part: the [Agent SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions), [user input](https://code.claude.com/docs/en/agent-sdk/user-input) and [permission modes](https://code.claude.com/docs/en/permission-modes) pages [doc], and `sdk.d.ts`/`sdk-tools.d.ts` of `@anthropic-ai/claude-agent-sdk@0.3.306` [sdk]. Since 2026-10-24 [contract] checks against the real binary: ask (allow runs the call, deny's message is the tool result), accept edits (a Write runs unasked, `python3 -c …` asks), plan with `ExitPlanMode` and the switch to accept edits on approval, `AskUserQuestion` answers, `EnterPlanMode` (unasked; a Write then asks), and an MCP tool asking in ask mode.
 
 - **Launch**: `--permission-mode default --permission-prompt-tool stdio --allow-dangerously-skip-permissions`, then `set_permission_mode` to the thread's mode before the first prompt and whenever the owner changes it. The mode isn't restored on `--resume`, so the runner sets it on every start. `bypassPermissions` can only be entered later if the CLI was launched with it or with `--allow-dangerously-skip-permissions` [doc].
 - **Banda's modes → `--permission-mode`**: bypass → `bypassPermissions`, ask → `default` (reads and read-only Bash run, edits and other commands ask), accept edits → `acceptEdits` (edits and `mkdir`/`touch`/`rm`/`mv`/`cp`/`sed` inside the checkout run, other commands ask), plan → `plan`. `auto` (a classifier) and `dontAsk` aren't offered [doc].
@@ -306,21 +306,12 @@ Banda took option A. Sources for this part: the [Agent SDK permissions](https://
 - **Mode switches by the agent**: `EnterPlanMode` (input `{}`) switches the session to plan itself and answers "Entered plan mode. …"; its permission check allows it without asking except behind a flag that asks (in neither `auto` nor `plan`), and it is refused in subagents [bin]. Observed [contract]: in ask mode it switches without a `can_use_tool`, and a Write then asks. The SDK also documents `system/status` lines carrying `permissionMode` [sdk], not observed. Banda takes a successful `EnterPlanMode` result as the switch (the runner remembers `plan` for a restarted claude, and the API records a `PermissionModeChanged` by `agent`); approving the plan (`ExitPlanMode`) switches back as before.
 - **Restarts**: the pending request lives in the claude process. If the pod or the runner restarts, the turn and its request are gone (stdin closes: `Tool permission stream closed before response received`, see above); Banda marks the card lost when the runner disconnects or the next one is ready.
 
-### M2 option B (the plan's current wording): MCP prompt tool
-
-Launch with `--mcp-config '{"mcpServers":{"banda":{"type":"stdio","command":"…"}}}' --permission-prompt-tool mcp__banda__approve` and verify the result with [obs]:
-
-- The tool is called with arguments `{"tool_name":"Bash","input":{"command":"touch banda.txt","description":"Print hi"},"tool_use_id":"toolu_fake1"}`.
-- It must return `{"content":[{"type":"text","text":"{\"behavior\":\"allow\",\"updatedInput\":{…}}"}]}`, or the JSON text `{"behavior":"deny","message":"…"}`.
-
-This needs an extra MCP server process that talks back to the runner. Option A gives the same result over the pipe the runner already owns. Either way the binary stays unmodified. Option A speaks the same wire protocol the Agent SDK uses, without importing the SDK. Whether that matters for the "built on the Agent SDK" clause in PLAN.md is for the plan owner to judge.
-
 ---
 
 ## 5. Session persistence and resume
 
 - **Location:** `$CLAUDE_CONFIG_DIR/projects/<cwd with every non-alphanumeric char replaced by ->/<session-id>.jsonl`. `CLAUDE_CONFIG_DIR` defaults to `~/.claude` [doc]. Observed: `/tmp/banda-research/cfg/projects/-private-tmp-banda-research-work/22222222-2222-4333-8444-555555555555.jsonl`, built from the cwd realpath [obs]. Set `CLAUDE_CODE_PROJECT_DIR_NAME` together with `CLAUDE_CONFIG_DIR` to pin the directory name (v2.1.234+) [doc]. Retention defaults to 30 days (`cleanupPeriodDays`) [doc]. The transcript format is internal [doc].
-- **Credentials** live in the same dir on Linux: `$CLAUDE_CONFIG_DIR/.credentials.json`, mode 0600 [doc]. Surviving a pod restart therefore needs a persistent volume for `~/.claude`, which covers both the transcript and the login. That is the grey area in PLAN.md open question 4.
+- **Credentials** live in the same dir on Linux: `$CLAUDE_CONFIG_DIR/.credentials.json`, mode 0600 [doc]. Surviving a pod restart therefore needs a persistent volume for `~/.claude`, which covers both the transcript and the login. That is the per-user volume of [claude-login.md](claude-login.md).
 - **Resume after a restart:** `claude -p … --resume <session-id>` with the same flags as before. Re-pass `--dangerously-skip-permissions`, `--mcp-config`, `--add-dir` and `--settings`, because they are not restored [doc]. History and model are restored [doc][obs].
   - Lookup by ID works from **any** cwd [doc][obs]. However, the resumed session **runs in the new cwd**: `system/init.cwd` showed the new directory, and tools act there [obs]. The transcript keeps appending to the original file [obs]. Practical rule: always mount the checkout at the same path, e.g. `/workspace/repo`.
   - Start every thread with `--session-id <thread-uuid>`, so the ID is known before the first event, and use `--resume <thread-uuid>` afterwards. `--session-id` on an existing ID fails [obs].

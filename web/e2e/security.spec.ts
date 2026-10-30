@@ -203,7 +203,7 @@ test.describe('repository URLs', () => {
 });
 
 test.describe('browser', () => {
-	// Regression guards for what open risk 6 relies on (PLAN.md): all pass since round 3.
+	// Regression guards for what open risk 6 relies on (PLAN.md).
 	const list = `${API}/banda.v1.ThreadService/ListThreads`;
 
 	test('F8: the Connect API refuses CORS-simple requests and answers no preflight', { tag: '@key' }, async () => {

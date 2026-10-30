@@ -10,7 +10,7 @@ It is built for one team that trusts each other, on a cluster that team runs. Wh
 
 - **One sandbox per thread.** Each thread gets its own pod with the repo on branch `banda/<id>`, the repo's tools from `mise.toml` and its `.banda/setup.sh`. It sleeps after 30 minutes idle and wakes on the next message.
 - **Each person's own Claude.** The unmodified `claude` CLI runs in the sandbox. Each user logs in once with their own subscription (or an API key); Banda never sees the credential.
-- **Multiplayer.** Everyone reads every thread. Teammates' requests to run your agent become cards you approve, unless you trust them. @mentions, chat mode, presence, a team board and a morning brief.
+- **Multiplayer.** Everyone reads every thread. On a subscription only you run your agent, and teammates suggest prompts you can use as a draft; on an API key their requests become cards you approve, unless you trust them. @mentions, chat mode, presence, a team board and a morning brief.
 - **Control.** Permission modes (bypass, ask, accept edits, plan) with approval cards, "always allow" rules and the agent's questions as votes. One `/decisions` page for everything waiting on you.
 - **Never losing work.** Auto-push after every turn, a push before every suspend, and nothing deleted that isn't on origin.
 - **GitHub and GitLab.** Open, review and merge pull and merge requests from the thread, with checks, reviews and the conversation in a tab. The agent reads failing checks and review comments.
@@ -85,8 +85,8 @@ There is no Compose file and no operator: sandboxes are Kubernetes objects, so B
 | [docs/configuration.md](docs/configuration.md) | Sign-in, every API setting, sandbox isolation |
 | [docs/deployment.md](docs/deployment.md) | Install with Helm, Kustomize or the manifest; releases; the options we didn't choose |
 | [docs/development.md](docs/development.md) | The dev loop, tests and the e2e suite |
-| [PLAN.md](PLAN.md) | Architecture, every decision, status and open risks |
-| [todo.md](todo.md) | What's left, by phase |
+| [PLAN.md](PLAN.md) | Architecture, every decision, known limits and open risks |
+| [todo.md](todo.md) | What's left |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 
 ## License

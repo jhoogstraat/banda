@@ -3,8 +3,8 @@
 A web app where a team builds software together with coding agents. Each thread is one owner, one Claude Code agent and one isolated Kubernetes sandbox with the repo checked out on its own branch. Teammates browse each other's threads, post into them and mention each other. An internal tool for one team, never sold.
 
 - [VISION.md](VISION.md): why Banda exists and the principles for deciding anything not settled yet. Read it before a design choice.
-- [PLAN.md](PLAN.md): the decisions made and what is built.
-- [todo.md](todo.md): what is left before Banda runs fully, by phase.
+- [PLAN.md](PLAN.md): the decisions made, how Banda works and its known limits.
+- [todo.md](todo.md): what is left before Banda runs fully.
 - [README.md](README.md): what Banda is and the quick start; `docs/`: [usage](docs/usage.md), [configuration](docs/configuration.md) (every setting), [deployment](docs/deployment.md) (Helm, Kustomize, releases), [development](docs/development.md) (dev loop, tests).
 
 When you notice an inefficiency or make a mistake that a clearer instruction would have prevented, improve this file (or the relevant skill or doc) right away so it doesn't happen again.

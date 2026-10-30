@@ -15,7 +15,7 @@ On GitHub the team sets up a **GitHub App** once, on GitLab an **application** p
 | GitHub, GitHub Enterprise Server (without the app, or not connected; deprecated) | `GIT_TOKEN` | Fine-grained: Contents read and write (pushes), Pull requests read and write (also labels and resolving review threads), Commit statuses read, Checks read (Actions read for workflow runs), Metadata read (collaborators, search). Classic: `repo`. |
 | GitLab, self-hosted GitLab (without the application, or not connected; deprecated) | `GITLAB_TOKEN`, else `GIT_TOKEN` (git in threads uses `GIT_TOKEN` only) | A personal access token with the `api` scope (`write_repository` alone pushes but can't open merge requests). |
 
-github.com and gitlab.com are known; name self-hosted hosts in `FORGE_HOSTS`, e.g. `FORGE_HOSTS=git.corp.example=gitlab,ghe.corp.example=github`. Banda reaches a forge over https only; for a private certificate authority or a private address, see [configuration](configuration.md#gitlab-application). A repository URL with a port other than the scheme's default (`https://git.corp.example:8443/team/app`) is another server: it is a known forge only if `FORGE_HOSTS` names that exact `host:port` (`git.corp.example:8443=gitlab`); otherwise Banda gives it no forge token and git no credential. The API polls linked pull requests every `PULL_REQUEST_POLL` (default `30s`) while someone has the thread open and ten times slower otherwise, with conditional requests on GitHub; no webhooks are needed. In the cluster the API needs `get` on Secrets in the sandbox namespace to read the tokens. Without a known forge or a token, the header links to GitHub's compare page instead.
+github.com and gitlab.com are known; self-hosted hosts are named in `FORGE_HOSTS` ([configuration](configuration.md#self-hosted-forges)). The API polls linked pull requests every `PULL_REQUEST_POLL` (default `30s`) while someone has the thread open and ten times slower otherwise, with conditional requests on GitHub; no webhooks are needed. In the cluster the API needs `get` on Secrets in the sandbox namespace to read the tokens. Without a known forge or a token, the header links to GitHub's compare page instead.
 
 ### The GitHub App
 
@@ -70,12 +70,13 @@ You (`/settings#claude`, `#accounts`, `#git`, `#defaults`, `#notifications`, `#a
 - **Git identity**: the name and email of commits in your threads, by default your sign-in's. A thread handed to you uses yours. Like secrets, it applies when an environment next starts.
 - **New threads**: the model, effort, permission mode and profile the new-thread composer (and a race) starts with, and what threads created through the API without them get (sub-threads keep their parent's).
 - **Notifications** and **Appearance** (System, Light or Dark; dark by default) are per browser.
-- **Secrets** and the **keyboard shortcuts**.
+- **Secrets**: environment variables in all your threads, applied when a thread's environment next starts and redacted from everything the agent reports. A personal secret beats a team one of the same name.
+- **Keyboard shortcuts**.
 
 Team (`#github-app`, `#gitlab-app`, `#team-secrets`, `#workload-identity`):
 
 - **GitHub App** and **GitLab**: setting them up (see [The GitHub App](#the-github-app) and [GitLab](#gitlab)).
-- **Team secrets**.
+- **Team secrets**: go to every thread of every teammate, so shared credentials (a kubeconfig, database URLs, observability tokens) need no setup. Anyone can replace or delete them, and Settings shows who set each last. Every agent can use them: prefer read-only credentials, or workload identity where a secret manager or cloud can trust Banda.
 - **Workload identity**: Banda's issuer and the team's token audiences, which give every running thread short-lived tokens naming its owner, and, folded until opened, recipes for OpenBao/Vault, Infisical, AWS, Google Cloud and Kubernetes filled in with this Banda's values. A secret manager that trusts Banda replaces pasted credentials: the agent signs in with the token file and fetches what it needs ([configuration](configuration.md#workload-identity)).
 
 ## Work without a repository

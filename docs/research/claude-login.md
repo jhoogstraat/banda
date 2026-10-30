@@ -117,28 +117,7 @@ The docs also warn: with `--dangerously-skip-permissions`, "dev containers do no
 
 ## 5. Policy
 
-**(a) Hosting, with each end user on their own subscription.** From [Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance):
-- > "preinstalling or running Claude Code in your products or services (e.g. in hosted sandboxes or other agent infrastructure) requires agreeing to our Commercial Terms of Service and complying with the conditions below"
-- > "**The Claude Code binary must not be modified.** … customers may not remove, disable, or restrict any authentication method built into it"
-- > "**Customers may not pay for, resell, or intermediate Claude usage on their end users' behalf.** Each end user must authenticate with their own Anthropic API key, Claude subscription plan credentials, or 3P inference provider credential"
-- > "Nor does it prevent an end user from signing in to the unmodified Claude Code binary with their own Claude subscription, including where a platform hosts Claude Code"
-- The [support article](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan) (update of 2026-10-07): "You can still use the Claude Agent SDK, `claude -p`, and third-party apps with your subscription limits."
-
-**(b) Storing credentials:**
-- > "Anthropic does not permit third-party developers to offer Claude.ai login into their own applications, or to route requests through Free, Pro, or Max plan credentials on behalf of their users. Moreover, developers may not collect, store, or intermediate Claude.ai credentials or session tokens — sign-in to a Claude account must complete through Anthropic's own flow."
-- The explicit carve-out covers only "their own API keys or third-party inference provider credentials — for example, configuring an API key in a development environment, secrets manager, or machine image". **Subscription OAuth tokens are not in it.**
-- > "Anthropic reserves the right to take measures to enforce these restrictions and may do so without prior notice."
-- What this means for Banda:
-  - The binary writing its own `.credentials.json` to a disk is how Claude Code works everywhere.
-  - A volume that outlives the pod is the grey zone. Anthropic's own devcontainer docs do exactly that.
-  - Banda's code reading, copying, backing up, or accepting tokens through its UI is clearly out.
-
-**(c) "Ordinary, individual usage" and teammates:**
-- [Legal](https://code.claude.com/docs/en/legal-and-compliance#acceptable-use): "Advertised usage limits for Pro and Max plans assume ordinary, individual usage of Claude Code and the Agent SDK."
-- OAuth "is intended exclusively for purchasers of Claude Free, Pro, Max, Team, and Enterprise subscription plans".
-- [Support](https://support.claude.com/en/articles/13189465-log-in-to-your-claude-account): "Subscription plans can only be used by subscribers."
-- [Consumer Terms](https://www.anthropic.com/legal/consumer-terms) §2 (effective 2025-10-08): "You may not share your Account login information, Anthropic API key, or Account credentials with anyone else or make your Account available to anyone else".
-- Consequence: a teammate whose message starts a turn on the owner's subscription is someone else using that subscription. Credentials are not shared, but it goes against "only by subscribers" and "individual usage". **Only the owner should be able to start agent turns.** A teammate's `@agent` should wait for the owner's one-click "run as me". This resolves PLAN.md open question 2.
+The terms are quoted and read in [claude-terms.md](claude-terms.md), which replaces the first reading made here; what Banda does about them is its Decision.
 
 **2026 changes (primary, dated via Wayback snapshots of the legal page):**
 - **2026-02-18:** the "Authentication and credential use" section appears. It is absent on 2026-02-01. It added the "no Claude.ai login in third-party apps / no routing through Free, Pro, Max credentials" rule and "without prior notice" enforcement.
@@ -159,7 +138,7 @@ Ranked best first:
 | # | Option | UX | Policy risk | Technical risk | kind fit |
 |---|---|---|---|---|---|
 | **A** | **Per-user volume as `CLAUDE_CONFIG_DIR`, binary-owned, mounted only into that user's pods** | Log in once; it lasts until the login expires or a race clears it | **Low–medium.** Same pattern as Anthropic's devcontainer. Banda's code never touches the token. Persistence beyond the pod is the open point. | Shared-file refresh races (#102985). Mitigated by graceful shutdown and v ≥ 2.1.301. The failure is one re-login for all pods. | Good. kind's default local-path class is RWO, and RWO "still can allow multiple pods to access … that volume when the pods are running on the same node" ([k8s](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes)). |
-| B | Log in per pod (current M1 plan) | About 30 s of URL plus pasted code on every thread | **None** beyond the baseline | None. Each pod has its own refresh chain. | Trivial |
+| B | Log in per pod | About 30 s of URL plus pasted code on every thread | **None** beyond the baseline | None. Each pod has its own refresh chain. | Trivial |
 | C | One long-lived pod per user that runs all of that user's threads (worktrees) | Log in once | Low | This is the documented "parallel sessions on one machine" case, but per-thread isolation is lost | Conflicts with one Sandbox per thread |
 | D | User-managed `setup-token` | Generate once a year | **High** if Banda accepts or stores it. Acceptable only if users create their own k8s Secret. | No refresh races. Inference only. Several open bugs. | Easy technically |
 | — | Reject: refresh-token env provisioning, copying or symlinking `.credentials.json`, `apiKeyHelper` with an OAuth token, Agent SDK | | Collects tokens or isn't allowed | Forks the rotation chain or gets 401 | |
@@ -168,38 +147,6 @@ Two other paths sit outside this ranking:
 - A user-supplied Console API key (via `apiKeyHelper` or an env Secret) is explicitly allowed. It is not a subscription, though.
 - Anthropic's [self-hosted environments](https://code.claude.com/docs/en/self-hosted-environments) need no credentials from the host. But they are a Team/Enterprise beta and are driven from claude.ai, not by Banda.
 
-**Pick A, and keep B as the fallback.** It is the only option that gives one login per user without Banda's code ever seeing a token. Anthropic documents exactly this pattern for containers. Its worst failure is "log in again once", and that applies to all pods together. Decided 2026-10-24: no question to Anthropic; Banda complies with the terms as written ([claude-terms.md](claude-terms.md), Decision). If they come to rule the volume out, switch it to the pod's lifetime and you are back at B with no other code change.
+**Pick A, and keep B as the fallback.** It is the only option that gives one login per user without Banda's code ever seeing a token. Anthropic documents exactly this pattern for containers. Its worst failure is "log in again once", and that applies to all pods together. If the terms ever rule the volume out, switch it to the pod's lifetime and you are back at B with no other code change.
 
-**Implementation for A:**
-
-1. **Image.** Pin Claude Code ≥ 2.1.301 and set `DISABLE_AUTOUPDATER=1`. Run as a non-root user, uid 1000, `HOME=/home/agent`. `--dangerously-skip-permissions` refuses to run as root.
-2. **Volume.** banda-api creates an empty PVC `claude-<userID>` on the user's first thread.
-   - On kind: the default `standard` StorageClass with RWO, since all pods share one node.
-   - Multi-node later: an RWX class (NFS, CephFS), or pin a user's pods to one node.
-   - Never mount it into banda-api. Never read it, copy it or back it up.
-3. **Sandbox `podTemplate`.** agent-sandbox takes a full PodSpec, so reference the existing claim directly (don't use `volumeClaimTemplates`):
-   ```yaml
-   securityContext: { runAsUser: 1000, fsGroup: 1000 }
-   terminationGracePeriodSeconds: 90
-   volumes: [{ name: claude, persistentVolumeClaim: { claimName: claude-<userID> } }]
-   containers:
-   - name: runner
-     env:
-     - { name: CLAUDE_CONFIG_DIR, value: /home/agent/.claude }
-     - { name: CLAUDE_CODE_PROJECT_DIR_NAME, value: <threadID> }   # per-thread transcripts in the shared dir (v2.1.234+)
-     volumeMounts: [{ name: claude, mountPath: /home/agent/.claude }]   # whole dir, no subPath
-   ```
-   Do **not** set `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the pod. They outrank the login.
-4. **Preflight.** The runner runs `claude auth status --json` without a short kill timeout.
-   - Exit 1 means the thread goes to `awaiting_input` with "Claude login needed".
-   - The user then logs in with `claude auth login` in the terminal: `kubectl exec -it <pod> -- claude auth login` in M1, the terminal pane in M2.
-   - Paste the code from the browser. Every other pod of that user reads the new `.credentials.json` on its own.
-   - If a `-p` process does not, restart it with `--resume <session-id>`.
-5. **Graceful stop.** The runner traps SIGTERM, stops `claude` cleanly, and waits for it to exit. Never `kill -9` `claude` and never run `claude …` under short timeouts. This is the main cause of shared-file logouts (#102985).
-6. **Detect expiry.** Map stream-json `error: authentication_failed` and `Login expired` to `errored`, with a "Log in again" action.
-7. **Hygiene.**
-   - Don't record PTY input in the terminal pane: the pasted OAuth code passes through it.
-   - "Forget my Claude login" runs `claude auth logout` in a pod, then deletes the PVC.
-   - Mount a user's PVC only into pods that user owns.
-   - Agent turns are started only by the owner (§5c).
-   - Add egress limits later: the devcontainer warning about exfiltration under skip-permissions applies here too.
+[PLAN.md](../../PLAN.md), "Claude login" and "Constraint: Claude subscriptions", has what Banda built.
