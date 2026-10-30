@@ -73,7 +73,9 @@ Inference:
 
 > "If your browser shows a login code instead of redirecting back after you sign in, paste it into the terminal at the `Paste code here if prompted` prompt. This happens when the browser can't reach Claude Code's local callback server, which is common in WSL2, SSH sessions, and containers."
 
-Inference: the sign-in happens on claude.ai in the user's own browser. The binary is what asks for and stores the result. But in Banda the user pastes the code into a web terminal, and the keystrokes travel browser → API → runner → PTY (PLAN.md, Architecture, "Terminal"). Banda doesn't keep them, but the code passes through Banda's code. Whether a one-time authorization code counts as a "credential or session token", and whether passing it on unread counts as "intermediating", is not answered by the text. Anthropic's docs show the same paste over SSH, which is also a relay. The [IAM](https://code.claude.com/docs/en/iam) page now serves the same content as Authentication.
+Note (2026-10-30): the page now stops after "prompt.": the second sentence, the one naming SSH sessions and containers, is gone from it and from the troubleshooting pages. The paste itself is still documented, without saying where it happens. So the SSH comparison below is no longer Anthropic's own text.
+
+Inference: the sign-in happens on claude.ai in the user's own browser. The binary is what asks for and stores the result. But in Banda the user pastes the code into a web terminal, and the keystrokes travel browser → API → runner → PTY (PLAN.md, Architecture, "Terminal"). Banda doesn't keep them, but the code passes through Banda's code. Whether a one-time authorization code counts as a "credential or session token", and whether passing it on unread counts as "intermediating", is not answered by the text. Anthropic's docs showed the same paste over SSH, which is also a relay (see the note above). The [IAM](https://code.claude.com/docs/en/iam) page now serves the same content as Authentication.
 
 **Persistence.** Authentication, "Log in to Claude Code":
 
@@ -98,6 +100,8 @@ Inference: Banda's per-user volume is this mechanism. The docs show it for an en
 [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan):
 
 > "Update October 7, 2026: Claude Max and Team plans now include monthly API credits, which cover the Claude Agent SDK, claude -p, the Claude API, and Claude Managed Agents. You can still use the Claude Agent SDK, claude -p, and third-party apps with your subscription limits."
+
+Note (2026-10-30): the same update now reads: "Claude Max and Team plans now include monthly API credits. They cover the Claude API, Claude Managed Agents, and the Claude Agent SDK and claude -p when you run them with an API key from your linked Claude Console organization. Nothing changes for your plan: when you're signed in with your Claude plan, the Claude Agent SDK and claude -p still draw from your subscription limits."
 
 [Monthly API credits for Max and Team plans](https://support.claude.com/en/articles/17154008-monthly-api-credits-for-max-and-team-plans):
 
@@ -240,8 +244,8 @@ No message goes to Anthropic. Banda complies with the text as written, and takes
 |---|---|---|
 | Hosting (1a) | Whoever runs Banda has agreed to Anthropic's Commercial Terms | A prerequisite on the install page (docs/deployment.md) and in the README; Banda can't check it |
 | Work use of Pro/Max in the EEA (added 2026-10-25) | The EEA Consumer Terms, §11: "you will not use our Services for any commercial or business purposes" | Banda is a work tool, so in the EEA and Switzerland each person runs Claude Code on a Team or Enterprise seat or an API key, not Pro/Max: a prerequisite on the install page and in the README; Banda can't check it |
-| Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription | Teammate turns and trust only when the owner runs Claude Code on an API key (PLAN.md, Teammate turns) |
-| The login code (1c) | Banda never collects, stores or reads a Claude credential, and sign-in completes in Anthropic's flow | The user runs the binary's own `claude auth login` and signs in on claude.ai in their own browser. The code they paste passes through the terminal stream as through an SSH session, which Anthropic's docs describe for containers; Banda neither logs nor stores it, and learns the login state from `claude auth status`, not the credentials file |
+| Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription | Teammate turns and trust only when the owner runs Claude Code on an API key (PLAN.md, Teammate turns). Only a key of the team's own Console account fits "the customer's own authorized users"; the README says so (Q4, added 2026-10-30) |
+| The login code (1c) | Banda never collects, stores or reads a Claude credential, and sign-in completes in Anthropic's flow | The user runs the binary's own `claude auth login` and signs in on claude.ai in their own browser. The code they paste passes through the terminal stream as through an SSH session; Banda neither logs nor stores it, and learns the login state from `claude auth status`, not the credentials file |
 | Offering login (3) | No Claude login form of Banda's own | Banda's buttons open a terminal running the binary's login, named as Claude Code's |
 | The login volume (1d) | Only the mechanism Anthropic documents for dev containers, for one user | Each user's volume is mounted only by their own pods, never by the API |
 | Turns no person started (1e) | Only the owner's own agent, for the owner, through `claude -p` (explicitly allowed) | Agents' sub-threads are their owner's; `wake_parent` wakes once, then only after a person posted; depth and running caps |
