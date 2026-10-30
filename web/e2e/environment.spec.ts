@@ -85,11 +85,17 @@ test('a start that waits on Kubernetes (no node fits) says why on the thread, th
 });
 
 test('a start without a runner after START_DEADLINE ends errored and a late runner still rescues it; a login terminal gives up the same way', async ({ as, startApi }) => {
-	const api = await startApi({ START_DEADLINE: '1ms' }) // past at the first look;
+	const api = await startApi({ START_DEADLINE: '1ms' }); // past at the first look, if no runner beat it there
 	const alice = as('alice', api);
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT, 120_000);
-	expect((await t.of('statusChanged')).find((e) => e.status === Status.ERRORED)?.reason).toMatch(/^The environment didn't start within 1ms: /);
+	await unschedulable(t); // this start has no runner to beat it
+	await t.send('wake up');
+	await t.waitForStatus(Status.ERRORED, 30_000);
+	expect((await t.of('statusChanged')).findLast((e) => e.status === Status.ERRORED)?.reason).toMatch(/^The environment didn't start within 1ms: /);
+	await kube('patch', 'sandbox', t.pod, '--type', 'merge', '-p', '{"spec":{"podTemplate":{"spec":{"nodeSelector":null}}}}');
+	await kube('delete', 'pod', t.pod, '--wait=false');
+	await t.waitForStatus(Status.AWAITING_INPUT, 120_000);
 	const login = alice.terminal((signal) => alice.settings.openLoginTerminal({ harness: 'claude', action: LoginAction.LOGIN, cols: 80, rows: 24 }, { signal }), 90_000);
 	expect(await refused(login)).toContain("The environment didn't start within 1ms");
 });
