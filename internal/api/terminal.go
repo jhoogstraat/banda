@@ -120,9 +120,11 @@ func (s *Service) toTerminal(key string, msg *bandav1.ConnectResponse) error {
 
 // waitRunner waits for the runner connected as key to connect, telling
 // waiting what its environment waits on every StartPoll (see
-// sandbox.Waiting). No timer: it waits as long as the environment may still
-// start, and fails with the reason once it can't.
+// sandbox.Waiting). It fails with the reason once the environment can't
+// start, or StartDeadline after it began waiting: the thread's own start ends
+// by its watch, and a login environment has no other.
 func (s *Service) waitRunner(ctx context.Context, key string, waiting func(string) error) error {
+	deadline, last := time.Now().Add(s.StartDeadline), ""
 	for next := time.Now(); ; {
 		s.mu.Lock()
 		_, ok := s.runners[key]
@@ -145,6 +147,10 @@ func (s *Service) waitRunner(ctx context.Context, key string, waiting func(strin
 			}
 			if failed {
 				return connect.NewError(connect.CodeFailedPrecondition, why)
+			}
+			last = or(why, last)
+			if time.Now().After(deadline) {
+				return connect.NewError(connect.CodeFailedPrecondition, s.tooLong(last))
 			}
 			if err := waiting(or(why, "Starting the environment…")); err != nil {
 				return err

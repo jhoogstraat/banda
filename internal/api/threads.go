@@ -140,6 +140,7 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 		r.tunnels.CloseAll()
 	}
 	delete(s.runners, t.ID)
+	delete(s.waits, t.ID)
 	s.closeTerminal(t.ID)
 	s.previewChanged(t.ID)
 	s.mu.Unlock()
@@ -171,9 +172,10 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 // runner connects or the thread leaves starting: viewers get what
 // Kubernetes says it waits on (EnvWaiting, ephemeral like the agent's
 // retries), and a start that can't succeed by itself ends as errored with
-// that reason (see sandbox.Waiting). No timer: a slow start is waited for.
-// One watch per thread; a new start resets its clock, so the pod from
-// before it isn't judged.
+// that reason (see sandbox.Waiting), as does one without a runner
+// StartDeadline after it began, by the store's clock so an API restart
+// doesn't renew it. One watch per thread; a new start resets its clock, so the
+// pod from before it isn't judged.
 func (s *Service) watchStart(id string) {
 	s.mu.Lock()
 	_, watched := s.starts[id]
@@ -185,7 +187,7 @@ func (s *Service) watchStart(id string) {
 }
 
 func (s *Service) watchStarting(ctx context.Context, id string) {
-	shown := ""
+	last := "" // what Kubernetes last said, for the deadline's message
 	for {
 		time.Sleep(s.StartPoll)
 		s.mu.Lock()
@@ -198,6 +200,7 @@ func (s *Service) watchStarting(ctx context.Context, id string) {
 			done := s.starts[id].Equal(since) // else it started again since: look again
 			if done {
 				delete(s.starts, id)
+				delete(s.waits, id)
 			}
 			s.mu.Unlock()
 			if done {
@@ -205,13 +208,20 @@ func (s *Service) watchStarting(ctx context.Context, id string) {
 			}
 			continue
 		}
-		if up || time.Since(since) < s.StartPoll {
+		if up {
+			s.showWaiting(id, "") // its setup still runs
+			continue
+		}
+		if time.Since(since) < s.StartPoll {
 			continue
 		}
 		why, failed, err := s.sandboxes.Waiting(ctx, id)
 		if err != nil {
 			slog.Error("look at starting environment", "thread", id, "err", err)
-			continue
+		}
+		last = or(why, last)
+		if !failed && time.Since(t.EnvStartedAt) > s.StartDeadline {
+			why, failed = s.tooLong(last), true
 		}
 		if failed {
 			_, events, err := s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
@@ -226,12 +236,48 @@ func (s *Service) watchStarting(ctx context.Context, id string) {
 			s.broadcast(id, events)
 			continue // the next look ends the watch
 		}
-		if why != "" || shown != "" { // again every time, for viewers who just came
-			s.broadcast(id, []*bandav1.Event{{ThreadId: id, Actor: "system", Time: timestamppb.Now(),
-				Kind: &bandav1.Event_EnvWaiting{EnvWaiting: &bandav1.EnvWaiting{Reason: why}}}})
+		if err == nil {
+			s.showWaiting(id, why)
 		}
-		shown = why
 	}
+}
+
+// showWaiting tells viewers what a starting thread waits on: its page every
+// time, for those who just came, and the lists when that changed.
+func (s *Service) showWaiting(id, why string) {
+	s.mu.Lock()
+	changed := s.waits[id] != why
+	if why != "" {
+		s.waits[id] = why
+	} else {
+		delete(s.waits, id)
+	}
+	if changed {
+		for w := range s.inbox {
+			if w.team || w.ids[id] {
+				w.wake()
+			}
+		}
+	}
+	s.mu.Unlock()
+	if changed || why != "" {
+		s.broadcast(id, []*bandav1.Event{{ThreadId: id, Actor: "system", Time: timestamppb.Now(),
+			Kind: &bandav1.Event_EnvWaiting{EnvWaiting: &bandav1.EnvWaiting{Reason: why}}}})
+	}
+}
+
+// tooLong is why a start ended at StartDeadline, given what Kubernetes last said.
+func (s *Service) tooLong(why string) string {
+	return "The environment didn't start within " + strings.Replace(s.StartDeadline.String(), "m0s", "m", 1) + ": " + or(why, "its runner never connected")
+}
+
+// listed is a thread as lists show it. Callers hold s.mu.
+func (s *Service) listed(t store.Thread) *bandav1.Thread {
+	p := toProto(t)
+	if t.Status == thread.Starting {
+		p.EnvWaiting = s.waits[t.ID]
+	}
+	return p
 }
 
 func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsRequest) (*bandav1.ListThreadsResponse, error) {
@@ -240,8 +286,10 @@ func (s *Service) ListThreads(ctx context.Context, req *bandav1.ListThreadsReque
 		return nil, err
 	}
 	res := &bandav1.ListThreadsResponse{}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, t := range threads {
-		res.Threads = append(res.Threads, toProto(t))
+		res.Threads = append(res.Threads, s.listed(t))
 	}
 	return res, nil
 }

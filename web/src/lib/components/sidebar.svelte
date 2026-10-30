@@ -72,6 +72,7 @@
 		{:else}<StatusDot status={t.status} waiting={wait} />{/if}
 		<span class="truncate {fresh ? 'font-semibold text-sidebar-foreground' : ''}">
 			{race ? `${raceTitle(t)} · ${race.children.length} tries` : t.title || t.repoUrl.split('/').pop() || t.id}
+			{#if t.envWaiting && !race}<span class="block truncate text-xs font-normal text-muted-foreground" title={t.envWaiting}>{t.envWaiting}</span>{/if}
 		</span>
 		{#if wait && !byline}
 			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-700 dark:text-amber-500" title={wait}>{asking(asks(t))}</span>

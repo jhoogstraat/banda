@@ -86,7 +86,7 @@ The owner can add a repository later (**Add a repository** in the thread's **…
 
 ## When an environment doesn't start
 
-While a thread's environment starts, the chat says what Kubernetes is waiting on, if anything: "Waiting for room on a node: …" when no node has room (it starts once one does), or "Can't pull the sandbox image, retrying: …". A slow start is waited for, however long. A start that can't succeed by itself (the image can't be pulled, the container can't be configured, the runner keeps exiting) stops the thread with that reason and **Retry**, which usually needs an admin to fix the cause first. The login terminal in Settings shows the same. A handed-off thread that waits for a node because its volume is on another one won't start: hand it back, or fork it.
+While a thread's environment starts, the chat says what Kubernetes is waiting on, if anything: "Waiting for room on a node: …" when no node has room (it starts once one does), or "Can't pull the sandbox image, retrying: …". The sidebar and the team board show the same line. A slow start is waited for up to 10 minutes (`START_DEADLINE`); then it ends as errored with what Kubernetes last said, and **Retry** starts over. A start that can't succeed by itself (the image can't be pulled, the container can't be configured, the runner keeps exiting) stops the thread with that reason and **Retry**, which usually needs an admin to fix the cause first. The login terminal in Settings shows the same. A handed-off thread that waits for a node because its volume is on another one won't start: hand it back, or fork it.
 
 ## Preparing a repo
 

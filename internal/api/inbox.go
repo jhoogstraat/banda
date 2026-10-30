@@ -107,7 +107,7 @@ func (s *Service) TeamWatch(ctx context.Context, _ *bandav1.TeamWatchRequest, st
 		res := &bandav1.TeamWatchResponse{}
 		s.mu.Lock()
 		for _, t := range threads {
-			p := toProto(t)
+			p := s.listed(t)
 			p.Overlaps = overlaps[t.ID]
 			p.PresentUserIds = slices.Sorted(maps.Keys(s.present[t.ID]))
 			res.Threads = append(res.Threads, p)

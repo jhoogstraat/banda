@@ -53,14 +53,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("SANDBOX_EGRESS_ALLOW: %v", err)
 	}
-	// Before serving: with one replica (and Recreate) no other API creates
-	// sandboxes now; the sweep's own age check covers the e2e's side by side.
-	// ponytail: one-off for Secrets from before start set their owner; drop once no install has them.
-	if n, err := sb.SweepTokens(ctx); err != nil {
-		log.Printf("sweep token Secrets: %v", err) // e.g. a Role without list/delete: they just linger
-	} else if n > 0 {
-		log.Printf("deleted %d token Secrets of deleted sandboxes", n)
-	}
 	started := time.Now()
 	publicURL := strings.TrimRight(env("PUBLIC_URL", "http://localhost:5173"), "/")
 	keys, err := sb.IdentityKeys(ctx, identity.FirstKey)
@@ -122,6 +114,9 @@ func main() {
 	}
 	if svc.WatchBuffer, err = strconv.Atoi(env("WATCH_BUFFER", "256")); err != nil {
 		log.Fatalf("WATCH_BUFFER: %v", err)
+	}
+	if svc.StartDeadline, err = time.ParseDuration(env("START_DEADLINE", "10m")); err != nil || svc.StartDeadline <= 0 {
+		log.Fatalf("START_DEADLINE: %q is not a positive duration", env("START_DEADLINE", "10m"))
 	}
 	every, err := time.ParseDuration(env("IDLE_SWEEP_EVERY", "1m"))
 	if err != nil {

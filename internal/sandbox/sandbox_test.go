@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -155,51 +154,6 @@ func TestStartKeepsTheNewPod(t *testing.T) {
 		if !running && (err != nil || got.UID != "new") {
 			t.Errorf("the controller's new pod was deleted: %v", err)
 		}
-	}
-}
-
-// Token Secrets from before Sandboxes owned them go once their Sandbox is gone;
-// fresh, recently written, owned and still used ones stay.
-func TestSweepTokens(t *testing.T) {
-	old := metav1.NewTime(time.Now().Add(-time.Hour))
-	secret := func(name string, created metav1.Time, mod func(*corev1.Secret)) runtime.Object {
-		s := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns", CreationTimestamp: created,
-			Labels: map[string]string{"banda.dev/runner-token": "true"}}}
-		if mod != nil {
-			mod(s)
-		}
-		return s
-	}
-	kube := kubefake.NewClientset(
-		secret("t-gone-token", old, nil),
-		secret("login-gone-token", old, nil),
-		secret("t-here-token", old, nil),
-		secret("t-fresh-token", metav1.Now(), nil),
-		secret("t-patched-token", old, func(s *corev1.Secret) {
-			now := metav1.Now()
-			s.ManagedFields = []metav1.ManagedFieldsEntry{{Manager: "api", Time: &now}}
-		}),
-		secret("t-owned-token", old, func(s *corev1.Secret) {
-			s.OwnerReferences = []metav1.OwnerReference{{Kind: "Sandbox", Name: "t-owned"}}
-		}),
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "banda-env-x", Namespace: "ns", CreationTimestamp: old}},
-	)
-	c := &Client{cfg: Config{Namespace: "ns"}, sbx: sandboxes(t, &sbv1.Sandbox{ObjectMeta: metav1.ObjectMeta{Name: "t-here"}}), kube: kube}
-	n, err := c.SweepTokens(t.Context())
-	if err != nil || n != 2 {
-		t.Fatalf("swept %d, %v; want 2", n, err)
-	}
-	list, err := kube.CoreV1().Secrets("ns").List(t.Context(), metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var left []string
-	for _, s := range list.Items {
-		left = append(left, s.Name)
-	}
-	slices.Sort(left)
-	if want := []string{"banda-env-x", "t-fresh-token", "t-here-token", "t-owned-token", "t-patched-token"}; !slices.Equal(left, want) {
-		t.Fatalf("left %v, want %v", left, want)
 	}
 }
 

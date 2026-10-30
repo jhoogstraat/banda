@@ -19,8 +19,10 @@ func (s *Service) ListMentioned(ctx context.Context, _ *bandav1.ListMentionedReq
 		return nil, err
 	}
 	res := &bandav1.ListMentionedResponse{}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, t := range threads {
-		res.Threads = append(res.Threads, toProto(t))
+		res.Threads = append(res.Threads, s.listed(t))
 	}
 	return res, nil
 }

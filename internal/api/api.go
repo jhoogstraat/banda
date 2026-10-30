@@ -47,6 +47,9 @@ type Service struct {
 	SuspendPause time.Duration
 	// StartPoll is how often a starting environment's pod is looked at (watchStart).
 	StartPoll time.Duration
+	// StartDeadline is how long an environment may take until its runner
+	// connects; then the start ends as errored (watchStart, waitRunner).
+	StartDeadline time.Duration
 	// WatchBuffer is how many events a WatchThread stream may lag behind
 	// before it catches up from the store.
 	WatchBuffer int
@@ -72,6 +75,8 @@ type Service struct {
 	// starts is when each starting thread's environment was last (re)created,
 	// while a watchStart looks at it.
 	starts map[string]time.Time
+	// waits is what each starting thread's pod waits on, as lists show it (showWaiting).
+	waits map[string]string
 	// loginLastUsed is when each user last had a login terminal.
 	loginLastUsed map[string]time.Time
 	// files holds the requests waiting for a runner's answer (see fileRequest).
@@ -139,7 +144,9 @@ func New(st *store.Store, sb *sandbox.Client) *Service {
 		IDTokenRefresh:     5 * time.Minute,
 		loginLastUsed:      map[string]time.Time{},
 		starts:             map[string]time.Time{},
+		waits:              map[string]string{},
 		StartPoll:          2 * time.Second,
+		StartDeadline:      10 * time.Minute,
 		previewKey:         signer(rand.Text()),
 	}
 	s.previewProxy = &http.Transport{DialContext: s.dialPreview, MaxIdleConnsPerHost: 8, IdleConnTimeout: time.Minute, DisableCompression: true}

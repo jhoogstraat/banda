@@ -328,6 +328,9 @@ message Thread {
   // The owner runs Claude Code on an API key, so teammates may request turns
   // and be trusted. On a subscription only the owner runs the agent.
   bool teammate_turns = 39;
+  // While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
+  // ListThreads, ListMentioned and TeamWatch; never stored.
+  string env_waiting = 40;
 }
 
 // Another thread that changes some of the same files (see Thread.overlaps).

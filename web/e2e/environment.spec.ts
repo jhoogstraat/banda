@@ -44,18 +44,36 @@ test('a start that can’t succeed (an image that can’t be pulled) ends as err
 	expect(await refused(login)).toContain("Can't pull the sandbox image");
 });
 
-test('a start that waits on Kubernetes (no node fits) says why and keeps waiting; once a node fits it starts', async ({ as }) => {
-	const alice = as('alice');
-	const t = await alice.create();
-	await t.waitForStatus(Status.AWAITING_INPUT);
+// Parks t and makes its next start wait for a node that never comes.
+async function unschedulable(t: Thread) {
 	await t.snooze();
 	await t.podGone();
 	// Only this test's Sandbox: a start keeps fields of its pod template that Banda doesn't set.
 	await kube('patch', 'sandbox', t.pod, '--type', 'merge', '-p', '{"spec":{"podTemplate":{"spec":{"nodeSelector":{"banda.dev/e2e":"nowhere"}}}}}');
+}
+
+test('a start that waits on Kubernetes (no node fits) says why on the thread, the sidebar and the team board, and keeps waiting; once a node fits it starts', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await unschedulable(t);
 	const page = await alice.page();
 	await page.goto(`/t/${t.id}`);
+	const phone = await alice.page(); // no hover there, so the board shows the reason whole, live
+	await phone.setViewportSize({ width: 390, height: 800 });
+	await phone.goto('/team');
 	await t.send('wake up');
-	await expect(page.getByText(/Waiting for room on a node: 0\/1 nodes are available/)).toBeVisible({ timeout: 30_000 });
+	const why = /Waiting for room on a node: 0\/1 nodes are available/;
+	await expect(page.locator('[aria-live=polite]').getByText(why)).toBeVisible({ timeout: 30_000 });
+	const row = page.locator(`a[href="/t/${t.id}"]`).filter({ hasText: why });
+	await page.locator('details', { has: row }).locator('summary').click(); // the sidebar's folded section
+	await expect(row).toBeVisible();
+	const card = phone.getByRole('link').filter({ hasText: why });
+	await expect(card).toBeVisible();
+	await expect.poll(() => card.getByText(why).evaluate((p) => p.scrollWidth <= p.clientWidth && p.scrollHeight <= p.clientHeight)).toBe(true);
+	const opened = await bob.page(); // opens the board mid-start
+	await opened.goto('/team');
+	await expect(opened.getByRole('link').filter({ hasText: why })).toBeVisible();
 	await page.waitForTimeout(6000); // several looks at the pod: still waiting, not errored
 	expect((await t.get()).status).toBe(Status.STARTING);
 
@@ -63,6 +81,35 @@ test('a start that waits on Kubernetes (no node fits) says why and keeps waiting
 	await kube('delete', 'pod', t.pod, '--wait=false');
 	await t.waitForStatus(Status.AWAITING_INPUT, 120_000);
 	await expect(page.getByText(/Waiting for room on a node/)).toHaveCount(0);
+	await expect(opened.getByText(/Waiting for room on a node/)).toHaveCount(0);
+});
+
+test('a start without a runner after START_DEADLINE ends errored and a late runner still rescues it; a login terminal gives up the same way', async ({ as, startApi }) => {
+	const api = await startApi({ START_DEADLINE: '1ms' }) // past at the first look;
+	const alice = as('alice', api);
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT, 120_000);
+	expect((await t.of('statusChanged')).find((e) => e.status === Status.ERRORED)?.reason).toMatch(/^The environment didn't start within 1ms: /);
+	const login = alice.terminal((signal) => alice.settings.openLoginTerminal({ harness: 'claude', action: LoginAction.LOGIN, cols: 80, rows: 24 }, { signal }), 90_000);
+	expect(await refused(login)).toContain("The environment didn't start within 1ms");
+});
+
+test('the start deadline counts from the thread’s start across an API restart, and ends it with Kubernetes’ last reason and Retry', async ({ as, startApi }) => {
+	const api = await startApi({ START_DEADLINE: '30m', IDLE_SWEEP_EVERY: '1s' });
+	const alice = as('alice', api);
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await unschedulable(t);
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await t.send('wake up');
+	await expect(page.locator('[aria-live=polite]').getByText(/Waiting for room on a node/)).toBeVisible({ timeout: 30_000 });
+	await api.stop();
+	await sql(`update threads set env_started_at = now() - interval '2 hours' where id = '${t.id}'`, api.db);
+	await api.start();
+	await t.waitForStatus(Status.ERRORED, 30_000);
+	const card = page.getByRole('alert').filter({ hasText: "The environment didn't start within 30m: Waiting for room on a node" });
+	await expect(card.getByRole('button', { name: 'Retry' })).toBeVisible({ timeout: 30_000 });
 });
 
 const sandbox = (id: string, field: string) => kube('get', 'sandbox', `t-${id}`, '-o', `jsonpath={.spec.${field}}`);

@@ -14,6 +14,7 @@
 
 	function doing(t: Thread) {
 		if (waiting(t)) return waiting(t);
+		if (t.envWaiting) return t.envWaiting;
 		if (t.status === Status.AWAITING_INPUT) return `Ready for ${t.ownerId === threads.me?.id ? 'you' : userName(t.ownerId)}`;
 		if (t.status === Status.SUSPENDED) return 'Paused';
 		const a = t.activity;
@@ -51,7 +52,7 @@
 			<span class="truncate {unread(t) ? 'font-semibold' : ''}">{t.title || 'Untitled thread'}</span>
 			{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
 		</div>
-		<p class="mt-1 truncate text-xs {t.status === Status.ERRORED ? 'text-destructive' : 'text-muted-foreground'}" title={doing(t)}>
+		<p class="mt-1 text-xs {t.envWaiting ? 'break-words' : 'truncate'} {t.status === Status.ERRORED ? 'text-destructive' : 'text-muted-foreground'}" title={doing(t)}>
 			{doing(t) || ' '}
 		</p>
 		<div class="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">

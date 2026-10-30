@@ -872,6 +872,9 @@ type Thread struct {
 	// The owner runs Claude Code on an API key, so teammates may request turns
 	// and be trusted. On a subscription only the owner runs the agent.
 	TeammateTurns bool `protobuf:"varint,39,opt,name=teammate_turns,json=teammateTurns,proto3" json:"teammate_turns,omitempty"`
+	// While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
+	// ListThreads, ListMentioned and TeamWatch; never stored.
+	EnvWaiting    string `protobuf:"bytes,40,opt,name=env_waiting,json=envWaiting,proto3" json:"env_waiting,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1170,6 +1173,13 @@ func (x *Thread) GetTeammateTurns() bool {
 		return x.TeammateTurns
 	}
 	return false
+}
+
+func (x *Thread) GetEnvWaiting() string {
+	if x != nil {
+		return x.EnvWaiting
+	}
+	return ""
 }
 
 // Another thread that changes some of the same files (see Thread.overlaps).
@@ -16399,7 +16409,7 @@ var File_banda_v1_banda_proto protoreflect.FileDescriptor
 
 const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
-	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9d\v\n" +
+	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\v\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bowner_id\x18\x02 \x01(\tR\aownerId\x12\x14\n" +
@@ -16445,7 +16455,9 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x05forge\x18% \x01(\tR\x05forge\x12\x1f\n" +
 	"\vforge_ready\x18& \x01(\bR\n" +
 	"forgeReady\x12%\n" +
-	"\x0eteammate_turns\x18' \x01(\bR\rteammateTurns\"\x97\x01\n" +
+	"\x0eteammate_turns\x18' \x01(\bR\rteammateTurns\x12\x1f\n" +
+	"\venv_waiting\x18( \x01(\tR\n" +
+	"envWaiting\"\x97\x01\n" +
 	"\aOverlap\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x19\n" +

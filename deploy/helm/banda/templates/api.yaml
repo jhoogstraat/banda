@@ -23,7 +23,7 @@ rules:
     verbs: [create]
   - apiGroups: [""]
     resources: [secrets] # users' banda-env-*, banda-auth-* and banda-forge-* (forge tokens, no pod mounts them), the team's banda-env-team, banda-github-app (its key, likewise) and banda-gitlab-app-<host> (GitLab applications' secrets, likewise), banda-git, runner tokens (<sandbox>-token, owned by their Sandbox), banda-identity (workload identity signing keys, made on first start, in no pod)
-    verbs: [get, list, create, patch, delete] # list, delete: the start-up sweep of token Secrets from before they had an owner; delete: disconnecting GitHub or GitLab, removing an app
+    verbs: [get, create, patch, delete] # delete: disconnecting GitHub or GitLab, removing an app
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies] # sandboxes-allow, from SANDBOX_EGRESS_ALLOW
     verbs: [create, patch, delete]

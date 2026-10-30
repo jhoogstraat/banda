@@ -260,6 +260,14 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
    * @generated from field: bool teammate_turns = 39;
    */
   teammateTurns: boolean;
+
+  /**
+   * While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
+   * ListThreads, ListMentioned and TeamWatch; never stored.
+   *
+   * @generated from field: string env_waiting = 40;
+   */
+  envWaiting: string;
 };
 
 /**

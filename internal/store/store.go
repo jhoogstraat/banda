@@ -64,6 +64,7 @@ type Thread struct {
 	Handoffs       int        // accepted handoffs; each starts a new Claude Code session
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	EnvStartedAt   time.Time // when provision last started the environment
 
 	// The viewer's own state; only set by List and ListMentioned.
 	SnoozedUntil *time.Time
@@ -159,18 +160,18 @@ func applyMigration(ctx context.Context, db *pgxpool.Pool, name, body string) er
 // cols are the thread columns Get, Update and the lists read; fields says where
 // each goes, in the same order. A new column goes into both, nowhere else.
 // The last is read-only: the owner's Claude Code auth method (see Settings).
-// env_api_key is written by NewRunnerToken only.
+// env_api_key is written by NewRunnerToken only, env_started_at by ResetEnv.
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at, handoff_to, handoffs, pending_teammate, env_api_key,
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at, handoff_to, handoffs, pending_teammate, env_api_key, env_started_at,
 	owner_id IN (SELECT user_id FROM harness_settings WHERE harness = 'claude' AND auth_method = 'api_key')`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent, &t.HandoffTo, &t.Handoffs, &t.PendingTeammate, &t.EnvAPIKey, &t.APIKey}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent, &t.HandoffTo, &t.Handoffs, &t.PendingTeammate, &t.EnvAPIKey, &t.EnvStartedAt, &t.APIKey}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -580,9 +581,9 @@ func (s *Store) SetEnvDeleteAt(ctx context.Context, id string, at *time.Time) er
 	return err
 }
 
-// ResetEnv forgets a deletion and what was pushed: the environment is (re)started.
+// ResetEnv forgets a deletion and what was pushed, and notes the time: the environment is (re)started.
 func (s *Store) ResetEnv(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx, `UPDATE threads SET env_delete_at = NULL, env_pushed = false, env_deleted = false WHERE id = $1`, id)
+	_, err := s.db.Exec(ctx, `UPDATE threads SET env_delete_at = NULL, env_pushed = false, env_deleted = false, env_started_at = now() WHERE id = $1`, id)
 	return err
 }
 
