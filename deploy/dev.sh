@@ -74,7 +74,19 @@ cluster() {
 		kc -n banda rollout status statefulset/postgres --timeout=300s
 		kc -n banda rollout status deployment/dex --timeout=300s
 	fi
+	coredns
 	host_api banda 8700 8999 # mise run api, and other checkouts' on ports of their own
+}
+
+# Pods here have no IPv6, so CoreDNS answers AAAA itself. Upstream it can hang: gvproxy, Podman's DNS on a
+# Mac, can fail every AAAA after a change of network until the VM restarts, and each name a pod looks up then
+# takes seconds per search domain. CoreDNS reloads its config within a minute.
+coredns() {
+	local corefile
+	corefile=$(kc -n kube-system get configmap coredns -o 'jsonpath={.data.Corefile}')
+	grep -q 'template IN AAAA' <<<"$corefile" && return
+	corefile=$(sed 's/^\( *\)forward \. /\1template IN AAAA . {\n\1    rcode NOERROR\n\1}\n&/' <<<"$corefile")
+	kc -n kube-system create configmap coredns --from-literal=Corefile="$corefile" --dry-run=client -o yaml | kc apply -f -
 }
 
 # host_api <namespace> <port> [<end port>]: lets the namespace's sandboxes reach an API on this machine,
