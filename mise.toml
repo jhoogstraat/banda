@@ -20,6 +20,8 @@ actionlint = "latest"
 # RUNNER_API_URL=http://host.docker.internal:8787 under [env] in mise.local.toml.
 KIND_EXPERIMENTAL_PROVIDER = "podman"
 CONTAINER_CONNECTION = "podman-machine-default-root"
+# `kind create cluster` moves kubeconfig's current context: the API on this Mac stays on Banda's cluster.
+KUBE_CONTEXT = "kind-banda"
 
 # The tasks take settings from the environment, e.g. `PUBLIC_HOST=192.168.0.30 mise run api`:
 #   PUBLIC_HOST    address browsers use (default localhost). Not localhost: web listens on all interfaces.

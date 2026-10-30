@@ -1,6 +1,7 @@
 // The harness's own capabilities (deploy/fake-claude directives, fixture repos, test APIs), so a
 // broken capability fails here instead of in a scenario built on it.
 import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { writeFile } from 'node:fs/promises';
 import { createServer, type AddressInfo, type Server } from 'node:net';
 import { expect, freePort, kube, mcpDirective, repo, Status, test } from './fixtures.ts';
 
@@ -63,6 +64,14 @@ test('setup-hold keeps a thread starting until released', async ({ as }) => {
 	expect((await t.get()).status).toBe(Status.STARTING);
 	await t.release('setup');
 	await t.waitForStatus(Status.AWAITING_INPUT);
+});
+
+test('a test’s API stays on the kind cluster when kubeconfig’s current context moves', async ({ startApi }, testInfo) => {
+	// As `kind create cluster` does for a second cluster: an API that followed it would find no namespace.
+	const config = await kube('config', 'view', '--raw');
+	const kubeconfig = testInfo.outputPath('kubeconfig');
+	await writeFile(kubeconfig, config.replace(/^current-context: .*$/m, 'current-context: elsewhere'));
+	await startApi({ KUBECONFIG: kubeconfig });
 });
 
 test('a test’s own API restarts mid-test; the runner reconnects to it', async ({ as, startApi }) => {

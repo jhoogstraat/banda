@@ -37,6 +37,7 @@ func main() {
 		log.Fatal(err)
 	}
 	sb, err := sandbox.New(sandbox.Config{
+		Context:   os.Getenv("KUBE_CONTEXT"),
 		Namespace: env("SANDBOX_NAMESPACE", "banda"),
 		Image:     env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
 		APIURL:    env("RUNNER_API_URL", "http://host.containers.internal:8787"),

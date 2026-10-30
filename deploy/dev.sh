@@ -58,7 +58,10 @@ host_ip() {
 }
 
 cluster() {
-	if ! kind get clusters 2>/dev/null | grep -qx banda; then
+	local clusters
+	# A Podman that doesn't answer is no missing cluster: `mise run cluster` would apply this checkout's controller to it.
+	clusters=$(kind get clusters 2>/dev/null) || { echo "kind can't reach the cluster's container engine" >&2; exit 1; }
+	if ! grep -qx banda <<<"$clusters"; then
 		mise run cluster
 		# E2E_IMAGE (CI): the e2e suite brings its image, it needs no dev image.
 		[ -n "${E2E_IMAGE:-}" ] || mise run image

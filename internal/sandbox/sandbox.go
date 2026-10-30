@@ -41,6 +41,7 @@ const (
 )
 
 type Config struct {
+	Context   string // of the kubeconfig; empty is its current one
 	Namespace string
 	Image     string
 	APIURL    string // where runners dial the API
@@ -97,7 +98,8 @@ type Client struct {
 
 // New uses the kubeconfig, or the in-cluster config when there is none.
 func New(cfg Config) (*Client, error) {
-	rc, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(clientcmd.NewDefaultClientConfigLoadingRules(), nil).ClientConfig()
+	rc, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{CurrentContext: cfg.Context}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
