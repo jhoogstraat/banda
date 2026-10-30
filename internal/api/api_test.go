@@ -70,12 +70,12 @@ func TestPublicError(t *testing.T) {
 func TestPullRequestURL(t *testing.T) {
 	pushed := bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String()
 	for repo, want := range map[string]string{
-		"https://github.com/o/r":      "https://github.com/o/r/compare/main...banda/x?expand=1",
-		"https://github.com/o/r.git":  "https://github.com/o/r/compare/main...banda/x?expand=1",
-		"git@github.com:o/r.git":      "https://github.com/o/r/compare/main...banda/x?expand=1",
-		"https://github.com/o/r.git/": "https://github.com/o/r/compare/main...banda/x?expand=1",
-		"https://gitlab.com/o/r.git":  "",
-		"/tmp/origin.git":             "",
+		"https://github.com/o/r":       "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://github.com/o/r.git":   "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"git@github.com:o/r.git":       "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://github.com/o/r.git/":  "https://github.com/o/r/compare/main...banda/x?expand=1",
+		"https://gitlab.com/g/o/r.git": "https://gitlab.com/g/o/r/-/merge_requests/new?merge_request%5Bsource_branch%5D=banda%2Fx&merge_request%5Btarget_branch%5D=main",
+		"/tmp/origin.git":              "",
 	} {
 		if got := pullRequestURL(store.Thread{RepoURL: repo, BaseBranch: "main", Branch: "banda/x", AutoPush: pushed}); got != want {
 			t.Errorf("%s: got %q, want %q", repo, got, want)

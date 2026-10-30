@@ -134,7 +134,7 @@
 		{:else if pr && owner && thread?.forgeReady}
 			<IconButton icon={GitPullRequestCreateIcon} label="Create a {noun(thread.forge)}" onclick={oncreate} />
 		{:else if pr}
-			<IconButton icon={GitPullRequestIcon} label="Open a pull request" href={pr} target="_blank" />
+			<IconButton icon={GitPullRequestIcon} label="Open a {noun(thread?.forge ?? '')}" href={pr} target="_blank" />
 		{:else if owner && thread?.repoUrl}
 			<IconButton icon={UploadIcon} label="Push the branch to origin" onclick={push} />
 		{/if}

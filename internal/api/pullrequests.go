@@ -290,7 +290,9 @@ func (s *Service) refresh(ctx context.Context, t store.Thread, old *bandav1.Pull
 	}
 	if err != nil {
 		stale := proto.CloneOf(old)
-		stale.Error = publicError(ctx, "forge", forgeError(err)).Error()
+		var ce *connect.Error
+		errors.As(publicError(ctx, "forge", forgeError(err)), &ce)
+		stale.Error = ce.Message()
 		if serr := s.storePullRequest(ctx, t, old, stale, actor, ""); serr != nil {
 			return nil, serr
 		}
@@ -505,7 +507,7 @@ func (s *Service) PullRequestChoices(ctx context.Context, req *bandav1.PullReque
 var spotting sync.Map // thread ids
 
 // spot links the open pull request of the thread's branch when the thread has
-// none: one the agent opened itself (gh, glab) or someone on the forge. It
+// none: one the agent opened itself (gh, a GitLab push option) or someone on the forge. It
 // says so like a link, by nobody. Quiet when the forge or the owner's token is
 // unknown.
 // ponytail: asks the forge at every turn's end and push while nothing is linked; a webhook would say when.

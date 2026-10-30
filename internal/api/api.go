@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/forge"
 	"github.com/jhoogstraat/banda/internal/identity"
 	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
@@ -330,14 +332,20 @@ func toProto(t store.Thread) *bandav1.Thread {
 
 var githubRepo = regexp.MustCompile(`^(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$`)
 
-// pullRequestURL opens a GitHub pull request for the thread's branch, once
-// all its work is pushed.
+// pullRequestURL opens a pull request (GitLab: merge request) for the
+// thread's branch on the forge, once all its work is pushed.
 func pullRequestURL(t store.Thread) string {
-	m := githubRepo.FindStringSubmatch(t.RepoURL)
-	if m == nil || t.AutoPush != bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String() {
+	if t.AutoPush != bandav1.AutoPushState_AUTO_PUSH_STATE_PUSHED.String() {
 		return ""
 	}
-	return fmt.Sprintf("https://github.com/%s/compare/%s...%s?expand=1", m[1], t.BaseBranch, t.Branch)
+	if m := githubRepo.FindStringSubmatch(t.RepoURL); m != nil {
+		return fmt.Sprintf("https://github.com/%s/compare/%s...%s?expand=1", m[1], t.BaseBranch, t.Branch)
+	}
+	if r, ok := Forges.Repo(t.RepoURL); ok && r.Kind == forge.GitLab {
+		q := url.Values{"merge_request[source_branch]": {t.Branch}, "merge_request[target_branch]": {t.BaseBranch}}
+		return Forges.Base(r.Host) + "/" + r.Path + "/-/merge_requests/new?" + q.Encode()
+	}
+	return ""
 }
 
 // title is a thread's title from its first prompt.

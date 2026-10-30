@@ -251,6 +251,9 @@ func TestGitLab(t *testing.T) {
 			map[string]any{"name": "test", "stage": "test", "status": "running"},
 			map[string]any{"name": "build", "stage": "build", "status": "success"}},
 		"GET " + gl + "/merge_requests/5/approvals": map[string]any{"approved_by": []any{map[string]any{"user": map[string]any{"username": "bob"}}}},
+		"GET " + gl + "/merge_requests/5/reviewers": []any{
+			map[string]any{"user": map[string]any{"username": "bob"}, "state": "approved"},
+			map[string]any{"user": map[string]any{"username": "carol"}, "state": "requested_changes"}},
 		"GET " + gl + "/merge_requests/5/discussions": []any{
 			map[string]any{"id": "d1", "individual_note": true, "notes": []any{map[string]any{"id": 1, "body": "hi", "author": map[string]any{"username": "dan"}}}},
 			map[string]any{"id": "d2", "individual_note": false, "notes": []any{
@@ -263,11 +266,17 @@ func TestGitLab(t *testing.T) {
 		"GET " + gl + "/members/all":                            []any{map[string]any{"username": "bob"}},
 		"GET " + gl + "/labels":                                 []any{map[string]any{"name": "ui"}},
 		"GET /api/v4/users":                                     []any{map[string]any{"id": 9, "username": "erin"}},
-		"POST " + gl + "/merge_requests/5/discussions":          map[string]any{"id": "d3"},
+		"POST " + gl + "/merge_requests/5/notes":                map[string]any{"id": 6},
 		"POST " + gl + "/merge_requests/5/discussions/d2/notes": map[string]any{"id": 5},
 		"PUT " + gl + "/merge_requests/5/merge":                 map[string]any{"iid": 5},
 		"PUT " + gl + "/merge_requests/6/merge": func(*http.Request) (int, any) {
 			return http.StatusMethodNotAllowed, map[string]any{"message": "405 Method Not Allowed"}
+		},
+		"PUT " + gl + "/merge_requests/7/merge": func(*http.Request) (int, any) {
+			return http.StatusConflict, map[string]any{"message": []any{"Another open merge request already exists"}}
+		},
+		"PUT " + gl + "/merge_requests/8/merge": func(*http.Request) (int, any) {
+			return http.StatusForbidden, map[string]any{"error": "insufficient_scope", "error_description": "The request requires higher privileges.", "scope": "api read_api"}
 		},
 	})
 	g := open(t, GitLab, base)
@@ -286,10 +295,11 @@ func TestGitLab(t *testing.T) {
 	}
 	s := pr.Summary
 	if s.State != bandav1.PullState_PULL_STATE_DRAFT || s.Mergeable != bandav1.Mergeable_MERGEABLE_BLOCKED || pr.MergeDetail != "Not approved yet" ||
-		s.Checks != bandav1.ChecksState_CHECKS_STATE_PENDING || s.Review != bandav1.ReviewState_REVIEW_STATE_APPROVED || pr.ChangedFiles != 3 {
+		s.Checks != bandav1.ChecksState_CHECKS_STATE_PENDING || s.Review != bandav1.ReviewState_REVIEW_STATE_CHANGES_REQUESTED || pr.ChangedFiles != 3 {
 		t.Errorf("summary %v, detail %q", s, pr.MergeDetail)
 	}
-	if pr.Checks[0].Name != "build / build" || len(pr.Reviewers) != 2 || pr.Reviewers[1].Login != "carol" {
+	if pr.Checks[0].Name != "build / build" || len(pr.Reviewers) != 2 || pr.Reviewers[1].Login != "carol" ||
+		pr.Reviewers[1].State != bandav1.ReviewState_REVIEW_STATE_CHANGES_REQUESTED {
 		t.Errorf("checks %v, reviewers %v", pr.Checks, pr.Reviewers)
 	}
 	if len(pr.Comments) != 3 || pr.Comments[1].Path != "a.go" || pr.Comments[2].ReplyTo != "2" || pr.Comments[0].ReplyTo != "" {
@@ -313,15 +323,21 @@ func TestGitLab(t *testing.T) {
 	if err := g.Comment(ctx, 5, "reply", "2"); err != nil || f.posted["POST "+gl+"/merge_requests/5/discussions/d2/notes"]["body"] != "reply" {
 		t.Fatalf("reply: %v", err)
 	}
-	if err := g.Comment(ctx, 5, "top", ""); err != nil {
-		t.Fatal(err)
+	if err := g.Comment(ctx, 5, "top", ""); err != nil || f.posted["POST "+gl+"/merge_requests/5/notes"]["body"] != "top" { // a note, not a thread to resolve
+		t.Fatalf("comment: %v", err)
 	}
 	if err := g.Merge(ctx, 5, "squash"); err != nil || f.posted["PUT "+gl+"/merge_requests/5/merge"]["squash"] != true {
 		t.Fatalf("merge: %v", err)
 	}
 	var fe *Error
-	if err := g.Merge(ctx, 6, "merge"); !errors.As(err, &fe) || fe.Code != Refused {
+	if err := g.Merge(ctx, 6, "merge"); !errors.As(err, &fe) || fe.Code != Refused || fe.Msg != "GitLab won't merge this yet: see what blocks it above" {
 		t.Errorf("merge refused: %v", err)
+	}
+	if err := g.Merge(ctx, 7, "merge"); !errors.As(err, &fe) || fe.Msg != "GitLab: Another open merge request already exists" {
+		t.Errorf("message unwrapped: %v", err)
+	}
+	if err := g.Merge(ctx, 8, "merge"); !errors.As(err, &fe) || fe.Msg != "GitLab doesn't let this token do that: it needs the api scope" {
+		t.Errorf("scope: %v", err)
 	}
 	if f.auth[0] != "Bearer tok" { // OAuth tokens only work this way; personal ones work either way
 		t.Errorf("Authorization %q", f.auth[0])

@@ -173,6 +173,39 @@ test('the create dialog asks for reviewers and adds labels from the forge’s li
 	await expect(pane(page).getByRole('button', { name: 'Remove label bug' })).toBeVisible();
 });
 
+test('GitLab: a comment is a plain note, a thread without a file resolves, changes requested show, and a refused merge says so plainly', async ({ as, startApi, forge }) => {
+	const { alice, t } = await world(as, startApi, forge, { FORGE_HOSTS: 'github.com=gitlab' });
+	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: '', reviewers: ['bob'] });
+	const page = await open(alice, t.id);
+	await page.getByRole('button', { name: /^MR !1/ }).click();
+	const conversation = pane(page).getByRole('region', { name: 'Conversation' });
+
+	// A new discussion would be an unresolved thread on GitLab, which can block merging.
+	await pane(page).getByLabel('Comment', { exact: true }).fill('Plain');
+	await pane(page).getByRole('button', { name: 'Comment', exact: true }).click();
+	await expect(conversation).toContainText('Plain');
+	expect(forge.calls.filter((c) => c.endsWith('/merge_requests/1/notes'))).toEqual(['POST /api/v4/projects/e2e/plain/merge_requests/1/notes']);
+	expect(forge.calls.some((c) => c.startsWith('POST') && c.endsWith('/discussions'))).toBe(false);
+	await expect(conversation.getByRole('button', { name: 'Resolve', exact: true })).toHaveCount(0);
+
+	// Someone starts a thread on GitLab, on no line: it blocks merging until resolved, here too.
+	forge.comment(1, { login: 'bob', body: 'Think again', thread: true });
+	forge.comment(1, { login: 'bob', body: '', review: 'CHANGES_REQUESTED' });
+	forge.pull(1).blocked = 'discussions_not_resolved';
+	await expect(page.getByRole('button', { name: /^MR !1 · Open · changes requested/ })).toBeVisible({ timeout: 15_000 });
+	await expect(pane(page).getByText('Unresolved discussions')).toBeVisible();
+	await expect(pane(page).getByRole('region', { name: 'Reviewers' })).toContainText('bobChanges requested');
+	await pane(page).getByRole('button', { name: 'Merge', exact: true }).click();
+	await expect(pane(page).getByText("GitLab won't merge this yet: see what blocks it above", { exact: true })).toBeVisible();
+	await conversation.getByRole('button', { name: 'Reply', exact: true }).click();
+	await conversation.getByLabel('Reply to bob').fill('Done');
+	await conversation.getByRole('button', { name: 'Reply', exact: true }).click();
+	await expect(conversation).toContainText('Done');
+	await conversation.getByRole('button', { name: 'Resolve', exact: true }).click();
+	await expect(conversation.getByRole('button', { name: 'Unresolve', exact: true })).toBeVisible();
+	expect(forge.pull(1).comments.find((c) => c.thread)?.resolved).toBe(true);
+});
+
 test('GitLab: a merge request created with reviewers and labels gets them', async ({ as, startApi, forge }) => {
 	const { alice, t } = await world(as, startApi, forge, { FORGE_HOSTS: 'github.com=gitlab' });
 	await alice.threads.pullRequestCreate({ threadId: t.id, title: 'Hello', body: '', reviewers: ['bob'], labels: ['bug'] });

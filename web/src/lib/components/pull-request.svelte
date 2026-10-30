@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
+	import { ConnectError } from '@connectrpc/connect';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import FileDiffIcon from '@lucide/svelte/icons/file-diff';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code';
@@ -69,7 +70,7 @@
 			loaded = true;
 			if (pr && !pr.mergeMethods.includes(method)) method = pr.mergeMethods[0] ?? '';
 		} catch (e) {
-			loadError = (e as Error).message;
+			loadError = ConnectError.from(e).rawMessage;
 		}
 	}
 	$effect(() => {
@@ -86,7 +87,7 @@
 			error = '';
 			return true;
 		} catch (e) {
-			error = (e as Error).message;
+			error = ConnectError.from(e).rawMessage;
 			return false;
 		} finally {
 			busy = false;
@@ -301,7 +302,7 @@
 				<div class="space-y-2">
 					{@render commentCard(c)}
 					{#each replies as r (r.id)}{@render commentCard(r, true)}{/each}
-					{#if c.path && canComment}
+					{#if (c.path || c.threadId) && canComment}
 						{#if replying === c.id}
 							<div class="space-y-1.5 border-l-2 pl-3">
 								<Textarea bind:value={reply} rows={2} placeholder="Reply" aria-label="Reply to {c.author}" />

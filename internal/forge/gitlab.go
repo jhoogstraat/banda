@@ -38,10 +38,17 @@ func gitLabClient(base, token string, refused func()) (*gitlab.Client, error) {
 	return gitlab.NewOAuthClient(token, gitlab.WithBaseURL(base+"/api/v4"), gitlab.WithoutRetries(), gitlab.WithHTTPClient(hc))
 }
 
+// wrapped is how the client renders GitLab's {"message": ...} and {"message": ["..."]}.
+var wrapped = regexp.MustCompile(`^\{(?:message|error): \[?([^{}]*?)\]?\}$`)
+
 func (f *gitLab) fail(err error) error {
 	var er *gitlab.ErrorResponse
 	if errors.As(err, &er) && er.Response != nil {
-		return fromStatus("GitLab", f.fix, er.Response.StatusCode, er.Message)
+		msg := wrapped.ReplaceAllString(er.Message, "$1")
+		if strings.Contains(msg, "insufficient_scope") { // a write_repository token as GITLAB_TOKEN
+			msg = "it needs the api scope"
+		}
+		return fromStatus("GitLab", f.fix, er.Response.StatusCode, msg)
 	}
 	if err == nil {
 		return nil
@@ -171,10 +178,20 @@ func (g *gitLab) Get(ctx context.Context, number int) (*bandav1.PullRequest, err
 			out.Reviewers = append(out.Reviewers, &bandav1.PullRequestReviewer{Login: a.User.Username, State: bandav1.ReviewState_REVIEW_STATE_APPROVED})
 		}
 	}
-	for _, r := range mr.Reviewers {
-		if !approved[r.Username] {
-			out.Reviewers = append(out.Reviewers, &bandav1.PullRequestReviewer{Login: r.Username, State: bandav1.ReviewState_REVIEW_STATE_REQUESTED})
+	// Only this list says who requested changes; the merge request's doesn't.
+	reviewers, _, err := g.c.MergeRequests.GetMergeRequestReviewers(g.path, iid, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, g.fail(err)
+	}
+	for _, r := range reviewers {
+		if r.User == nil || approved[r.User.Username] {
+			continue
 		}
+		state := bandav1.ReviewState_REVIEW_STATE_REQUESTED
+		if r.State == "requested_changes" {
+			state = bandav1.ReviewState_REVIEW_STATE_CHANGES_REQUESTED
+		}
+		out.Reviewers = append(out.Reviewers, &bandav1.PullRequestReviewer{Login: r.User.Username, State: state})
 	}
 	s.Review = reviewRollup(out.Reviewers)
 
@@ -255,13 +272,16 @@ func (g *gitLab) Merge(ctx context.Context, number int, method string) error {
 		return &Error{Refused, "GitLab merges with merge or squash"}
 	}
 	_, _, err := g.c.MergeRequests.AcceptMergeRequest(g.path, int64(number), &gitlab.AcceptMergeRequestOptions{Squash: gitlab.Ptr(method == "squash")}, gitlab.WithContext(ctx))
+	if gitlab.HasStatusCode(err, http.StatusMethodNotAllowed) { // all GitLab says for anything blocking a merge
+		return &Error{Refused, "GitLab won't merge this yet: see what blocks it above"}
+	}
 	return g.fail(err)
 }
 
 func (g *gitLab) Comment(ctx context.Context, number int, body, replyTo string) error {
 	iid := int64(number)
-	if replyTo == "" {
-		_, _, err := g.c.Discussions.CreateMergeRequestDiscussion(g.path, iid, &gitlab.CreateMergeRequestDiscussionOptions{Body: &body}, gitlab.WithContext(ctx))
+	if replyTo == "" { // a note: a new discussion would be a thread to resolve, which can block merging
+		_, _, err := g.c.Notes.CreateMergeRequestNote(g.path, iid, &gitlab.CreateMergeRequestNoteOptions{Body: &body}, gitlab.WithContext(ctx))
 		return g.fail(err)
 	}
 	discussions, _, err := g.c.Discussions.ListMergeRequestDiscussions(g.path, iid, &gitlab.ListMergeRequestDiscussionsOptions{ListOptions: gitlab.ListOptions{PerPage: 100}}, gitlab.WithContext(ctx))

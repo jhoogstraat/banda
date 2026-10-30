@@ -184,6 +184,62 @@ test('connected: a merge request goes out as the user, and git in the pod gets t
 	for (const v of [apiGrant.access, apiGrant.refresh, gitGrant.refresh, gitGrant.access, appSecret]) expect(env).not.toContain(v);
 });
 
+test('on GitLab itself the header opens a merge request: created by the connected owner, a link to GitLab’s form for everyone else', async ({ as, startApi, forge }) => {
+	const { api } = await startWorld(startApi, forge);
+	const [alice, bob] = [as('alice', api), as('bob', api)];
+	await setUp(alice);
+	await connect(api, alice, forge, 'alice');
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+	const { branch } = await t.get();
+
+	const bobs = await open(bob, `/t/${t.id}`);
+	const q = new URLSearchParams({ 'merge_request[source_branch]': branch, 'merge_request[target_branch]': 'main' });
+	await expect(bobs.getByRole('link', { name: 'Open a merge request' })).toHaveAttribute('href', `${forge.url}/e2e/plain/-/merge_requests/new?${q}`);
+
+	const page = await open(alice, `/t/${t.id}`);
+	await page.getByRole('button', { name: 'Create a merge request' }).click();
+	const dialog = page.getByRole('dialog');
+	await dialog.getByLabel('Title').fill('From the header');
+	await dialog.getByRole('button', { name: 'Create merge request' }).click();
+	await expect(dialog).toBeHidden();
+	expect(forge.pull(1)).toMatchObject({ author: 'alice', title: 'From the header' });
+	await expect(page.getByRole('button', { name: /^MR !1/ })).toBeVisible();
+});
+
+test('a merge request already open for the branch: the dialog says so in GitLab’s words, and links it', async ({ as, startApi, forge }) => {
+	const { api } = await startWorld(startApi, forge);
+	const alice = as('alice', api);
+	await setUp(alice);
+	await connect(api, alice, forge, 'alice');
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+	const page = await open(alice, `/t/${t.id}`);
+	await page.getByRole('button', { name: 'Create a merge request' }).click();
+	const dialog = page.getByRole('dialog');
+	await forge.open((await t.get()).branch, 'Someone was first');
+	await dialog.getByLabel('Title').fill('Too late');
+	await dialog.getByRole('button', { name: 'Create merge request' }).click();
+	await expect(dialog.getByText('GitLab: Another open merge request already exists for this source branch: !1', { exact: true })).toBeVisible();
+	await dialog.getByRole('button', { name: 'Link the open one for this branch' }).click();
+	await expect(page.getByRole('button', { name: /^MR !1/ })).toBeVisible();
+});
+
+test('the repository chip lists the projects of a connected GitLab account and searches GitLab', async ({ as, startApi, forge }) => {
+	const { api } = await startWorld(startApi, forge);
+	const alice = as('alice', api);
+	await setUp(alice);
+	await connect(api, alice, forge, 'alice');
+	forge.gitlabProjects = ['e2e/plain', 'e2e/archive-2019'];
+	const page = await open(alice, '/');
+	await page.getByRole('button', { name: /Choose repository|main$/ }).first().click();
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/plain' })).toBeVisible();
+	await page.getByLabel('Repository URL').fill('archive');
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/archive-2019' })).toBeVisible();
+	await expect(page.getByRole('menuitemradio', { name: 'e2e/plain' })).toHaveCount(0);
+	await expect.poll(() => forge.calls.includes('GET /api/v4/projects')).toBe(true);
+});
+
 test('no application, then not connected: each says what to do, with the button for it', async ({ as, startApi, forge }) => {
 	const { api } = await startWorld(startApi, forge);
 	const [alice, bob] = [as('alice', api), as('bob', api)];
@@ -252,6 +308,48 @@ test('refresh tokens rotate per grant: one refresh each, the new pairs saved; a 
 	await expect(section(page, 'GitLab')).toContainText('GitLab no longer accepts your connection as @alice');
 	await expect(section(page, 'GitLab').getByRole('link', { name: 'Reconnect GitLab' })).toBeVisible();
 	if (process.env.E2E_SCREENSHOTS) await shoot(page, 'gitlab-broken', '#gitlab');
+});
+
+test('an access token GitLab calls expired before Banda thought it would is refreshed, not taken for a revocation', async ({ as, startApi, forge }) => {
+	const { api } = await startWorld(startApi, forge);
+	const alice = as('alice', api);
+	await setUp(alice);
+	await connect(api, alice, forge, 'alice');
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+	const [apiFirst, gitFirst] = [forge.grant('alice', 'api')!.refresh, forge.grant('alice', 'write_repository')!.refresh];
+
+	// The api grant, as a call hears of it: the one call fails, the next one works, and nothing was revoked.
+	forge.gitlabExpire('alice', 'api');
+	await alice.threads.listForgeRepos({});
+	await until(async () => forge.gitlabRefreshed.includes(apiFirst), () => 'the api grant to be refreshed');
+	expect(forge.grants.every((g) => !g.revoked)).toBe(true);
+	expect((await alice.settings.getGitLab({})).hosts[0].connection?.broken).toBe(false);
+	await until(async () => (await stored(alice))['refresh-token'] === forge.grant('alice', 'api')!.refresh, () => 'the new pair to be saved');
+	expect(forge.grant('alice', 'api')!.refresh).not.toBe(apiFirst);
+
+	// The git grant, which nothing but handing it out tests.
+	forge.gitlabExpire('alice', 'write_repository');
+	expect(await credentialFill(t.pod)).toContain(`password=${forge.grant('alice', 'write_repository')!.access}`);
+	expect(forge.gitlabRefreshed).toEqual([apiFirst, gitFirst]);
+});
+
+test('revoked on GitLab with nothing polling: a thread’s next push says to reconnect, with the button, not git’s “Access denied”', async ({ as, startApi, forge }) => {
+	const { api } = await startWorld(startApi, forge);
+	const alice = as('alice', api);
+	await setUp(alice);
+	await connect(api, alice, forge, 'alice');
+	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
+
+	forge.gitlabRevokeAll('alice');
+	expect(await credentialFill(t.pod)).toContain('Banda: reconnect GitLab in Settings');
+	await t.turn(() => t.send('e2e: commit'));
+	await t.waitFor('unpushable', (i) => i.autoPush === AutoPushState.UNAVAILABLE);
+	expect((await t.of('autoPush')).at(-1)?.detail).toContain('reconnect GitLab');
+	const page = await open(alice, `/t/${t.id}`);
+	await expect(page.getByRole('link', { name: 'Reconnect GitLab' }).first()).toBeVisible();
+	await expect(page.getByText('Access denied')).toHaveCount(0);
 });
 
 test('disconnect revokes both grants on GitLab and forgets the tokens', async ({ as, startApi, forge }) => {

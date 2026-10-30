@@ -209,11 +209,21 @@ func (s *Service) gitLabRefused(ctx context.Context, userID, host string) {
 }
 
 // gitLabTokenRefused hears of a token GitLab answered 401 to: if it is a
-// user's api token, they revoked the application.
+// user's api token, it expired or they revoked the application. Only the
+// refresh token can tell: gitLabToken breaks the connection if GitLab refuses
+// that too, and otherwise the next call uses the new pair.
 func (s *Service) gitLabTokenRefused(token string) {
-	if user, host := s.gl.api.owner(token); user != "" {
-		slog.Info("gitlab refused a user's token", "user", user)
-		s.gitLabRefused(context.Background(), user, host)
+	user, host := s.gl.api.owner(token)
+	if user == "" {
+		return
+	}
+	slog.Info("gitlab refused a user's token", "user", user)
+	ctx := context.Background()
+	if a := s.gitLabAppFor(ctx, host); a != nil {
+		s.gl.api.expire(user, host, token)
+		if _, err := s.gitLabToken(ctx, s.gl.api, user, a); err != nil {
+			slog.Info("refresh a refused gitlab token", "user", user, "err", err)
+		}
 	}
 }
 
@@ -264,6 +274,15 @@ func (s *Service) gitLabCredential(ctx context.Context, t store.Thread, repo for
 		return nil, refuse(fmt.Sprintf("set up GitLab for %s in Settings, so Banda can push as you (or add a GIT_TOKEN secret)", repo.Host))
 	}
 	tok, err := s.gitLabToken(ctx, s.gl.git, t.OwnerID, a)
+	// Nothing else tells Banda a git token stopped working, and git only says
+	// "Access denied": a token GitLab refuses goes through its refresh token.
+	if err == nil && tok.Access != "" {
+		var fe *forge.Error
+		if _, oerr := a.Owner(ctx, tok.Access); errors.As(oerr, &fe) && fe.Code == forge.Unauthorized {
+			s.gl.git.expire(t.OwnerID, repo.Host, tok.Access)
+			tok, err = s.gitLabToken(ctx, s.gl.git, t.OwnerID, a)
+		}
+	}
 	if errors.Is(err, forge.ErrRevoked) {
 		return nil, refuse("reconnect GitLab in Settings: GitLab no longer accepts your connection")
 	}

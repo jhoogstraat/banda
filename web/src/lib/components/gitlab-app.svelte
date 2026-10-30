@@ -47,7 +47,7 @@
 	const where = $derived(!h ? '' : owner === 'admin' ? h.adminAppsUrl : groupPath ? h.groupAppsUrl.replace('{group}', groupPath) : '');
 	const owners = $derived(
 		[
-			['group', 'A group', 'Recommended: one with few Owners. It outlives any one person.'],
+			['group', 'A group', 'Recommended: one with few Owners, and you need to be one. It outlives any one person.'],
 			['admin', 'The instance', 'Needs an administrator. Admins can mark it trusted, which skips GitLab’s consent screens.']
 		].filter(([o]) => o !== 'admin' || h?.adminAppsUrl)
 	);
@@ -263,7 +263,7 @@
 						{:else if n === 2}
 							<form class="space-y-3" onsubmit={save}>
 								<p class="max-w-prose text-sm text-muted-foreground">
-									GitLab shows both once you save the application. Banda checks them with GitLab and keeps them where no sandbox can read them.
+									GitLab shows both once you save the application, the secret only then (Renew secret makes a new one). Banda checks them with GitLab and keeps them where no sandbox can read them.
 								</p>
 								<div class="grid max-w-md gap-2 text-sm">
 									<label class="grid gap-1">

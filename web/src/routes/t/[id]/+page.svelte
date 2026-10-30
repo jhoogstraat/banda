@@ -337,7 +337,7 @@
 		if (owner && t.status === Status.ERRORED) c.push({ label: 'Retry', icon: RotateCcwIcon, run: retry });
 		if (t.pullRequest) c.push({ label: `Show the ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => show('pull') });
 		else if (pr && owner && t.forgeReady) c.push({ label: `Create a ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => (prOpen = true) });
-		else if (pr) c.push({ label: 'Open a pull request', icon: GitPullRequestIcon, run: () => open(pr) });
+		else if (pr) c.push({ label: `Open a ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
 		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
 		if (owner && (!t.repoUrl || repoFixable)) c.push({ label: t.repoUrl ? 'Change the repository' : 'Add a repository', icon: FolderGit2Icon, run: () => (repoOpen = true) });

@@ -42,6 +42,8 @@ Set up from Settings ([usage.md](usage.md#gitlab)), one per GitLab host: gitlab.
 
 `FORGE_HOSTS` names self-hosted forges as `host=github` or `host=gitlab`, comma-separated. A forge on a port other than its scheme's default is named with it (`git.corp.example:8443=gitlab`): a repository URL with a non-default port is a known forge only under that exact `host:port`, never as the bare host's or as github.com's or gitlab.com's, so no forge token or git credential goes to another server on the same host.
 
+Banda talks to every forge over `https://<host>`, so a self-hosted one needs https, with a name that both the API and sandboxes resolve to it. Its certificate has to be trusted on both sides: from a private authority, set `SSL_CERT_FILE` on the API, and build `SANDBOX_IMAGE` on Banda's image with the authority added (`update-ca-certificates`). A forge on a private address also needs that address in `SANDBOX_EGRESS_ALLOW`, or git in sandboxes can't reach it.
+
 ## Workload identity
 
 Banda is an OIDC issuer of short-lived identity tokens for each running thread, as GitHub Actions is for its jobs: a secret manager or cloud that trusts Banda gives a thread's agent access as its owner, so the team fetches secrets at run time instead of pasting long-lived credentials into Settings ([PLAN.md](../PLAN.md), "Workload identity"). It needs no setting of its own:

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ConnectError } from '@connectrpc/connect';
 	import ForgeAction from '#lib/components/forge-action.svelte';
 	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -43,7 +44,7 @@
 			open = false;
 			ondone();
 		} catch (err) {
-			error = (err as Error).message;
+			error = ConnectError.from(err).rawMessage;
 		} finally {
 			busy = false;
 		}

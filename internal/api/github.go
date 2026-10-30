@@ -307,6 +307,17 @@ func (k *tokenKeeper) forget(user, host string) {
 	}
 }
 
+// expire makes the next fresh refresh the access token token, if it is still
+// the user's: the forge refused it, whatever its expiry says here.
+func (k *tokenKeeper) expire(user, host, token string) {
+	c := k.conn(user, host)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.tok.Access == token {
+		c.tok.Expiry = time.Now()
+	}
+}
+
 // owner is whose cached access token token is.
 func (k *tokenKeeper) owner(token string) (user, host string) {
 	k.mu.Lock()

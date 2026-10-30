@@ -7,7 +7,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { kexec } from './fixtures';
 
 export type Check = { name: string; status: 'queued' | 'in_progress' | 'completed'; conclusion?: 'success' | 'failure' | 'skipped' };
-export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string; resolved?: boolean };
+/** thread: a GitLab discussion without a file, which is resolvable like one on a line (a plain note isn't). */
+export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string; resolved?: boolean; thread?: boolean };
 
 export type Pull = {
 	number: number;
@@ -25,6 +26,8 @@ export type Pull = {
 	comments: Comment[];
 	mergedBy?: string;
 	mergeMethod?: string;
+	/** GitLab: the detailed_merge_status that blocks merging, which then answers a bare 405. */
+	blocked?: string;
 };
 
 type GitLabApp = { clientId: string; clientSecret: string; redirect: string; scopes: string[] };
@@ -78,7 +81,9 @@ export class FakeForge {
 		this.gitlabApps.push(a);
 	}
 	/** Grants, newest last; a refresh replaces a grant's tokens, a revocation ends it. */
-	grants: { login: string; scope: string; access: string; refresh: string; clientId: string; revoked?: boolean }[] = [];
+	grants: { login: string; scope: string; access: string; refresh: string; clientId: string; revoked?: boolean; expired?: boolean }[] = [];
+	/** Projects a user's api token lists, and finds by search. */
+	gitlabProjects: string[] = [];
 	/** Who approves an authorization of a scope instead of signedIn, as if the browser's GitLab session changed between the two. */
 	gitlabSignedInFor: Record<string, string> = {};
 	/** The OAuth error refreshing a GitLab token answers with (e.g. invalid_client, with a 401), or an HTTP status. */
@@ -153,9 +158,10 @@ export class FakeForge {
 		if (path.startsWith('/oauth/')) return this.gitlabOAuth(req.method!, path, url, body, req, res);
 		const token = (req.headers.authorization ?? '').replace(/^Bearer /, '') || String(req.headers['private-token'] ?? '');
 		const login = this.tokens[token];
-		if (!login) return send(res, 401, { message: 'Bad credentials' });
+		if (!login) return send(res, 401, { message: path.startsWith('/api/v4/') ? '401 Unauthorized' : 'Bad credentials' });
 		// GitLab: an OAuth token reaches the API only with the api scope; write_repository is for git over https.
 		const g = this.grants.find((g) => g.access === token);
+		if (g?.expired) return send(res, 401, { error: 'invalid_token', error_description: 'Token is expired. You can either do re-authorization or token refresh.' });
 		if (g && path.startsWith('/api/v4/') && g.scope !== 'api') return send(res, 403, { error: 'insufficient_scope', scope: 'api' });
 		// A user's app token reaches only repositories the app is installed for.
 		if (token.startsWith('ghu_') && /^\/api\/v3\/repos\/e2e\//.test(path) && !this.installedOn.includes('e2e')) return send(res, 404, { message: 'Not Found' });
@@ -405,8 +411,8 @@ export class FakeForge {
 	/** GitLab's OAuth endpoints (Doorkeeper): authorize (the signed-in user approves at once), token, revoke. */
 	private async gitlabOAuth(method: string, path: string, url: URL, body: Record<string, any>, req: IncomingMessage, res: ServerResponse) {
 		if (method === 'GET' && path === '/oauth/token/info') {
-			const g = this.grants.find((g) => g.access && g.access === (req.headers.authorization ?? '').replace(/^Bearer /, '') && !g.revoked);
-			if (!g) return send(res, 401, { error: 'invalid_token' });
+			const g = this.grants.find((g) => g.access && g.access === (req.headers.authorization ?? '').replace(/^Bearer /, '') && !g.revoked && !g.expired);
+			if (!g) return send(res, 401, { error: 'invalid_token', error_description: 'The access token is invalid', state: 'unauthorized' });
 			return send(res, 200, { resource_owner_id: this.idOf(g.login), scope: [g.scope], expires_in: 7200, application: { uid: g.clientId } });
 		}
 		if (method === 'GET' && path === '/oauth/authorize') {
@@ -452,7 +458,7 @@ export class FakeForge {
 				created_at: Math.floor(Date.now() / 1000) });
 		}
 		if (method === 'POST' && path === '/oauth/revoke') {
-			if (!a) return send(res, 403, { error: 'invalid_client' });
+			if (!a) return send(res, 403, { error: 'unauthorized_client', error_description: 'You are not authorized to revoke this token' });
 			const g = this.grants.find((g) => (g.access === body.token || g.refresh === body.token) && g.clientId === a.clientId);
 			if (g && !g.revoked) {
 				g.revoked = true;
@@ -461,6 +467,11 @@ export class FakeForge {
 			return send(res, 200, {});
 		}
 		return send(res, 404, { message: 'Not Found' });
+	}
+
+	/** Expires a user's access token on GitLab, whatever expires_in said: its refresh token still works. */
+	gitlabExpire(login: string, scope: string) {
+		this.grant(login, scope)!.expired = true;
 	}
 
 	/** Revokes all of a user's grants of the GitLab application, as revoking it in their GitLab settings does. */
@@ -477,7 +488,10 @@ export class FakeForge {
 			const name = url.searchParams.get('username');
 			return send(res, 200, name ? [{ id: this.idOf(name), username: name }] : []);
 		}
-		if (method === 'GET' && path === '/api/v4/projects') return send(res, 200, []); // github.com's repositories are the ones listed
+		if (method === 'GET' && path === '/api/v4/projects') {
+			const search = url.searchParams.get('search') ?? '';
+			return send(res, 200, this.gitlabProjects.filter((p) => p.includes(search)).map((path_with_namespace) => ({ path_with_namespace, description: '' })));
+		}
 		if (method === 'GET' && /^\/api\/v4\/projects\/e2e\/\w+\/members\/all$/.test(path)) return send(res, 200, this.collaborators.map((username) => ({ username })));
 		if (method === 'GET' && /^\/api\/v4\/projects\/e2e\/\w+\/labels$/.test(path)) return send(res, 200, this.labels.map((name) => ({ name })));
 		const m = path.match(/^\/api\/v4\/projects\/e2e\/(\w+)(\/.*)$/);
@@ -488,17 +502,20 @@ export class FakeForge {
 			iid: p.number, title: (p.draft ? 'Draft: ' : '') + p.title, description: p.body, draft: p.draft,
 			state: p.state === 'open' ? 'opened' : p.state, web_url: `${web}/${p.number}`, author: { username: p.author },
 			source_branch: p.head, target_branch: p.base, sha: p.sha, labels: p.labels, changes_count: '1',
-			detailed_merge_status: p.draft ? 'draft_status' : 'mergeable', merged_by: p.mergedBy ? { username: p.mergedBy } : null,
+			detailed_merge_status: p.blocked ?? (p.draft ? 'draft_status' : 'mergeable'), merged_by: p.mergedBy ? { username: p.mergedBy } : null,
 			reviewers: p.reviewers.map((u) => ({ id: this.idOf(u), username: u })), head_pipeline: p.checks.length ? { id: p.number } : null
 		});
 		let r: RegExpMatchArray | null;
 		if (method === 'GET' && rest === '/merge_requests') {
 			const head = url.searchParams.get('source_branch');
-			return send(res, 200, this.pulls.filter((p) => p.state === 'open' && (!head || p.head === head)).map(json));
+			// Only a single merge request has its head pipeline.
+			return send(res, 200, this.pulls.filter((p) => p.state === 'open' && (!head || p.head === head)).map((p) => ({ ...json(p), head_pipeline: undefined })));
 		}
 		if (method === 'POST' && rest === '/merge_requests') {
+			const open = this.pulls.find((p) => p.head === body.source_branch && p.state === 'open');
+			if (open) return send(res, 409, { message: [`Another open merge request already exists for this source branch: !${open.number}`] });
 			const head = await sha(repo, body.source_branch).catch(() => '');
-			if (!head) return send(res, 400, { message: 'Source branch does not exist' });
+			if (!head) return send(res, 400, { message: { source_branch: ['does not exist'] } });
 			const draft = /^draft:\s*/i.test(body.title);
 			return send(res, 201, json(this.newPull(body.source_branch, body.target_branch, body.title.replace(/^draft:\s*/i, ''), body.description ?? '', draft, login, head)));
 		}
@@ -512,7 +529,7 @@ export class FakeForge {
 		if (!p) return send(res, 404, { message: '404 Not Found' });
 		const sub = r[2] ?? '';
 		const note = (c: Comment) => ({ id: c.id, body: c.body, author: { username: c.login }, created_at: c.at, position: c.path ? { new_path: c.path, new_line: c.line } : null,
-			resolvable: !!c.path, resolved: !!c.resolved });
+			resolvable: !!c.path || !!c.thread, resolved: !!c.resolved });
 		if (method === 'GET' && sub === '') return send(res, 200, json(p));
 		if (method === 'PUT' && sub === '') {
 			if (body.title !== undefined) [p.draft, p.title] = [/^draft:\s*/i.test(body.title), body.title.replace(/^draft:\s*/i, '')];
@@ -522,14 +539,21 @@ export class FakeForge {
 			if (body.remove_labels) p.labels = p.labels.filter((l) => !body.remove_labels.split(',').includes(l));
 			return send(res, 200, json(p));
 		}
+		if (method === 'GET' && sub === '/reviewers')
+			return send(res, 200, p.reviewers.map((username) => ({ user: { username }, state: p.comments.some((c) => c.login === username && c.review === 'CHANGES_REQUESTED') ? 'requested_changes' : 'unreviewed' })));
 		if (method === 'GET' && sub === '/approvals')
 			return send(res, 200, { approved_by: p.comments.filter((c) => c.review === 'APPROVED').map((c) => ({ user: { username: c.login } })) });
 		if (method === 'GET' && sub === '/discussions') {
 			const roots = p.comments.filter((c) => !c.inReplyTo && !c.review);
-			return send(res, 200, roots.map((c) => ({ id: `d${c.id}`, individual_note: !c.path, notes: [c, ...p.comments.filter((x) => x.inReplyTo === c.id)].map(note) })));
+			return send(res, 200, roots.map((c) => ({ id: `d${c.id}`, individual_note: !c.path && !c.thread, notes: [c, ...p.comments.filter((x) => x.inReplyTo === c.id)].map(note) })));
+		}
+		// A note is a plain comment; a new discussion is a thread to resolve, with or without a position.
+		if (method === 'POST' && sub === '/notes') {
+			this.comment(p.number, { login, body: body.body });
+			return send(res, 201, { id: this.nextId, body: body.body, system: false });
 		}
 		if (method === 'POST' && sub === '/discussions') {
-			this.comment(p.number, { login, body: body.body });
+			this.comment(p.number, { login, body: body.body, thread: true });
 			return send(res, 201, { id: `d${this.nextId}` });
 		}
 		if (method === 'PUT' && (r = sub.match(/^\/discussions\/d(\d+)$/))) {
@@ -543,7 +567,7 @@ export class FakeForge {
 			return send(res, 201, { id: this.nextId });
 		}
 		if (method === 'PUT' && sub === '/merge') {
-			if (p.state !== 'open' || p.draft) return send(res, 405, { message: '405 Method Not Allowed' });
+			if (p.state !== 'open' || p.draft || p.blocked) return send(res, 405, { message: '405 Method Not Allowed' });
 			Object.assign(p, { state: 'merged', mergedBy: login, mergeMethod: body.squash ? 'squash' : 'merge' });
 			return send(res, 200, json(p));
 		}
