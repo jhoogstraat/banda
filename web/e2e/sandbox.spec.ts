@@ -8,6 +8,13 @@ test('terminal runs commands in the sandbox', { tag: '@key' }, async ({ as }) =>
 	expect(await t.terminal('echo e2e-terminal-$((6*7))')).toContain('e2e-terminal-42');
 });
 
+// Node from a repo's mise.toml links it on arm64: without it the thread's setup fails.
+test('the image has what upstream Node links', async ({ as }) => {
+	const t = await as('alice').create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	expect(await t.terminal('/sbin/ldconfig -p | grep -c libatomic.so.1')).toMatch(/^\s*[1-9]/m);
+});
+
 test('the owner’s secrets are in the environment (no API key), and redacted from files, the diff and the database', { tag: '@key' }, async ({ as }) => {
 	const alice = as('alice');
 	const secret = `e2e-secret-${Date.now()}`;

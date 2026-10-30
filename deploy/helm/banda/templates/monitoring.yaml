@@ -7,7 +7,7 @@ metadata:
   name: banda-api
   labels:
     {{- include "banda.labels" $ | nindent 4 }}
-    {{- with .labels }}{{ toYaml . | nindent 4 }}{{ end }}
+    {{- with .serviceMonitor.labels }}{{ toYaml . | nindent 4 }}{{ end }}
 spec:
   namespaceSelector: {matchNames: [{{ $.Release.Namespace }}]}
   selector:
@@ -23,7 +23,7 @@ metadata:
   name: banda
   labels:
     {{- include "banda.labels" $ | nindent 4 }}
-    {{- with .labels }}{{ toYaml . | nindent 4 }}{{ end }}
+    {{- with .prometheusRule.labels }}{{ toYaml . | nindent 4 }}{{ end }}
 spec:
   groups:
     - name: banda

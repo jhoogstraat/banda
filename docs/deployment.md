@@ -1,6 +1,6 @@
 # Deployment
 
-Checked against the repo on 2026-10-24; "Install" followed word for word on a fresh kind cluster. Banda runs on one Mac in Podman (kind) for development, and on a cluster a team shares. It is open source under MIT, so strangers install it with values nobody can predict.
+Checked against the repo on 2026-10-24; "Install" followed word for word on a fresh kind cluster. Rehearsed for real on 2026-10-30 on a 2-node kind cluster: Calico with `podCIDR` set, ingress-nginx and Traefik, kube-prometheus-stack, the fake agent. Banda runs on one Mac in Podman (kind) for development, and on a cluster a team shares. It is open source under MIT, so strangers install it with values nobody can predict.
 
 Settings are in [configuration.md](configuration.md).
 
@@ -9,7 +9,7 @@ Settings are in [configuration.md](configuration.md).
 From an empty cluster to a signed-in team. You need:
 
 - A Kubernetes cluster with a CNI that enforces NetworkPolicy (Calico, Cilium; kind's kindnet does) and a default StorageClass (`kubectl get storageclass`). On more than one node, one whose volumes attach to any node (a cloud disk, Ceph RBD, Longhorn), with Banda's nodes in one zone: "Volumes" below.
-- An ingress controller, and its IngressClass name (`kubectl get ingressclass`).
+- An ingress controller, and its IngressClass name (`kubectl get ingressclass`). ingress-nginx (retired upstream in March 2026, so no more security fixes) and Traefik are rehearsed; for a new cluster take Traefik or another maintained one.
 - Two hostnames pointing at the ingress controller, e.g. `banda.example.com` and `preview.banda.example.com` (the Browser tab; a sibling or subdomain of the first), and a TLS Secret covering both in the namespace `banda` (`kubectl create namespace banda` first), from cert-manager or `kubectl -n banda create secret tls banda-tls --cert=... --key=...`.
 - Your cluster's pod network, e.g. `kubectl cluster-info dump | grep -m1 -o -- '--cluster-cidr=[^"]*'` (a node's `spec.podCIDR` is only its slice).
 - Your organization's agreement to Anthropic's Commercial Terms: running Claude Code in hosted sandboxes requires it ([legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)). A Claude Team or Enterprise plan or an API account is under them. Each person still logs in with their own subscription or API key. In the EEA and Switzerland that subscription is a Team or Enterprise seat, not Pro or Max: the Consumer Terms there allow no "commercial or business purposes" ([research](research/claude-terms.md#decision-2026-10-24)).
@@ -212,6 +212,34 @@ Deleting the Secret makes the API create a new key on its next start, which sign
 
 A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api` and `banda-sandbox` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and both image builds on every pull request and push to `main`, and the whole e2e suite on kind with Docker (about 30 minutes) on `main` only.
 
+## Sizing
+
+Rule of thumb: **4 GiB of memory and 2 CPU per thread that builds at the same time**, and only disk for the rest. A 16 CPU, 32 GiB node carries about 6 such threads with room for the system. Count threads running at once, not threads in total: an idle running thread costs next to nothing and a suspended one only disk. A real model's turn was not measured: what the real `claude` process takes comes on top of these numbers, so check them during the first dogfood week.
+
+Measured in one sandbox pod (arm64, 8 CPU VM shared with other work) with the fake agent and Banda's own checkout, on the default limits:
+
+| What the thread does | Memory, without page cache | Memory, with page cache | CPU | Processes |
+|---|---|---|---|---|
+| Idle, 5 threads side by side | 8 MiB | 10-19 MiB | under 0.01 | 12-16 |
+| A fake agent turn | adds under 1 MiB, so it says nothing about a real one | | | |
+| `mise install` (Go, Node, pnpm) | 41 MiB | 750 MiB | 0.1 | 36 |
+| `pnpm install`, 13 s | 390 MiB | 1.6 GiB | 0.9 (peak 2.1) | 82 |
+| `vite build`, 8 s | 1.5 GiB | 2.8 GiB | 2.1 | 68 |
+| `go build`, cold, 40 s | 1.0 GiB | 3.1 GiB | 3.3 (peak 4) | 56 |
+| `vite build` and `go build -a` together, 40 s | 2.5 GiB | 4.0 GiB | 3.9 (peak 4) | 102 |
+
+What the numbers say about the chart's `sandboxes:` values:
+
+- **`cpu: 4`** is the limit that bites: compiles ran at it and were throttled, nothing failed. Raise it for faster builds.
+- **`memory: 8Gi`** left room: the peak was 4.1 GiB, no OOM kill, and about half of that is page cache the kernel gives back under pressure. A repo with heavier builds needs its own measurement.
+- **`homeSize: 10Gi`** held 2.2 GiB after all of it (tools 550 MiB, caches 940 MiB, checkout 430 MiB, Go modules 280 MiB). `scratch: 10Gi` was barely touched: `/tmp` held 8 MiB.
+- **Requests are 50m and 128 MiB**, far below a build, so the scheduler doesn't keep busy threads apart: nodes fill up by pod count, and one person's threads all share one node ("Volumes"). The rule above is yours to apply, by node size or `SANDBOX_CPU` and `SANDBOX_MEMORY`.
+- **The rest of Banda is small:** with 5 running threads, the API took 53 MiB, Postgres 49 MiB, Dex 24 MiB.
+
+Set the kubelet's `podPidsLimit` (`deploy/kind.yaml` uses 4096; the rehearsal peaked at 103): the chart can't, and without it one sandbox's fork bomb can take all of a node's PIDs.
+
+Each thread adds a Sandbox, its Pod, a token Secret (`<sandbox>-token`) and a volume (`home-t-<thread>`, with its PersistentVolume). No Service or NetworkPolicy per thread. Suspending removes the pod; the rest stays. Each person adds a Claude volume (`claude-<hash>`, with its PersistentVolume), plus a login environment's Sandbox and Pod while they connect, and Secrets for their secrets and forge connections. A node's pod limit (110 by default) is the ceiling on running threads.
+
 ## Volumes
 
 Banda creates ReadWriteOnce volumes in the default StorageClass: one per thread (`home-t-<thread>`, the checkout) and one per person (`claude-<hash>`, their Claude Code login, config and transcripts). Each person's Claude volume is mounted by all of their pods at once, threads and login environment alike, so the API asks Kubernetes to run all of one person's pods on one node (a required pod affinity on the label `banda.dev/user`). The first of them goes wherever it fits and the rest follow it. Different people's pods spread over the nodes. Nothing to set. What follows from it:
@@ -228,14 +256,17 @@ Also in [todo.md](../todo.md).
 
 - **Postgres:** the bundled one has a non-superuser role for the API and nightly dumps on a volume in the same cluster ("Postgres" above): copy them off the cluster, or use CloudNativePG or a managed database for point-in-time recovery and failover.
 - **Pod network:** the ingress policies tell sandboxes from browsers by `podCIDR` (kind's `10.244.0.0/16` by default); set your cluster's.
-- **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists.
-- **Sizes:** each thread's pod may take 4 CPU, 8 GiB and 10 GiB scratch, plus a 10 GiB volume, by default; the chart's `sandboxes` values change them ([configuration](configuration.md)). Plan nodes for the number of threads running at once, not threads in total (suspended threads cost only disk).
-- **Ingress:** thread streams are long-lived; controllers cut a stream quiet for their read timeout (60 s for ingress-nginx). The API sends a keepalive on every stream every 25 s, so any timeout above that works; a long one saves reconnects. For ingress-nginx, in `ingress.annotations`:
+- **One replica:** stays until Postgres `LISTEN/NOTIFY` fan-out exists. An API restart also restarts every thread's runner, which resumes on its own. Several in a row trip Kubernetes' back-off: a thread can then show its last status with no runner behind it for up to 5 minutes.
+- **Sizes:** "Sizing" below.
+- **Ingress:** thread streams are long-lived; controllers cut a stream quiet for their read timeout. The API sends a keepalive on every stream every 25 s, so for Banda's own streams any timeout above that works: a quiet thread page stayed on one stream for 11 minutes behind ingress-nginx (60 s) and Traefik, and a teammate's post reached it in under 200 ms without a reload. With a 20 s timeout ingress-nginx cuts it every 20 s. The preview and the terminal work through both. A previewed app's own WebSockets have no such keepalive, so the chart sets ingress-nginx's read and send timeouts to an hour. It also sets `proxy-body-size` to `64m` (its 1 MiB default refused attachments over 1 MiB); other controllers ignore that annotation, and a limit of your own must let through 5 MB attachments and 64 MB preview requests.
+- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job at it, or use the Prometheus operator:
 
   ```yaml
-  nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-  nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  monitoring:
+    serviceMonitor: {enabled: true, labels: {release: kube-prometheus-stack}}
+    prometheusRule: {enabled: true, labels: {release: kube-prometheus-stack}}
   ```
 
-  Other controllers have their own (Traefik's `respondingTimeouts` on the entry point, a cloud load balancer's idle timeout): keep them above 25 s.
-- **Monitoring:** the API serves Prometheus metrics at `:9090/metrics` (`api.metricsPort`, the `banda-api` Service's port `metrics`; no ingress routes it): `banda_threads{status}`, `banda_sandboxes{mode}` (running, suspended), `banda_runners_connected`, `banda_internal_errors_total` (each also logged as `internal error` with the call) and `banda_uptime_seconds`. Point a scrape job at it, or with the Prometheus operator set `monitoring.serviceMonitor.enabled`. Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume), not Banda's. `monitoring.prometheusRule.enabled` adds two alerts: `BandaInternalErrors` when `banda_internal_errors_total` rose in the last 10 minutes, and `BandaVolumeFull` when a thread's, a user's Claude or Postgres's volume is fuller than `volumeFull` (0.9) for 15 minutes, from the kubelet's numbers. Both resources take `labels` for the Prometheus that should select them (kube-prometheus-stack: `release: <its release>`). Logs go to stdout.
+  `release` is what your Prometheus selects, by default the Helm release of kube-prometheus-stack; check with `kubectl get prometheus -A -o jsonpath='{.items[*].spec.serviceMonitorSelector}{.items[*].spec.ruleSelector}'`. Without a matching label the operator skips both resources and nothing says so. Prometheus's Targets page then has no `banda-api`.
+
+  Volume disk use is the kubelet's `kubelet_volume_stats_used_bytes` (`persistentvolumeclaim` label: `home-t-<thread>`, and `claude-<hash>` for each user's Claude volume), not Banda's, and kube-prometheus-stack scrapes it by default. `monitoring.prometheusRule.enabled` adds two alerts: `BandaInternalErrors` when `banda_internal_errors_total` rose in the last 10 minutes, and `BandaVolumeFull` when a thread's, a user's Claude or Postgres's volume is fuller than `volumeFull` (0.9) for 15 minutes, from the kubelet's numbers. Both fired for real in the rehearsal and reached Alertmanager. `BandaVolumeFull` needs a volume type that reports those numbers: kind's `local-path` (hostPath) reports none, so the alert can't fire there; a `local` PersistentVolume does. Check yours with `count(kubelet_volume_stats_used_bytes)`. Logs go to stdout.

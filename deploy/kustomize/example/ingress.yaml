@@ -1,12 +1,15 @@
 # Banda and its preview origin on sibling hosts, with a certificate covering
 # both (here from cert-manager). Thread streams are long-lived: the API sends a
-# keepalive every 25 s, and a long read timeout saves reconnects (ingress-nginx).
+# keepalive every 25 s. The annotation is ingress-nginx's: its default 1m refuses
+# what Banda takes (5 MB attachments, 64 MB preview requests), and a previewed
+# app's own WebSockets have no keepalive of Banda's.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: banda-api
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:

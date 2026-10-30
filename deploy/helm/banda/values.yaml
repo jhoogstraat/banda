@@ -72,11 +72,13 @@ ingress:
   enabled: false
   className: ""
   # Thread streams stay open for hours. The API sends a keepalive on each every
-  # 25 s, so a read timeout above that keeps them, but a longer one saves
-  # reconnects, e.g. for ingress-nginx:
-  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-  #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-  annotations: {}
+  # 25 s, so any read timeout above that keeps them, ingress-nginx's default 60 s too.
+  annotations:
+    # Its default 1m refuses what Banda takes: 5 MB attachments, 64 MB preview requests.
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
+    # A previewed app's own WebSockets have no keepalive of Banda's.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
   host: "" # banda.example.com
   previewHost: "" # preview.banda.example.com: a sibling of host, for the preview's SameSite cookie
   # A TLS Secret covering both hosts (e.g. from cert-manager). Banda wants https outside a trusted LAN.
@@ -103,7 +105,8 @@ postgres:
   nodePort: null
 
 # For the Prometheus operator's CRDs (kube-prometheus-stack). Add the labels its
-# Prometheus selects, e.g. {release: kube-prometheus-stack}.
+# Prometheus selects, e.g. {release: kube-prometheus-stack}: without them it
+# silently skips both.
 monitoring:
   # Scrapes the API's /metrics (api.metricsPort).
   serviceMonitor: {enabled: false, labels: {}}

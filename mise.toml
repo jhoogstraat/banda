@@ -127,7 +127,7 @@ set -e
 helm lint deploy/helm/banda
 helm lint deploy/helm/banda -f deploy/kustomize/kind/values.yaml
 helm template banda deploy/helm/banda -n banda --set dex.enabled=true,ingress.enabled=true,ingress.host=banda.example.com,ingress.previewHost=preview.banda.example.com,ingress.tlsSecret=tls >/dev/null
-helm template banda deploy/helm/banda -n banda --set monitoring.serviceMonitor.enabled=true,monitoring.prometheusRule.enabled=true | grep -q 'kind: PrometheusRule'
+[ "$(helm template banda deploy/helm/banda -n banda --set monitoring.serviceMonitor.enabled=true,monitoring.prometheusRule.enabled=true,monitoring.serviceMonitor.labels.release=p,monitoring.prometheusRule.labels.release=p | grep -c 'release: p$')" = 2 ]
 for k in base kind example; do kubectl kustomize --enable-helm deploy/kustomize/$k >/dev/null; done
 """
 

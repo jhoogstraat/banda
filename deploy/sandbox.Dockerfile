@@ -14,7 +14,7 @@ FROM debian:trixie-slim AS sandbox
 ARG CLAUDE_VERSION=2.1.301
 ENV DISABLE_AUTOUPDATER=1
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates curl ripgrep jq make procps python3 nodejs npm \
+ && apt-get install -y --no-install-recommends git ca-certificates curl ripgrep jq make procps python3 nodejs npm libatomic1 \
  && rm -rf /var/lib/apt/lists/* \
  && curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_VERSION" \
  && cp -L /root/.local/bin/claude /usr/local/bin/claude \
