@@ -31,7 +31,7 @@
 		pending: Comment[];
 		posted: (Comment & { by: string })[];
 		focus?: Comment;
-		ask?: boolean; // undefined: the agent can't be asked
+		ask: boolean;
 		onsend: (summary: string) => Promise<boolean>;
 	} = $props();
 
@@ -144,9 +144,7 @@
 		<div class="flex shrink-0 flex-wrap items-center gap-2 border-b bg-amber-500/5 px-3 py-2 text-xs">
 			<span class="font-medium">{pending.length} pending comment{pending.length > 1 ? 's' : ''}</span>
 			<Input bind:value={summary} placeholder="Summary (optional)" class="h-7 min-w-32 flex-1 text-xs" />
-			{#if ask !== undefined}
-				<label class="flex items-center gap-1.5 text-muted-foreground"><input type="checkbox" bind:checked={ask} class="accent-primary" /> Ask @agent</label>
-			{/if}
+			<label class="flex items-center gap-1.5 text-muted-foreground"><input type="checkbox" bind:checked={ask} class="accent-primary" /> Ask @agent</label>
 			<Button size="sm" variant="ghost" onclick={() => (pending = [])}>Discard</Button>
 			<Button size="sm" disabled={sending} onclick={send}>Send review</Button>
 		</div>

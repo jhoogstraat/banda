@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
+	import { create } from '@bufbuild/protobuf';
 	import { Code, ConnectError } from '@connectrpc/connect';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
@@ -49,8 +50,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { api, upload } from '#lib/api.js';
 	import type { Comment } from '#lib/diff.js';
-	import { apply, itemAt, newChat, prepend, typingNow, type Chat } from '#lib/events.js';
-	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import { apply, itemAt, newChat, prepend, typingNow, type Chat, type Item } from '#lib/events.js';
+	import { AttachmentSchema, Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.js';
 	import { threadKeys, ui, visited, type Command } from '#lib/shortcuts.svelte.js';
 	import { threads, userName } from '#lib/threads.svelte.js';
@@ -120,10 +121,10 @@
 	const reviewKey = `banda-review-${id}`;
 	let pending = $state<Comment[]>(JSON.parse(localStorage.getItem(reviewKey) ?? '[]'));
 	$effect(() => localStorage.setItem(reviewKey, JSON.stringify(pending)));
-	// Ask the agent to address the review: on by default for the owner; a teammate can't on a subscription.
-	let ask = $state<boolean>();
+	// Ask the agent to address the review: on by default for the owner. A teammate's is a turn request, or on a subscription a proposal.
+	let ask = $state(false);
 	$effect(() => {
-		ask = owner || thread?.teammateTurns ? owner : undefined;
+		ask = owner;
 	});
 	let focus = $state<Comment>();
 	const waiting = $derived(chat.items.filter((i) => i.kind === 'request' && !i.resolved));
@@ -364,25 +365,41 @@
 		};
 	}
 
+	// A review's text: with `ask`, it asks @agent.
+	function reviewText(summary: string) {
+		const text = summary.trim();
+		return ask && !/@agent\b/.test(text) ? `@agent ${text || 'please address these review comments.'}` : text;
+	}
+
+	// Use as draft: the proposal's text and files go into the composer, its comments join the pending review there, as copies to edit.
+	function draft({ text, review, attachments }: Extract<Item, { kind: 'message' }>) {
+		const comments = review.map(({ path, startLine, endLine, old, code, body }) => ({ path, startLine, endLine, old, code, body }));
+		pending = [...pending, ...comments.filter((c) => !pending.some((p) => JSON.stringify(p) === JSON.stringify(c)))];
+		useAsDraft(id, text, attachments);
+	}
+
 	async function send({ text, attachments: files }: PromptInputMessage) {
-		if (!text.trim() && !files.length) return;
+		const review = $state.snapshot(pending);
+		if (!text.trim() && !files.length && !review.length) return;
 		const threadId = id; // the thread it was sent from, even if another opens during the upload
 		let attachments;
 		try {
-			attachments = await Promise.all(files.map((f) => upload(f.file)));
+			attachments = await Promise.all(files.map((f) => (f.remoteUrl ? create(AttachmentSchema, { id: f.id }) : upload(f.file))));
 		} catch (e) {
 			error = (e as Error).message;
 			throw e;
 		}
 		// Throwing keeps the text and files in the prompt box so they can be retried.
-		if (!(await act(api.sendMessage({ threadId, message: { ...message(text), attachments } })))) throw new Error(error);
+		if (!(await act(api.sendMessage({ threadId, message: { ...message(review.length ? reviewText(text) : text, review), attachments } })))) throw new Error(error);
 		typedAt = 0;
+		if (review.length) {
+			pending = [];
+			localStorage.removeItem(reviewKey); // by now another thread may be open, and this page's effect gone
+		}
 	}
 
 	async function sendReview(summary: string) {
-		let text = summary.trim();
-		if (ask && !/@agent\b/.test(text)) text = `@agent ${text || 'please address these review comments.'}`;
-		const ok = await act(api.sendMessage({ threadId: id, message: message(text, pending) }));
+		const ok = await act(api.sendMessage({ threadId: id, message: message(reviewText(summary), pending) }));
 		if (ok) pending = [];
 		return ok;
 	}
@@ -418,7 +435,7 @@
 								? 'ring-2 ring-primary/60 ring-offset-4 ring-offset-background'
 								: ''}"
 						>
-							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} ondraft={(text) => useAsDraft(id, text)} />
+							<ChatItem {item} threadId={id} {thread} {owner} {act} {waiting} onreveal={reveal} onlogin={() => (loginOpen = true)} onshow={show} ondraft={draft} />
 						</div>
 					{/each}
 
@@ -449,7 +466,7 @@
 			<ConversationScrollButton />
 		</Conversation>
 
-		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} {toggleMode} />
+		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} {toggleMode} bind:pending bind:ask />
 	{/if}
 </div>
 

@@ -899,6 +899,16 @@ export declare type Message = Message$1<"banda.v1.Message"> & {
    * @generated from field: repeated banda.v1.Attachment attachments = 6;
    */
   attachments: Attachment[];
+
+  /**
+   * Set by the API when the post is stored, whatever a client sends: a
+   * teammate's @agent post that started nothing, because a teammate's turn
+   * can't run here (the owner's Claude subscription). It stays what it was
+   * when the thread's auth changes, and messages from before it have it unset.
+   *
+   * @generated from field: bool proposal = 7;
+   */
+  proposal: boolean;
 };
 
 /**

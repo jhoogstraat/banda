@@ -65,7 +65,7 @@ test('bob’s new thread shows up live on carol’s team board, then its error',
 	board.stop();
 });
 
-test('on a subscription only the owner runs the agent: a teammate’s @agent post is a plain post the owner’s next prompt carries, and there is no trust', { tag: '@key' }, async ({ as }) => {
+test('on a subscription only the owner runs the agent: a teammate’s @agent post never reaches it by itself, their chat does, and there is no trust', { tag: '@key' }, async ({ as }) => {
 	const bob = as('bob');
 	const t = await as('alice').create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
@@ -79,8 +79,12 @@ test('on a subscription only the owner runs the agent: a teammate’s @agent pos
 	expect(await t.of('turnEnded')).toHaveLength(1);
 	await refused(t.user.threads.trust({ threadId: t.id, trusted: true }));
 	expect((await t.get()).trusted).toBe(false);
-	const after = await t.turn(() => t.send('@agent carry on', { mentionsAgent: true }));
-	expect(after.diff).toContain('e2e: from bob');
+	await t.as(bob).send('e2e: chat with alice');
+	await t.turn(() => t.send('@agent e2e-echo e2e-noop carry on', { mentionsAgent: true }));
+	const prompt = (await t.prompts()).at(-1)!;
+	expect(prompt).toContain('e2e: chat with alice');
+	expect(prompt).not.toContain('e2e: from bob');
+	expect(prompt).not.toContain('e2e: bob asks in a review');
 });
 
 test('on a subscription a teammate’s @agent post is a proposal: only the owner uses it as a draft, edits it and sends it as their own', { tag: '@key' }, async ({ as }) => {
@@ -88,7 +92,8 @@ test('on a subscription a teammate’s @agent post is a proposal: only the owner
 	const [t, other] = [await alice.create(), await alice.create({ prompt: 'e2e: another thread' })];
 	await Promise.all([t.waitForStatus(Status.AWAITING_INPUT), other.waitForStatus(Status.AWAITING_INPUT)]);
 	const proposal = '@agent e2e-echo e2e-noop the login button should also show a spinner while it waits';
-	await t.as(bob).send(proposal, { mentionsAgent: true });
+	await t.as(bob).send(proposal, { mentionsAgent: true, proposal: false });
+	expect((await t.of('message')).at(-1)!.proposal).toBe(true); // the API's fact, whatever a client says
 	const [page, bobPage] = [await alice.page(), await bob.page()];
 	await Promise.all([page.goto(`/t/${t.id}`), bobPage.goto(`/t/${t.id}`)]);
 	const box = page.locator('textarea[name=message]');
@@ -116,6 +121,7 @@ test('on a subscription a teammate’s @agent post is a proposal: only the owner
 	expect([mine.actor, (mine.kind.value as { text: string }).text]).toEqual([alice.id, `e2e: alice first,\n${proposal}, and e2e: alice’s edit`]);
 	expect((await t.prompts()).at(-1)).toContain('e2e: alice first,');
 	expect((await t.prompts()).at(-1)).toContain('e2e: alice’s edit');
+	expect((await t.prompts()).at(-1)).not.toContain('Messages posted in this thread'); // only what she sent: the agent gets it once
 	expect(await t.of('turnRequest')).toHaveLength(0);
 	await expect(box).toHaveValue('');
 
@@ -154,6 +160,174 @@ test('on a subscription a teammate’s @agent post is a proposal: only the owner
 	await expect(carolPage.getByRole('button', { name: 'Use as draft' })).toHaveCount(0);
 });
 
+test('a client can’t mark a post a proposal: the owner’s and a plain post aren’t, whatever they send', async ({ as }) => {
+	const bob = as('bob');
+	const t = await as('alice').create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.send('e2e: mine', { proposal: true });
+	await t.as(bob).send('e2e: no agent mentioned', { proposal: true });
+	await t.send('@agent e2e-noop mine too', { mentionsAgent: true, proposal: true });
+	expect((await t.of('message')).map((m) => m.proposal)).toEqual([false, false, false, false]); // with the first prompt
+});
+
+test('a proposal’s files and comments come along as Use as draft: chips and comments to remove or edit, sent as the owner’s, and the agent gets them', { tag: '@key' }, async ({ as }) => {
+	const [alice, bob, carol] = [as('alice'), as('bob'), as('carol')];
+	const [t, other] = [await alice.create(), await alice.create({ prompt: 'e2e: another thread' })];
+	await Promise.all([t.waitForStatus(Status.AWAITING_INPUT), other.waitForStatus(Status.AWAITING_INPUT)]);
+	const [image, notes, gone, plain] = [
+		await bob.attach('dot.png', 'image/png', png),
+		await bob.attach('notes.md', '', '# e2e: bob’s notes\n'),
+		await bob.attach('gone.md', '', '# e2e: removed\n'),
+		await bob.attach('plain.png', 'image/png', png)
+	];
+	const comments = [
+		{ path: 'hello1.txt', startLine: 1, endLine: 1, code: '+hello 1', body: 'e2e: bob’s first comment' },
+		{ path: 'hello2.txt', startLine: 1, endLine: 1, code: '+hello 2', body: 'e2e: bob’s second comment' }
+	];
+	await t.as(bob).send('@agent e2e-echo please look', { mentionsAgent: true, attachments: [{ id: image }, { id: notes }, { id: gone }], review: comments });
+	await t.as(bob).send('e2e: not a proposal', { attachments: [{ id: plain }] });
+
+	// Only the owner may post a proposal’s files, and only that thread’s proposals’.
+	await refused(t.send('e2e: not proposed', { attachments: [{ id: plain }] }));
+	await refused(other.send('e2e: another thread', { attachments: [{ id: image }] }));
+	await refused(t.as(carol).send('e2e: not the owner', { attachments: [{ id: image }] }));
+
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	const box = page.locator('textarea[name=message]');
+	const form = page.locator('form').filter({ has: box });
+	await page.getByRole('button', { name: 'Use as draft' }).click();
+	await expect(box).toHaveValue('@agent e2e-echo please look');
+	await expect(form.getByRole('img', { name: 'dot.png' })).toBeVisible();
+	await expect(form.getByText('notes.md')).toBeVisible();
+	await expect(form.getByText('gone.md')).toBeVisible();
+	const draft = page.getByRole('group', { name: 'Pending review comments' });
+	await expect(draft.getByText('2 pending comments')).toBeVisible();
+
+	// A second click adds nothing twice; the draft survives switching threads, for this thread only.
+	await page.getByRole('button', { name: 'Use as draft' }).click();
+	await expect(draft.getByText('2 pending comments')).toBeVisible();
+	await expect(form.getByText('notes.md')).toHaveCount(1);
+	await page.locator(`a[href="/t/${other.id}"]`).first().click();
+	await expect(page).toHaveURL(`/t/${other.id}`);
+	await expect(form.getByText('notes.md')).toHaveCount(0);
+	await page.locator(`a[href="/t/${t.id}"]`).first().click();
+	await expect(form.getByText('notes.md')).toBeVisible();
+
+	// She removes a file and a comment, and edits the other comment.
+	await form.getByText('gone.md').hover();
+	await form.getByRole('button', { name: 'Remove file' }).nth(1).click();
+	await expect(form.getByText('gone.md')).toHaveCount(0);
+	await draft.getByRole('button', { name: 'Remove the comment on hello2.txt:1' }).click();
+	await draft.getByRole('textbox', { name: 'Comment on hello1.txt:1' }).fill('e2e: alice’s version');
+	await box.fill('@agent e2e-echo please look, says alice');
+	await t.turn(() => box.press('Enter'));
+	await expect(draft).toBeHidden();
+	await expect(form.getByText('notes.md')).toHaveCount(0);
+
+	const events = (await t.events()).filter((e) => e.kind.case === 'message');
+	const mine = events.at(-1)!;
+	const sent = mine.kind.value as { attachments: { id: string; name: string }[]; review: { body: string }[]; proposal: boolean };
+	expect(mine.actor).toBe(alice.id);
+	expect([sent.attachments.map((a) => a.name), sent.review.map((c) => c.body), sent.proposal]).toEqual([['dot.png', 'notes.md'], ['e2e: alice’s version'], false]);
+	const prompt = (await t.prompts()).at(-1)!;
+	expect(prompt).toContain(`${alice.id}: @agent e2e-echo please look, says alice`);
+	expect(prompt).toContain('e2e: not a proposal'); // chat is context, a proposal only what she sent of it
+	expect(prompt).toMatch(/hello1\.txt, line 1:.*\+hello 1.*e2e: alice’s version/s);
+	expect(prompt).toContain('# e2e: bob’s notes');
+	for (const removed of ['e2e: bob’s first comment', 'e2e: bob’s second comment', '# e2e: removed', '@agent e2e-echo please look\n']) expect(prompt).not.toContain(removed);
+	expect((await t.of('agentText')).map((a) => a.text)).toContain('Received 2 image blocks (image/png image/png) and 1 text files');
+	const proposal = events.find((e) => e.actor === bob.id)!.kind.value as { attachments: unknown[]; review: { body: string }[] };
+	expect([proposal.attachments.length, proposal.review[0].body]).toEqual([3, 'e2e: bob’s first comment']); // the proposal stays as posted
+});
+
+test('a teammate’s review asking @agent on a subscription is a proposal: the owner sends it from the composer; a review without text works too', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	const [page, bobPage] = [await alice.page(), await bob.page()];
+	await Promise.all([page.goto(`/t/${t.id}`), bobPage.goto(`/t/${t.id}`)]);
+
+	await bobPage.getByRole('button', { name: 'View diff' }).click();
+	await bobPage.locator('[data-file="hello1.txt"]').getByRole('button', { name: 'Comment on line 1' }).click();
+	await bobPage.getByPlaceholder('Comment on this line').fill('e2e-echo e2e-noop e2e: bob reviews');
+	await bobPage.getByRole('button', { name: 'Add to review' }).click();
+	await bobPage.getByRole('checkbox', { name: 'Ask @agent' }).first().check();
+	await bobPage.getByRole('button', { name: 'Send review' }).click();
+	await expect(bobPage.getByText('suggests a prompt')).toBeVisible();
+	const posted = (await t.of('message')).at(-1)!;
+	expect([posted.proposal, posted.text, (await t.get()).status]).toEqual([true, '@agent please address these review comments.', Status.AWAITING_INPUT]);
+
+	await page.getByRole('button', { name: 'Use as draft' }).click();
+	const box = page.locator('textarea[name=message]');
+	const draft = page.getByRole('group', { name: 'Pending review comments' });
+	await expect(draft.getByRole('textbox', { name: 'Comment on hello1.txt:1' })).toHaveValue('e2e-echo e2e-noop e2e: bob reviews');
+	await t.turn(() => box.press('Enter'));
+	await expect(draft).toBeHidden();
+	let mine = (await t.events()).filter((e) => e.kind.case === 'message').at(-1)!;
+	expect(mine.actor).toBe(alice.id);
+	let prompt = (await t.prompts()).at(-1)!;
+	expect(prompt).toContain('e2e: bob reviews');
+	expect(prompt).not.toContain('Messages posted in this thread');
+
+	// Through the API a review needs no text: the chip still shows, and only the comment goes to the composer.
+	await t.as(bob).send('', { mentionsAgent: true, review: [{ path: 'hello1.txt', startLine: 1, endLine: 1, code: '+hello 1', body: 'e2e-echo e2e-noop e2e: bob again' }] });
+	await expect(page.getByText('The comments below')).toBeVisible();
+	await page.getByRole('button', { name: 'Use as draft' }).nth(1).click();
+	await expect(draft.getByText('1 pending comment')).toBeVisible();
+	await expect(box).toHaveValue('');
+	await t.turn(() => box.press('Enter'));
+	mine = (await t.events()).filter((e) => e.kind.case === 'message').at(-1)!;
+	expect([mine.actor, (mine.kind.value as { text: string }).text]).toEqual([alice.id, '@agent please address these review comments.']);
+	prompt = (await t.prompts()).at(-1)!;
+	expect(prompt).toContain('e2e: bob again');
+	expect(prompt).not.toContain('Messages posted in this thread');
+});
+
+test('a proposal’s file survives the thread’s suspend: the owner’s send wakes it and the agent gets the teammate’s upload', async ({ as }) => {
+	const [alice, bob] = [as('alice'), as('bob')];
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await t.as(bob).send('@agent e2e-echo see this', { mentionsAgent: true, attachments: [{ id: await bob.attach('dot.png', 'image/png', png) }] });
+	await t.snooze();
+	await t.podGone();
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	await page.getByRole('button', { name: 'Use as draft' }).click();
+	const box = page.locator('textarea[name=message]');
+	await expect(box).toHaveValue('@agent e2e-echo see this');
+	await t.turn(() => box.press('Enter'));
+	expect((await t.of('agentText')).map((a) => a.text)).toContain('Received 1 image blocks (image/png) and 0 text files');
+	expect((await t.prompts()).at(-1)).toBe('@agent e2e-echo see this\n[attached image: dot.png]');
+});
+
+test('a post stays what it was when the thread’s auth changes: a turn that ran isn’t a proposal on a subscription, a proposal stays one on a key', { tag: '@key' }, async ({ as }) => {
+	const bob = as('bob');
+	const alice = await as('alice').apiKey();
+	const t = await alice.create();
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await alice.threads.trust({ threadId: t.id, trusted: true });
+	await t.turn(() => t.as(bob).send('@agent e2e-noop e2e: a real turn', { mentionsAgent: true }));
+
+	await alice.settings.setAuthMethod({ harness: 'claude', authMethod: AuthMethod.SUBSCRIPTION });
+	await t.waitFor('the subscription', (i) => !i.teammateTurns);
+	await t.as(bob).send('@agent e2e: a proposal', { mentionsAgent: true });
+	expect((await t.of('message')).filter((m) => m.text.startsWith('@agent')).map((m) => m.proposal)).toEqual([false, true]);
+	const page = await alice.page();
+	await page.goto(`/t/${t.id}`);
+	const says = (text: string) => page.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(@class, "gap-3")][1]');
+	await expect(says('@agent e2e: a proposal').getByText('suggests a prompt')).toBeVisible();
+	await expect(says('@agent e2e-noop e2e: a real turn').getByText('suggests a prompt')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Use as draft' })).toHaveCount(1);
+
+	await alice.apiKey();
+	await t.waitFor('the key', (i) => i.teammateTurns);
+	await page.reload();
+	await expect(says('@agent e2e: a proposal').getByText('suggests a prompt')).toBeVisible();
+	await expect(says('@agent e2e-noop e2e: a real turn').getByText('suggests a prompt')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Use as draft' })).toHaveCount(1);
+});
+
 test('switching to a subscription withdraws pending turn requests, saying why, and turns trust off for good', async ({ as }) => {
 	const bob = as('bob');
 	const alice = await as('alice').apiKey();
@@ -188,6 +362,7 @@ test('switching to an API key mid-turn: a teammate’s turn waits until the envi
 	expect((await t.get()).teammateTurns).toBe(true);
 	await t.as(bob).send('@agent e2e-auth e2e: from bob', { mentionsAgent: true });
 	await t.waitFor('a turn request', (i) => i.turnRequests === 1);
+	expect((await t.of('turnRequest'))[0].message!.proposal).toBe(false); // the owner decides on it, so it proposes nothing
 	const seq = await lastRequest(t);
 	expect(await refused(alice.threads.approveTurn({ threadId: t.id, requestSeq: seq }))).toContain('still runs on your Claude subscription');
 	expect(await refused(alice.threads.trust({ threadId: t.id, trusted: true }))).toContain('still runs on your Claude subscription');

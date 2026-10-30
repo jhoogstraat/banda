@@ -46,11 +46,15 @@ func agentPrompt(owner string, names map[string]string, unseen []*bandav1.Event,
 }
 
 // postedSince lists the messages, sub-thread reports, overlaps and pull request changes among events for the
-// agent, a line each, with the images attached to them.
+// agent, a line each, with the images attached to them. Never a proposal: it reaches the agent only as what the
+// owner sends, if they do (docs/research/proposed-prompts.md).
 func postedSince(names map[string]string, events []*bandav1.Event, texts map[string]string) (string, []string) {
 	var b strings.Builder
 	var images []string
 	for _, e := range events {
+		if e.GetMessage().GetProposal() {
+			continue
+		}
 		if m := e.GetMessage(); m != nil {
 			text, own := messageBody(m, texts)
 			images = append(images, own...)

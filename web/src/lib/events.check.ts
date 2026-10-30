@@ -110,6 +110,10 @@ apply(chat, { ...ev({ case: 'message', value: { text: 'hi', attachments: [{ id: 
 const posted = chat.items.at(-1);
 if (posted?.kind !== 'message' || posted.attachments[0]?.id !== 'f1') throw new Error('a message should keep its attachments');
 if (typingNow(chat, Date.now()).join() !== 'carol') throw new Error("a person's message should end their typing");
+if (posted.proposal) throw new Error('a message is a proposal only if the API says so');
+apply(chat, { ...ev({ case: 'message', value: { text: '@agent go', proposal: true } }), actor: 'bob' });
+const proposed = chat.items.at(-1);
+if (proposed?.kind !== 'message' || !proposed.proposal) throw new Error('a message should keep that it is a proposal');
 
 const asks = newChat();
 apply(asks, { seq: 7n, actor: 'bob', kind: { case: 'turnRequest', value: { message: { text: '@agent go' } } } } as Event);

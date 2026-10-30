@@ -73,8 +73,8 @@
 		onlogin: () => void;
 		// Opens a tab of the right pane: "diff", or "browser" on a port. Without it (no pane) the chat has no such links.
 		onshow?: (tab: string, port?: number) => void;
-		// Puts text into the owner's composer. Without it (no composer) proposals have no "Use as draft".
-		ondraft?: (text: string) => void;
+		// Puts a proposal into the owner's composer. Without it (no composer) proposals have no "Use as draft".
+		ondraft?: (m: Extract<Item, { kind: 'message' }>) => void;
 	} = $props();
 
 	// The owner's optional note when declining a turn request, behind its note button.
@@ -124,8 +124,8 @@
 {#if item.kind === 'message'}
 	{@const name = userName(item.actor)}
 	<!-- On a subscription a teammate's @agent post starts nothing (Anthropic's terms): it proposes a prompt, which only the
-	     owner can put into their own composer to edit and send as theirs. Render-only: on an API key such a post is a request. -->
-	{@const proposal = item.mentionsAgent && thread && !thread.teammateTurns && item.actor !== thread.ownerId && !item.actor.startsWith('agent:')}
+	     owner can put into their own composer to edit and send as theirs. The API records it when the post is stored. -->
+	{@const proposal = item.proposal}
 	<div class="flex gap-3">
 		<UserAvatar {name} class="mt-0.5 size-7" />
 		<div class="min-w-0 flex-1 space-y-1">
@@ -138,7 +138,7 @@
 				{#if proposal}<span class="text-xs text-muted-foreground">suggests a prompt</span>{/if}
 				<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			</div>
-			{#if item.text}
+			{#if item.text || proposal}
 				{@const draftable = proposal && owner && ondraft}
 				<!-- A proposal hasn't gone to the agent yet, so for everyone it reads as a draft: dashed and unfilled. -->
 				{@const pending = 'border border-dashed border-muted-foreground/40 group-[.is-user]:bg-transparent'}
@@ -148,14 +148,14 @@
 					     bubble's last line clear of the 14px it reaches inside. -->
 					<div class="relative w-fit max-w-full">
 						<MessageContent class="group-[.is-user]:ml-0 {proposal ? pending : ''} {draftable ? 'min-w-36 group-[.is-user]:pb-7' : ''}"
-							><p class="whitespace-pre-wrap"><MentionText text={item.text} /></p></MessageContent>
+							><p class="whitespace-pre-wrap">{#if item.text}<MentionText text={item.text} />{:else}<span class="text-muted-foreground">The {item.review.length ? 'comments' : 'files'} below</span>{/if}</p></MessageContent>
 						{#if draftable}
 							<Button
 								size="xs"
 								variant="outline"
 								class="absolute right-3 -bottom-3.5 h-7 rounded-full px-2.5 shadow-sm before:absolute before:-inset-x-2 before:-inset-y-1.5 dark:border-muted-foreground/30 dark:bg-background dark:hover:bg-muted"
 								title="Put it in your message box to edit and send as yours"
-								onclick={() => ondraft!(item.text)}
+								onclick={() => ondraft!(item)}
 							>
 								<PencilLineIcon /> Use as draft
 							</Button>

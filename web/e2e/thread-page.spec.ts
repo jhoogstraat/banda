@@ -242,9 +242,10 @@ test('review: alice comments on a line of the diff and sends the review; the cha
 	await file.getByRole('button', { name: 'Comment on line 1' }).click();
 	await page.getByPlaceholder('Comment on this line').fill('e2e: say hello back');
 	await page.getByRole('button', { name: 'Add to review' }).click();
-	await expect(page.getByText('1 pending comment')).toBeVisible();
+	const pending = page.getByRole('tabpanel', { name: 'Diff' }).getByText('1 pending comment');
+	await expect(pending).toBeVisible();
 	await page.getByRole('button', { name: 'Send review' }).click();
-	await expect(page.getByText('1 pending comment')).toBeHidden();
+	await expect(pending).toBeHidden();
 	await expect(page.getByRole('button', { name: 'hello1.txt:1' })).toBeVisible(); // the review card in the chat
 	await expect(file.getByText('e2e: say hello back')).toBeVisible(); // and posted at its line
 	await expect(page.getByText('Created hello2.txt')).toBeVisible({ timeout: 60_000 });

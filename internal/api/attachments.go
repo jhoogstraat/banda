@@ -115,8 +115,9 @@ func attachmentProto(a store.Attachment) *bandav1.Attachment {
 }
 
 // checkAttachments replaces the client's attachment list with the stored
-// metadata, and refuses attachments that someone else uploaded.
-func (s *Service) checkAttachments(ctx context.Context, m *bandav1.Message, by string) error {
+// metadata, and refuses attachments that someone else uploaded, unless by owns
+// threadID ("" for none) and a proposal there carries them (Use as draft).
+func (s *Service) checkAttachments(ctx context.Context, m *bandav1.Message, by, threadID string) error {
 	if len(m.Attachments) > maxAttachments {
 		return connect.NewError(connect.CodeInvalidArgument, "at most 5 files per message")
 	}
@@ -133,12 +134,43 @@ func (s *Service) checkAttachments(ctx context.Context, m *bandav1.Message, by s
 	} else if err != nil {
 		return err
 	}
+	var proposed map[string]bool
 	m.Attachments = nil
 	for _, a := range stored {
-		if a.UserID != by {
+		if a.UserID != by && proposed == nil {
+			if proposed, err = s.proposedFiles(ctx, threadID, by); err != nil {
+				return err
+			}
+		}
+		if a.UserID != by && !proposed[a.ID] {
 			return connect.NewError(connect.CodeInvalidArgument, "unknown attachment")
 		}
 		m.Attachments = append(m.Attachments, attachmentProto(a))
 	}
 	return nil
+}
+
+// proposedFiles are the ids of the files on threadID's proposals, which only
+// its owner may post again. Never nil.
+func (s *Service) proposedFiles(ctx context.Context, threadID, by string) (map[string]bool, error) {
+	ids := map[string]bool{}
+	if threadID == "" {
+		return ids, nil
+	}
+	t, err := s.store.Get(ctx, threadID)
+	if err != nil || t.OwnerID != by {
+		return ids, err
+	}
+	events, err := s.store.EventsOf(ctx, threadID, 0, "message")
+	if err != nil {
+		return ids, err
+	}
+	for _, m := range messages(events) {
+		for _, a := range m.Attachments {
+			if m.Proposal {
+				ids[a.Id] = true
+			}
+		}
+	}
+	return ids, nil
 }

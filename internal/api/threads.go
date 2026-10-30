@@ -50,7 +50,7 @@ func (s *Service) firstPrompt(ctx context.Context, m *bandav1.Message, by string
 	if strings.TrimSpace(m.Text) == "" {
 		return "", nil, connect.NewError(connect.CodeInvalidArgument, "prompt is required")
 	}
-	if err := s.checkAttachments(ctx, m, by); err != nil {
+	if err := s.checkAttachments(ctx, m, by, ""); err != nil {
 		return "", nil, err
 	}
 	texts, err := textAttachments(ctx, s.store, []*bandav1.Message{m})

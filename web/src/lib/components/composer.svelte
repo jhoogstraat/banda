@@ -1,14 +1,24 @@
 <script lang="ts" module>
-	import { tick } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
+	import type { PromptInputAttachmentData } from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { Attachment } from '#lib/gen/banda/v1/banda_pb.js';
 
-	// The composer's text per thread: it survives switching threads, and "Use as draft" fills it.
+	// The composer's text and files per thread: they survive switching threads (files picked here don't, see onDestroy), and "Use as draft" fills them.
 	const drafts = $state<Record<string, string>>({});
+	const files = $state<Record<string, PromptInputAttachmentData[]>>({});
 	let input: HTMLTextAreaElement | null = null;
 
-	/** Puts a teammate's proposal into the owner's composer, after what they typed, and focuses it: they edit it and send it as their own. */
-	export async function useAsDraft(threadId: string, text: string) {
+	/** Puts a teammate's proposal into the owner's composer, after what they typed, and focuses it: they edit it and send it as their own.
+	 *  Its files stay the uploads they are (`remoteUrl`, the id its upload's): the API lets the owner post a proposal's files. */
+	export async function useAsDraft(threadId: string, text: string, attachments: Attachment[]) {
 		const typed = drafts[threadId]?.trimEnd();
-		drafts[threadId] = typed ? `${typed}\n${text}` : text;
+		if (text) drafts[threadId] = typed ? `${typed}\n${text}` : text;
+		const have = files[threadId] ?? [];
+		const added = attachments.filter((a) => !have.some((f) => f.id === a.id));
+		files[threadId] = [
+			...have,
+			...added.map((a) => ({ id: a.id, file: new File([], a.name, { type: a.mediaType }), filename: a.name, mediaType: a.mediaType, remoteUrl: `/files/${a.id}` }))
+		];
 		await tick();
 		input?.focus();
 		input?.setSelectionRange(input.value.length, input.value.length);
@@ -26,15 +36,18 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
-	import type { PromptInputAttachmentData, PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
+	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
 	import AttachButton, { attachLimits } from '#lib/components/attach-button.svelte';
+	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionInput from '#lib/components/mention-input.svelte';
 	import OptionMenu, { efforts, models } from '#lib/components/option-menu.svelte';
 	import Plan from '#lib/components/plan.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
+	import { where, type Comment } from '#lib/diff.js';
 	import type { Chat } from '#lib/events.js';
 	import { Mode, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { permissionLabel, permissionModes, ruleLabel } from '#lib/permissions.js';
@@ -43,6 +56,7 @@
 
 	// The bottom of a thread: the context line (activity, typing, mode), the error, banners, the plan and the prompt box.
 	// typing: the names of the others typing. send throws to keep the prompt; typed reports typing.
+	// pending and ask are the review being written: send sends it along, so it shows here, each comment editable and removable.
 	let {
 		thread,
 		owner,
@@ -53,7 +67,9 @@
 		send,
 		typed,
 		setAgent,
-		toggleMode
+		toggleMode,
+		pending = $bindable(),
+		ask = $bindable()
 	}: {
 		thread?: Thread;
 		owner: boolean;
@@ -65,6 +81,8 @@
 		typed: () => void;
 		setAgent: (change: { model?: string; effort?: string; profile?: string }) => void;
 		toggleMode: () => void;
+		pending: Comment[];
+		ask: boolean;
 	} = $props();
 
 	const typingText = $derived(
@@ -84,13 +102,17 @@
 	// On a subscription only the owner runs the agent (Anthropic's terms): teammates propose prompts, which the owner may
 	// use as a draft of their own, and fork for their own work.
 	// The box clears after a successful send, from the thread it was sent from: by then another thread may be open.
-	let files = $state<PromptInputAttachmentData[]>();
 	async function submit(m: PromptInputMessage) {
 		const id = thread?.id ?? '';
 		await send(m);
 		drafts[id] = '';
-		files = [];
+		files[id] = [];
 	}
+	// A file picked here has a preview that dies with this page, so it goes too; a proposal's is an upload and stays.
+	onDestroy(() => {
+		const id = thread?.id ?? '';
+		if (files[id]) files[id] = files[id].filter((f) => f.remoteUrl);
+	});
 	const placeholder = $derived(
 		!thread
 			? 'Message…'
@@ -140,11 +162,29 @@
 	{#if error}<p role="alert" class="mb-2 text-sm text-destructive">{error}</p>{/if}
 	{#if thread}<ThreadBanners {thread} />{/if}
 	<Plan plan={chat.plan} />
-	<PromptInput.Root onSubmit={submit} clearOnSubmit={false} bind:attachments={files} {...attachLimits} onError={(e) => (error = e.message)}>
+	<PromptInput.Root onSubmit={submit} clearOnSubmit={false} bind:attachments={() => files[thread?.id ?? ''], (v) => (files[thread?.id ?? ''] = v ?? [])} {...attachLimits} onError={(e) => (error = e.message)}>
 		<fieldset disabled={thread?.status === Status.STARTING} class="contents" oninput={typed}>
 			<PromptInput.Attachments class="px-2">
 				{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
 			</PromptInput.Attachments>
+			{#if pending.length}
+				<div class="max-h-64 space-y-1.5 overflow-y-auto px-3 pt-2" role="group" aria-label="Pending review comments">
+					<div class="flex items-center gap-2 text-xs">
+						<span class="font-medium">{pending.length} pending comment{pending.length > 1 ? 's' : ''}</span>
+						<label class="ml-auto flex items-center gap-1.5 text-muted-foreground"><input type="checkbox" bind:checked={ask} class="accent-primary" /> Ask @agent</label>
+					</div>
+					{#each pending as c, i (i)}
+						<div class="overflow-hidden rounded-md border text-xs">
+							<div class="flex items-center gap-1 bg-muted/40 px-2 py-0.5">
+								<span class="min-w-0 flex-1 truncate font-mono">{where(c)}</span>
+								<IconButton icon={XIcon} label="Remove the comment on {where(c)}" class="size-5" onclick={() => (pending = pending.filter((_, j) => j !== i))} />
+							</div>
+							{#if c.code}<pre class="max-h-24 overflow-auto border-t px-2 py-1 font-mono leading-5">{c.code}</pre>{/if}
+							<Textarea bind:value={c.body} aria-label="Comment on {where(c)}" class="min-h-0 rounded-none border-0 border-t text-xs shadow-none focus-visible:ring-0" rows={2} />
+						</div>
+					{/each}
+				</div>
+			{/if}
 			<PromptInput.Body>
 				<MentionInput
 					{placeholder}

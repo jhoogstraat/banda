@@ -35,7 +35,7 @@
 		tab: string;
 		pending: Comment[];
 		focus?: Comment;
-		ask?: boolean;
+		ask: boolean;
 		// A port for the Browser tab to show (see Browser's want).
 		port?: number;
 		posted: (Comment & { by: string })[];

@@ -194,7 +194,7 @@ func Apply(s State, a Action) (State, Effect, error) {
 			return s, None, nil
 		}
 		if !s.Trusts(a.By) && !a.OwnersAgent {
-			if !s.APIKey { // a plain post: the owner's next prompt includes it
+			if !s.APIKey { // a proposal, the owner's to send (api.SendMessage)
 				s.Mode = ChatMode
 				return s, None, nil
 			}

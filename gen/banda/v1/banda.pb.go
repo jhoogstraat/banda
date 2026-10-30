@@ -2480,7 +2480,12 @@ type Message struct {
 	Review []*ReviewComment `protobuf:"bytes,4,rep,name=review,proto3" json:"review,omitempty"`
 	// Files uploaded with POST /files and posted with the message. The API
 	// fills in name, media type and size from the upload.
-	Attachments   []*Attachment `protobuf:"bytes,6,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	Attachments []*Attachment `protobuf:"bytes,6,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// Set by the API when the post is stored, whatever a client sends: a
+	// teammate's @agent post that started nothing, because a teammate's turn
+	// can't run here (the owner's Claude subscription). It stays what it was
+	// when the thread's auth changes, and messages from before it have it unset.
+	Proposal      bool `protobuf:"varint,7,opt,name=proposal,proto3" json:"proposal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2548,6 +2553,13 @@ func (x *Message) GetAttachments() []*Attachment {
 		return x.Attachments
 	}
 	return nil
+}
+
+func (x *Message) GetProposal() bool {
+	if x != nil {
+		return x.Proposal
+	}
+	return false
 }
 
 // A comment on a line range of the diff.
@@ -16549,13 +16561,14 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x16\n" +
 	"\x06picked\x18\x03 \x01(\bR\x06picked\x12\x12\n" +
-	"\x04turn\x18\x04 \x01(\x05R\x04turn\"\xdb\x01\n" +
+	"\x04turn\x18\x04 \x01(\x05R\x04turn\"\xf7\x01\n" +
 	"\aMessage\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12%\n" +
 	"\x0ementions_agent\x18\x02 \x01(\bR\rmentionsAgent\x12,\n" +
 	"\x12mentioned_user_ids\x18\x03 \x03(\tR\x10mentionedUserIds\x12/\n" +
 	"\x06review\x18\x04 \x03(\v2\x17.banda.v1.ReviewCommentR\x06review\x126\n" +
-	"\vattachments\x18\x06 \x03(\v2\x14.banda.v1.AttachmentR\vattachments\"\x97\x01\n" +
+	"\vattachments\x18\x06 \x03(\v2\x14.banda.v1.AttachmentR\vattachments\x12\x1a\n" +
+	"\bproposal\x18\a \x01(\bR\bproposal\"\x97\x01\n" +
 	"\rReviewComment\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1d\n" +
 	"\n" +

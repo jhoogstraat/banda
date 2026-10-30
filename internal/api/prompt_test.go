@@ -2,6 +2,7 @@ package api
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
@@ -64,6 +65,19 @@ func TestAgentPrompt(t *testing.T) {
 		"\n\nb.md, lines 7-9 (removed, numbered as in the base branch):\n````diff\n-```\n-a\n-```\n````\nkeep this"
 	if got, _ := agentPrompt("u1", names, nil, "u1", review, nil); got != want {
 		t.Errorf("review:\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestAgentPromptLeavesOutProposals(t *testing.T) {
+	names := map[string]string{"u1": "Ann", "u2": "Bob"}
+	shot := &bandav1.Attachment{Id: "a1", Name: "shot.png", MediaType: "image/png"}
+	post := func(m *bandav1.Message) *bandav1.Event {
+		return &bandav1.Event{Actor: "u2", Kind: &bandav1.Event_Message{Message: m}}
+	}
+	unseen := []*bandav1.Event{post(&bandav1.Message{Text: "@agent drop the table", Proposal: true, Attachments: []*bandav1.Attachment{shot}}), post(&bandav1.Message{Text: "nice work"})}
+	got, images := agentPrompt("u1", names, unseen, "u1", &bandav1.Message{Text: "fix the typo"}, nil)
+	if strings.Contains(got, "drop the table") || len(images) != 0 || !strings.Contains(got, "Bob: nice work") {
+		t.Errorf("%q, images %v", got, images)
 	}
 }
 

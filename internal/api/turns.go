@@ -26,7 +26,7 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 		}
 	}
 	by, id := user(ctx), req.ThreadId
-	if err := s.checkAttachments(ctx, m, by); err != nil {
+	if err := s.checkAttachments(ctx, m, by, id); err != nil {
 		return nil, err
 	}
 	names := s.names(ctx)
@@ -60,6 +60,9 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 				return nil, err
 			}
 			effect = eff
+			// On a key with the environment still on the login the post is a
+			// turn request instead, hence the effect.
+			m.Proposal = eff == thread.None && m.MentionsAgent && !t.State.TeammateTurns() && by != t.OwnerID && !strings.HasPrefix(by, "agent:")
 			posted := messageEvent(by, m)
 			if eff == thread.RequestTurn {
 				posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}

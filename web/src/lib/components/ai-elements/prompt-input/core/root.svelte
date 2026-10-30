@@ -93,7 +93,8 @@
 		};
 
 		attachmentsContext.onAttachmentsChange = syncAttachments;
-		syncAttachments(attachmentsContext.attachments);
+		// A bound value set from outside wins (the effect below), not what was here.
+		if (attachments === undefined) syncAttachments(attachmentsContext.attachments);
 
 		return () => {
 			if (attachmentsContext.onAttachmentsChange === syncAttachments) {

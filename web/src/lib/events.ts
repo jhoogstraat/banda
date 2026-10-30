@@ -36,7 +36,7 @@ export type Step = Tool | { kind: 'thinking'; text: string };
 
 // `key` is the seq of the event that started the item: stable when older history is prepended.
 export type Item = { key: number } & (
-	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; mentionsAgent: boolean; time?: Timestamp }
+	| { kind: 'message'; actor: string; text: string; review: ReviewComment[]; attachments: Attachment[]; proposal: boolean; time?: Timestamp }
 	| { kind: 'text' | 'notice'; text: string }
 	| { kind: 'steps'; steps: Step[] }
 	// A teammate's turn request; `resolved` (by the owner, `by`) once approved or declined.
@@ -171,7 +171,7 @@ export function apply(chat: Chat, e: Event) {
 	switch (k.case) {
 		case 'message':
 			delete chat.typing[e.actor];
-			chat.items.push({ key, kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, attachments: k.value.attachments, mentionsAgent: k.value.mentionsAgent, time: e.time });
+			chat.items.push({ key, kind: 'message', actor: e.actor, text: k.value.text, review: k.value.review, attachments: k.value.attachments, proposal: k.value.proposal, time: e.time });
 			break;
 		case 'lineageUpdate':
 			chat.items.push({ key, kind: 'lineage', actor: e.actor, update: k.value });
