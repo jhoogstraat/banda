@@ -30,6 +30,8 @@ import (
 type Service struct {
 	store     *store.Store
 	sandboxes *sandbox.Client
+	// TeamIdentity: threads can run on the team's Console identity.
+	TeamIdentity bool
 	// DeleteSettledAfter is how long after the owner settles a thread its
 	// pushed environment is kept.
 	DeleteSettledAfter time.Duration
@@ -306,6 +308,7 @@ func toProto(t store.Thread) *bandav1.Thread {
 		TurnRequests:       int32(t.Requests),
 		Trusted:            t.Trusted,
 		TeammateTurns:      t.APIKey,
+		TeamIdentity:       t.TeamIdentity,
 		AutoPush:           bandav1.AutoPushState(bandav1.AutoPushState_value[t.AutoPush]),
 		EnvironmentDeleted: t.EnvDeleteAt != nil && !t.EnvDeleteAt.After(time.Now()),
 		Activity:           t.Activity,

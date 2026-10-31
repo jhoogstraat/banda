@@ -46,6 +46,29 @@ type Config struct {
 	Image     string
 	APIURL    string // where runners dial the API
 	Sizes     Sizes
+	Team      TeamIdentity
+}
+
+// AuthTeam is the auth method of a thread on the team's Console identity.
+const AuthTeam = "team"
+
+// TeamAudience is the audience of the identity token Anthropic's Workload
+// Identity Federation takes; only threads on the team's identity get one.
+const TeamAudience = "https://api.anthropic.com"
+
+// TeamTokenFile is that token's file in IDTokenDir.
+const TeamTokenFile = "api.anthropic.com"
+
+// TeamIdentity is the federation rule threads on the team's Console identity
+// run under. Ids, not secrets: the credential is the pod's identity token.
+type TeamIdentity struct {
+	RuleID, OrganizationID, ServiceAccountID string
+	WorkspaceID                              string // only for a rule on several workspaces
+}
+
+// Set reports whether a team identity is configured.
+func (t TeamIdentity) Set() bool {
+	return t.RuleID != "" && t.OrganizationID != "" && t.ServiceAccountID != ""
 }
 
 // Sizes are what one environment may take: the limits of a thread's and of a
@@ -118,11 +141,11 @@ func New(cfg Config) (*Client, error) {
 }
 
 // Ensure gives the thread a freshly started pod, with token as its runner
-// token. authMethod is the owner's: "subscription" or "api_key"; secrets are
-// the names of the team's and the owner's secrets, which the runner redacts;
-// git is who the owner's commits are by.
+// token. authMethod is "subscription", "api_key" or AuthTeam; secrets are the
+// names of the team's and the owner's secrets, which the runner redacts; git
+// is who the owner's commits are by.
 func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod string, secrets []string, git store.GitIdentity) error {
-	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID)
+	claim, err := c.ensureClaudeVolume(ctx, t.OwnerID, authMethod != "subscription")
 	if err == nil {
 		err = c.putToken(ctx, "t-"+t.ID, token)
 	}
@@ -136,7 +159,7 @@ func (c *Client) Ensure(ctx context.Context, t store.Thread, token, authMethod s
 // a runner token from newToken. A pod that is still starting is kept, so
 // opening the terminal twice doesn't restart it.
 func (c *Client) EnsureLogin(ctx context.Context, owner string, newToken func() (string, error)) error {
-	claim, err := c.ensureClaudeVolume(ctx, owner)
+	claim, err := c.ensureClaudeVolume(ctx, owner, false)
 	if err != nil {
 		return err
 	}
@@ -415,9 +438,15 @@ func (c *Client) patchSecret(ctx context.Context, name, label string, data map[s
 
 // ensureClaudeVolume creates the owner's Claude Code config volume. It is
 // ReadWriteOnce, which every cluster has, and mounted by all of the owner's
-// pods at once, so sameNode keeps those on one node.
-func (c *Client) ensureClaudeVolume(ctx context.Context, owner string) (string, error) {
+// pods at once, so sameNode keeps those on one node. A pod that doesn't run on
+// the subscription gets a volume of its own: a teammate's turn can run there,
+// and must not reach the owner's login, by reading it or by running claude
+// without the key (Anthropic's terms).
+func (c *Client) ensureClaudeVolume(ctx context.Context, owner string, noLogin bool) (string, error) {
 	name := "claude-" + hash(owner)
+	if noLogin {
+		name = "claude-key-" + hash(owner)
+	}
 	_, err := c.kube.CoreV1().PersistentVolumeClaims(c.cfg.Namespace).Create(ctx, &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"banda.dev/claude-config": "true"}},
 		Spec:       pvcSpec(c.cfg.Sizes.ClaudeVolume),
@@ -493,6 +522,15 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 	}
 	if t.Handoffs > 0 { // a new owner's session: the old one's transcript is on the old owner's volume
 		env["BANDA_SESSION_KEY"] = fmt.Sprintf("/handoff-%d", t.Handoffs)
+	}
+	if authMethod == AuthTeam { // a federation variable set shadows any login; ANTHROPIC_ names are reserved in Secrets
+		env["ANTHROPIC_FEDERATION_RULE_ID"] = c.cfg.Team.RuleID
+		env["ANTHROPIC_ORGANIZATION_ID"] = c.cfg.Team.OrganizationID
+		env["ANTHROPIC_SERVICE_ACCOUNT_ID"] = c.cfg.Team.ServiceAccountID
+		env["ANTHROPIC_IDENTITY_TOKEN_FILE"] = IDTokenDir + "/" + TeamTokenFile
+		if c.cfg.Team.WorkspaceID != "" {
+			env["ANTHROPIC_WORKSPACE_ID"] = c.cfg.Team.WorkspaceID
+		}
 	}
 	vars := []corev1.EnvVar{tokenEnv(name)}
 	for k, v := range env {

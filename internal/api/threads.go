@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
+	"github.com/jhoogstraat/banda/internal/sandbox"
 	"github.com/jhoogstraat/banda/internal/store"
 	"github.com/jhoogstraat/banda/internal/thread"
 )
@@ -153,12 +154,15 @@ func (s *Service) provision(ctx context.Context, t store.Thread) {
 	if err == nil {
 		git, err = s.store.GitIdentity(ctx, t.OwnerID)
 	}
-	var token string // a new one for every pod: an old pod's can't connect any more
 	if err == nil {
-		token, err = s.store.NewRunnerToken(ctx, t.ID, st.AuthMethod == "api_key")
-	}
-	if err == nil {
-		err = s.sandboxes.Ensure(ctx, t, token, st.AuthMethod, secrets, git)
+		method := st.AuthMethod
+		if t.TeamIdentity {
+			method = sandbox.AuthTeam
+		}
+		var token string // a new one for every pod: an old pod's can't connect any more
+		if token, err = s.store.NewRunnerToken(ctx, t.ID, method != "subscription"); err == nil {
+			err = s.sandboxes.Ensure(ctx, t, token, method, secrets, git)
+		}
 	}
 	if err != nil {
 		slog.Error("provision sandbox", "thread", t.ID, "err", err)
@@ -318,6 +322,52 @@ func (s *Service) Trust(ctx context.Context, req *bandav1.TrustRequest) (*bandav
 		&bandav1.Event{Actor: user(ctx), Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}})
 	s.wakeInboxes()
 	return &bandav1.TrustResponse{}, err
+}
+
+// SetTeamIdentity moves the thread between the team's Console identity and its
+// owner's own login. On the team's, teammates' turns can run, as on an API key;
+// leaving it withdraws them. An idle environment restarts now, a working one
+// at its turn's end if it started on the subscription, else at its next start.
+func (s *Service) SetTeamIdentity(ctx context.Context, req *bandav1.SetTeamIdentityRequest) (*bandav1.SetTeamIdentityResponse, error) {
+	by := user(ctx)
+	if req.On && !s.TeamIdentity {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "this Banda has no team identity set up (docs/configuration.md)")
+	}
+	names := s.names(ctx)
+	t, stored, err := s.store.Update(ctx, req.ThreadId, func(tx *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		if err := t.CheckOwner(by); err != nil {
+			return nil, err
+		}
+		if t.TeamIdentity == req.On {
+			return nil, nil
+		}
+		st, err := tx.Settings(ctx, t.OwnerID, harness)
+		if err != nil {
+			return nil, err
+		}
+		text := "This thread runs on the team's Console account now: teammates can request turns."
+		t.TeamIdentity, t.APIKey = req.On, req.On || st.AuthMethod == "api_key"
+		if !req.On {
+			text = "This thread runs on its owner's own Claude login again."
+		}
+		events := []*bandav1.Event{{Actor: by, Kind: &bandav1.Event_Notice{Notice: &bandav1.Notice{Text: text}}}}
+		if !t.APIKey {
+			withdrawn, err := withdrawTurns(ctx, tx, t, or(names[by], by))
+			return append(events, withdrawn...), err
+		}
+		return events, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.broadcast(req.ThreadId, stored)
+	s.wakeInboxes()
+	if t.Status == thread.AwaitingInput {
+		if effect, err := s.apply(context.WithoutCancel(ctx), req.ThreadId, thread.Suspend{}); err == nil {
+			s.do(context.WithoutCancel(ctx), req.ThreadId, effect)
+		}
+	}
+	return &bandav1.SetTeamIdentityResponse{}, nil
 }
 
 // wakeInboxes refreshes every inbox: trust changed, so pending permission

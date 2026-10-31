@@ -83,8 +83,8 @@ func (s State) CheckOwner(by string) error {
 // the owner, or anyone once the owner, on an API key, trusts teammates.
 func (s State) Trusts(by string) bool { return by == s.OwnerID || s.TeammateTurns() && s.Trusted }
 
-// TeammateTurns reports whether a teammate's turn may run now: the owner is
-// on an API key, and the environment started with it or starts anew. A
+// TeammateTurns reports whether a teammate's turn may run now: the thread is
+// on an API key or the team's identity, and the environment started with it or starts anew. A
 // teammate's turn never runs in a claude process started on a subscription.
 func (s State) TeammateTurns() bool { return s.APIKey && (s.EnvAPIKey || s.Status == Suspended) }
 

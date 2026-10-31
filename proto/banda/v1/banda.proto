@@ -24,6 +24,7 @@ service ThreadService {
   rpc DeclineTurn(DeclineTurnRequest) returns (DeclineTurnResponse);
   // Owner only: whether teammates can start turns without approval.
   rpc Trust(TrustRequest) returns (TrustResponse);
+  rpc SetTeamIdentity(SetTeamIdentityRequest) returns (SetTeamIdentityResponse);
   // A sub-thread of parent_id, owned by the caller. It starts from the
   // parent's branch if that was pushed, else from the parent's base branch.
   rpc SpawnThread(SpawnThreadRequest) returns (SpawnThreadResponse);
@@ -327,9 +328,12 @@ message Thread {
   // The owner has a token for the forge, so Banda can open and manage the
   // pull request. Set by GetThread only.
   bool forge_ready = 38;
-  // The owner runs Claude Code on an API key, so teammates may request turns
-  // and be trusted. On a subscription only the owner runs the agent.
+  // The thread runs Claude Code on an API key or the team's Console identity,
+  // so teammates may request turns and be trusted. On a subscription only the
+  // owner runs the agent.
   bool teammate_turns = 39;
+  // Runs Claude Code on the team's Console identity, not the owner's login.
+  bool team_identity = 41;
   // While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
   // ListThreads, ListMentioned and TeamWatch; never stored.
   string env_waiting = 40;
@@ -781,6 +785,13 @@ message TrustRequest {
 
 message TrustResponse {}
 
+message SetTeamIdentityRequest {
+  string thread_id = 1;
+  bool on = 2;
+}
+
+message SetTeamIdentityResponse {}
+
 message HandoffOfferRequest {
   string thread_id = 1;
   string to_user_id = 2;
@@ -971,6 +982,8 @@ message MeRequest {}
 
 message MeResponse {
   User user = 1;
+  // This Banda has a team Console identity threads can run on.
+  bool team_identity = 2;
 }
 
 message ListUsersRequest {}

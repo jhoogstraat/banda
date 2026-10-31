@@ -30,7 +30,7 @@ Around threads, Banda adds what a team needs and a terminal lacks:
 |---|---|
 | See each other's work | Every thread is readable by everyone: chat, tool calls, diff, files, the running app. The team board and search span all of it. |
 | Help each other | Anyone posts into any thread, mentions people, reviews the diff line by line, forks a thread to try another way. |
-| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts. On a subscription nobody else ever does (Anthropic's terms); teammates talk to the owner, suggest prompts, and fork to run it on their own. On an API key, a teammate's request is a card the owner approves, or the owner trusts teammates. |
+| Stay in control of your own agent | Only the owner runs the agent, changes how it runs, or answers its permission prompts. On a subscription nobody else ever does (Anthropic's terms); teammates talk to the owner, suggest prompts, and fork to run it on their own. On an API key or the team's Console identity, a teammate's request is a card the owner approves, or the owner trusts teammates. |
 | Run many agents without chaos | One sandbox per thread: no shared checkout, ports or dependencies. Races run 2–4 tries of one prompt and compare them. Sub-threads split work. |
 | Know what needs you | The sidebar and `/decisions` show only what blocks on you; "the agent is done" is news, not a demand. Overlaps warn when two threads touch the same files. |
 | Never lose work | Auto-push after every turn, a push before every suspend, nothing deleted that isn't on origin. |
@@ -62,7 +62,7 @@ When a choice isn't covered by PLAN.md, apply these in order. Earlier ones win.
 - Would it make Banda pay for, hold or relay a Claude credential? → **No.**
 - Could it delete or hide work that isn't on origin? → Redesign it.
 - Does it let someone act on another person's thread without approval? → Needs the owner's trust.
-- Does it start a turn on someone's subscription that they didn't start themselves? → **No.** Only on an API key, with the owner's approval or trust.
+- Does it start a turn on someone's subscription that they didn't start themselves? → **No**, nor may a turn that could be a teammate's reach that login or a thread on it. Only on an API key or the team's Console identity, with the owner's approval or trust.
 - Does it put a long-lived or broader-than-needed credential in a sandbox? → Mint a short-lived, scoped one in the API instead.
 - Does it add a new service, dependency or setting? → Show that the existing ones can't do it.
 - Does it add a notification, badge or section? → Show it is something that blocks a person.

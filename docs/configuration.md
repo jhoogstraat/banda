@@ -46,6 +46,24 @@ Set up from Settings ([usage.md](usage.md#gitlab)), one per GitLab host: gitlab.
 
 Banda talks to every forge over `https://<host>`, so a self-hosted one needs https, with a name that both the API and sandboxes resolve to it. Its certificate has to be trusted on both sides: from a private authority, set `SSL_CERT_FILE` on the API, and build `SANDBOX_IMAGE` on Banda's image with the authority added (`update-ca-certificates`). A forge on a private address also needs that address in `SANDBOX_EGRESS_ALLOW`, or git in sandboxes can't reach it.
 
+## Team Console identity
+
+A thread can run Claude Code on the team's Claude Console account instead of its owner's login, so that teammates can run the agent there (the thread's **…** menu). It uses Anthropic's [Workload Identity Federation](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation): the pod holds Banda's identity token for at most 15 minutes and the CLI exchanges it for a Console token, so no API key enters a pod. Only threads on it get the token, and only their pods get these settings.
+
+1. In the Console, under **Settings › Workload identity federation**, choose **Connect workload › Custom OIDC**. You need the admin or owner role.
+2. Issuer URL `PUBLIC_URL`. Its discovery must be on public https, port 443. Otherwise use JWKS mode `inline` with the keys from `$PUBLIC_URL/.well-known/jwks.json`, and update them when Banda's keys rotate.
+3. A rule with audience `https://api.anthropic.com`, subject `user:*` or a narrower prefix, scope `workspace:developer`, lifetime 600 s, for a service account that is a member of the workspace.
+4. Set these on the API (`api.env` in the chart):
+
+| Setting | Value |
+|---|---|
+| `CLAUDE_TEAM_RULE_ID` | The rule, `fdrl_…` |
+| `CLAUDE_TEAM_ORGANIZATION_ID` | The organization's id |
+| `CLAUDE_TEAM_SERVICE_ACCOUNT_ID` | The service account, `svac_…` |
+| `CLAUDE_TEAM_WORKSPACE_ID` | Only for a rule on several workspaces |
+
+The team's token has no `jti`: Anthropic takes each `jti` once, and `claude` exchanges the same file again after a restart. The token's 15 minutes bound a replay instead. Usage is billed to the rule's workspace. A linked Team plan's monthly API credits cover the Agent SDK and `claude -p` "with an API key from your linked Claude Console organization"; Anthropic's page doesn't say whether that includes federated tokens, so check the balance after a first turn. Team credits are pooled, capped at $500 a month, and expire with the billing cycle.
+
 ## Workload identity
 
 Banda is an OIDC issuer of short-lived identity tokens for each running thread, as GitHub Actions is for its jobs: a secret manager or cloud that trusts Banda gives a thread's agent access as its owner, so the team fetches secrets at run time instead of pasting long-lived credentials into Settings ([PLAN.md](../PLAN.md), "Workload identity"). It needs no setting of its own:

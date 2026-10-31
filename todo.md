@@ -24,6 +24,7 @@ A week of real work, ideally Banda building Banda. Each annoyance becomes a fail
 - [ ] Set up the GitHub App from Settings and connect (or add a `GIT_TOKEN` secret); check a real turn auto-pushes the branch and the Push button turns into "Create a pull request".
 - [ ] Pull requests on github.com: create, checks from GitHub Actions, a review, a merge; check the token scopes in docs/usage.md are enough and no more.
 - [ ] The Banda MCP tools with a real model (the contract test calls a stub with their names).
+- [ ] A thread on the team's Console identity against the real Console (docs/configuration.md): a first turn, the balance of a linked Team plan's credits after it (Anthropic's page names API keys only), a restart within 5 minutes, and a token past its first refresh.
 - [ ] A second person on the LAN (bob) posts, mentions, suggests a prompt, requests a turn (the owner on an API key), forks; a handoff to bob with bob's own Claude login.
 - [ ] A repo with `.banda/setup.sh` and a dev server: the Browser tab and HMR. With background tasks off, Bash has no `run_in_background`, but a server started with `&` survives the turn (`TestContractDevServer`). Left for a real model: does it use `&` on the first try, and does it redirect the log to a file it can read? If it doesn't, add one line to the runner's system prompt rather than turning background tasks back on.
 - [ ] When you hit a Claude usage limit, save `kubectl -n banda logs t-<thread> | grep rate_limit_event` before the pod suspends (30 min idle): the shape the usage limit feature below waits for.

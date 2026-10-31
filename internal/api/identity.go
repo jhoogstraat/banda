@@ -16,6 +16,7 @@ import (
 	bandav1 "github.com/jhoogstraat/banda/gen/banda/v1"
 	"github.com/jhoogstraat/banda/internal/identity"
 	"github.com/jhoogstraat/banda/internal/sandbox"
+	"github.com/jhoogstraat/banda/internal/store"
 )
 
 // Workload identity: each running thread's pod gets short-lived tokens
@@ -43,6 +44,9 @@ func (s *Service) IdTokens(ctx context.Context, req *bandav1.IdTokensRequest) (*
 		return nil, errNotRunning
 	}
 	auds, err := s.store.Audiences(ctx)
+	if err == nil && t.TeamIdentity && s.TeamIdentity {
+		auds = append(auds, store.Audience{Audience: sandbox.TeamAudience})
+	}
 	if err != nil || len(auds) == 0 {
 		return &bandav1.IdTokensResponse{RefreshSeconds: int32(s.IDTokenRefresh / time.Second)}, err
 	}
@@ -68,7 +72,7 @@ func (s *Service) IdTokens(ctx context.Context, req *bandav1.IdTokensRequest) (*
 	}
 	res := &bandav1.IdTokensResponse{RefreshSeconds: int32(s.IDTokenRefresh / time.Second)}
 	for _, a := range auds {
-		c.Audience = a.Audience
+		c.Audience, c.NoJTI = a.Audience, a.Audience == sandbox.TeamAudience
 		tok, exp, err := s.Identity.Mint(c, now)
 		if err != nil {
 			return nil, err
@@ -153,6 +157,9 @@ func (s *Service) AddIdTokenAudience(ctx context.Context, req *bandav1.AddIdToke
 	aud := strings.TrimSpace(req.Audience)
 	if aud == "" || len(aud) > 200 || badAudience.MatchString(aud) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "an audience is up to 200 characters without spaces, such as sts.amazonaws.com or vault")
+	}
+	if aud == sandbox.TeamAudience { // it would reach every thread, also those on a subscription
+		return nil, connect.NewError(connect.CodeInvalidArgument, "that is the team's Console identity, which goes only to threads on it (docs/configuration.md)")
 	}
 	auds, err := s.store.Audiences(ctx)
 	if err != nil {

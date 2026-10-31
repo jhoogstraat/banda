@@ -24,6 +24,7 @@
 </script>
 
 <script lang="ts">
+	import { threads } from '#lib/threads.svelte.js';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -124,6 +125,21 @@
 			{/if}
 			<!-- A switch, not a check mark: the setting stays, unlike the actions above. Only on an API key: a
 				subscription runs only its owner's turns. -->
+			{#if threads.teamIdentity}
+			<Menu.CheckboxItem
+				checked={thread.teamIdentity}
+				onCheckedChange={(on) => act(api.setTeamIdentity({ threadId: thread.id, on }))}
+				class="pr-1.5 [&>[data-slot=dropdown-menu-checkbox-item-indicator]]:hidden"
+			>
+				<span class="flex-1">
+					Run on the team's Console account
+					<span class="block text-xs text-muted-foreground">{thread.teamIdentity ? 'Teammates can run the agent here' : 'Runs on your own Claude login'}</span>
+				</span>
+				<span aria-hidden="true" class="flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors {thread.teamIdentity ? 'bg-primary' : 'bg-input'}">
+					<span class="size-3 rounded-full bg-background shadow transition-transform {thread.teamIdentity ? 'translate-x-3' : ''}"></span>
+				</span>
+			</Menu.CheckboxItem>
+			{/if}
 			{#if thread.teammateTurns}
 			<Menu.CheckboxItem
 				checked={thread.trusted}

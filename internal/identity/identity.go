@@ -40,6 +40,10 @@ type Claims struct {
 	Thread   string
 	Repo     string // host/path, empty without a repository
 	Branch   string
+	// NoJTI leaves jti out, for a verifier that takes each jti once: a client
+	// exchanging the same file twice, as claude does after a restart, would be
+	// refused until the next refresh. The token's lifetime still bounds it.
+	NoJTI bool
 }
 
 // Issuer signs tokens with the newest key that is due and publishes all of them.
@@ -165,11 +169,15 @@ func (i *Issuer) Mint(c Claims, now time.Time) (string, time.Time, error) {
 	if err != nil {
 		return "", exp, err
 	}
-	payload, err := json.Marshal(map[string]any{
+	claims := map[string]any{
 		"iss": i.URL, "aud": c.Audience, "sub": "user:" + c.Email,
-		"iat": now.Unix(), "nbf": now.Unix(), "exp": exp.Unix(), "jti": rand.Text(),
+		"iat": now.Unix(), "nbf": now.Unix(), "exp": exp.Unix(),
 		"email": c.Email, "email_verified": true, "thread": c.Thread, "repo": c.Repo, "branch": c.Branch,
-	})
+	}
+	if !c.NoJTI {
+		claims["jti"] = rand.Text()
+	}
+	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", exp, err
 	}

@@ -33,13 +33,14 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 	// An agent posting through MCP (as "agent:<thread>") acts for its
 	// thread's owner: e.g. a sub-thread handed to a teammate no longer wakes
 	// its parent without the parent's owner.
-	agentOwner := ""
+	agentOwner, agentShared := "", false
 	if src, ok := strings.CutPrefix(by, "agent:"); ok {
 		t, err := s.store.Get(ctx, src)
 		if err != nil {
 			return nil, err
 		}
-		agentOwner = t.OwnerID
+		// Its turn may be a teammate's: it can't start one on a subscription.
+		agentOwner, agentShared = t.OwnerID, t.APIKey || t.EnvAPIKey
 	}
 
 	var effect thread.Effect
@@ -54,15 +55,17 @@ func (s *Service) SendMessage(ctx context.Context, req *bandav1.SendMessageReque
 			return err
 		}
 		_, stored, err = s.store.Update(ctx, id, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+			ownersAgent := agentOwner == t.OwnerID && (!agentShared || t.State.TeammateTurns())
 			next, eff, err := thread.Apply(t.State, thread.Send{By: by, MentionsAgent: m.MentionsAgent,
-				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: agentOwner == t.OwnerID, Review: len(m.Review) > 0})
+				MentionsUsers: len(m.MentionedUserIds) > 0, OwnersAgent: ownersAgent, Review: len(m.Review) > 0})
 			if err != nil {
 				return nil, err
 			}
 			effect = eff
 			// On a key with the environment still on the login the post is a
 			// turn request instead, hence the effect.
-			m.Proposal = eff == thread.None && m.MentionsAgent && !t.State.TeammateTurns() && by != t.OwnerID && !strings.HasPrefix(by, "agent:")
+			m.Proposal = eff == thread.None && m.MentionsAgent && !t.State.TeammateTurns() && by != t.OwnerID &&
+				(!strings.HasPrefix(by, "agent:") || agentOwner == t.OwnerID && !ownersAgent)
 			posted := messageEvent(by, m)
 			if eff == thread.RequestTurn {
 				posted = &bandav1.Event{Actor: by, Kind: &bandav1.Event_TurnRequest{TurnRequest: &bandav1.TurnRequest{Message: m}}}
@@ -272,10 +275,26 @@ func (s *Service) lockDelivery(id string) func() {
 	return m.(*sync.Mutex).Unlock
 }
 
+// movedPrompt opens the first prompt on another Claude volume, whose session
+// knows nothing of the thread.
+func (s *Service) movedPrompt(ctx context.Context, id string) string {
+	events, err := s.transcript(ctx, id)
+	if err != nil {
+		slog.Error("read conversation", "thread", id, "err", err)
+	}
+	return "This thread moved to a new Claude Code session: the checkout holds all the work so far. The conversation so far (people's messages and your replies):\n\n" +
+		conversation(s.names(ctx), events) + "\n\n---\n\n"
+}
+
 // deliver hands a prompt and its images (attachment ids) to the runner.
 // Without one the environment is gone: keep the prompt for the next runner,
 // which delivers it once it is ready, if it may run a teammate's turn.
 func (s *Service) deliver(ctx context.Context, id, prompt string, images []string, teammate bool) {
+	if moved, err := s.store.TakeSessionMoved(ctx, id); err != nil {
+		slog.Error("read session move", "thread", id, "err", err)
+	} else if moved {
+		prompt = s.movedPrompt(ctx, id) + prompt
+	}
 	p := &bandav1.Prompt{Text: prompt}
 	files, err := s.store.Attachments(ctx, images, true)
 	if err != nil {

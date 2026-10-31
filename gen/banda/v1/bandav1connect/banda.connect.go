@@ -53,6 +53,9 @@ const (
 	ThreadServiceDeclineTurnProcedure = "/banda.v1.ThreadService/DeclineTurn"
 	// ThreadServiceTrustProcedure is the procedure name of the ThreadService's Trust RPC.
 	ThreadServiceTrustProcedure = "/banda.v1.ThreadService/Trust"
+	// ThreadServiceSetTeamIdentityProcedure is the procedure name of the ThreadService's
+	// SetTeamIdentity RPC.
+	ThreadServiceSetTeamIdentityProcedure = "/banda.v1.ThreadService/SetTeamIdentity"
 	// ThreadServiceSpawnThreadProcedure is the procedure name of the ThreadService's SpawnThread RPC.
 	ThreadServiceSpawnThreadProcedure = "/banda.v1.ThreadService/SpawnThread"
 	// ThreadServiceLineageChildrenProcedure is the procedure name of the ThreadService's
@@ -330,6 +333,13 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("Trust"),
 			Procedure:  ThreadServiceTrustProcedure,
+		}
+	})
+	threadServiceSetTeamIdentitySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("SetTeamIdentity"),
+			Procedure:  ThreadServiceSetTeamIdentityProcedure,
 		}
 	})
 	threadServiceSpawnThreadSpec = sync.OnceValue(func() connect.Spec {
@@ -674,6 +684,7 @@ type ThreadServiceClient interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
+	SetTeamIdentity(context.Context, *v1.SetTeamIdentityRequest) (*v1.SetTeamIdentityResponse, error)
 	// A sub-thread of parent_id, owned by the caller. It starts from the
 	// parent's branch if that was pushed, else from the parent's base branch.
 	SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error)
@@ -935,6 +946,7 @@ type ThreadServiceHandler interface {
 	DeclineTurn(context.Context, *v1.DeclineTurnRequest) (*v1.DeclineTurnResponse, error)
 	// Owner only: whether teammates can start turns without approval.
 	Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error)
+	SetTeamIdentity(context.Context, *v1.SetTeamIdentityRequest) (*v1.SetTeamIdentityResponse, error)
 	// A sub-thread of parent_id, owned by the caller. It starts from the
 	// parent's branch if that was pushed, else from the parent's base branch.
 	SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error)
@@ -1085,6 +1097,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServiceApproveTurnSpec(), Handler: adapter.approveTurn},
 		connect.Method{Spec: threadServiceDeclineTurnSpec(), Handler: adapter.declineTurn},
 		connect.Method{Spec: threadServiceTrustSpec(), Handler: adapter.trust},
+		connect.Method{Spec: threadServiceSetTeamIdentitySpec(), Handler: adapter.setTeamIdentity},
 		connect.Method{Spec: threadServiceSpawnThreadSpec(), Handler: adapter.spawnThread},
 		connect.Method{Spec: threadServiceLineageChildrenSpec(), Handler: adapter.lineageChildren},
 		connect.Method{Spec: threadServiceWatchThreadSpec(), Handler: adapter.watchThread},
@@ -1257,6 +1270,10 @@ func (UnimplementedThreadServiceHandler) DeclineTurn(context.Context, *v1.Declin
 
 func (UnimplementedThreadServiceHandler) Trust(context.Context, *v1.TrustRequest) (*v1.TrustResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.Trust is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) SetTeamIdentity(context.Context, *v1.SetTeamIdentityRequest) (*v1.SetTeamIdentityResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.SetTeamIdentity is not implemented")
 }
 
 func (UnimplementedThreadServiceHandler) SpawnThread(context.Context, *v1.SpawnThreadRequest) (*v1.SpawnThreadResponse, error) {
@@ -1530,6 +1547,14 @@ func (c *threadServiceClient) DeclineTurn(ctx context.Context, req *v1.DeclineTu
 func (c *threadServiceClient) Trust(ctx context.Context, req *v1.TrustRequest) (*v1.TrustResponse, error) {
 	var res v1.TrustResponse
 	if err := c.client.CallUnary(ctx, threadServiceTrustSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) SetTeamIdentity(ctx context.Context, req *v1.SetTeamIdentityRequest) (*v1.SetTeamIdentityResponse, error) {
+	var res v1.SetTeamIdentityResponse
+	if err := c.client.CallUnary(ctx, threadServiceSetTeamIdentitySpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2031,6 +2056,18 @@ func (h threadServiceHandler) trust(ctx context.Context, _ connect.Spec, stream 
 		return err
 	}
 	res, err := h.svc.Trust(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) setTeamIdentity(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetTeamIdentityRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetTeamIdentity(ctx, &req)
 	if err != nil {
 		return err
 	}

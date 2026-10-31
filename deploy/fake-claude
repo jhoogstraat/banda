@@ -24,8 +24,9 @@
 # (web/e2e/fixtures.ts has helpers for them):
 #   e2e-echo          first says "Received: <the prompt's text>", so tests read
 #                     what reached the agent from the events.
-#   e2e-auth          says "Auth: api key" if it started with ANTHROPIC_API_KEY,
-#                     else "Auth: subscription".
+#   e2e-auth          says "Auth: team identity" if it started with a federation
+#                     token file, "Auth: api key" with ANTHROPIC_API_KEY, else
+#                     "Auth: subscription".
 #   e2e-hold:<name>   starts the turn (init, a delta, "Holding <name>", a Bash
 #                     tool call) and keeps it open until ~/e2e-release/<name>
 #                     exists, then goes on with the prompt. It keeps reading
@@ -207,7 +208,8 @@ while next; do
       text "Received: $(prompt "$line")"
     fi
     if [[ $line == *e2e-auth* ]]; then
-      if [ -n "$ANTHROPIC_API_KEY" ]; then text "Auth: api key"; else text "Auth: subscription"; fi
+      if [ -n "$ANTHROPIC_IDENTITY_TOKEN_FILE" ]; then text "Auth: team identity"
+      elif [ -n "$ANTHROPIC_API_KEY" ]; then text "Auth: api key"; else text "Auth: subscription"; fi
     fi
     if [[ $line =~ e2e-deltas:([0-9]+) ]]; then
       for ((i = 0; i < BASH_REMATCH[1]; i++)); do

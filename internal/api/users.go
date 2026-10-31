@@ -17,7 +17,7 @@ func (s *Service) Me(ctx context.Context, _ *bandav1.MeRequest) (*bandav1.MeResp
 	}
 	for _, u := range users {
 		if u.ID == id {
-			return &bandav1.MeResponse{User: &bandav1.User{Id: u.ID, Name: u.Name, Email: u.Email}}, nil
+			return &bandav1.MeResponse{User: &bandav1.User{Id: u.ID, Name: u.Name, Email: u.Email}, TeamIdentity: s.TeamIdentity}, nil
 		}
 	}
 	return &bandav1.MeResponse{User: &bandav1.User{Id: id, Name: id}}, nil

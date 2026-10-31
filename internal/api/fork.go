@@ -288,6 +288,8 @@ func conversation(names map[string]string, events []*bandav1.Event) string {
 	for _, e := range events {
 		var line string
 		switch {
+		case e.GetMessage().GetProposal(): // only what its owner sends reaches an agent
+			continue
 		case e.GetMessage() != nil:
 			line = actorName(names, e.Actor) + ": " + messageText(e.GetMessage())
 		case e.GetAgentText() != nil:

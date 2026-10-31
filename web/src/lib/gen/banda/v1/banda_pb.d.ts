@@ -254,12 +254,20 @@ export declare type Thread = Message$1<"banda.v1.Thread"> & {
   forgeReady: boolean;
 
   /**
-   * The owner runs Claude Code on an API key, so teammates may request turns
-   * and be trusted. On a subscription only the owner runs the agent.
+   * The thread runs Claude Code on an API key or the team's Console identity,
+   * so teammates may request turns and be trusted. On a subscription only the
+   * owner runs the agent.
    *
    * @generated from field: bool teammate_turns = 39;
    */
   teammateTurns: boolean;
+
+  /**
+   * Runs Claude Code on the team's Console identity, not the owner's login.
+   *
+   * @generated from field: bool team_identity = 41;
+   */
+  teamIdentity: boolean;
 
   /**
    * While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
@@ -1864,6 +1872,39 @@ export declare type TrustResponse = Message$1<"banda.v1.TrustResponse"> & {
 export declare const TrustResponseSchema: GenMessage<TrustResponse>;
 
 /**
+ * @generated from message banda.v1.SetTeamIdentityRequest
+ */
+export declare type SetTeamIdentityRequest = Message$1<"banda.v1.SetTeamIdentityRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: bool on = 2;
+   */
+  on: boolean;
+};
+
+/**
+ * Describes the message banda.v1.SetTeamIdentityRequest.
+ * Use `create(SetTeamIdentityRequestSchema)` to create a new message.
+ */
+export declare const SetTeamIdentityRequestSchema: GenMessage<SetTeamIdentityRequest>;
+
+/**
+ * @generated from message banda.v1.SetTeamIdentityResponse
+ */
+export declare type SetTeamIdentityResponse = Message$1<"banda.v1.SetTeamIdentityResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.SetTeamIdentityResponse.
+ * Use `create(SetTeamIdentityResponseSchema)` to create a new message.
+ */
+export declare const SetTeamIdentityResponseSchema: GenMessage<SetTeamIdentityResponse>;
+
+/**
  * @generated from message banda.v1.HandoffOfferRequest
  */
 export declare type HandoffOfferRequest = Message$1<"banda.v1.HandoffOfferRequest"> & {
@@ -2606,6 +2647,13 @@ export declare type MeResponse = Message$1<"banda.v1.MeResponse"> & {
    * @generated from field: banda.v1.User user = 1;
    */
   user?: User | undefined;
+
+  /**
+   * This Banda has a team Console identity threads can run on.
+   *
+   * @generated from field: bool team_identity = 2;
+   */
+  teamIdentity: boolean;
 };
 
 /**
@@ -7689,6 +7737,14 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof TrustRequestSchema;
     output: typeof TrustResponseSchema;
+  },
+  /**
+   * @generated from rpc banda.v1.ThreadService.SetTeamIdentity
+   */
+  setTeamIdentity: {
+    methodKind: "unary";
+    input: typeof SetTeamIdentityRequestSchema;
+    output: typeof SetTeamIdentityResponseSchema;
   },
   /**
    * A sub-thread of parent_id, owned by the caller. It starts from the

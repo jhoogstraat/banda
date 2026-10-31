@@ -29,6 +29,7 @@ var (
 	threadID  = os.Getenv("BANDA_THREAD_ID")
 	loginUser = os.Getenv("BANDA_LOGIN_USER_ID")
 	apiKey    = os.Getenv("BANDA_AUTH_METHOD") == "api_key" // the user chose an API key over their subscription
+	teamToken = os.Getenv("ANTHROPIC_IDENTITY_TOKEN_FILE")  // the thread runs on the team's Console identity
 	repoURL   = os.Getenv("BANDA_REPO_URL")                 // empty: no repository, work is an empty folder
 	work      = filepath.Join(os.Getenv("HOME"), "work")
 	base      = "origin/" + os.Getenv("BANDA_BASE_BRANCH")

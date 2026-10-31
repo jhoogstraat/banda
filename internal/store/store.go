@@ -40,6 +40,9 @@ type Thread struct {
 	Effort        string
 	Profile       string // "engineer", "spec", "devops" or "business"
 	PendingPrompt string
+	// TeamIdentity: the thread runs on the team's Console identity, not its
+	// owner's login; State.APIKey is true then too.
+	TeamIdentity  bool
 	PendingImages []string // attachment ids of pending_prompt's images
 	// PendingTeammate: the pending prompt holds a teammate's turn, which runs
 	// only in an environment started with the API key (see ready).
@@ -159,19 +162,20 @@ func applyMigration(ctx context.Context, db *pgxpool.Pool, name, body string) er
 
 // cols are the thread columns Get, Update and the lists read; fields says where
 // each goes, in the same order. A new column goes into both, nowhere else.
-// The last is read-only: the owner's Claude Code auth method (see Settings).
+// The last is read-only: the thread runs on an API key, its owner's or the
+// team's identity (see Settings), not on a subscription.
 // env_api_key is written by NewRunnerToken only, env_started_at by ResetEnv.
 const cols = `id, owner_id, title, repo_url, base_branch, branch, model, effort, status, mode,
 	pending_prompt, runner_hash, diff, delivered_seq, last_seq, turns, requests, trusted,
 	permission_mode, permissions, allowed_tools, forked_from, fork_turn, race_id, created_at, updated_at,
-	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at, handoff_to, handoffs, pending_teammate, env_api_key, env_started_at,
-	owner_id IN (SELECT user_id FROM harness_settings WHERE harness = 'claude' AND auth_method = 'api_key')`
+	auto_push, env_delete_at, pending_images, parent_id, env_pushed, profile, wake_parent, woke_parent_at, handoff_to, handoffs, pending_teammate, env_api_key, env_started_at, team_identity,
+	owner_id IN (SELECT user_id FROM harness_settings WHERE harness = 'claude' AND auth_method = 'api_key') OR team_identity`
 
 func fields(t *Thread) []any {
 	return []any{&t.ID, &t.OwnerID, &t.Title, &t.RepoURL, &t.BaseBranch, &t.Branch, &t.Model, &t.Effort, &t.Status, &t.Mode,
 		&t.PendingPrompt, &t.RunnerHash, &t.Diff, &t.DeliveredSeq, &t.LastSeq, &t.Turns, &t.Requests, &t.Trusted,
 		&t.PermissionMode, &t.Permissions, &t.AllowedTools, &t.ForkedFrom, &t.ForkTurn, &t.RaceID, &t.CreatedAt, &t.UpdatedAt,
-		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent, &t.HandoffTo, &t.Handoffs, &t.PendingTeammate, &t.EnvAPIKey, &t.EnvStartedAt, &t.APIKey}
+		&t.AutoPush, &t.EnvDeleteAt, &t.PendingImages, &t.ParentID, &t.EnvPushed, &t.Profile, &t.WakeParent, &t.WokeParent, &t.HandoffTo, &t.Handoffs, &t.PendingTeammate, &t.EnvAPIKey, &t.EnvStartedAt, &t.TeamIdentity, &t.APIKey}
 }
 
 // listCols are cols of threads t for listWithView, without the diff (large).
@@ -198,10 +202,10 @@ func scan(row pgx.Row) (Thread, error) {
 
 func (s *Store) Create(ctx context.Context, t Thread) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO threads (id, owner_id, title, repo_url, base_branch, branch, model,
-		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id, profile, wake_parent, pending_images)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,coalesce($21, '{}'::text[]))`,
+		effort, status, mode, pending_prompt, runner_hash, permission_mode, diff, forked_from, fork_turn, race_id, parent_id, profile, wake_parent, pending_images, team_identity)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,coalesce($21, '{}'::text[]),$22)`,
 		t.ID, t.OwnerID, t.Title, t.RepoURL, t.BaseBranch, t.Branch, t.Model, t.Effort, t.Status, t.Mode,
-		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID, t.Profile, t.WakeParent, t.PendingImages)
+		t.PendingPrompt, t.RunnerHash, t.PermissionMode, t.Diff, t.ForkedFrom, t.ForkTurn, t.RaceID, t.ParentID, t.Profile, t.WakeParent, t.PendingImages, t.TeamIdentity)
 	return err
 }
 
@@ -499,10 +503,10 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
 		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18,
-		owner_id=$19, handoff_to=$20, handoffs=$21, profile=$22, summary=coalesce($23, summary), pending_teammate=$25, title=$26,
+		owner_id=$19, handoff_to=$20, handoffs=$21, profile=$22, summary=coalesce($23, summary), pending_teammate=$25, title=$26, team_identity=$27,
 		finished_at=CASE WHEN $24 THEN now() ELSE finished_at END, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, t.Profile, summary, finished, t.PendingTeammate, t.Title).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, t.Profile, summary, finished, t.PendingTeammate, t.Title, t.TeamIdentity).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -105,10 +106,16 @@ type fakeAPI struct {
 	mu     sync.Mutex
 	reqs   []*apiReq
 	mcp    []string // tools called and their Authorization and X-Banda-Thread headers
+	// exchanges are the bodies of /v1/oauth/token requests, auth the credential
+	// of each /v1/messages request.
+	exchanges, auth []string
 	// limitedUntil, when set, answers every request as Anthropic does at a
 	// usage limit: 429 with the unified rate-limit headers.
 	limitedUntil time.Time
 }
+
+// federatedToken is what the fake API's exchange mints: fake, as the rest.
+const federatedToken = "sk-ant-oat01-contract-throwaway"
 
 func newFakeAPI(t *testing.T, script func(r *apiReq) []map[string]any) *fakeAPI {
 	f := &fakeAPI{script: script}
@@ -131,7 +138,17 @@ func newFakeAPI(t *testing.T, script func(r *apiReq) []map[string]any) *fakeAPI 
 			}
 			r.Body = io.NopCloser(strings.NewReader(string(body)))
 			mcpHandler.ServeHTTP(w, r)
+		case r.URL.Path == "/v1/oauth/token": // Workload Identity Federation's exchange
+			body, _ := io.ReadAll(r.Body)
+			f.mu.Lock()
+			f.exchanges = append(f.exchanges, string(body))
+			f.mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"access_token": federatedToken, "token_type": "Bearer", "expires_in": 600, "scope": "workspace:developer"})
 		case r.URL.Path == "/v1/messages":
+			f.mu.Lock()
+			f.auth = append(f.auth, r.Header.Get("Authorization")+r.Header.Get("X-Api-Key"))
+			f.mu.Unlock()
 			f.messages(w, r)
 		default: // e.g. HEAD /api/hello, a reachability check
 		}
@@ -770,6 +787,45 @@ func TestContractResume(t *testing.T) {
 	if r.Model != "claude-sonnet-5-5" || string(r.OutputConfig) != `{"effort":"low"}` || !strings.Contains(string(b), "first prompt") || !strings.Contains(sys, spec) {
 		t.Errorf("resumed request: model %s, output_config %s, has the first prompt %v, has the spec profile %v",
 			r.Model, r.OutputConfig, strings.Contains(string(b), "first prompt"), strings.Contains(sys, spec))
+	}
+}
+
+// A thread on the team's Console identity: no key and no login, only the
+// federation variables and a token file as the pod has them. The CLI exchanges
+// the token at the base URL and sends what it gets as a bearer token, also
+// after a restart with the same file, which a real issuer would refuse if the
+// token had a jti (identity.Claims.NoJTI).
+func TestContractFederation(t *testing.T) {
+	contractEnv(t)
+	api := newFakeAPI(t, nil)
+	file := filepath.Join(t.TempDir(), "api.anthropic.com")
+	if err := os.WriteFile(file, []byte("eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyOmFsaWNlIn0.c2lnbmF0dXJl"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.Unsetenv("ANTHROPIC_API_KEY") // would shadow federation; the container still has no network and no login
+	t.Setenv("ANTHROPIC_FEDERATION_RULE_ID", "fdrl_contract")
+	t.Setenv("ANTHROPIC_ORGANIZATION_ID", "00000000-0000-0000-0000-000000000000")
+	t.Setenv("ANTHROPIC_SERVICE_ACCOUNT_ID", "svac_contract")
+	t.Setenv("ANTHROPIC_IDENTITY_TOKEN_FILE", file)
+
+	s := start(t, settings{})
+	s.turn("first prompt", nil)
+	s.stop()
+	s = start(t, settings{})
+	s.turn("second prompt", nil)
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if len(api.exchanges) == 0 || !strings.Contains(api.exchanges[0], "fdrl_contract") || !strings.Contains(api.exchanges[0], "svac_contract") {
+		t.Fatalf("no exchange with the rule and service account: %q", api.exchanges)
+	}
+	if len(api.auth) == 0 {
+		t.Fatal("no request reached the Messages API")
+	}
+	for _, auth := range api.auth {
+		if auth != "Bearer "+federatedToken {
+			t.Errorf("a request authenticated with %q", auth)
+		}
 	}
 }
 

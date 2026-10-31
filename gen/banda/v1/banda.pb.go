@@ -869,9 +869,12 @@ type Thread struct {
 	// The owner has a token for the forge, so Banda can open and manage the
 	// pull request. Set by GetThread only.
 	ForgeReady bool `protobuf:"varint,38,opt,name=forge_ready,json=forgeReady,proto3" json:"forge_ready,omitempty"`
-	// The owner runs Claude Code on an API key, so teammates may request turns
-	// and be trusted. On a subscription only the owner runs the agent.
+	// The thread runs Claude Code on an API key or the team's Console identity,
+	// so teammates may request turns and be trusted. On a subscription only the
+	// owner runs the agent.
 	TeammateTurns bool `protobuf:"varint,39,opt,name=teammate_turns,json=teammateTurns,proto3" json:"teammate_turns,omitempty"`
+	// Runs Claude Code on the team's Console identity, not the owner's login.
+	TeamIdentity bool `protobuf:"varint,41,opt,name=team_identity,json=teamIdentity,proto3" json:"team_identity,omitempty"`
 	// While starting: what Kubernetes says its pod waits on, as EnvWaiting. In
 	// ListThreads, ListMentioned and TeamWatch; never stored.
 	EnvWaiting    string `protobuf:"bytes,40,opt,name=env_waiting,json=envWaiting,proto3" json:"env_waiting,omitempty"`
@@ -1171,6 +1174,13 @@ func (x *Thread) GetForgeReady() bool {
 func (x *Thread) GetTeammateTurns() bool {
 	if x != nil {
 		return x.TeammateTurns
+	}
+	return false
+}
+
+func (x *Thread) GetTeamIdentity() bool {
+	if x != nil {
+		return x.TeamIdentity
 	}
 	return false
 }
@@ -4783,6 +4793,94 @@ func (*TrustResponse) Descriptor() ([]byte, []int) {
 	return file_banda_v1_banda_proto_rawDescGZIP(), []int{55}
 }
 
+type SetTeamIdentityRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	On            bool                   `protobuf:"varint,2,opt,name=on,proto3" json:"on,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetTeamIdentityRequest) Reset() {
+	*x = SetTeamIdentityRequest{}
+	mi := &file_banda_v1_banda_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTeamIdentityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTeamIdentityRequest) ProtoMessage() {}
+
+func (x *SetTeamIdentityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTeamIdentityRequest.ProtoReflect.Descriptor instead.
+func (*SetTeamIdentityRequest) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *SetTeamIdentityRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *SetTeamIdentityRequest) GetOn() bool {
+	if x != nil {
+		return x.On
+	}
+	return false
+}
+
+type SetTeamIdentityResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetTeamIdentityResponse) Reset() {
+	*x = SetTeamIdentityResponse{}
+	mi := &file_banda_v1_banda_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTeamIdentityResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTeamIdentityResponse) ProtoMessage() {}
+
+func (x *SetTeamIdentityResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_banda_v1_banda_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTeamIdentityResponse.ProtoReflect.Descriptor instead.
+func (*SetTeamIdentityResponse) Descriptor() ([]byte, []int) {
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{57}
+}
+
 type HandoffOfferRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
@@ -4795,7 +4893,7 @@ type HandoffOfferRequest struct {
 
 func (x *HandoffOfferRequest) Reset() {
 	*x = HandoffOfferRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[56]
+	mi := &file_banda_v1_banda_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4807,7 +4905,7 @@ func (x *HandoffOfferRequest) String() string {
 func (*HandoffOfferRequest) ProtoMessage() {}
 
 func (x *HandoffOfferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[56]
+	mi := &file_banda_v1_banda_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4820,7 +4918,7 @@ func (x *HandoffOfferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffOfferRequest.ProtoReflect.Descriptor instead.
 func (*HandoffOfferRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{56}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *HandoffOfferRequest) GetThreadId() string {
@@ -4852,7 +4950,7 @@ type HandoffOfferResponse struct {
 
 func (x *HandoffOfferResponse) Reset() {
 	*x = HandoffOfferResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[57]
+	mi := &file_banda_v1_banda_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4864,7 +4962,7 @@ func (x *HandoffOfferResponse) String() string {
 func (*HandoffOfferResponse) ProtoMessage() {}
 
 func (x *HandoffOfferResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[57]
+	mi := &file_banda_v1_banda_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4877,7 +4975,7 @@ func (x *HandoffOfferResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffOfferResponse.ProtoReflect.Descriptor instead.
 func (*HandoffOfferResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{57}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{59}
 }
 
 type HandoffAcceptRequest struct {
@@ -4889,7 +4987,7 @@ type HandoffAcceptRequest struct {
 
 func (x *HandoffAcceptRequest) Reset() {
 	*x = HandoffAcceptRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[58]
+	mi := &file_banda_v1_banda_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4901,7 +4999,7 @@ func (x *HandoffAcceptRequest) String() string {
 func (*HandoffAcceptRequest) ProtoMessage() {}
 
 func (x *HandoffAcceptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[58]
+	mi := &file_banda_v1_banda_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4914,7 +5012,7 @@ func (x *HandoffAcceptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffAcceptRequest.ProtoReflect.Descriptor instead.
 func (*HandoffAcceptRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{58}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *HandoffAcceptRequest) GetThreadId() string {
@@ -4932,7 +5030,7 @@ type HandoffAcceptResponse struct {
 
 func (x *HandoffAcceptResponse) Reset() {
 	*x = HandoffAcceptResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[59]
+	mi := &file_banda_v1_banda_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4944,7 +5042,7 @@ func (x *HandoffAcceptResponse) String() string {
 func (*HandoffAcceptResponse) ProtoMessage() {}
 
 func (x *HandoffAcceptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[59]
+	mi := &file_banda_v1_banda_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4957,7 +5055,7 @@ func (x *HandoffAcceptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffAcceptResponse.ProtoReflect.Descriptor instead.
 func (*HandoffAcceptResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{59}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{61}
 }
 
 type HandoffDeclineRequest struct {
@@ -4969,7 +5067,7 @@ type HandoffDeclineRequest struct {
 
 func (x *HandoffDeclineRequest) Reset() {
 	*x = HandoffDeclineRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[60]
+	mi := &file_banda_v1_banda_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4981,7 +5079,7 @@ func (x *HandoffDeclineRequest) String() string {
 func (*HandoffDeclineRequest) ProtoMessage() {}
 
 func (x *HandoffDeclineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[60]
+	mi := &file_banda_v1_banda_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4994,7 +5092,7 @@ func (x *HandoffDeclineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffDeclineRequest.ProtoReflect.Descriptor instead.
 func (*HandoffDeclineRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{60}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *HandoffDeclineRequest) GetThreadId() string {
@@ -5012,7 +5110,7 @@ type HandoffDeclineResponse struct {
 
 func (x *HandoffDeclineResponse) Reset() {
 	*x = HandoffDeclineResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[61]
+	mi := &file_banda_v1_banda_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5024,7 +5122,7 @@ func (x *HandoffDeclineResponse) String() string {
 func (*HandoffDeclineResponse) ProtoMessage() {}
 
 func (x *HandoffDeclineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[61]
+	mi := &file_banda_v1_banda_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5037,7 +5135,7 @@ func (x *HandoffDeclineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffDeclineResponse.ProtoReflect.Descriptor instead.
 func (*HandoffDeclineResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{61}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{63}
 }
 
 type SpawnThreadRequest struct {
@@ -5058,7 +5156,7 @@ type SpawnThreadRequest struct {
 
 func (x *SpawnThreadRequest) Reset() {
 	*x = SpawnThreadRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[62]
+	mi := &file_banda_v1_banda_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5070,7 +5168,7 @@ func (x *SpawnThreadRequest) String() string {
 func (*SpawnThreadRequest) ProtoMessage() {}
 
 func (x *SpawnThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[62]
+	mi := &file_banda_v1_banda_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5083,7 +5181,7 @@ func (x *SpawnThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpawnThreadRequest.ProtoReflect.Descriptor instead.
 func (*SpawnThreadRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{62}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *SpawnThreadRequest) GetParentId() string {
@@ -5144,7 +5242,7 @@ type SpawnThreadResponse struct {
 
 func (x *SpawnThreadResponse) Reset() {
 	*x = SpawnThreadResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[63]
+	mi := &file_banda_v1_banda_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5156,7 +5254,7 @@ func (x *SpawnThreadResponse) String() string {
 func (*SpawnThreadResponse) ProtoMessage() {}
 
 func (x *SpawnThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[63]
+	mi := &file_banda_v1_banda_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5169,7 +5267,7 @@ func (x *SpawnThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpawnThreadResponse.ProtoReflect.Descriptor instead.
 func (*SpawnThreadResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{63}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *SpawnThreadResponse) GetThread() *Thread {
@@ -5188,7 +5286,7 @@ type LineageChildrenRequest struct {
 
 func (x *LineageChildrenRequest) Reset() {
 	*x = LineageChildrenRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[64]
+	mi := &file_banda_v1_banda_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5200,7 +5298,7 @@ func (x *LineageChildrenRequest) String() string {
 func (*LineageChildrenRequest) ProtoMessage() {}
 
 func (x *LineageChildrenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[64]
+	mi := &file_banda_v1_banda_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5213,7 +5311,7 @@ func (x *LineageChildrenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LineageChildrenRequest.ProtoReflect.Descriptor instead.
 func (*LineageChildrenRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{64}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *LineageChildrenRequest) GetThreadId() string {
@@ -5232,7 +5330,7 @@ type LineageChildrenResponse struct {
 
 func (x *LineageChildrenResponse) Reset() {
 	*x = LineageChildrenResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[65]
+	mi := &file_banda_v1_banda_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5244,7 +5342,7 @@ func (x *LineageChildrenResponse) String() string {
 func (*LineageChildrenResponse) ProtoMessage() {}
 
 func (x *LineageChildrenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[65]
+	mi := &file_banda_v1_banda_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5257,7 +5355,7 @@ func (x *LineageChildrenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LineageChildrenResponse.ProtoReflect.Descriptor instead.
 func (*LineageChildrenResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{65}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *LineageChildrenResponse) GetThreads() []*Thread {
@@ -5275,7 +5373,7 @@ type ListMentionedRequest struct {
 
 func (x *ListMentionedRequest) Reset() {
 	*x = ListMentionedRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[66]
+	mi := &file_banda_v1_banda_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5287,7 +5385,7 @@ func (x *ListMentionedRequest) String() string {
 func (*ListMentionedRequest) ProtoMessage() {}
 
 func (x *ListMentionedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[66]
+	mi := &file_banda_v1_banda_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5300,7 +5398,7 @@ func (x *ListMentionedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMentionedRequest.ProtoReflect.Descriptor instead.
 func (*ListMentionedRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{66}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{68}
 }
 
 type ListMentionedResponse struct {
@@ -5312,7 +5410,7 @@ type ListMentionedResponse struct {
 
 func (x *ListMentionedResponse) Reset() {
 	*x = ListMentionedResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[67]
+	mi := &file_banda_v1_banda_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5324,7 +5422,7 @@ func (x *ListMentionedResponse) String() string {
 func (*ListMentionedResponse) ProtoMessage() {}
 
 func (x *ListMentionedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[67]
+	mi := &file_banda_v1_banda_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5337,7 +5435,7 @@ func (x *ListMentionedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMentionedResponse.ProtoReflect.Descriptor instead.
 func (*ListMentionedResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{67}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *ListMentionedResponse) GetThreads() []*Thread {
@@ -5357,7 +5455,7 @@ type SnoozeRequest struct {
 
 func (x *SnoozeRequest) Reset() {
 	*x = SnoozeRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[68]
+	mi := &file_banda_v1_banda_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5369,7 +5467,7 @@ func (x *SnoozeRequest) String() string {
 func (*SnoozeRequest) ProtoMessage() {}
 
 func (x *SnoozeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[68]
+	mi := &file_banda_v1_banda_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5382,7 +5480,7 @@ func (x *SnoozeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnoozeRequest.ProtoReflect.Descriptor instead.
 func (*SnoozeRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{68}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *SnoozeRequest) GetThreadId() string {
@@ -5407,7 +5505,7 @@ type SnoozeResponse struct {
 
 func (x *SnoozeResponse) Reset() {
 	*x = SnoozeResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[69]
+	mi := &file_banda_v1_banda_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5419,7 +5517,7 @@ func (x *SnoozeResponse) String() string {
 func (*SnoozeResponse) ProtoMessage() {}
 
 func (x *SnoozeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[69]
+	mi := &file_banda_v1_banda_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5432,7 +5530,7 @@ func (x *SnoozeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnoozeResponse.ProtoReflect.Descriptor instead.
 func (*SnoozeResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{69}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{71}
 }
 
 type SettleRequest struct {
@@ -5445,7 +5543,7 @@ type SettleRequest struct {
 
 func (x *SettleRequest) Reset() {
 	*x = SettleRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[70]
+	mi := &file_banda_v1_banda_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5457,7 +5555,7 @@ func (x *SettleRequest) String() string {
 func (*SettleRequest) ProtoMessage() {}
 
 func (x *SettleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[70]
+	mi := &file_banda_v1_banda_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5470,7 +5568,7 @@ func (x *SettleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleRequest.ProtoReflect.Descriptor instead.
 func (*SettleRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{70}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *SettleRequest) GetThreadId() string {
@@ -5495,7 +5593,7 @@ type SettleResponse struct {
 
 func (x *SettleResponse) Reset() {
 	*x = SettleResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[71]
+	mi := &file_banda_v1_banda_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5507,7 +5605,7 @@ func (x *SettleResponse) String() string {
 func (*SettleResponse) ProtoMessage() {}
 
 func (x *SettleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[71]
+	mi := &file_banda_v1_banda_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5520,7 +5618,7 @@ func (x *SettleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleResponse.ProtoReflect.Descriptor instead.
 func (*SettleResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{71}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{73}
 }
 
 type PushRequest struct {
@@ -5532,7 +5630,7 @@ type PushRequest struct {
 
 func (x *PushRequest) Reset() {
 	*x = PushRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[72]
+	mi := &file_banda_v1_banda_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5544,7 +5642,7 @@ func (x *PushRequest) String() string {
 func (*PushRequest) ProtoMessage() {}
 
 func (x *PushRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[72]
+	mi := &file_banda_v1_banda_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5557,7 +5655,7 @@ func (x *PushRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PushRequest.ProtoReflect.Descriptor instead.
 func (*PushRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{72}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *PushRequest) GetThreadId() string {
@@ -5575,7 +5673,7 @@ type PushResponse struct {
 
 func (x *PushResponse) Reset() {
 	*x = PushResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[73]
+	mi := &file_banda_v1_banda_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5587,7 +5685,7 @@ func (x *PushResponse) String() string {
 func (*PushResponse) ProtoMessage() {}
 
 func (x *PushResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[73]
+	mi := &file_banda_v1_banda_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5600,7 +5698,7 @@ func (x *PushResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PushResponse.ProtoReflect.Descriptor instead.
 func (*PushResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{73}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{75}
 }
 
 type EnvironmentRecreateRequest struct {
@@ -5612,7 +5710,7 @@ type EnvironmentRecreateRequest struct {
 
 func (x *EnvironmentRecreateRequest) Reset() {
 	*x = EnvironmentRecreateRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[74]
+	mi := &file_banda_v1_banda_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5624,7 +5722,7 @@ func (x *EnvironmentRecreateRequest) String() string {
 func (*EnvironmentRecreateRequest) ProtoMessage() {}
 
 func (x *EnvironmentRecreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[74]
+	mi := &file_banda_v1_banda_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5637,7 +5735,7 @@ func (x *EnvironmentRecreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnvironmentRecreateRequest.ProtoReflect.Descriptor instead.
 func (*EnvironmentRecreateRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{74}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *EnvironmentRecreateRequest) GetThreadId() string {
@@ -5655,7 +5753,7 @@ type EnvironmentRecreateResponse struct {
 
 func (x *EnvironmentRecreateResponse) Reset() {
 	*x = EnvironmentRecreateResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[75]
+	mi := &file_banda_v1_banda_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5667,7 +5765,7 @@ func (x *EnvironmentRecreateResponse) String() string {
 func (*EnvironmentRecreateResponse) ProtoMessage() {}
 
 func (x *EnvironmentRecreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[75]
+	mi := &file_banda_v1_banda_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5680,7 +5778,7 @@ func (x *EnvironmentRecreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnvironmentRecreateResponse.ProtoReflect.Descriptor instead.
 func (*EnvironmentRecreateResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{75}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{77}
 }
 
 // Sent by the runner after a turn changed the diff, or a push, when the
@@ -5698,7 +5796,7 @@ type AutoPush struct {
 
 func (x *AutoPush) Reset() {
 	*x = AutoPush{}
-	mi := &file_banda_v1_banda_proto_msgTypes[76]
+	mi := &file_banda_v1_banda_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5710,7 +5808,7 @@ func (x *AutoPush) String() string {
 func (*AutoPush) ProtoMessage() {}
 
 func (x *AutoPush) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[76]
+	mi := &file_banda_v1_banda_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5723,7 +5821,7 @@ func (x *AutoPush) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutoPush.ProtoReflect.Descriptor instead.
 func (*AutoPush) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{76}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *AutoPush) GetState() AutoPushState {
@@ -5760,7 +5858,7 @@ type OpenTerminalRequest struct {
 
 func (x *OpenTerminalRequest) Reset() {
 	*x = OpenTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[77]
+	mi := &file_banda_v1_banda_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5772,7 +5870,7 @@ func (x *OpenTerminalRequest) String() string {
 func (*OpenTerminalRequest) ProtoMessage() {}
 
 func (x *OpenTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[77]
+	mi := &file_banda_v1_banda_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5785,7 +5883,7 @@ func (x *OpenTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenTerminalRequest.ProtoReflect.Descriptor instead.
 func (*OpenTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{77}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *OpenTerminalRequest) GetThreadId() string {
@@ -5830,7 +5928,7 @@ type OpenTerminalResponse struct {
 
 func (x *OpenTerminalResponse) Reset() {
 	*x = OpenTerminalResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[78]
+	mi := &file_banda_v1_banda_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5842,7 +5940,7 @@ func (x *OpenTerminalResponse) String() string {
 func (*OpenTerminalResponse) ProtoMessage() {}
 
 func (x *OpenTerminalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[78]
+	mi := &file_banda_v1_banda_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5855,7 +5953,7 @@ func (x *OpenTerminalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenTerminalResponse.ProtoReflect.Descriptor instead.
 func (*OpenTerminalResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{78}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *OpenTerminalResponse) GetData() []byte {
@@ -5889,7 +5987,7 @@ type WriteTerminalRequest struct {
 
 func (x *WriteTerminalRequest) Reset() {
 	*x = WriteTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[79]
+	mi := &file_banda_v1_banda_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5901,7 +5999,7 @@ func (x *WriteTerminalRequest) String() string {
 func (*WriteTerminalRequest) ProtoMessage() {}
 
 func (x *WriteTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[79]
+	mi := &file_banda_v1_banda_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5914,7 +6012,7 @@ func (x *WriteTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteTerminalRequest.ProtoReflect.Descriptor instead.
 func (*WriteTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{79}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *WriteTerminalRequest) GetThreadId() string {
@@ -5939,7 +6037,7 @@ type WriteTerminalResponse struct {
 
 func (x *WriteTerminalResponse) Reset() {
 	*x = WriteTerminalResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[80]
+	mi := &file_banda_v1_banda_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5951,7 +6049,7 @@ func (x *WriteTerminalResponse) String() string {
 func (*WriteTerminalResponse) ProtoMessage() {}
 
 func (x *WriteTerminalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[80]
+	mi := &file_banda_v1_banda_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5964,7 +6062,7 @@ func (x *WriteTerminalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteTerminalResponse.ProtoReflect.Descriptor instead.
 func (*WriteTerminalResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{80}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{82}
 }
 
 type ResizeTerminalRequest struct {
@@ -5978,7 +6076,7 @@ type ResizeTerminalRequest struct {
 
 func (x *ResizeTerminalRequest) Reset() {
 	*x = ResizeTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[81]
+	mi := &file_banda_v1_banda_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5990,7 +6088,7 @@ func (x *ResizeTerminalRequest) String() string {
 func (*ResizeTerminalRequest) ProtoMessage() {}
 
 func (x *ResizeTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[81]
+	mi := &file_banda_v1_banda_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6003,7 +6101,7 @@ func (x *ResizeTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeTerminalRequest.ProtoReflect.Descriptor instead.
 func (*ResizeTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{81}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *ResizeTerminalRequest) GetThreadId() string {
@@ -6035,7 +6133,7 @@ type ResizeTerminalResponse struct {
 
 func (x *ResizeTerminalResponse) Reset() {
 	*x = ResizeTerminalResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[82]
+	mi := &file_banda_v1_banda_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6047,7 +6145,7 @@ func (x *ResizeTerminalResponse) String() string {
 func (*ResizeTerminalResponse) ProtoMessage() {}
 
 func (x *ResizeTerminalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[82]
+	mi := &file_banda_v1_banda_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6060,7 +6158,7 @@ func (x *ResizeTerminalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeTerminalResponse.ProtoReflect.Descriptor instead.
 func (*ResizeTerminalResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{82}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{84}
 }
 
 type ListFilesRequest struct {
@@ -6072,7 +6170,7 @@ type ListFilesRequest struct {
 
 func (x *ListFilesRequest) Reset() {
 	*x = ListFilesRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[83]
+	mi := &file_banda_v1_banda_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6084,7 +6182,7 @@ func (x *ListFilesRequest) String() string {
 func (*ListFilesRequest) ProtoMessage() {}
 
 func (x *ListFilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[83]
+	mi := &file_banda_v1_banda_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6097,7 +6195,7 @@ func (x *ListFilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFilesRequest.ProtoReflect.Descriptor instead.
 func (*ListFilesRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{83}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *ListFilesRequest) GetThreadId() string {
@@ -6118,7 +6216,7 @@ type ListFilesResponse struct {
 
 func (x *ListFilesResponse) Reset() {
 	*x = ListFilesResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[84]
+	mi := &file_banda_v1_banda_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6130,7 +6228,7 @@ func (x *ListFilesResponse) String() string {
 func (*ListFilesResponse) ProtoMessage() {}
 
 func (x *ListFilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[84]
+	mi := &file_banda_v1_banda_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6143,7 +6241,7 @@ func (x *ListFilesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFilesResponse.ProtoReflect.Descriptor instead.
 func (*ListFilesResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{84}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ListFilesResponse) GetPaths() []string {
@@ -6171,7 +6269,7 @@ type ReadFileRequest struct {
 
 func (x *ReadFileRequest) Reset() {
 	*x = ReadFileRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[85]
+	mi := &file_banda_v1_banda_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6183,7 +6281,7 @@ func (x *ReadFileRequest) String() string {
 func (*ReadFileRequest) ProtoMessage() {}
 
 func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[85]
+	mi := &file_banda_v1_banda_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6196,7 +6294,7 @@ func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileRequest.ProtoReflect.Descriptor instead.
 func (*ReadFileRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{85}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *ReadFileRequest) GetThreadId() string {
@@ -6226,7 +6324,7 @@ type ReadFileResponse struct {
 
 func (x *ReadFileResponse) Reset() {
 	*x = ReadFileResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[86]
+	mi := &file_banda_v1_banda_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6238,7 +6336,7 @@ func (x *ReadFileResponse) String() string {
 func (*ReadFileResponse) ProtoMessage() {}
 
 func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[86]
+	mi := &file_banda_v1_banda_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6251,7 +6349,7 @@ func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileResponse.ProtoReflect.Descriptor instead.
 func (*ReadFileResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{86}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ReadFileResponse) GetContent() string {
@@ -6285,7 +6383,7 @@ type PreviewWatchRequest struct {
 
 func (x *PreviewWatchRequest) Reset() {
 	*x = PreviewWatchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[87]
+	mi := &file_banda_v1_banda_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6297,7 +6395,7 @@ func (x *PreviewWatchRequest) String() string {
 func (*PreviewWatchRequest) ProtoMessage() {}
 
 func (x *PreviewWatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[87]
+	mi := &file_banda_v1_banda_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6310,7 +6408,7 @@ func (x *PreviewWatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewWatchRequest.ProtoReflect.Descriptor instead.
 func (*PreviewWatchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{87}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *PreviewWatchRequest) GetThreadId() string {
@@ -6340,7 +6438,7 @@ type PreviewWatchResponse struct {
 
 func (x *PreviewWatchResponse) Reset() {
 	*x = PreviewWatchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[88]
+	mi := &file_banda_v1_banda_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6352,7 +6450,7 @@ func (x *PreviewWatchResponse) String() string {
 func (*PreviewWatchResponse) ProtoMessage() {}
 
 func (x *PreviewWatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[88]
+	mi := &file_banda_v1_banda_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6365,7 +6463,7 @@ func (x *PreviewWatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewWatchResponse.ProtoReflect.Descriptor instead.
 func (*PreviewWatchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{88}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *PreviewWatchResponse) GetRunning() bool {
@@ -6400,7 +6498,7 @@ type PreviewPort struct {
 
 func (x *PreviewPort) Reset() {
 	*x = PreviewPort{}
-	mi := &file_banda_v1_banda_proto_msgTypes[89]
+	mi := &file_banda_v1_banda_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6412,7 +6510,7 @@ func (x *PreviewPort) String() string {
 func (*PreviewPort) ProtoMessage() {}
 
 func (x *PreviewPort) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[89]
+	mi := &file_banda_v1_banda_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6425,7 +6523,7 @@ func (x *PreviewPort) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewPort.ProtoReflect.Descriptor instead.
 func (*PreviewPort) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{89}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *PreviewPort) GetPort() uint32 {
@@ -6454,7 +6552,7 @@ type PreviewOpenRequest struct {
 
 func (x *PreviewOpenRequest) Reset() {
 	*x = PreviewOpenRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[90]
+	mi := &file_banda_v1_banda_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6466,7 +6564,7 @@ func (x *PreviewOpenRequest) String() string {
 func (*PreviewOpenRequest) ProtoMessage() {}
 
 func (x *PreviewOpenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[90]
+	mi := &file_banda_v1_banda_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6479,7 +6577,7 @@ func (x *PreviewOpenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewOpenRequest.ProtoReflect.Descriptor instead.
 func (*PreviewOpenRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{90}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *PreviewOpenRequest) GetThreadId() string {
@@ -6512,7 +6610,7 @@ type PreviewOpenResponse struct {
 
 func (x *PreviewOpenResponse) Reset() {
 	*x = PreviewOpenResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[91]
+	mi := &file_banda_v1_banda_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6524,7 +6622,7 @@ func (x *PreviewOpenResponse) String() string {
 func (*PreviewOpenResponse) ProtoMessage() {}
 
 func (x *PreviewOpenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[91]
+	mi := &file_banda_v1_banda_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6537,7 +6635,7 @@ func (x *PreviewOpenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewOpenResponse.ProtoReflect.Descriptor instead.
 func (*PreviewOpenResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{91}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *PreviewOpenResponse) GetUrl() string {
@@ -6555,7 +6653,7 @@ type MeRequest struct {
 
 func (x *MeRequest) Reset() {
 	*x = MeRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[92]
+	mi := &file_banda_v1_banda_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6567,7 +6665,7 @@ func (x *MeRequest) String() string {
 func (*MeRequest) ProtoMessage() {}
 
 func (x *MeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[92]
+	mi := &file_banda_v1_banda_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6580,19 +6678,21 @@ func (x *MeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeRequest.ProtoReflect.Descriptor instead.
 func (*MeRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{92}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{94}
 }
 
 type MeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	User  *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// This Banda has a team Console identity threads can run on.
+	TeamIdentity  bool `protobuf:"varint,2,opt,name=team_identity,json=teamIdentity,proto3" json:"team_identity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MeResponse) Reset() {
 	*x = MeResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[93]
+	mi := &file_banda_v1_banda_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6604,7 +6704,7 @@ func (x *MeResponse) String() string {
 func (*MeResponse) ProtoMessage() {}
 
 func (x *MeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[93]
+	mi := &file_banda_v1_banda_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6617,7 +6717,7 @@ func (x *MeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeResponse.ProtoReflect.Descriptor instead.
 func (*MeResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{93}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *MeResponse) GetUser() *User {
@@ -6625,6 +6725,13 @@ func (x *MeResponse) GetUser() *User {
 		return x.User
 	}
 	return nil
+}
+
+func (x *MeResponse) GetTeamIdentity() bool {
+	if x != nil {
+		return x.TeamIdentity
+	}
+	return false
 }
 
 type ListUsersRequest struct {
@@ -6635,7 +6742,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[94]
+	mi := &file_banda_v1_banda_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6647,7 +6754,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[94]
+	mi := &file_banda_v1_banda_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6660,7 +6767,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{94}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{96}
 }
 
 type ListUsersResponse struct {
@@ -6672,7 +6779,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[95]
+	mi := &file_banda_v1_banda_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6684,7 +6791,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[95]
+	mi := &file_banda_v1_banda_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6697,7 +6804,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{95}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -6723,7 +6830,7 @@ type HarnessAccount struct {
 
 func (x *HarnessAccount) Reset() {
 	*x = HarnessAccount{}
-	mi := &file_banda_v1_banda_proto_msgTypes[96]
+	mi := &file_banda_v1_banda_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6735,7 +6842,7 @@ func (x *HarnessAccount) String() string {
 func (*HarnessAccount) ProtoMessage() {}
 
 func (x *HarnessAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[96]
+	mi := &file_banda_v1_banda_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6748,7 +6855,7 @@ func (x *HarnessAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HarnessAccount.ProtoReflect.Descriptor instead.
 func (*HarnessAccount) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{96}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *HarnessAccount) GetHarness() string {
@@ -6805,7 +6912,7 @@ type SecretInfo struct {
 
 func (x *SecretInfo) Reset() {
 	*x = SecretInfo{}
-	mi := &file_banda_v1_banda_proto_msgTypes[97]
+	mi := &file_banda_v1_banda_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6817,7 +6924,7 @@ func (x *SecretInfo) String() string {
 func (*SecretInfo) ProtoMessage() {}
 
 func (x *SecretInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[97]
+	mi := &file_banda_v1_banda_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6830,7 +6937,7 @@ func (x *SecretInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretInfo.ProtoReflect.Descriptor instead.
 func (*SecretInfo) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{97}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *SecretInfo) GetName() string {
@@ -6862,7 +6969,7 @@ type GetSettingsRequest struct {
 
 func (x *GetSettingsRequest) Reset() {
 	*x = GetSettingsRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[98]
+	mi := &file_banda_v1_banda_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6874,7 +6981,7 @@ func (x *GetSettingsRequest) String() string {
 func (*GetSettingsRequest) ProtoMessage() {}
 
 func (x *GetSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[98]
+	mi := &file_banda_v1_banda_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6887,7 +6994,7 @@ func (x *GetSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{98}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{100}
 }
 
 type GetSettingsResponse struct {
@@ -6904,7 +7011,7 @@ type GetSettingsResponse struct {
 
 func (x *GetSettingsResponse) Reset() {
 	*x = GetSettingsResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[99]
+	mi := &file_banda_v1_banda_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6916,7 +7023,7 @@ func (x *GetSettingsResponse) String() string {
 func (*GetSettingsResponse) ProtoMessage() {}
 
 func (x *GetSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[99]
+	mi := &file_banda_v1_banda_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6929,7 +7036,7 @@ func (x *GetSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{99}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *GetSettingsResponse) GetAccounts() []*HarnessAccount {
@@ -6979,7 +7086,7 @@ type SetAuthMethodRequest struct {
 
 func (x *SetAuthMethodRequest) Reset() {
 	*x = SetAuthMethodRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[100]
+	mi := &file_banda_v1_banda_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6991,7 +7098,7 @@ func (x *SetAuthMethodRequest) String() string {
 func (*SetAuthMethodRequest) ProtoMessage() {}
 
 func (x *SetAuthMethodRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[100]
+	mi := &file_banda_v1_banda_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7004,7 +7111,7 @@ func (x *SetAuthMethodRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAuthMethodRequest.ProtoReflect.Descriptor instead.
 func (*SetAuthMethodRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{100}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *SetAuthMethodRequest) GetHarness() string {
@@ -7036,7 +7143,7 @@ type SetAuthMethodResponse struct {
 
 func (x *SetAuthMethodResponse) Reset() {
 	*x = SetAuthMethodResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[101]
+	mi := &file_banda_v1_banda_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7048,7 +7155,7 @@ func (x *SetAuthMethodResponse) String() string {
 func (*SetAuthMethodResponse) ProtoMessage() {}
 
 func (x *SetAuthMethodResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[101]
+	mi := &file_banda_v1_banda_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7061,7 +7168,7 @@ func (x *SetAuthMethodResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAuthMethodResponse.ProtoReflect.Descriptor instead.
 func (*SetAuthMethodResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{101}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{103}
 }
 
 type SetSecretRequest struct {
@@ -7075,7 +7182,7 @@ type SetSecretRequest struct {
 
 func (x *SetSecretRequest) Reset() {
 	*x = SetSecretRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[102]
+	mi := &file_banda_v1_banda_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7087,7 +7194,7 @@ func (x *SetSecretRequest) String() string {
 func (*SetSecretRequest) ProtoMessage() {}
 
 func (x *SetSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[102]
+	mi := &file_banda_v1_banda_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7100,7 +7207,7 @@ func (x *SetSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretRequest.ProtoReflect.Descriptor instead.
 func (*SetSecretRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{102}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *SetSecretRequest) GetName() string {
@@ -7125,7 +7232,7 @@ type SetSecretResponse struct {
 
 func (x *SetSecretResponse) Reset() {
 	*x = SetSecretResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[103]
+	mi := &file_banda_v1_banda_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7137,7 +7244,7 @@ func (x *SetSecretResponse) String() string {
 func (*SetSecretResponse) ProtoMessage() {}
 
 func (x *SetSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[103]
+	mi := &file_banda_v1_banda_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7150,7 +7257,7 @@ func (x *SetSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretResponse.ProtoReflect.Descriptor instead.
 func (*SetSecretResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{103}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{105}
 }
 
 type DeleteSecretRequest struct {
@@ -7162,7 +7269,7 @@ type DeleteSecretRequest struct {
 
 func (x *DeleteSecretRequest) Reset() {
 	*x = DeleteSecretRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[104]
+	mi := &file_banda_v1_banda_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7174,7 +7281,7 @@ func (x *DeleteSecretRequest) String() string {
 func (*DeleteSecretRequest) ProtoMessage() {}
 
 func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[104]
+	mi := &file_banda_v1_banda_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7187,7 +7294,7 @@ func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSecretRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSecretRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{104}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *DeleteSecretRequest) GetName() string {
@@ -7205,7 +7312,7 @@ type DeleteSecretResponse struct {
 
 func (x *DeleteSecretResponse) Reset() {
 	*x = DeleteSecretResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[105]
+	mi := &file_banda_v1_banda_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7217,7 +7324,7 @@ func (x *DeleteSecretResponse) String() string {
 func (*DeleteSecretResponse) ProtoMessage() {}
 
 func (x *DeleteSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[105]
+	mi := &file_banda_v1_banda_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7230,7 +7337,7 @@ func (x *DeleteSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSecretResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSecretResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{105}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{107}
 }
 
 type SetDefaultProfileRequest struct {
@@ -7242,7 +7349,7 @@ type SetDefaultProfileRequest struct {
 
 func (x *SetDefaultProfileRequest) Reset() {
 	*x = SetDefaultProfileRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[106]
+	mi := &file_banda_v1_banda_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7254,7 +7361,7 @@ func (x *SetDefaultProfileRequest) String() string {
 func (*SetDefaultProfileRequest) ProtoMessage() {}
 
 func (x *SetDefaultProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[106]
+	mi := &file_banda_v1_banda_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7267,7 +7374,7 @@ func (x *SetDefaultProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDefaultProfileRequest.ProtoReflect.Descriptor instead.
 func (*SetDefaultProfileRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{106}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *SetDefaultProfileRequest) GetProfile() string {
@@ -7285,7 +7392,7 @@ type SetDefaultProfileResponse struct {
 
 func (x *SetDefaultProfileResponse) Reset() {
 	*x = SetDefaultProfileResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[107]
+	mi := &file_banda_v1_banda_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7297,7 +7404,7 @@ func (x *SetDefaultProfileResponse) String() string {
 func (*SetDefaultProfileResponse) ProtoMessage() {}
 
 func (x *SetDefaultProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[107]
+	mi := &file_banda_v1_banda_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7310,7 +7417,7 @@ func (x *SetDefaultProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDefaultProfileResponse.ProtoReflect.Descriptor instead.
 func (*SetDefaultProfileResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{107}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{109}
 }
 
 type ListTeamSecretsRequest struct {
@@ -7321,7 +7428,7 @@ type ListTeamSecretsRequest struct {
 
 func (x *ListTeamSecretsRequest) Reset() {
 	*x = ListTeamSecretsRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[108]
+	mi := &file_banda_v1_banda_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7333,7 +7440,7 @@ func (x *ListTeamSecretsRequest) String() string {
 func (*ListTeamSecretsRequest) ProtoMessage() {}
 
 func (x *ListTeamSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[108]
+	mi := &file_banda_v1_banda_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7346,7 +7453,7 @@ func (x *ListTeamSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTeamSecretsRequest.ProtoReflect.Descriptor instead.
 func (*ListTeamSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{108}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{110}
 }
 
 type ListTeamSecretsResponse struct {
@@ -7358,7 +7465,7 @@ type ListTeamSecretsResponse struct {
 
 func (x *ListTeamSecretsResponse) Reset() {
 	*x = ListTeamSecretsResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[109]
+	mi := &file_banda_v1_banda_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7370,7 +7477,7 @@ func (x *ListTeamSecretsResponse) String() string {
 func (*ListTeamSecretsResponse) ProtoMessage() {}
 
 func (x *ListTeamSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[109]
+	mi := &file_banda_v1_banda_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7383,7 +7490,7 @@ func (x *ListTeamSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTeamSecretsResponse.ProtoReflect.Descriptor instead.
 func (*ListTeamSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{109}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *ListTeamSecretsResponse) GetSecrets() []*SecretInfo {
@@ -7404,7 +7511,7 @@ type SetTeamSecretRequest struct {
 
 func (x *SetTeamSecretRequest) Reset() {
 	*x = SetTeamSecretRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[110]
+	mi := &file_banda_v1_banda_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7416,7 +7523,7 @@ func (x *SetTeamSecretRequest) String() string {
 func (*SetTeamSecretRequest) ProtoMessage() {}
 
 func (x *SetTeamSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[110]
+	mi := &file_banda_v1_banda_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7429,7 +7536,7 @@ func (x *SetTeamSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamSecretRequest.ProtoReflect.Descriptor instead.
 func (*SetTeamSecretRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{110}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *SetTeamSecretRequest) GetName() string {
@@ -7454,7 +7561,7 @@ type SetTeamSecretResponse struct {
 
 func (x *SetTeamSecretResponse) Reset() {
 	*x = SetTeamSecretResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[111]
+	mi := &file_banda_v1_banda_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7466,7 +7573,7 @@ func (x *SetTeamSecretResponse) String() string {
 func (*SetTeamSecretResponse) ProtoMessage() {}
 
 func (x *SetTeamSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[111]
+	mi := &file_banda_v1_banda_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7479,7 +7586,7 @@ func (x *SetTeamSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamSecretResponse.ProtoReflect.Descriptor instead.
 func (*SetTeamSecretResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{111}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{113}
 }
 
 type DeleteTeamSecretRequest struct {
@@ -7491,7 +7598,7 @@ type DeleteTeamSecretRequest struct {
 
 func (x *DeleteTeamSecretRequest) Reset() {
 	*x = DeleteTeamSecretRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[112]
+	mi := &file_banda_v1_banda_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7503,7 +7610,7 @@ func (x *DeleteTeamSecretRequest) String() string {
 func (*DeleteTeamSecretRequest) ProtoMessage() {}
 
 func (x *DeleteTeamSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[112]
+	mi := &file_banda_v1_banda_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7516,7 +7623,7 @@ func (x *DeleteTeamSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTeamSecretRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTeamSecretRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{112}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *DeleteTeamSecretRequest) GetName() string {
@@ -7534,7 +7641,7 @@ type DeleteTeamSecretResponse struct {
 
 func (x *DeleteTeamSecretResponse) Reset() {
 	*x = DeleteTeamSecretResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[113]
+	mi := &file_banda_v1_banda_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7546,7 +7653,7 @@ func (x *DeleteTeamSecretResponse) String() string {
 func (*DeleteTeamSecretResponse) ProtoMessage() {}
 
 func (x *DeleteTeamSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[113]
+	mi := &file_banda_v1_banda_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7559,7 +7666,7 @@ func (x *DeleteTeamSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTeamSecretResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTeamSecretResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{113}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{115}
 }
 
 type OpenLoginTerminalRequest struct {
@@ -7574,7 +7681,7 @@ type OpenLoginTerminalRequest struct {
 
 func (x *OpenLoginTerminalRequest) Reset() {
 	*x = OpenLoginTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[114]
+	mi := &file_banda_v1_banda_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7586,7 +7693,7 @@ func (x *OpenLoginTerminalRequest) String() string {
 func (*OpenLoginTerminalRequest) ProtoMessage() {}
 
 func (x *OpenLoginTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[114]
+	mi := &file_banda_v1_banda_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7599,7 +7706,7 @@ func (x *OpenLoginTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenLoginTerminalRequest.ProtoReflect.Descriptor instead.
 func (*OpenLoginTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{114}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *OpenLoginTerminalRequest) GetHarness() string {
@@ -7640,7 +7747,7 @@ type WriteLoginTerminalRequest struct {
 
 func (x *WriteLoginTerminalRequest) Reset() {
 	*x = WriteLoginTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[115]
+	mi := &file_banda_v1_banda_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7652,7 +7759,7 @@ func (x *WriteLoginTerminalRequest) String() string {
 func (*WriteLoginTerminalRequest) ProtoMessage() {}
 
 func (x *WriteLoginTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[115]
+	mi := &file_banda_v1_banda_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7665,7 +7772,7 @@ func (x *WriteLoginTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteLoginTerminalRequest.ProtoReflect.Descriptor instead.
 func (*WriteLoginTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{115}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *WriteLoginTerminalRequest) GetHarness() string {
@@ -7693,7 +7800,7 @@ type ResizeLoginTerminalRequest struct {
 
 func (x *ResizeLoginTerminalRequest) Reset() {
 	*x = ResizeLoginTerminalRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[116]
+	mi := &file_banda_v1_banda_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7705,7 +7812,7 @@ func (x *ResizeLoginTerminalRequest) String() string {
 func (*ResizeLoginTerminalRequest) ProtoMessage() {}
 
 func (x *ResizeLoginTerminalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[116]
+	mi := &file_banda_v1_banda_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7718,7 +7825,7 @@ func (x *ResizeLoginTerminalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeLoginTerminalRequest.ProtoReflect.Descriptor instead.
 func (*ResizeLoginTerminalRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{116}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *ResizeLoginTerminalRequest) GetHarness() string {
@@ -7756,7 +7863,7 @@ type TeamActivity struct {
 
 func (x *TeamActivity) Reset() {
 	*x = TeamActivity{}
-	mi := &file_banda_v1_banda_proto_msgTypes[117]
+	mi := &file_banda_v1_banda_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7768,7 +7875,7 @@ func (x *TeamActivity) String() string {
 func (*TeamActivity) ProtoMessage() {}
 
 func (x *TeamActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[117]
+	mi := &file_banda_v1_banda_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7781,7 +7888,7 @@ func (x *TeamActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeamActivity.ProtoReflect.Descriptor instead.
 func (*TeamActivity) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{117}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *TeamActivity) GetActor() string {
@@ -7813,7 +7920,7 @@ type TeamWatchRequest struct {
 
 func (x *TeamWatchRequest) Reset() {
 	*x = TeamWatchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[118]
+	mi := &file_banda_v1_banda_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7825,7 +7932,7 @@ func (x *TeamWatchRequest) String() string {
 func (*TeamWatchRequest) ProtoMessage() {}
 
 func (x *TeamWatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[118]
+	mi := &file_banda_v1_banda_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7838,7 +7945,7 @@ func (x *TeamWatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeamWatchRequest.ProtoReflect.Descriptor instead.
 func (*TeamWatchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{118}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{120}
 }
 
 type TeamWatchResponse struct {
@@ -7854,7 +7961,7 @@ type TeamWatchResponse struct {
 
 func (x *TeamWatchResponse) Reset() {
 	*x = TeamWatchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[119]
+	mi := &file_banda_v1_banda_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7866,7 +7973,7 @@ func (x *TeamWatchResponse) String() string {
 func (*TeamWatchResponse) ProtoMessage() {}
 
 func (x *TeamWatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[119]
+	mi := &file_banda_v1_banda_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7879,7 +7986,7 @@ func (x *TeamWatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeamWatchResponse.ProtoReflect.Descriptor instead.
 func (*TeamWatchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{119}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *TeamWatchResponse) GetThreads() []*Thread {
@@ -7904,7 +8011,7 @@ type BriefRequest struct {
 
 func (x *BriefRequest) Reset() {
 	*x = BriefRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[120]
+	mi := &file_banda_v1_banda_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7916,7 +8023,7 @@ func (x *BriefRequest) String() string {
 func (*BriefRequest) ProtoMessage() {}
 
 func (x *BriefRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[120]
+	mi := &file_banda_v1_banda_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7929,7 +8036,7 @@ func (x *BriefRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefRequest.ProtoReflect.Descriptor instead.
 func (*BriefRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{120}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{122}
 }
 
 type BriefResponse struct {
@@ -7953,7 +8060,7 @@ type BriefResponse struct {
 
 func (x *BriefResponse) Reset() {
 	*x = BriefResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[121]
+	mi := &file_banda_v1_banda_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7965,7 +8072,7 @@ func (x *BriefResponse) String() string {
 func (*BriefResponse) ProtoMessage() {}
 
 func (x *BriefResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[121]
+	mi := &file_banda_v1_banda_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7978,7 +8085,7 @@ func (x *BriefResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefResponse.ProtoReflect.Descriptor instead.
 func (*BriefResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{121}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *BriefResponse) GetSince() *timestamppb.Timestamp {
@@ -8037,7 +8144,7 @@ type BriefItem struct {
 
 func (x *BriefItem) Reset() {
 	*x = BriefItem{}
-	mi := &file_banda_v1_banda_proto_msgTypes[122]
+	mi := &file_banda_v1_banda_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8049,7 +8156,7 @@ func (x *BriefItem) String() string {
 func (*BriefItem) ProtoMessage() {}
 
 func (x *BriefItem) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[122]
+	mi := &file_banda_v1_banda_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8062,7 +8169,7 @@ func (x *BriefItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefItem.ProtoReflect.Descriptor instead.
 func (*BriefItem) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{122}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *BriefItem) GetThreadId() string {
@@ -8109,7 +8216,7 @@ type BriefSeenRequest struct {
 
 func (x *BriefSeenRequest) Reset() {
 	*x = BriefSeenRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[123]
+	mi := &file_banda_v1_banda_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8121,7 +8228,7 @@ func (x *BriefSeenRequest) String() string {
 func (*BriefSeenRequest) ProtoMessage() {}
 
 func (x *BriefSeenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[123]
+	mi := &file_banda_v1_banda_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8134,7 +8241,7 @@ func (x *BriefSeenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefSeenRequest.ProtoReflect.Descriptor instead.
 func (*BriefSeenRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{123}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *BriefSeenRequest) GetUntil() *timestamppb.Timestamp {
@@ -8152,7 +8259,7 @@ type BriefSeenResponse struct {
 
 func (x *BriefSeenResponse) Reset() {
 	*x = BriefSeenResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[124]
+	mi := &file_banda_v1_banda_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8164,7 +8271,7 @@ func (x *BriefSeenResponse) String() string {
 func (*BriefSeenResponse) ProtoMessage() {}
 
 func (x *BriefSeenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[124]
+	mi := &file_banda_v1_banda_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8177,7 +8284,7 @@ func (x *BriefSeenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefSeenResponse.ProtoReflect.Descriptor instead.
 func (*BriefSeenResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{124}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{126}
 }
 
 type InboxWatchRequest struct {
@@ -8188,7 +8295,7 @@ type InboxWatchRequest struct {
 
 func (x *InboxWatchRequest) Reset() {
 	*x = InboxWatchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[125]
+	mi := &file_banda_v1_banda_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8200,7 +8307,7 @@ func (x *InboxWatchRequest) String() string {
 func (*InboxWatchRequest) ProtoMessage() {}
 
 func (x *InboxWatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[125]
+	mi := &file_banda_v1_banda_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8213,7 +8320,7 @@ func (x *InboxWatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboxWatchRequest.ProtoReflect.Descriptor instead.
 func (*InboxWatchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{125}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{127}
 }
 
 type InboxWatchResponse struct {
@@ -8234,7 +8341,7 @@ type InboxWatchResponse struct {
 
 func (x *InboxWatchResponse) Reset() {
 	*x = InboxWatchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[126]
+	mi := &file_banda_v1_banda_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8246,7 +8353,7 @@ func (x *InboxWatchResponse) String() string {
 func (*InboxWatchResponse) ProtoMessage() {}
 
 func (x *InboxWatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[126]
+	mi := &file_banda_v1_banda_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8259,7 +8366,7 @@ func (x *InboxWatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboxWatchResponse.ProtoReflect.Descriptor instead.
 func (*InboxWatchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{126}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *InboxWatchResponse) GetThreads() []*Thread {
@@ -8312,7 +8419,7 @@ type Decision struct {
 
 func (x *Decision) Reset() {
 	*x = Decision{}
-	mi := &file_banda_v1_banda_proto_msgTypes[127]
+	mi := &file_banda_v1_banda_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8324,7 +8431,7 @@ func (x *Decision) String() string {
 func (*Decision) ProtoMessage() {}
 
 func (x *Decision) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[127]
+	mi := &file_banda_v1_banda_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8337,7 +8444,7 @@ func (x *Decision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Decision.ProtoReflect.Descriptor instead.
 func (*Decision) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{127}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *Decision) GetThread() *Thread {
@@ -8363,7 +8470,7 @@ type InboxMarkReadRequest struct {
 
 func (x *InboxMarkReadRequest) Reset() {
 	*x = InboxMarkReadRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[128]
+	mi := &file_banda_v1_banda_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8375,7 +8482,7 @@ func (x *InboxMarkReadRequest) String() string {
 func (*InboxMarkReadRequest) ProtoMessage() {}
 
 func (x *InboxMarkReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[128]
+	mi := &file_banda_v1_banda_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8388,7 +8495,7 @@ func (x *InboxMarkReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboxMarkReadRequest.ProtoReflect.Descriptor instead.
 func (*InboxMarkReadRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{128}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *InboxMarkReadRequest) GetThreadId() string {
@@ -8406,7 +8513,7 @@ type InboxMarkReadResponse struct {
 
 func (x *InboxMarkReadResponse) Reset() {
 	*x = InboxMarkReadResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[129]
+	mi := &file_banda_v1_banda_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8418,7 +8525,7 @@ func (x *InboxMarkReadResponse) String() string {
 func (*InboxMarkReadResponse) ProtoMessage() {}
 
 func (x *InboxMarkReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[129]
+	mi := &file_banda_v1_banda_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8431,7 +8538,7 @@ func (x *InboxMarkReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InboxMarkReadResponse.ProtoReflect.Descriptor instead.
 func (*InboxMarkReadResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{129}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{131}
 }
 
 type WatchThreadRequest struct {
@@ -8446,7 +8553,7 @@ type WatchThreadRequest struct {
 
 func (x *WatchThreadRequest) Reset() {
 	*x = WatchThreadRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[130]
+	mi := &file_banda_v1_banda_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8458,7 +8565,7 @@ func (x *WatchThreadRequest) String() string {
 func (*WatchThreadRequest) ProtoMessage() {}
 
 func (x *WatchThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[130]
+	mi := &file_banda_v1_banda_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8471,7 +8578,7 @@ func (x *WatchThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchThreadRequest.ProtoReflect.Descriptor instead.
 func (*WatchThreadRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{130}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *WatchThreadRequest) GetThreadId() string {
@@ -8509,7 +8616,7 @@ type HistoryRequest struct {
 
 func (x *HistoryRequest) Reset() {
 	*x = HistoryRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[131]
+	mi := &file_banda_v1_banda_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8521,7 +8628,7 @@ func (x *HistoryRequest) String() string {
 func (*HistoryRequest) ProtoMessage() {}
 
 func (x *HistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[131]
+	mi := &file_banda_v1_banda_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8534,7 +8641,7 @@ func (x *HistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryRequest.ProtoReflect.Descriptor instead.
 func (*HistoryRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{131}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *HistoryRequest) GetThreadId() string {
@@ -8574,7 +8681,7 @@ type HistoryResponse struct {
 
 func (x *HistoryResponse) Reset() {
 	*x = HistoryResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[132]
+	mi := &file_banda_v1_banda_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8586,7 +8693,7 @@ func (x *HistoryResponse) String() string {
 func (*HistoryResponse) ProtoMessage() {}
 
 func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[132]
+	mi := &file_banda_v1_banda_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8599,7 +8706,7 @@ func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryResponse.ProtoReflect.Descriptor instead.
 func (*HistoryResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{132}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *HistoryResponse) GetEvents() []*Event {
@@ -8627,7 +8734,7 @@ type PermissionRequested struct {
 
 func (x *PermissionRequested) Reset() {
 	*x = PermissionRequested{}
-	mi := &file_banda_v1_banda_proto_msgTypes[133]
+	mi := &file_banda_v1_banda_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8639,7 +8746,7 @@ func (x *PermissionRequested) String() string {
 func (*PermissionRequested) ProtoMessage() {}
 
 func (x *PermissionRequested) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[133]
+	mi := &file_banda_v1_banda_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8652,7 +8759,7 @@ func (x *PermissionRequested) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionRequested.ProtoReflect.Descriptor instead.
 func (*PermissionRequested) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{133}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *PermissionRequested) GetId() string {
@@ -8712,7 +8819,7 @@ type PermissionResolved struct {
 
 func (x *PermissionResolved) Reset() {
 	*x = PermissionResolved{}
-	mi := &file_banda_v1_banda_proto_msgTypes[134]
+	mi := &file_banda_v1_banda_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8724,7 +8831,7 @@ func (x *PermissionResolved) String() string {
 func (*PermissionResolved) ProtoMessage() {}
 
 func (x *PermissionResolved) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[134]
+	mi := &file_banda_v1_banda_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8737,7 +8844,7 @@ func (x *PermissionResolved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionResolved.ProtoReflect.Descriptor instead.
 func (*PermissionResolved) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{134}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *PermissionResolved) GetId() string {
@@ -8816,7 +8923,7 @@ type PermissionAnswerRequest struct {
 
 func (x *PermissionAnswerRequest) Reset() {
 	*x = PermissionAnswerRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[135]
+	mi := &file_banda_v1_banda_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8828,7 +8935,7 @@ func (x *PermissionAnswerRequest) String() string {
 func (*PermissionAnswerRequest) ProtoMessage() {}
 
 func (x *PermissionAnswerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[135]
+	mi := &file_banda_v1_banda_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8841,7 +8948,7 @@ func (x *PermissionAnswerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionAnswerRequest.ProtoReflect.Descriptor instead.
 func (*PermissionAnswerRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{135}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *PermissionAnswerRequest) GetThreadId() string {
@@ -8908,7 +9015,7 @@ type PermissionAnswerResponse struct {
 
 func (x *PermissionAnswerResponse) Reset() {
 	*x = PermissionAnswerResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[136]
+	mi := &file_banda_v1_banda_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8920,7 +9027,7 @@ func (x *PermissionAnswerResponse) String() string {
 func (*PermissionAnswerResponse) ProtoMessage() {}
 
 func (x *PermissionAnswerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[136]
+	mi := &file_banda_v1_banda_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8933,7 +9040,7 @@ func (x *PermissionAnswerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionAnswerResponse.ProtoReflect.Descriptor instead.
 func (*PermissionAnswerResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{136}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{138}
 }
 
 type PermissionVoteRequest struct {
@@ -8948,7 +9055,7 @@ type PermissionVoteRequest struct {
 
 func (x *PermissionVoteRequest) Reset() {
 	*x = PermissionVoteRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[137]
+	mi := &file_banda_v1_banda_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8960,7 +9067,7 @@ func (x *PermissionVoteRequest) String() string {
 func (*PermissionVoteRequest) ProtoMessage() {}
 
 func (x *PermissionVoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[137]
+	mi := &file_banda_v1_banda_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8973,7 +9080,7 @@ func (x *PermissionVoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionVoteRequest.ProtoReflect.Descriptor instead.
 func (*PermissionVoteRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{137}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *PermissionVoteRequest) GetThreadId() string {
@@ -9005,7 +9112,7 @@ type PermissionVoteResponse struct {
 
 func (x *PermissionVoteResponse) Reset() {
 	*x = PermissionVoteResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[138]
+	mi := &file_banda_v1_banda_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9017,7 +9124,7 @@ func (x *PermissionVoteResponse) String() string {
 func (*PermissionVoteResponse) ProtoMessage() {}
 
 func (x *PermissionVoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[138]
+	mi := &file_banda_v1_banda_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9030,7 +9137,7 @@ func (x *PermissionVoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionVoteResponse.ProtoReflect.Descriptor instead.
 func (*PermissionVoteResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{138}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{140}
 }
 
 // The actor's vote on a pending question; replaces their previous one.
@@ -9044,7 +9151,7 @@ type PermissionVoted struct {
 
 func (x *PermissionVoted) Reset() {
 	*x = PermissionVoted{}
-	mi := &file_banda_v1_banda_proto_msgTypes[139]
+	mi := &file_banda_v1_banda_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9056,7 +9163,7 @@ func (x *PermissionVoted) String() string {
 func (*PermissionVoted) ProtoMessage() {}
 
 func (x *PermissionVoted) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[139]
+	mi := &file_banda_v1_banda_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9069,7 +9176,7 @@ func (x *PermissionVoted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionVoted.ProtoReflect.Descriptor instead.
 func (*PermissionVoted) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{139}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *PermissionVoted) GetId() string {
@@ -9097,7 +9204,7 @@ type PermissionRevokeRequest struct {
 
 func (x *PermissionRevokeRequest) Reset() {
 	*x = PermissionRevokeRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[140]
+	mi := &file_banda_v1_banda_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9109,7 +9216,7 @@ func (x *PermissionRevokeRequest) String() string {
 func (*PermissionRevokeRequest) ProtoMessage() {}
 
 func (x *PermissionRevokeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[140]
+	mi := &file_banda_v1_banda_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9122,7 +9229,7 @@ func (x *PermissionRevokeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionRevokeRequest.ProtoReflect.Descriptor instead.
 func (*PermissionRevokeRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{140}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *PermissionRevokeRequest) GetThreadId() string {
@@ -9147,7 +9254,7 @@ type PermissionRevokeResponse struct {
 
 func (x *PermissionRevokeResponse) Reset() {
 	*x = PermissionRevokeResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[141]
+	mi := &file_banda_v1_banda_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9159,7 +9266,7 @@ func (x *PermissionRevokeResponse) String() string {
 func (*PermissionRevokeResponse) ProtoMessage() {}
 
 func (x *PermissionRevokeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[141]
+	mi := &file_banda_v1_banda_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9172,7 +9279,7 @@ func (x *PermissionRevokeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionRevokeResponse.ProtoReflect.Descriptor instead.
 func (*PermissionRevokeResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{141}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{143}
 }
 
 type PermissionRevoked struct {
@@ -9184,7 +9291,7 @@ type PermissionRevoked struct {
 
 func (x *PermissionRevoked) Reset() {
 	*x = PermissionRevoked{}
-	mi := &file_banda_v1_banda_proto_msgTypes[142]
+	mi := &file_banda_v1_banda_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9196,7 +9303,7 @@ func (x *PermissionRevoked) String() string {
 func (*PermissionRevoked) ProtoMessage() {}
 
 func (x *PermissionRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[142]
+	mi := &file_banda_v1_banda_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9209,7 +9316,7 @@ func (x *PermissionRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionRevoked.ProtoReflect.Descriptor instead.
 func (*PermissionRevoked) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{142}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *PermissionRevoked) GetRule() string {
@@ -9229,7 +9336,7 @@ type PermissionSetModeRequest struct {
 
 func (x *PermissionSetModeRequest) Reset() {
 	*x = PermissionSetModeRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[143]
+	mi := &file_banda_v1_banda_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9241,7 +9348,7 @@ func (x *PermissionSetModeRequest) String() string {
 func (*PermissionSetModeRequest) ProtoMessage() {}
 
 func (x *PermissionSetModeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[143]
+	mi := &file_banda_v1_banda_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9254,7 +9361,7 @@ func (x *PermissionSetModeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionSetModeRequest.ProtoReflect.Descriptor instead.
 func (*PermissionSetModeRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{143}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *PermissionSetModeRequest) GetThreadId() string {
@@ -9279,7 +9386,7 @@ type PermissionSetModeResponse struct {
 
 func (x *PermissionSetModeResponse) Reset() {
 	*x = PermissionSetModeResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[144]
+	mi := &file_banda_v1_banda_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9291,7 +9398,7 @@ func (x *PermissionSetModeResponse) String() string {
 func (*PermissionSetModeResponse) ProtoMessage() {}
 
 func (x *PermissionSetModeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[144]
+	mi := &file_banda_v1_banda_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9304,7 +9411,7 @@ func (x *PermissionSetModeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionSetModeResponse.ProtoReflect.Descriptor instead.
 func (*PermissionSetModeResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{144}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{146}
 }
 
 type PermissionModeChanged struct {
@@ -9316,7 +9423,7 @@ type PermissionModeChanged struct {
 
 func (x *PermissionModeChanged) Reset() {
 	*x = PermissionModeChanged{}
-	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	mi := &file_banda_v1_banda_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9328,7 +9435,7 @@ func (x *PermissionModeChanged) String() string {
 func (*PermissionModeChanged) ProtoMessage() {}
 
 func (x *PermissionModeChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[145]
+	mi := &file_banda_v1_banda_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9341,7 +9448,7 @@ func (x *PermissionModeChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionModeChanged.ProtoReflect.Descriptor instead.
 func (*PermissionModeChanged) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{145}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *PermissionModeChanged) GetMode() PermissionMode {
@@ -9363,7 +9470,7 @@ type HandoffOffered struct {
 
 func (x *HandoffOffered) Reset() {
 	*x = HandoffOffered{}
-	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	mi := &file_banda_v1_banda_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9375,7 +9482,7 @@ func (x *HandoffOffered) String() string {
 func (*HandoffOffered) ProtoMessage() {}
 
 func (x *HandoffOffered) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[146]
+	mi := &file_banda_v1_banda_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9388,7 +9495,7 @@ func (x *HandoffOffered) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffOffered.ProtoReflect.Descriptor instead.
 func (*HandoffOffered) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{146}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *HandoffOffered) GetToUserId() string {
@@ -9422,7 +9529,7 @@ type HandoffResolved struct {
 
 func (x *HandoffResolved) Reset() {
 	*x = HandoffResolved{}
-	mi := &file_banda_v1_banda_proto_msgTypes[147]
+	mi := &file_banda_v1_banda_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9434,7 +9541,7 @@ func (x *HandoffResolved) String() string {
 func (*HandoffResolved) ProtoMessage() {}
 
 func (x *HandoffResolved) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[147]
+	mi := &file_banda_v1_banda_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9447,7 +9554,7 @@ func (x *HandoffResolved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffResolved.ProtoReflect.Descriptor instead.
 func (*HandoffResolved) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{147}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *HandoffResolved) GetOfferSeq() int64 {
@@ -9474,7 +9581,7 @@ type WatchThreadResponse struct {
 
 func (x *WatchThreadResponse) Reset() {
 	*x = WatchThreadResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[148]
+	mi := &file_banda_v1_banda_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9486,7 +9593,7 @@ func (x *WatchThreadResponse) String() string {
 func (*WatchThreadResponse) ProtoMessage() {}
 
 func (x *WatchThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[148]
+	mi := &file_banda_v1_banda_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9499,7 +9606,7 @@ func (x *WatchThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchThreadResponse.ProtoReflect.Descriptor instead.
 func (*WatchThreadResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{148}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *WatchThreadResponse) GetEvent() *Event {
@@ -9532,7 +9639,7 @@ type ConnectRequest struct {
 
 func (x *ConnectRequest) Reset() {
 	*x = ConnectRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[149]
+	mi := &file_banda_v1_banda_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9544,7 +9651,7 @@ func (x *ConnectRequest) String() string {
 func (*ConnectRequest) ProtoMessage() {}
 
 func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[149]
+	mi := &file_banda_v1_banda_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9557,7 +9664,7 @@ func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectRequest.ProtoReflect.Descriptor instead.
 func (*ConnectRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{149}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *ConnectRequest) GetKind() isConnectRequest_Kind {
@@ -9753,7 +9860,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_banda_v1_banda_proto_msgTypes[150]
+	mi := &file_banda_v1_banda_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9765,7 +9872,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[150]
+	mi := &file_banda_v1_banda_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9778,7 +9885,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{150}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{152}
 }
 
 type Pong struct {
@@ -9789,7 +9896,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_banda_v1_banda_proto_msgTypes[151]
+	mi := &file_banda_v1_banda_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9801,7 +9908,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[151]
+	mi := &file_banda_v1_banda_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9814,7 +9921,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{151}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{153}
 }
 
 type Hello struct {
@@ -9830,7 +9937,7 @@ type Hello struct {
 
 func (x *Hello) Reset() {
 	*x = Hello{}
-	mi := &file_banda_v1_banda_proto_msgTypes[152]
+	mi := &file_banda_v1_banda_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9842,7 +9949,7 @@ func (x *Hello) String() string {
 func (*Hello) ProtoMessage() {}
 
 func (x *Hello) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[152]
+	mi := &file_banda_v1_banda_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9855,7 +9962,7 @@ func (x *Hello) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Hello.ProtoReflect.Descriptor instead.
 func (*Hello) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{152}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *Hello) GetThreadId() string {
@@ -9889,7 +9996,7 @@ type LoginStatus struct {
 
 func (x *LoginStatus) Reset() {
 	*x = LoginStatus{}
-	mi := &file_banda_v1_banda_proto_msgTypes[153]
+	mi := &file_banda_v1_banda_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9901,7 +10008,7 @@ func (x *LoginStatus) String() string {
 func (*LoginStatus) ProtoMessage() {}
 
 func (x *LoginStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[153]
+	mi := &file_banda_v1_banda_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9914,7 +10021,7 @@ func (x *LoginStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginStatus.ProtoReflect.Descriptor instead.
 func (*LoginStatus) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{153}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *LoginStatus) GetHarness() string {
@@ -9939,7 +10046,7 @@ type Ready struct {
 
 func (x *Ready) Reset() {
 	*x = Ready{}
-	mi := &file_banda_v1_banda_proto_msgTypes[154]
+	mi := &file_banda_v1_banda_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9951,7 +10058,7 @@ func (x *Ready) String() string {
 func (*Ready) ProtoMessage() {}
 
 func (x *Ready) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[154]
+	mi := &file_banda_v1_banda_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9964,7 +10071,7 @@ func (x *Ready) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ready.ProtoReflect.Descriptor instead.
 func (*Ready) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{154}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{156}
 }
 
 type TerminalOutput struct {
@@ -9977,7 +10084,7 @@ type TerminalOutput struct {
 
 func (x *TerminalOutput) Reset() {
 	*x = TerminalOutput{}
-	mi := &file_banda_v1_banda_proto_msgTypes[155]
+	mi := &file_banda_v1_banda_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9989,7 +10096,7 @@ func (x *TerminalOutput) String() string {
 func (*TerminalOutput) ProtoMessage() {}
 
 func (x *TerminalOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[155]
+	mi := &file_banda_v1_banda_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10002,7 +10109,7 @@ func (x *TerminalOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalOutput.ProtoReflect.Descriptor instead.
 func (*TerminalOutput) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{155}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *TerminalOutput) GetData() []byte {
@@ -10028,7 +10135,7 @@ type Diff struct {
 
 func (x *Diff) Reset() {
 	*x = Diff{}
-	mi := &file_banda_v1_banda_proto_msgTypes[156]
+	mi := &file_banda_v1_banda_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10040,7 +10147,7 @@ func (x *Diff) String() string {
 func (*Diff) ProtoMessage() {}
 
 func (x *Diff) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[156]
+	mi := &file_banda_v1_banda_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10053,7 +10160,7 @@ func (x *Diff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Diff.ProtoReflect.Descriptor instead.
 func (*Diff) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{156}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *Diff) GetDiff() string {
@@ -10079,7 +10186,7 @@ type FileResponse struct {
 
 func (x *FileResponse) Reset() {
 	*x = FileResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[157]
+	mi := &file_banda_v1_banda_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10091,7 +10198,7 @@ func (x *FileResponse) String() string {
 func (*FileResponse) ProtoMessage() {}
 
 func (x *FileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[157]
+	mi := &file_banda_v1_banda_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10104,7 +10211,7 @@ func (x *FileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileResponse.ProtoReflect.Descriptor instead.
 func (*FileResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{157}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *FileResponse) GetRequestId() string {
@@ -10174,7 +10281,7 @@ type ConnectResponse struct {
 
 func (x *ConnectResponse) Reset() {
 	*x = ConnectResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[158]
+	mi := &file_banda_v1_banda_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10186,7 +10293,7 @@ func (x *ConnectResponse) String() string {
 func (*ConnectResponse) ProtoMessage() {}
 
 func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[158]
+	mi := &file_banda_v1_banda_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10199,7 +10306,7 @@ func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectResponse.ProtoReflect.Descriptor instead.
 func (*ConnectResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{158}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *ConnectResponse) GetKind() isConnectResponse_Kind {
@@ -10434,7 +10541,7 @@ type PermissionCommand struct {
 
 func (x *PermissionCommand) Reset() {
 	*x = PermissionCommand{}
-	mi := &file_banda_v1_banda_proto_msgTypes[159]
+	mi := &file_banda_v1_banda_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10446,7 +10553,7 @@ func (x *PermissionCommand) String() string {
 func (*PermissionCommand) ProtoMessage() {}
 
 func (x *PermissionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[159]
+	mi := &file_banda_v1_banda_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10459,7 +10566,7 @@ func (x *PermissionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PermissionCommand.ProtoReflect.Descriptor instead.
 func (*PermissionCommand) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{159}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *PermissionCommand) GetRequestId() string {
@@ -10522,7 +10629,7 @@ type Prompt struct {
 
 func (x *Prompt) Reset() {
 	*x = Prompt{}
-	mi := &file_banda_v1_banda_proto_msgTypes[160]
+	mi := &file_banda_v1_banda_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10534,7 +10641,7 @@ func (x *Prompt) String() string {
 func (*Prompt) ProtoMessage() {}
 
 func (x *Prompt) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[160]
+	mi := &file_banda_v1_banda_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10547,7 +10654,7 @@ func (x *Prompt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Prompt.ProtoReflect.Descriptor instead.
 func (*Prompt) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{160}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *Prompt) GetText() string {
@@ -10574,7 +10681,7 @@ type AttachmentImage struct {
 
 func (x *AttachmentImage) Reset() {
 	*x = AttachmentImage{}
-	mi := &file_banda_v1_banda_proto_msgTypes[161]
+	mi := &file_banda_v1_banda_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10586,7 +10693,7 @@ func (x *AttachmentImage) String() string {
 func (*AttachmentImage) ProtoMessage() {}
 
 func (x *AttachmentImage) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[161]
+	mi := &file_banda_v1_banda_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10599,7 +10706,7 @@ func (x *AttachmentImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachmentImage.ProtoReflect.Descriptor instead.
 func (*AttachmentImage) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{161}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *AttachmentImage) GetMediaType() string {
@@ -10625,7 +10732,7 @@ type Stop struct {
 
 func (x *Stop) Reset() {
 	*x = Stop{}
-	mi := &file_banda_v1_banda_proto_msgTypes[162]
+	mi := &file_banda_v1_banda_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10637,7 +10744,7 @@ func (x *Stop) String() string {
 func (*Stop) ProtoMessage() {}
 
 func (x *Stop) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[162]
+	mi := &file_banda_v1_banda_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10650,7 +10757,7 @@ func (x *Stop) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stop.ProtoReflect.Descriptor instead.
 func (*Stop) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{162}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{164}
 }
 
 // Push the thread branch and report the result as a notice.
@@ -10666,7 +10773,7 @@ type Push struct {
 
 func (x *Push) Reset() {
 	*x = Push{}
-	mi := &file_banda_v1_banda_proto_msgTypes[163]
+	mi := &file_banda_v1_banda_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10678,7 +10785,7 @@ func (x *Push) String() string {
 func (*Push) ProtoMessage() {}
 
 func (x *Push) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[163]
+	mi := &file_banda_v1_banda_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10691,7 +10798,7 @@ func (x *Push) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Push.ProtoReflect.Descriptor instead.
 func (*Push) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{163}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *Push) GetSuspend() bool {
@@ -10712,7 +10819,7 @@ type TerminalOpen struct {
 
 func (x *TerminalOpen) Reset() {
 	*x = TerminalOpen{}
-	mi := &file_banda_v1_banda_proto_msgTypes[164]
+	mi := &file_banda_v1_banda_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10724,7 +10831,7 @@ func (x *TerminalOpen) String() string {
 func (*TerminalOpen) ProtoMessage() {}
 
 func (x *TerminalOpen) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[164]
+	mi := &file_banda_v1_banda_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10737,7 +10844,7 @@ func (x *TerminalOpen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalOpen.ProtoReflect.Descriptor instead.
 func (*TerminalOpen) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{164}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{166}
 }
 
 func (x *TerminalOpen) GetCols() uint32 {
@@ -10770,7 +10877,7 @@ type TerminalInput struct {
 
 func (x *TerminalInput) Reset() {
 	*x = TerminalInput{}
-	mi := &file_banda_v1_banda_proto_msgTypes[165]
+	mi := &file_banda_v1_banda_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10782,7 +10889,7 @@ func (x *TerminalInput) String() string {
 func (*TerminalInput) ProtoMessage() {}
 
 func (x *TerminalInput) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[165]
+	mi := &file_banda_v1_banda_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10795,7 +10902,7 @@ func (x *TerminalInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalInput.ProtoReflect.Descriptor instead.
 func (*TerminalInput) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{165}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *TerminalInput) GetData() []byte {
@@ -10815,7 +10922,7 @@ type TerminalResize struct {
 
 func (x *TerminalResize) Reset() {
 	*x = TerminalResize{}
-	mi := &file_banda_v1_banda_proto_msgTypes[166]
+	mi := &file_banda_v1_banda_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10827,7 +10934,7 @@ func (x *TerminalResize) String() string {
 func (*TerminalResize) ProtoMessage() {}
 
 func (x *TerminalResize) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[166]
+	mi := &file_banda_v1_banda_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10840,7 +10947,7 @@ func (x *TerminalResize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalResize.ProtoReflect.Descriptor instead.
 func (*TerminalResize) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{166}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *TerminalResize) GetCols() uint32 {
@@ -10865,7 +10972,7 @@ type TerminalClose struct {
 
 func (x *TerminalClose) Reset() {
 	*x = TerminalClose{}
-	mi := &file_banda_v1_banda_proto_msgTypes[167]
+	mi := &file_banda_v1_banda_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10877,7 +10984,7 @@ func (x *TerminalClose) String() string {
 func (*TerminalClose) ProtoMessage() {}
 
 func (x *TerminalClose) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[167]
+	mi := &file_banda_v1_banda_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10890,7 +10997,7 @@ func (x *TerminalClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalClose.ProtoReflect.Descriptor instead.
 func (*TerminalClose) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{167}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{169}
 }
 
 // Lists the checkout's files, or reads `path` from it.
@@ -10905,7 +11012,7 @@ type FileRequest struct {
 
 func (x *FileRequest) Reset() {
 	*x = FileRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[168]
+	mi := &file_banda_v1_banda_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10917,7 +11024,7 @@ func (x *FileRequest) String() string {
 func (*FileRequest) ProtoMessage() {}
 
 func (x *FileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[168]
+	mi := &file_banda_v1_banda_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10930,7 +11037,7 @@ func (x *FileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileRequest.ProtoReflect.Descriptor instead.
 func (*FileRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{168}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *FileRequest) GetRequestId() string {
@@ -10974,7 +11081,7 @@ type HttpTunnel struct {
 
 func (x *HttpTunnel) Reset() {
 	*x = HttpTunnel{}
-	mi := &file_banda_v1_banda_proto_msgTypes[169]
+	mi := &file_banda_v1_banda_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10986,7 +11093,7 @@ func (x *HttpTunnel) String() string {
 func (*HttpTunnel) ProtoMessage() {}
 
 func (x *HttpTunnel) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[169]
+	mi := &file_banda_v1_banda_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10999,7 +11106,7 @@ func (x *HttpTunnel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpTunnel.ProtoReflect.Descriptor instead.
 func (*HttpTunnel) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{169}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{171}
 }
 
 func (x *HttpTunnel) GetId() string {
@@ -11053,7 +11160,7 @@ type PreviewPorts struct {
 
 func (x *PreviewPorts) Reset() {
 	*x = PreviewPorts{}
-	mi := &file_banda_v1_banda_proto_msgTypes[170]
+	mi := &file_banda_v1_banda_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11065,7 +11172,7 @@ func (x *PreviewPorts) String() string {
 func (*PreviewPorts) ProtoMessage() {}
 
 func (x *PreviewPorts) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[170]
+	mi := &file_banda_v1_banda_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11078,7 +11185,7 @@ func (x *PreviewPorts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewPorts.ProtoReflect.Descriptor instead.
 func (*PreviewPorts) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{170}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{172}
 }
 
 func (x *PreviewPorts) GetPorts() []*PreviewPort {
@@ -11100,7 +11207,7 @@ type RaceTry struct {
 
 func (x *RaceTry) Reset() {
 	*x = RaceTry{}
-	mi := &file_banda_v1_banda_proto_msgTypes[171]
+	mi := &file_banda_v1_banda_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11112,7 +11219,7 @@ func (x *RaceTry) String() string {
 func (*RaceTry) ProtoMessage() {}
 
 func (x *RaceTry) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[171]
+	mi := &file_banda_v1_banda_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11125,7 +11232,7 @@ func (x *RaceTry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceTry.ProtoReflect.Descriptor instead.
 func (*RaceTry) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{171}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *RaceTry) GetModel() string {
@@ -11155,7 +11262,7 @@ type ForkRequest struct {
 
 func (x *ForkRequest) Reset() {
 	*x = ForkRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[172]
+	mi := &file_banda_v1_banda_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11167,7 +11274,7 @@ func (x *ForkRequest) String() string {
 func (*ForkRequest) ProtoMessage() {}
 
 func (x *ForkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[172]
+	mi := &file_banda_v1_banda_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11180,7 +11287,7 @@ func (x *ForkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkRequest.ProtoReflect.Descriptor instead.
 func (*ForkRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{172}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{174}
 }
 
 func (x *ForkRequest) GetThreadId() string {
@@ -11213,7 +11320,7 @@ type ForkResponse struct {
 
 func (x *ForkResponse) Reset() {
 	*x = ForkResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[173]
+	mi := &file_banda_v1_banda_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11225,7 +11332,7 @@ func (x *ForkResponse) String() string {
 func (*ForkResponse) ProtoMessage() {}
 
 func (x *ForkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[173]
+	mi := &file_banda_v1_banda_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11238,7 +11345,7 @@ func (x *ForkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkResponse.ProtoReflect.Descriptor instead.
 func (*ForkResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{173}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *ForkResponse) GetThreads() []*Thread {
@@ -11268,7 +11375,7 @@ type RaceRequest struct {
 
 func (x *RaceRequest) Reset() {
 	*x = RaceRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[174]
+	mi := &file_banda_v1_banda_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11280,7 +11387,7 @@ func (x *RaceRequest) String() string {
 func (*RaceRequest) ProtoMessage() {}
 
 func (x *RaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[174]
+	mi := &file_banda_v1_banda_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11293,7 +11400,7 @@ func (x *RaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceRequest.ProtoReflect.Descriptor instead.
 func (*RaceRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{174}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{176}
 }
 
 func (x *RaceRequest) GetRepoUrl() string {
@@ -11354,7 +11461,7 @@ type RaceResponse struct {
 
 func (x *RaceResponse) Reset() {
 	*x = RaceResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[175]
+	mi := &file_banda_v1_banda_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11366,7 +11473,7 @@ func (x *RaceResponse) String() string {
 func (*RaceResponse) ProtoMessage() {}
 
 func (x *RaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[175]
+	mi := &file_banda_v1_banda_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11379,7 +11486,7 @@ func (x *RaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceResponse.ProtoReflect.Descriptor instead.
 func (*RaceResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{175}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{177}
 }
 
 func (x *RaceResponse) GetThreads() []*Thread {
@@ -11400,7 +11507,7 @@ type RaceCompareRequest struct {
 
 func (x *RaceCompareRequest) Reset() {
 	*x = RaceCompareRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[176]
+	mi := &file_banda_v1_banda_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11412,7 +11519,7 @@ func (x *RaceCompareRequest) String() string {
 func (*RaceCompareRequest) ProtoMessage() {}
 
 func (x *RaceCompareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[176]
+	mi := &file_banda_v1_banda_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11425,7 +11532,7 @@ func (x *RaceCompareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceCompareRequest.ProtoReflect.Descriptor instead.
 func (*RaceCompareRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{176}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{178}
 }
 
 func (x *RaceCompareRequest) GetRaceId() string {
@@ -11451,7 +11558,7 @@ type RaceCompareResponse struct {
 
 func (x *RaceCompareResponse) Reset() {
 	*x = RaceCompareResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[177]
+	mi := &file_banda_v1_banda_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11463,7 +11570,7 @@ func (x *RaceCompareResponse) String() string {
 func (*RaceCompareResponse) ProtoMessage() {}
 
 func (x *RaceCompareResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[177]
+	mi := &file_banda_v1_banda_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11476,7 +11583,7 @@ func (x *RaceCompareResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceCompareResponse.ProtoReflect.Descriptor instead.
 func (*RaceCompareResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{177}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{179}
 }
 
 func (x *RaceCompareResponse) GetEntries() []*RaceEntry {
@@ -11501,7 +11608,7 @@ type RaceEntry struct {
 
 func (x *RaceEntry) Reset() {
 	*x = RaceEntry{}
-	mi := &file_banda_v1_banda_proto_msgTypes[178]
+	mi := &file_banda_v1_banda_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11513,7 +11620,7 @@ func (x *RaceEntry) String() string {
 func (*RaceEntry) ProtoMessage() {}
 
 func (x *RaceEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[178]
+	mi := &file_banda_v1_banda_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11526,7 +11633,7 @@ func (x *RaceEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceEntry.ProtoReflect.Descriptor instead.
 func (*RaceEntry) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{178}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *RaceEntry) GetThread() *Thread {
@@ -11572,7 +11679,7 @@ type RaceListRequest struct {
 
 func (x *RaceListRequest) Reset() {
 	*x = RaceListRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[179]
+	mi := &file_banda_v1_banda_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11584,7 +11691,7 @@ func (x *RaceListRequest) String() string {
 func (*RaceListRequest) ProtoMessage() {}
 
 func (x *RaceListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[179]
+	mi := &file_banda_v1_banda_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11597,7 +11704,7 @@ func (x *RaceListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceListRequest.ProtoReflect.Descriptor instead.
 func (*RaceListRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{179}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{181}
 }
 
 type RaceListResponse struct {
@@ -11610,7 +11717,7 @@ type RaceListResponse struct {
 
 func (x *RaceListResponse) Reset() {
 	*x = RaceListResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[180]
+	mi := &file_banda_v1_banda_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11622,7 +11729,7 @@ func (x *RaceListResponse) String() string {
 func (*RaceListResponse) ProtoMessage() {}
 
 func (x *RaceListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[180]
+	mi := &file_banda_v1_banda_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11635,7 +11742,7 @@ func (x *RaceListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaceListResponse.ProtoReflect.Descriptor instead.
 func (*RaceListResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{180}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{182}
 }
 
 func (x *RaceListResponse) GetThreads() []*Thread {
@@ -11654,7 +11761,7 @@ type RacePickRequest struct {
 
 func (x *RacePickRequest) Reset() {
 	*x = RacePickRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[181]
+	mi := &file_banda_v1_banda_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11666,7 +11773,7 @@ func (x *RacePickRequest) String() string {
 func (*RacePickRequest) ProtoMessage() {}
 
 func (x *RacePickRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[181]
+	mi := &file_banda_v1_banda_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11679,7 +11786,7 @@ func (x *RacePickRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RacePickRequest.ProtoReflect.Descriptor instead.
 func (*RacePickRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{181}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{183}
 }
 
 func (x *RacePickRequest) GetThreadId() string {
@@ -11697,7 +11804,7 @@ type RacePickResponse struct {
 
 func (x *RacePickResponse) Reset() {
 	*x = RacePickResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[182]
+	mi := &file_banda_v1_banda_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11709,7 +11816,7 @@ func (x *RacePickResponse) String() string {
 func (*RacePickResponse) ProtoMessage() {}
 
 func (x *RacePickResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[182]
+	mi := &file_banda_v1_banda_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11722,7 +11829,7 @@ func (x *RacePickResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RacePickResponse.ProtoReflect.Descriptor instead.
 func (*RacePickResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{182}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{184}
 }
 
 type ForkPatchRequest struct {
@@ -11735,7 +11842,7 @@ type ForkPatchRequest struct {
 
 func (x *ForkPatchRequest) Reset() {
 	*x = ForkPatchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[183]
+	mi := &file_banda_v1_banda_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11747,7 +11854,7 @@ func (x *ForkPatchRequest) String() string {
 func (*ForkPatchRequest) ProtoMessage() {}
 
 func (x *ForkPatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[183]
+	mi := &file_banda_v1_banda_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11760,7 +11867,7 @@ func (x *ForkPatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkPatchRequest.ProtoReflect.Descriptor instead.
 func (*ForkPatchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{183}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{185}
 }
 
 func (x *ForkPatchRequest) GetThreadId() string {
@@ -11789,7 +11896,7 @@ type ForkPatchResponse struct {
 
 func (x *ForkPatchResponse) Reset() {
 	*x = ForkPatchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[184]
+	mi := &file_banda_v1_banda_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11801,7 +11908,7 @@ func (x *ForkPatchResponse) String() string {
 func (*ForkPatchResponse) ProtoMessage() {}
 
 func (x *ForkPatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[184]
+	mi := &file_banda_v1_banda_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11814,7 +11921,7 @@ func (x *ForkPatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkPatchResponse.ProtoReflect.Descriptor instead.
 func (*ForkPatchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{184}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{186}
 }
 
 func (x *ForkPatchResponse) GetPatch() string {
@@ -11851,7 +11958,7 @@ type SearchRequest struct {
 
 func (x *SearchRequest) Reset() {
 	*x = SearchRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[185]
+	mi := &file_banda_v1_banda_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11863,7 +11970,7 @@ func (x *SearchRequest) String() string {
 func (*SearchRequest) ProtoMessage() {}
 
 func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[185]
+	mi := &file_banda_v1_banda_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11876,7 +11983,7 @@ func (x *SearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
 func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{185}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{187}
 }
 
 func (x *SearchRequest) GetQuery() string {
@@ -11946,7 +12053,7 @@ type SearchResult struct {
 
 func (x *SearchResult) Reset() {
 	*x = SearchResult{}
-	mi := &file_banda_v1_banda_proto_msgTypes[186]
+	mi := &file_banda_v1_banda_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11958,7 +12065,7 @@ func (x *SearchResult) String() string {
 func (*SearchResult) ProtoMessage() {}
 
 func (x *SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[186]
+	mi := &file_banda_v1_banda_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11971,7 +12078,7 @@ func (x *SearchResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResult.ProtoReflect.Descriptor instead.
 func (*SearchResult) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{186}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{188}
 }
 
 func (x *SearchResult) GetThreadId() string {
@@ -12039,7 +12146,7 @@ type SearchResponse struct {
 
 func (x *SearchResponse) Reset() {
 	*x = SearchResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[187]
+	mi := &file_banda_v1_banda_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12051,7 +12158,7 @@ func (x *SearchResponse) String() string {
 func (*SearchResponse) ProtoMessage() {}
 
 func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[187]
+	mi := &file_banda_v1_banda_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12064,7 +12171,7 @@ func (x *SearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
 func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{187}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{189}
 }
 
 func (x *SearchResponse) GetResults() []*SearchResult {
@@ -12092,7 +12199,7 @@ type PullRequestSummary struct {
 
 func (x *PullRequestSummary) Reset() {
 	*x = PullRequestSummary{}
-	mi := &file_banda_v1_banda_proto_msgTypes[188]
+	mi := &file_banda_v1_banda_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12104,7 +12211,7 @@ func (x *PullRequestSummary) String() string {
 func (*PullRequestSummary) ProtoMessage() {}
 
 func (x *PullRequestSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[188]
+	mi := &file_banda_v1_banda_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12117,7 +12224,7 @@ func (x *PullRequestSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestSummary.ProtoReflect.Descriptor instead.
 func (*PullRequestSummary) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{188}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{190}
 }
 
 func (x *PullRequestSummary) GetForge() string {
@@ -12191,7 +12298,7 @@ type PullRequestCheck struct {
 
 func (x *PullRequestCheck) Reset() {
 	*x = PullRequestCheck{}
-	mi := &file_banda_v1_banda_proto_msgTypes[189]
+	mi := &file_banda_v1_banda_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12203,7 +12310,7 @@ func (x *PullRequestCheck) String() string {
 func (*PullRequestCheck) ProtoMessage() {}
 
 func (x *PullRequestCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[189]
+	mi := &file_banda_v1_banda_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12216,7 +12323,7 @@ func (x *PullRequestCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCheck.ProtoReflect.Descriptor instead.
 func (*PullRequestCheck) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{189}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{191}
 }
 
 func (x *PullRequestCheck) GetName() string {
@@ -12272,7 +12379,7 @@ type PullRequestReviewer struct {
 
 func (x *PullRequestReviewer) Reset() {
 	*x = PullRequestReviewer{}
-	mi := &file_banda_v1_banda_proto_msgTypes[190]
+	mi := &file_banda_v1_banda_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12284,7 +12391,7 @@ func (x *PullRequestReviewer) String() string {
 func (*PullRequestReviewer) ProtoMessage() {}
 
 func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[190]
+	mi := &file_banda_v1_banda_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12297,7 +12404,7 @@ func (x *PullRequestReviewer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestReviewer.ProtoReflect.Descriptor instead.
 func (*PullRequestReviewer) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{190}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{192}
 }
 
 func (x *PullRequestReviewer) GetLogin() string {
@@ -12343,7 +12450,7 @@ type PullRequestComment struct {
 
 func (x *PullRequestComment) Reset() {
 	*x = PullRequestComment{}
-	mi := &file_banda_v1_banda_proto_msgTypes[191]
+	mi := &file_banda_v1_banda_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12355,7 +12462,7 @@ func (x *PullRequestComment) String() string {
 func (*PullRequestComment) ProtoMessage() {}
 
 func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[191]
+	mi := &file_banda_v1_banda_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12368,7 +12475,7 @@ func (x *PullRequestComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestComment.ProtoReflect.Descriptor instead.
 func (*PullRequestComment) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{191}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{193}
 }
 
 func (x *PullRequestComment) GetId() string {
@@ -12488,7 +12595,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[192]
+	mi := &file_banda_v1_banda_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12500,7 +12607,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[192]
+	mi := &file_banda_v1_banda_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12513,7 +12620,7 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{192}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{194}
 }
 
 func (x *PullRequest) GetSummary() *PullRequestSummary {
@@ -12678,7 +12785,7 @@ type PullRequestChanged struct {
 
 func (x *PullRequestChanged) Reset() {
 	*x = PullRequestChanged{}
-	mi := &file_banda_v1_banda_proto_msgTypes[193]
+	mi := &file_banda_v1_banda_proto_msgTypes[195]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12690,7 +12797,7 @@ func (x *PullRequestChanged) String() string {
 func (*PullRequestChanged) ProtoMessage() {}
 
 func (x *PullRequestChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[193]
+	mi := &file_banda_v1_banda_proto_msgTypes[195]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12703,7 +12810,7 @@ func (x *PullRequestChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestChanged.ProtoReflect.Descriptor instead.
 func (*PullRequestChanged) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{193}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{195}
 }
 
 func (x *PullRequestChanged) GetPullRequest() *PullRequestSummary {
@@ -12731,7 +12838,7 @@ type PullRequestGetRequest struct {
 
 func (x *PullRequestGetRequest) Reset() {
 	*x = PullRequestGetRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[194]
+	mi := &file_banda_v1_banda_proto_msgTypes[196]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12743,7 +12850,7 @@ func (x *PullRequestGetRequest) String() string {
 func (*PullRequestGetRequest) ProtoMessage() {}
 
 func (x *PullRequestGetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[194]
+	mi := &file_banda_v1_banda_proto_msgTypes[196]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12756,7 +12863,7 @@ func (x *PullRequestGetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestGetRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestGetRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{194}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{196}
 }
 
 func (x *PullRequestGetRequest) GetThreadId() string {
@@ -12785,7 +12892,7 @@ type PullRequestGetResponse struct {
 
 func (x *PullRequestGetResponse) Reset() {
 	*x = PullRequestGetResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[195]
+	mi := &file_banda_v1_banda_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12797,7 +12904,7 @@ func (x *PullRequestGetResponse) String() string {
 func (*PullRequestGetResponse) ProtoMessage() {}
 
 func (x *PullRequestGetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[195]
+	mi := &file_banda_v1_banda_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12810,7 +12917,7 @@ func (x *PullRequestGetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestGetResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestGetResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{195}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{197}
 }
 
 func (x *PullRequestGetResponse) GetPullRequest() *PullRequest {
@@ -12843,7 +12950,7 @@ type PullRequestCreateRequest struct {
 
 func (x *PullRequestCreateRequest) Reset() {
 	*x = PullRequestCreateRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[196]
+	mi := &file_banda_v1_banda_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12855,7 +12962,7 @@ func (x *PullRequestCreateRequest) String() string {
 func (*PullRequestCreateRequest) ProtoMessage() {}
 
 func (x *PullRequestCreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[196]
+	mi := &file_banda_v1_banda_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12868,7 +12975,7 @@ func (x *PullRequestCreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCreateRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestCreateRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{196}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{198}
 }
 
 func (x *PullRequestCreateRequest) GetThreadId() string {
@@ -12922,7 +13029,7 @@ type PullRequestCreateResponse struct {
 
 func (x *PullRequestCreateResponse) Reset() {
 	*x = PullRequestCreateResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[197]
+	mi := &file_banda_v1_banda_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12934,7 +13041,7 @@ func (x *PullRequestCreateResponse) String() string {
 func (*PullRequestCreateResponse) ProtoMessage() {}
 
 func (x *PullRequestCreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[197]
+	mi := &file_banda_v1_banda_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12947,7 +13054,7 @@ func (x *PullRequestCreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCreateResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestCreateResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{197}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{199}
 }
 
 func (x *PullRequestCreateResponse) GetPullRequest() *PullRequest {
@@ -12968,7 +13075,7 @@ type PullRequestLinkRequest struct {
 
 func (x *PullRequestLinkRequest) Reset() {
 	*x = PullRequestLinkRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[198]
+	mi := &file_banda_v1_banda_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12980,7 +13087,7 @@ func (x *PullRequestLinkRequest) String() string {
 func (*PullRequestLinkRequest) ProtoMessage() {}
 
 func (x *PullRequestLinkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[198]
+	mi := &file_banda_v1_banda_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12993,7 +13100,7 @@ func (x *PullRequestLinkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestLinkRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestLinkRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{198}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{200}
 }
 
 func (x *PullRequestLinkRequest) GetThreadId() string {
@@ -13019,7 +13126,7 @@ type PullRequestLinkResponse struct {
 
 func (x *PullRequestLinkResponse) Reset() {
 	*x = PullRequestLinkResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[199]
+	mi := &file_banda_v1_banda_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13031,7 +13138,7 @@ func (x *PullRequestLinkResponse) String() string {
 func (*PullRequestLinkResponse) ProtoMessage() {}
 
 func (x *PullRequestLinkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[199]
+	mi := &file_banda_v1_banda_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13044,7 +13151,7 @@ func (x *PullRequestLinkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestLinkResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestLinkResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{199}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{201}
 }
 
 func (x *PullRequestLinkResponse) GetPullRequest() *PullRequest {
@@ -13071,7 +13178,7 @@ type PullRequestUpdateRequest struct {
 
 func (x *PullRequestUpdateRequest) Reset() {
 	*x = PullRequestUpdateRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[200]
+	mi := &file_banda_v1_banda_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13083,7 +13190,7 @@ func (x *PullRequestUpdateRequest) String() string {
 func (*PullRequestUpdateRequest) ProtoMessage() {}
 
 func (x *PullRequestUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[200]
+	mi := &file_banda_v1_banda_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13096,7 +13203,7 @@ func (x *PullRequestUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestUpdateRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{200}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{202}
 }
 
 func (x *PullRequestUpdateRequest) GetThreadId() string {
@@ -13157,7 +13264,7 @@ type PullRequestUpdateResponse struct {
 
 func (x *PullRequestUpdateResponse) Reset() {
 	*x = PullRequestUpdateResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[201]
+	mi := &file_banda_v1_banda_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13169,7 +13276,7 @@ func (x *PullRequestUpdateResponse) String() string {
 func (*PullRequestUpdateResponse) ProtoMessage() {}
 
 func (x *PullRequestUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[201]
+	mi := &file_banda_v1_banda_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13182,7 +13289,7 @@ func (x *PullRequestUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestUpdateResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{201}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{203}
 }
 
 func (x *PullRequestUpdateResponse) GetPullRequest() *PullRequest {
@@ -13203,7 +13310,7 @@ type PullRequestMergeRequest struct {
 
 func (x *PullRequestMergeRequest) Reset() {
 	*x = PullRequestMergeRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[202]
+	mi := &file_banda_v1_banda_proto_msgTypes[204]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13215,7 +13322,7 @@ func (x *PullRequestMergeRequest) String() string {
 func (*PullRequestMergeRequest) ProtoMessage() {}
 
 func (x *PullRequestMergeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[202]
+	mi := &file_banda_v1_banda_proto_msgTypes[204]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13228,7 +13335,7 @@ func (x *PullRequestMergeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestMergeRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestMergeRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{202}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{204}
 }
 
 func (x *PullRequestMergeRequest) GetThreadId() string {
@@ -13254,7 +13361,7 @@ type PullRequestMergeResponse struct {
 
 func (x *PullRequestMergeResponse) Reset() {
 	*x = PullRequestMergeResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[203]
+	mi := &file_banda_v1_banda_proto_msgTypes[205]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13266,7 +13373,7 @@ func (x *PullRequestMergeResponse) String() string {
 func (*PullRequestMergeResponse) ProtoMessage() {}
 
 func (x *PullRequestMergeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[203]
+	mi := &file_banda_v1_banda_proto_msgTypes[205]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13279,7 +13386,7 @@ func (x *PullRequestMergeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestMergeResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestMergeResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{203}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{205}
 }
 
 func (x *PullRequestMergeResponse) GetPullRequest() *PullRequest {
@@ -13301,7 +13408,7 @@ type PullRequestCommentRequest struct {
 
 func (x *PullRequestCommentRequest) Reset() {
 	*x = PullRequestCommentRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[204]
+	mi := &file_banda_v1_banda_proto_msgTypes[206]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13313,7 +13420,7 @@ func (x *PullRequestCommentRequest) String() string {
 func (*PullRequestCommentRequest) ProtoMessage() {}
 
 func (x *PullRequestCommentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[204]
+	mi := &file_banda_v1_banda_proto_msgTypes[206]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13326,7 +13433,7 @@ func (x *PullRequestCommentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCommentRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestCommentRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{204}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{206}
 }
 
 func (x *PullRequestCommentRequest) GetThreadId() string {
@@ -13359,7 +13466,7 @@ type PullRequestCommentResponse struct {
 
 func (x *PullRequestCommentResponse) Reset() {
 	*x = PullRequestCommentResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[205]
+	mi := &file_banda_v1_banda_proto_msgTypes[207]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13371,7 +13478,7 @@ func (x *PullRequestCommentResponse) String() string {
 func (*PullRequestCommentResponse) ProtoMessage() {}
 
 func (x *PullRequestCommentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[205]
+	mi := &file_banda_v1_banda_proto_msgTypes[207]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13384,7 +13491,7 @@ func (x *PullRequestCommentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestCommentResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestCommentResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{205}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{207}
 }
 
 func (x *PullRequestCommentResponse) GetPullRequest() *PullRequest {
@@ -13405,7 +13512,7 @@ type ListForgeReposRequest struct {
 
 func (x *ListForgeReposRequest) Reset() {
 	*x = ListForgeReposRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[206]
+	mi := &file_banda_v1_banda_proto_msgTypes[208]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13417,7 +13524,7 @@ func (x *ListForgeReposRequest) String() string {
 func (*ListForgeReposRequest) ProtoMessage() {}
 
 func (x *ListForgeReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[206]
+	mi := &file_banda_v1_banda_proto_msgTypes[208]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13430,7 +13537,7 @@ func (x *ListForgeReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListForgeReposRequest.ProtoReflect.Descriptor instead.
 func (*ListForgeReposRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{206}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{208}
 }
 
 func (x *ListForgeReposRequest) GetQuery() string {
@@ -13455,7 +13562,7 @@ type ListForgeReposResponse struct {
 
 func (x *ListForgeReposResponse) Reset() {
 	*x = ListForgeReposResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[207]
+	mi := &file_banda_v1_banda_proto_msgTypes[209]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13467,7 +13574,7 @@ func (x *ListForgeReposResponse) String() string {
 func (*ListForgeReposResponse) ProtoMessage() {}
 
 func (x *ListForgeReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[207]
+	mi := &file_banda_v1_banda_proto_msgTypes[209]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13480,7 +13587,7 @@ func (x *ListForgeReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListForgeReposResponse.ProtoReflect.Descriptor instead.
 func (*ListForgeReposResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{207}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{209}
 }
 
 func (x *ListForgeReposResponse) GetRepos() []*ForgeRepo {
@@ -13519,7 +13626,7 @@ type ForgeRepo struct {
 
 func (x *ForgeRepo) Reset() {
 	*x = ForgeRepo{}
-	mi := &file_banda_v1_banda_proto_msgTypes[208]
+	mi := &file_banda_v1_banda_proto_msgTypes[210]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13531,7 +13638,7 @@ func (x *ForgeRepo) String() string {
 func (*ForgeRepo) ProtoMessage() {}
 
 func (x *ForgeRepo) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[208]
+	mi := &file_banda_v1_banda_proto_msgTypes[210]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13544,7 +13651,7 @@ func (x *ForgeRepo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgeRepo.ProtoReflect.Descriptor instead.
 func (*ForgeRepo) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{208}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{210}
 }
 
 func (x *ForgeRepo) GetUrl() string {
@@ -13584,7 +13691,7 @@ type PullRequestChoicesRequest struct {
 
 func (x *PullRequestChoicesRequest) Reset() {
 	*x = PullRequestChoicesRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[209]
+	mi := &file_banda_v1_banda_proto_msgTypes[211]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13596,7 +13703,7 @@ func (x *PullRequestChoicesRequest) String() string {
 func (*PullRequestChoicesRequest) ProtoMessage() {}
 
 func (x *PullRequestChoicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[209]
+	mi := &file_banda_v1_banda_proto_msgTypes[211]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13609,7 +13716,7 @@ func (x *PullRequestChoicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestChoicesRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestChoicesRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{209}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{211}
 }
 
 func (x *PullRequestChoicesRequest) GetThreadId() string {
@@ -13631,7 +13738,7 @@ type PullRequestChoicesResponse struct {
 
 func (x *PullRequestChoicesResponse) Reset() {
 	*x = PullRequestChoicesResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[210]
+	mi := &file_banda_v1_banda_proto_msgTypes[212]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13643,7 +13750,7 @@ func (x *PullRequestChoicesResponse) String() string {
 func (*PullRequestChoicesResponse) ProtoMessage() {}
 
 func (x *PullRequestChoicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[210]
+	mi := &file_banda_v1_banda_proto_msgTypes[212]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13656,7 +13763,7 @@ func (x *PullRequestChoicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestChoicesResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestChoicesResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{210}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{212}
 }
 
 func (x *PullRequestChoicesResponse) GetReviewers() []string {
@@ -13685,7 +13792,7 @@ type PullRequestResolveRequest struct {
 
 func (x *PullRequestResolveRequest) Reset() {
 	*x = PullRequestResolveRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[211]
+	mi := &file_banda_v1_banda_proto_msgTypes[213]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13697,7 +13804,7 @@ func (x *PullRequestResolveRequest) String() string {
 func (*PullRequestResolveRequest) ProtoMessage() {}
 
 func (x *PullRequestResolveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[211]
+	mi := &file_banda_v1_banda_proto_msgTypes[213]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13710,7 +13817,7 @@ func (x *PullRequestResolveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestResolveRequest.ProtoReflect.Descriptor instead.
 func (*PullRequestResolveRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{211}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{213}
 }
 
 func (x *PullRequestResolveRequest) GetThreadId() string {
@@ -13743,7 +13850,7 @@ type PullRequestResolveResponse struct {
 
 func (x *PullRequestResolveResponse) Reset() {
 	*x = PullRequestResolveResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[212]
+	mi := &file_banda_v1_banda_proto_msgTypes[214]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13755,7 +13862,7 @@ func (x *PullRequestResolveResponse) String() string {
 func (*PullRequestResolveResponse) ProtoMessage() {}
 
 func (x *PullRequestResolveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[212]
+	mi := &file_banda_v1_banda_proto_msgTypes[214]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13768,7 +13875,7 @@ func (x *PullRequestResolveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequestResolveResponse.ProtoReflect.Descriptor instead.
 func (*PullRequestResolveResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{212}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{214}
 }
 
 func (x *PullRequestResolveResponse) GetPullRequest() *PullRequest {
@@ -13791,7 +13898,7 @@ type GitIdentity struct {
 
 func (x *GitIdentity) Reset() {
 	*x = GitIdentity{}
-	mi := &file_banda_v1_banda_proto_msgTypes[213]
+	mi := &file_banda_v1_banda_proto_msgTypes[215]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13803,7 +13910,7 @@ func (x *GitIdentity) String() string {
 func (*GitIdentity) ProtoMessage() {}
 
 func (x *GitIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[213]
+	mi := &file_banda_v1_banda_proto_msgTypes[215]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13816,7 +13923,7 @@ func (x *GitIdentity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitIdentity.ProtoReflect.Descriptor instead.
 func (*GitIdentity) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{213}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{215}
 }
 
 func (x *GitIdentity) GetName() string {
@@ -13857,7 +13964,7 @@ type SetGitIdentityRequest struct {
 
 func (x *SetGitIdentityRequest) Reset() {
 	*x = SetGitIdentityRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[214]
+	mi := &file_banda_v1_banda_proto_msgTypes[216]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13869,7 +13976,7 @@ func (x *SetGitIdentityRequest) String() string {
 func (*SetGitIdentityRequest) ProtoMessage() {}
 
 func (x *SetGitIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[214]
+	mi := &file_banda_v1_banda_proto_msgTypes[216]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13882,7 +13989,7 @@ func (x *SetGitIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitIdentityRequest.ProtoReflect.Descriptor instead.
 func (*SetGitIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{214}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{216}
 }
 
 func (x *SetGitIdentityRequest) GetName() string {
@@ -13907,7 +14014,7 @@ type SetGitIdentityResponse struct {
 
 func (x *SetGitIdentityResponse) Reset() {
 	*x = SetGitIdentityResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[215]
+	mi := &file_banda_v1_banda_proto_msgTypes[217]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13919,7 +14026,7 @@ func (x *SetGitIdentityResponse) String() string {
 func (*SetGitIdentityResponse) ProtoMessage() {}
 
 func (x *SetGitIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[215]
+	mi := &file_banda_v1_banda_proto_msgTypes[217]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13932,7 +14039,7 @@ func (x *SetGitIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitIdentityResponse.ProtoReflect.Descriptor instead.
 func (*SetGitIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{215}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{217}
 }
 
 // Empty (unspecified) uses Banda's default.
@@ -13947,7 +14054,7 @@ type ThreadDefaults struct {
 
 func (x *ThreadDefaults) Reset() {
 	*x = ThreadDefaults{}
-	mi := &file_banda_v1_banda_proto_msgTypes[216]
+	mi := &file_banda_v1_banda_proto_msgTypes[218]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13959,7 +14066,7 @@ func (x *ThreadDefaults) String() string {
 func (*ThreadDefaults) ProtoMessage() {}
 
 func (x *ThreadDefaults) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[216]
+	mi := &file_banda_v1_banda_proto_msgTypes[218]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13972,7 +14079,7 @@ func (x *ThreadDefaults) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadDefaults.ProtoReflect.Descriptor instead.
 func (*ThreadDefaults) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{216}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{218}
 }
 
 func (x *ThreadDefaults) GetModel() string {
@@ -14005,7 +14112,7 @@ type SetThreadDefaultsRequest struct {
 
 func (x *SetThreadDefaultsRequest) Reset() {
 	*x = SetThreadDefaultsRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[217]
+	mi := &file_banda_v1_banda_proto_msgTypes[219]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14017,7 +14124,7 @@ func (x *SetThreadDefaultsRequest) String() string {
 func (*SetThreadDefaultsRequest) ProtoMessage() {}
 
 func (x *SetThreadDefaultsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[217]
+	mi := &file_banda_v1_banda_proto_msgTypes[219]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14030,7 +14137,7 @@ func (x *SetThreadDefaultsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetThreadDefaultsRequest.ProtoReflect.Descriptor instead.
 func (*SetThreadDefaultsRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{217}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{219}
 }
 
 func (x *SetThreadDefaultsRequest) GetDefaults() *ThreadDefaults {
@@ -14048,7 +14155,7 @@ type SetThreadDefaultsResponse struct {
 
 func (x *SetThreadDefaultsResponse) Reset() {
 	*x = SetThreadDefaultsResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[218]
+	mi := &file_banda_v1_banda_proto_msgTypes[220]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14060,7 +14167,7 @@ func (x *SetThreadDefaultsResponse) String() string {
 func (*SetThreadDefaultsResponse) ProtoMessage() {}
 
 func (x *SetThreadDefaultsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[218]
+	mi := &file_banda_v1_banda_proto_msgTypes[220]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14073,7 +14180,7 @@ func (x *SetThreadDefaultsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetThreadDefaultsResponse.ProtoReflect.Descriptor instead.
 func (*SetThreadDefaultsResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{218}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{220}
 }
 
 type RepoAdded struct {
@@ -14086,7 +14193,7 @@ type RepoAdded struct {
 
 func (x *RepoAdded) Reset() {
 	*x = RepoAdded{}
-	mi := &file_banda_v1_banda_proto_msgTypes[219]
+	mi := &file_banda_v1_banda_proto_msgTypes[221]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14098,7 +14205,7 @@ func (x *RepoAdded) String() string {
 func (*RepoAdded) ProtoMessage() {}
 
 func (x *RepoAdded) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[219]
+	mi := &file_banda_v1_banda_proto_msgTypes[221]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14111,7 +14218,7 @@ func (x *RepoAdded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepoAdded.ProtoReflect.Descriptor instead.
 func (*RepoAdded) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{219}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{221}
 }
 
 func (x *RepoAdded) GetRepoUrl() string {
@@ -14137,7 +14244,7 @@ type ThreadRenamed struct {
 
 func (x *ThreadRenamed) Reset() {
 	*x = ThreadRenamed{}
-	mi := &file_banda_v1_banda_proto_msgTypes[220]
+	mi := &file_banda_v1_banda_proto_msgTypes[222]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14149,7 +14256,7 @@ func (x *ThreadRenamed) String() string {
 func (*ThreadRenamed) ProtoMessage() {}
 
 func (x *ThreadRenamed) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[220]
+	mi := &file_banda_v1_banda_proto_msgTypes[222]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14162,7 +14269,7 @@ func (x *ThreadRenamed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadRenamed.ProtoReflect.Descriptor instead.
 func (*ThreadRenamed) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{220}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{222}
 }
 
 func (x *ThreadRenamed) GetTitle() string {
@@ -14182,7 +14289,7 @@ type RenameThreadRequest struct {
 
 func (x *RenameThreadRequest) Reset() {
 	*x = RenameThreadRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[221]
+	mi := &file_banda_v1_banda_proto_msgTypes[223]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14194,7 +14301,7 @@ func (x *RenameThreadRequest) String() string {
 func (*RenameThreadRequest) ProtoMessage() {}
 
 func (x *RenameThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[221]
+	mi := &file_banda_v1_banda_proto_msgTypes[223]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14207,7 +14314,7 @@ func (x *RenameThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameThreadRequest.ProtoReflect.Descriptor instead.
 func (*RenameThreadRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{221}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{223}
 }
 
 func (x *RenameThreadRequest) GetThreadId() string {
@@ -14232,7 +14339,7 @@ type RenameThreadResponse struct {
 
 func (x *RenameThreadResponse) Reset() {
 	*x = RenameThreadResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[222]
+	mi := &file_banda_v1_banda_proto_msgTypes[224]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14244,7 +14351,7 @@ func (x *RenameThreadResponse) String() string {
 func (*RenameThreadResponse) ProtoMessage() {}
 
 func (x *RenameThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[222]
+	mi := &file_banda_v1_banda_proto_msgTypes[224]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14257,7 +14364,7 @@ func (x *RenameThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameThreadResponse.ProtoReflect.Descriptor instead.
 func (*RenameThreadResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{222}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{224}
 }
 
 type AddRepositoryRequest struct {
@@ -14273,7 +14380,7 @@ type AddRepositoryRequest struct {
 
 func (x *AddRepositoryRequest) Reset() {
 	*x = AddRepositoryRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[223]
+	mi := &file_banda_v1_banda_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14285,7 +14392,7 @@ func (x *AddRepositoryRequest) String() string {
 func (*AddRepositoryRequest) ProtoMessage() {}
 
 func (x *AddRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[223]
+	mi := &file_banda_v1_banda_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14298,7 +14405,7 @@ func (x *AddRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*AddRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{223}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *AddRepositoryRequest) GetThreadId() string {
@@ -14330,7 +14437,7 @@ type AddRepositoryResponse struct {
 
 func (x *AddRepositoryResponse) Reset() {
 	*x = AddRepositoryResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[224]
+	mi := &file_banda_v1_banda_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14342,7 +14449,7 @@ func (x *AddRepositoryResponse) String() string {
 func (*AddRepositoryResponse) ProtoMessage() {}
 
 func (x *AddRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[224]
+	mi := &file_banda_v1_banda_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14355,7 +14462,7 @@ func (x *AddRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*AddRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{224}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{226}
 }
 
 type IdTokensChanged struct {
@@ -14366,7 +14473,7 @@ type IdTokensChanged struct {
 
 func (x *IdTokensChanged) Reset() {
 	*x = IdTokensChanged{}
-	mi := &file_banda_v1_banda_proto_msgTypes[225]
+	mi := &file_banda_v1_banda_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14378,7 +14485,7 @@ func (x *IdTokensChanged) String() string {
 func (*IdTokensChanged) ProtoMessage() {}
 
 func (x *IdTokensChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[225]
+	mi := &file_banda_v1_banda_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14391,7 +14498,7 @@ func (x *IdTokensChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdTokensChanged.ProtoReflect.Descriptor instead.
 func (*IdTokensChanged) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{225}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{227}
 }
 
 type IdTokensRequest struct {
@@ -14404,7 +14511,7 @@ type IdTokensRequest struct {
 
 func (x *IdTokensRequest) Reset() {
 	*x = IdTokensRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[226]
+	mi := &file_banda_v1_banda_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14416,7 +14523,7 @@ func (x *IdTokensRequest) String() string {
 func (*IdTokensRequest) ProtoMessage() {}
 
 func (x *IdTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[226]
+	mi := &file_banda_v1_banda_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14429,7 +14536,7 @@ func (x *IdTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdTokensRequest.ProtoReflect.Descriptor instead.
 func (*IdTokensRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{226}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{228}
 }
 
 func (x *IdTokensRequest) GetThreadId() string {
@@ -14458,7 +14565,7 @@ type IdTokensResponse struct {
 
 func (x *IdTokensResponse) Reset() {
 	*x = IdTokensResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[227]
+	mi := &file_banda_v1_banda_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14470,7 +14577,7 @@ func (x *IdTokensResponse) String() string {
 func (*IdTokensResponse) ProtoMessage() {}
 
 func (x *IdTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[227]
+	mi := &file_banda_v1_banda_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14483,7 +14590,7 @@ func (x *IdTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdTokensResponse.ProtoReflect.Descriptor instead.
 func (*IdTokensResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{227}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *IdTokensResponse) GetTokens() []*IdToken {
@@ -14514,7 +14621,7 @@ type IdToken struct {
 
 func (x *IdToken) Reset() {
 	*x = IdToken{}
-	mi := &file_banda_v1_banda_proto_msgTypes[228]
+	mi := &file_banda_v1_banda_proto_msgTypes[230]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14526,7 +14633,7 @@ func (x *IdToken) String() string {
 func (*IdToken) ProtoMessage() {}
 
 func (x *IdToken) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[228]
+	mi := &file_banda_v1_banda_proto_msgTypes[230]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14539,7 +14646,7 @@ func (x *IdToken) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdToken.ProtoReflect.Descriptor instead.
 func (*IdToken) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{228}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{230}
 }
 
 func (x *IdToken) GetAudience() string {
@@ -14578,7 +14685,7 @@ type GetWorkloadIdentityRequest struct {
 
 func (x *GetWorkloadIdentityRequest) Reset() {
 	*x = GetWorkloadIdentityRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[229]
+	mi := &file_banda_v1_banda_proto_msgTypes[231]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14590,7 +14697,7 @@ func (x *GetWorkloadIdentityRequest) String() string {
 func (*GetWorkloadIdentityRequest) ProtoMessage() {}
 
 func (x *GetWorkloadIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[229]
+	mi := &file_banda_v1_banda_proto_msgTypes[231]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14603,7 +14710,7 @@ func (x *GetWorkloadIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkloadIdentityRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkloadIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{229}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{231}
 }
 
 type GetWorkloadIdentityResponse struct {
@@ -14623,7 +14730,7 @@ type GetWorkloadIdentityResponse struct {
 
 func (x *GetWorkloadIdentityResponse) Reset() {
 	*x = GetWorkloadIdentityResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[230]
+	mi := &file_banda_v1_banda_proto_msgTypes[232]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14635,7 +14742,7 @@ func (x *GetWorkloadIdentityResponse) String() string {
 func (*GetWorkloadIdentityResponse) ProtoMessage() {}
 
 func (x *GetWorkloadIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[230]
+	mi := &file_banda_v1_banda_proto_msgTypes[232]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14648,7 +14755,7 @@ func (x *GetWorkloadIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkloadIdentityResponse.ProtoReflect.Descriptor instead.
 func (*GetWorkloadIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{230}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{232}
 }
 
 func (x *GetWorkloadIdentityResponse) GetIssuer() string {
@@ -14699,7 +14806,7 @@ type IdTokenAudience struct {
 
 func (x *IdTokenAudience) Reset() {
 	*x = IdTokenAudience{}
-	mi := &file_banda_v1_banda_proto_msgTypes[231]
+	mi := &file_banda_v1_banda_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14711,7 +14818,7 @@ func (x *IdTokenAudience) String() string {
 func (*IdTokenAudience) ProtoMessage() {}
 
 func (x *IdTokenAudience) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[231]
+	mi := &file_banda_v1_banda_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14724,7 +14831,7 @@ func (x *IdTokenAudience) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdTokenAudience.ProtoReflect.Descriptor instead.
 func (*IdTokenAudience) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{231}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{233}
 }
 
 func (x *IdTokenAudience) GetAudience() string {
@@ -14764,7 +14871,7 @@ type AddIdTokenAudienceRequest struct {
 
 func (x *AddIdTokenAudienceRequest) Reset() {
 	*x = AddIdTokenAudienceRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[232]
+	mi := &file_banda_v1_banda_proto_msgTypes[234]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14776,7 +14883,7 @@ func (x *AddIdTokenAudienceRequest) String() string {
 func (*AddIdTokenAudienceRequest) ProtoMessage() {}
 
 func (x *AddIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[232]
+	mi := &file_banda_v1_banda_proto_msgTypes[234]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14789,7 +14896,7 @@ func (x *AddIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddIdTokenAudienceRequest.ProtoReflect.Descriptor instead.
 func (*AddIdTokenAudienceRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{232}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{234}
 }
 
 func (x *AddIdTokenAudienceRequest) GetAudience() string {
@@ -14807,7 +14914,7 @@ type AddIdTokenAudienceResponse struct {
 
 func (x *AddIdTokenAudienceResponse) Reset() {
 	*x = AddIdTokenAudienceResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[233]
+	mi := &file_banda_v1_banda_proto_msgTypes[235]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14819,7 +14926,7 @@ func (x *AddIdTokenAudienceResponse) String() string {
 func (*AddIdTokenAudienceResponse) ProtoMessage() {}
 
 func (x *AddIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[233]
+	mi := &file_banda_v1_banda_proto_msgTypes[235]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14832,7 +14939,7 @@ func (x *AddIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddIdTokenAudienceResponse.ProtoReflect.Descriptor instead.
 func (*AddIdTokenAudienceResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{233}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{235}
 }
 
 type RemoveIdTokenAudienceRequest struct {
@@ -14844,7 +14951,7 @@ type RemoveIdTokenAudienceRequest struct {
 
 func (x *RemoveIdTokenAudienceRequest) Reset() {
 	*x = RemoveIdTokenAudienceRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[234]
+	mi := &file_banda_v1_banda_proto_msgTypes[236]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14856,7 +14963,7 @@ func (x *RemoveIdTokenAudienceRequest) String() string {
 func (*RemoveIdTokenAudienceRequest) ProtoMessage() {}
 
 func (x *RemoveIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[234]
+	mi := &file_banda_v1_banda_proto_msgTypes[236]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14869,7 +14976,7 @@ func (x *RemoveIdTokenAudienceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveIdTokenAudienceRequest.ProtoReflect.Descriptor instead.
 func (*RemoveIdTokenAudienceRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{234}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{236}
 }
 
 func (x *RemoveIdTokenAudienceRequest) GetAudience() string {
@@ -14887,7 +14994,7 @@ type RemoveIdTokenAudienceResponse struct {
 
 func (x *RemoveIdTokenAudienceResponse) Reset() {
 	*x = RemoveIdTokenAudienceResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[235]
+	mi := &file_banda_v1_banda_proto_msgTypes[237]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14899,7 +15006,7 @@ func (x *RemoveIdTokenAudienceResponse) String() string {
 func (*RemoveIdTokenAudienceResponse) ProtoMessage() {}
 
 func (x *RemoveIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[235]
+	mi := &file_banda_v1_banda_proto_msgTypes[237]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14912,7 +15019,7 @@ func (x *RemoveIdTokenAudienceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveIdTokenAudienceResponse.ProtoReflect.Descriptor instead.
 func (*RemoveIdTokenAudienceResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{235}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{237}
 }
 
 type GetGitHubRequest struct {
@@ -14923,7 +15030,7 @@ type GetGitHubRequest struct {
 
 func (x *GetGitHubRequest) Reset() {
 	*x = GetGitHubRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[236]
+	mi := &file_banda_v1_banda_proto_msgTypes[238]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14935,7 +15042,7 @@ func (x *GetGitHubRequest) String() string {
 func (*GetGitHubRequest) ProtoMessage() {}
 
 func (x *GetGitHubRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[236]
+	mi := &file_banda_v1_banda_proto_msgTypes[238]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14948,7 +15055,7 @@ func (x *GetGitHubRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGitHubRequest.ProtoReflect.Descriptor instead.
 func (*GetGitHubRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{236}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{238}
 }
 
 type GetGitHubResponse struct {
@@ -14971,7 +15078,7 @@ type GetGitHubResponse struct {
 
 func (x *GetGitHubResponse) Reset() {
 	*x = GetGitHubResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[237]
+	mi := &file_banda_v1_banda_proto_msgTypes[239]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14983,7 +15090,7 @@ func (x *GetGitHubResponse) String() string {
 func (*GetGitHubResponse) ProtoMessage() {}
 
 func (x *GetGitHubResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[237]
+	mi := &file_banda_v1_banda_proto_msgTypes[239]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14996,7 +15103,7 @@ func (x *GetGitHubResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGitHubResponse.ProtoReflect.Descriptor instead.
 func (*GetGitHubResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{237}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{239}
 }
 
 func (x *GetGitHubResponse) GetApp() *GitHubApp {
@@ -15060,7 +15167,7 @@ type GitHubAppChange struct {
 
 func (x *GitHubAppChange) Reset() {
 	*x = GitHubAppChange{}
-	mi := &file_banda_v1_banda_proto_msgTypes[238]
+	mi := &file_banda_v1_banda_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15072,7 +15179,7 @@ func (x *GitHubAppChange) String() string {
 func (*GitHubAppChange) ProtoMessage() {}
 
 func (x *GitHubAppChange) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[238]
+	mi := &file_banda_v1_banda_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15085,7 +15192,7 @@ func (x *GitHubAppChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppChange.ProtoReflect.Descriptor instead.
 func (*GitHubAppChange) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{238}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *GitHubAppChange) GetAction() string {
@@ -15157,7 +15264,7 @@ type GitHubAppRefusal struct {
 
 func (x *GitHubAppRefusal) Reset() {
 	*x = GitHubAppRefusal{}
-	mi := &file_banda_v1_banda_proto_msgTypes[239]
+	mi := &file_banda_v1_banda_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15169,7 +15276,7 @@ func (x *GitHubAppRefusal) String() string {
 func (*GitHubAppRefusal) ProtoMessage() {}
 
 func (x *GitHubAppRefusal) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[239]
+	mi := &file_banda_v1_banda_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15182,7 +15289,7 @@ func (x *GitHubAppRefusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppRefusal.ProtoReflect.Descriptor instead.
 func (*GitHubAppRefusal) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{239}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *GitHubAppRefusal) GetReason() string {
@@ -15228,7 +15335,7 @@ type GitHubApp struct {
 
 func (x *GitHubApp) Reset() {
 	*x = GitHubApp{}
-	mi := &file_banda_v1_banda_proto_msgTypes[240]
+	mi := &file_banda_v1_banda_proto_msgTypes[242]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15240,7 +15347,7 @@ func (x *GitHubApp) String() string {
 func (*GitHubApp) ProtoMessage() {}
 
 func (x *GitHubApp) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[240]
+	mi := &file_banda_v1_banda_proto_msgTypes[242]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15253,7 +15360,7 @@ func (x *GitHubApp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubApp.ProtoReflect.Descriptor instead.
 func (*GitHubApp) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{240}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{242}
 }
 
 func (x *GitHubApp) GetHost() string {
@@ -15336,7 +15443,7 @@ type ForgeConnection struct {
 
 func (x *ForgeConnection) Reset() {
 	*x = ForgeConnection{}
-	mi := &file_banda_v1_banda_proto_msgTypes[241]
+	mi := &file_banda_v1_banda_proto_msgTypes[243]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15348,7 +15455,7 @@ func (x *ForgeConnection) String() string {
 func (*ForgeConnection) ProtoMessage() {}
 
 func (x *ForgeConnection) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[241]
+	mi := &file_banda_v1_banda_proto_msgTypes[243]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15361,7 +15468,7 @@ func (x *ForgeConnection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgeConnection.ProtoReflect.Descriptor instead.
 func (*ForgeConnection) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{241}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{243}
 }
 
 func (x *ForgeConnection) GetHost() string {
@@ -15421,7 +15528,7 @@ type GitHubAppManifestRequest struct {
 
 func (x *GitHubAppManifestRequest) Reset() {
 	*x = GitHubAppManifestRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[242]
+	mi := &file_banda_v1_banda_proto_msgTypes[244]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15433,7 +15540,7 @@ func (x *GitHubAppManifestRequest) String() string {
 func (*GitHubAppManifestRequest) ProtoMessage() {}
 
 func (x *GitHubAppManifestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[242]
+	mi := &file_banda_v1_banda_proto_msgTypes[244]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15446,7 +15553,7 @@ func (x *GitHubAppManifestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppManifestRequest.ProtoReflect.Descriptor instead.
 func (*GitHubAppManifestRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{242}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{244}
 }
 
 func (x *GitHubAppManifestRequest) GetHost() string {
@@ -15481,7 +15588,7 @@ type GitHubAppManifestResponse struct {
 
 func (x *GitHubAppManifestResponse) Reset() {
 	*x = GitHubAppManifestResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[243]
+	mi := &file_banda_v1_banda_proto_msgTypes[245]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15493,7 +15600,7 @@ func (x *GitHubAppManifestResponse) String() string {
 func (*GitHubAppManifestResponse) ProtoMessage() {}
 
 func (x *GitHubAppManifestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[243]
+	mi := &file_banda_v1_banda_proto_msgTypes[245]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15506,7 +15613,7 @@ func (x *GitHubAppManifestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubAppManifestResponse.ProtoReflect.Descriptor instead.
 func (*GitHubAppManifestResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{243}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{245}
 }
 
 func (x *GitHubAppManifestResponse) GetUrl() string {
@@ -15533,7 +15640,7 @@ type ListGitHubInstallationsRequest struct {
 
 func (x *ListGitHubInstallationsRequest) Reset() {
 	*x = ListGitHubInstallationsRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[244]
+	mi := &file_banda_v1_banda_proto_msgTypes[246]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15545,7 +15652,7 @@ func (x *ListGitHubInstallationsRequest) String() string {
 func (*ListGitHubInstallationsRequest) ProtoMessage() {}
 
 func (x *ListGitHubInstallationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[244]
+	mi := &file_banda_v1_banda_proto_msgTypes[246]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15558,7 +15665,7 @@ func (x *ListGitHubInstallationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGitHubInstallationsRequest.ProtoReflect.Descriptor instead.
 func (*ListGitHubInstallationsRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{244}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{246}
 }
 
 func (x *ListGitHubInstallationsRequest) GetFresh() bool {
@@ -15577,7 +15684,7 @@ type ListGitHubInstallationsResponse struct {
 
 func (x *ListGitHubInstallationsResponse) Reset() {
 	*x = ListGitHubInstallationsResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[245]
+	mi := &file_banda_v1_banda_proto_msgTypes[247]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15589,7 +15696,7 @@ func (x *ListGitHubInstallationsResponse) String() string {
 func (*ListGitHubInstallationsResponse) ProtoMessage() {}
 
 func (x *ListGitHubInstallationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[245]
+	mi := &file_banda_v1_banda_proto_msgTypes[247]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15602,7 +15709,7 @@ func (x *ListGitHubInstallationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGitHubInstallationsResponse.ProtoReflect.Descriptor instead.
 func (*ListGitHubInstallationsResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{245}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{247}
 }
 
 func (x *ListGitHubInstallationsResponse) GetInstallations() []*GitHubInstallation {
@@ -15626,7 +15733,7 @@ type GitHubInstallation struct {
 
 func (x *GitHubInstallation) Reset() {
 	*x = GitHubInstallation{}
-	mi := &file_banda_v1_banda_proto_msgTypes[246]
+	mi := &file_banda_v1_banda_proto_msgTypes[248]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15638,7 +15745,7 @@ func (x *GitHubInstallation) String() string {
 func (*GitHubInstallation) ProtoMessage() {}
 
 func (x *GitHubInstallation) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[246]
+	mi := &file_banda_v1_banda_proto_msgTypes[248]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15651,7 +15758,7 @@ func (x *GitHubInstallation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubInstallation.ProtoReflect.Descriptor instead.
 func (*GitHubInstallation) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{246}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{248}
 }
 
 func (x *GitHubInstallation) GetAccount() string {
@@ -15697,7 +15804,7 @@ type RemoveGitHubAppRequest struct {
 
 func (x *RemoveGitHubAppRequest) Reset() {
 	*x = RemoveGitHubAppRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[247]
+	mi := &file_banda_v1_banda_proto_msgTypes[249]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15709,7 +15816,7 @@ func (x *RemoveGitHubAppRequest) String() string {
 func (*RemoveGitHubAppRequest) ProtoMessage() {}
 
 func (x *RemoveGitHubAppRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[247]
+	mi := &file_banda_v1_banda_proto_msgTypes[249]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15722,7 +15829,7 @@ func (x *RemoveGitHubAppRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveGitHubAppRequest.ProtoReflect.Descriptor instead.
 func (*RemoveGitHubAppRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{247}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{249}
 }
 
 type RemoveGitHubAppResponse struct {
@@ -15733,7 +15840,7 @@ type RemoveGitHubAppResponse struct {
 
 func (x *RemoveGitHubAppResponse) Reset() {
 	*x = RemoveGitHubAppResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[248]
+	mi := &file_banda_v1_banda_proto_msgTypes[250]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15745,7 +15852,7 @@ func (x *RemoveGitHubAppResponse) String() string {
 func (*RemoveGitHubAppResponse) ProtoMessage() {}
 
 func (x *RemoveGitHubAppResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[248]
+	mi := &file_banda_v1_banda_proto_msgTypes[250]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15758,7 +15865,7 @@ func (x *RemoveGitHubAppResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveGitHubAppResponse.ProtoReflect.Descriptor instead.
 func (*RemoveGitHubAppResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{248}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{250}
 }
 
 type DisconnectGitHubRequest struct {
@@ -15769,7 +15876,7 @@ type DisconnectGitHubRequest struct {
 
 func (x *DisconnectGitHubRequest) Reset() {
 	*x = DisconnectGitHubRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[249]
+	mi := &file_banda_v1_banda_proto_msgTypes[251]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15781,7 +15888,7 @@ func (x *DisconnectGitHubRequest) String() string {
 func (*DisconnectGitHubRequest) ProtoMessage() {}
 
 func (x *DisconnectGitHubRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[249]
+	mi := &file_banda_v1_banda_proto_msgTypes[251]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15794,7 +15901,7 @@ func (x *DisconnectGitHubRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectGitHubRequest.ProtoReflect.Descriptor instead.
 func (*DisconnectGitHubRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{249}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{251}
 }
 
 type DisconnectGitHubResponse struct {
@@ -15805,7 +15912,7 @@ type DisconnectGitHubResponse struct {
 
 func (x *DisconnectGitHubResponse) Reset() {
 	*x = DisconnectGitHubResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[250]
+	mi := &file_banda_v1_banda_proto_msgTypes[252]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15817,7 +15924,7 @@ func (x *DisconnectGitHubResponse) String() string {
 func (*DisconnectGitHubResponse) ProtoMessage() {}
 
 func (x *DisconnectGitHubResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[250]
+	mi := &file_banda_v1_banda_proto_msgTypes[252]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15830,7 +15937,7 @@ func (x *DisconnectGitHubResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectGitHubResponse.ProtoReflect.Descriptor instead.
 func (*DisconnectGitHubResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{250}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{252}
 }
 
 type GitCredentialRequest struct {
@@ -15843,7 +15950,7 @@ type GitCredentialRequest struct {
 
 func (x *GitCredentialRequest) Reset() {
 	*x = GitCredentialRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[251]
+	mi := &file_banda_v1_banda_proto_msgTypes[253]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15855,7 +15962,7 @@ func (x *GitCredentialRequest) String() string {
 func (*GitCredentialRequest) ProtoMessage() {}
 
 func (x *GitCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[251]
+	mi := &file_banda_v1_banda_proto_msgTypes[253]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15868,7 +15975,7 @@ func (x *GitCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitCredentialRequest.ProtoReflect.Descriptor instead.
 func (*GitCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{251}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{253}
 }
 
 func (x *GitCredentialRequest) GetThreadId() string {
@@ -15896,7 +16003,7 @@ type GitCredentialResponse struct {
 
 func (x *GitCredentialResponse) Reset() {
 	*x = GitCredentialResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[252]
+	mi := &file_banda_v1_banda_proto_msgTypes[254]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15908,7 +16015,7 @@ func (x *GitCredentialResponse) String() string {
 func (*GitCredentialResponse) ProtoMessage() {}
 
 func (x *GitCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[252]
+	mi := &file_banda_v1_banda_proto_msgTypes[254]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15921,7 +16028,7 @@ func (x *GitCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitCredentialResponse.ProtoReflect.Descriptor instead.
 func (*GitCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{252}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{254}
 }
 
 func (x *GitCredentialResponse) GetUsername() string {
@@ -15953,7 +16060,7 @@ type GetGitLabRequest struct {
 
 func (x *GetGitLabRequest) Reset() {
 	*x = GetGitLabRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[253]
+	mi := &file_banda_v1_banda_proto_msgTypes[255]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15965,7 +16072,7 @@ func (x *GetGitLabRequest) String() string {
 func (*GetGitLabRequest) ProtoMessage() {}
 
 func (x *GetGitLabRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[253]
+	mi := &file_banda_v1_banda_proto_msgTypes[255]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15978,7 +16085,7 @@ func (x *GetGitLabRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGitLabRequest.ProtoReflect.Descriptor instead.
 func (*GetGitLabRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{253}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{255}
 }
 
 type GetGitLabResponse struct {
@@ -15997,7 +16104,7 @@ type GetGitLabResponse struct {
 
 func (x *GetGitLabResponse) Reset() {
 	*x = GetGitLabResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[254]
+	mi := &file_banda_v1_banda_proto_msgTypes[256]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16009,7 +16116,7 @@ func (x *GetGitLabResponse) String() string {
 func (*GetGitLabResponse) ProtoMessage() {}
 
 func (x *GetGitLabResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[254]
+	mi := &file_banda_v1_banda_proto_msgTypes[256]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16022,7 +16129,7 @@ func (x *GetGitLabResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGitLabResponse.ProtoReflect.Descriptor instead.
 func (*GetGitLabResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{254}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{256}
 }
 
 func (x *GetGitLabResponse) GetHosts() []*GitLabHost {
@@ -16070,7 +16177,7 @@ type GitLabHost struct {
 
 func (x *GitLabHost) Reset() {
 	*x = GitLabHost{}
-	mi := &file_banda_v1_banda_proto_msgTypes[255]
+	mi := &file_banda_v1_banda_proto_msgTypes[257]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16082,7 +16189,7 @@ func (x *GitLabHost) String() string {
 func (*GitLabHost) ProtoMessage() {}
 
 func (x *GitLabHost) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[255]
+	mi := &file_banda_v1_banda_proto_msgTypes[257]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16095,7 +16202,7 @@ func (x *GitLabHost) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitLabHost.ProtoReflect.Descriptor instead.
 func (*GitLabHost) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{255}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{257}
 }
 
 func (x *GitLabHost) GetHost() string {
@@ -16156,7 +16263,7 @@ type GitLabAppChange struct {
 
 func (x *GitLabAppChange) Reset() {
 	*x = GitLabAppChange{}
-	mi := &file_banda_v1_banda_proto_msgTypes[256]
+	mi := &file_banda_v1_banda_proto_msgTypes[258]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16168,7 +16275,7 @@ func (x *GitLabAppChange) String() string {
 func (*GitLabAppChange) ProtoMessage() {}
 
 func (x *GitLabAppChange) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[256]
+	mi := &file_banda_v1_banda_proto_msgTypes[258]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16181,7 +16288,7 @@ func (x *GitLabAppChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitLabAppChange.ProtoReflect.Descriptor instead.
 func (*GitLabAppChange) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{256}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{258}
 }
 
 func (x *GitLabAppChange) GetAction() string {
@@ -16237,7 +16344,7 @@ type GitLabApp struct {
 
 func (x *GitLabApp) Reset() {
 	*x = GitLabApp{}
-	mi := &file_banda_v1_banda_proto_msgTypes[257]
+	mi := &file_banda_v1_banda_proto_msgTypes[259]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16249,7 +16356,7 @@ func (x *GitLabApp) String() string {
 func (*GitLabApp) ProtoMessage() {}
 
 func (x *GitLabApp) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[257]
+	mi := &file_banda_v1_banda_proto_msgTypes[259]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16262,7 +16369,7 @@ func (x *GitLabApp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitLabApp.ProtoReflect.Descriptor instead.
 func (*GitLabApp) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{257}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{259}
 }
 
 func (x *GitLabApp) GetApplicationId() string {
@@ -16314,7 +16421,7 @@ type SetGitLabAppRequest struct {
 
 func (x *SetGitLabAppRequest) Reset() {
 	*x = SetGitLabAppRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[258]
+	mi := &file_banda_v1_banda_proto_msgTypes[260]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16326,7 +16433,7 @@ func (x *SetGitLabAppRequest) String() string {
 func (*SetGitLabAppRequest) ProtoMessage() {}
 
 func (x *SetGitLabAppRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[258]
+	mi := &file_banda_v1_banda_proto_msgTypes[260]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16339,7 +16446,7 @@ func (x *SetGitLabAppRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitLabAppRequest.ProtoReflect.Descriptor instead.
 func (*SetGitLabAppRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{258}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{260}
 }
 
 func (x *SetGitLabAppRequest) GetHost() string {
@@ -16378,7 +16485,7 @@ type SetGitLabAppResponse struct {
 
 func (x *SetGitLabAppResponse) Reset() {
 	*x = SetGitLabAppResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[259]
+	mi := &file_banda_v1_banda_proto_msgTypes[261]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16390,7 +16497,7 @@ func (x *SetGitLabAppResponse) String() string {
 func (*SetGitLabAppResponse) ProtoMessage() {}
 
 func (x *SetGitLabAppResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[259]
+	mi := &file_banda_v1_banda_proto_msgTypes[261]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16403,7 +16510,7 @@ func (x *SetGitLabAppResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitLabAppResponse.ProtoReflect.Descriptor instead.
 func (*SetGitLabAppResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{259}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{261}
 }
 
 type RemoveGitLabAppRequest struct {
@@ -16415,7 +16522,7 @@ type RemoveGitLabAppRequest struct {
 
 func (x *RemoveGitLabAppRequest) Reset() {
 	*x = RemoveGitLabAppRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[260]
+	mi := &file_banda_v1_banda_proto_msgTypes[262]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16427,7 +16534,7 @@ func (x *RemoveGitLabAppRequest) String() string {
 func (*RemoveGitLabAppRequest) ProtoMessage() {}
 
 func (x *RemoveGitLabAppRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[260]
+	mi := &file_banda_v1_banda_proto_msgTypes[262]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16440,7 +16547,7 @@ func (x *RemoveGitLabAppRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveGitLabAppRequest.ProtoReflect.Descriptor instead.
 func (*RemoveGitLabAppRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{260}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{262}
 }
 
 func (x *RemoveGitLabAppRequest) GetHost() string {
@@ -16458,7 +16565,7 @@ type RemoveGitLabAppResponse struct {
 
 func (x *RemoveGitLabAppResponse) Reset() {
 	*x = RemoveGitLabAppResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[261]
+	mi := &file_banda_v1_banda_proto_msgTypes[263]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16470,7 +16577,7 @@ func (x *RemoveGitLabAppResponse) String() string {
 func (*RemoveGitLabAppResponse) ProtoMessage() {}
 
 func (x *RemoveGitLabAppResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[261]
+	mi := &file_banda_v1_banda_proto_msgTypes[263]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16483,7 +16590,7 @@ func (x *RemoveGitLabAppResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveGitLabAppResponse.ProtoReflect.Descriptor instead.
 func (*RemoveGitLabAppResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{261}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{263}
 }
 
 type DisconnectGitLabRequest struct {
@@ -16495,7 +16602,7 @@ type DisconnectGitLabRequest struct {
 
 func (x *DisconnectGitLabRequest) Reset() {
 	*x = DisconnectGitLabRequest{}
-	mi := &file_banda_v1_banda_proto_msgTypes[262]
+	mi := &file_banda_v1_banda_proto_msgTypes[264]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16507,7 +16614,7 @@ func (x *DisconnectGitLabRequest) String() string {
 func (*DisconnectGitLabRequest) ProtoMessage() {}
 
 func (x *DisconnectGitLabRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[262]
+	mi := &file_banda_v1_banda_proto_msgTypes[264]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16520,7 +16627,7 @@ func (x *DisconnectGitLabRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectGitLabRequest.ProtoReflect.Descriptor instead.
 func (*DisconnectGitLabRequest) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{262}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{264}
 }
 
 func (x *DisconnectGitLabRequest) GetHost() string {
@@ -16538,7 +16645,7 @@ type DisconnectGitLabResponse struct {
 
 func (x *DisconnectGitLabResponse) Reset() {
 	*x = DisconnectGitLabResponse{}
-	mi := &file_banda_v1_banda_proto_msgTypes[263]
+	mi := &file_banda_v1_banda_proto_msgTypes[265]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16550,7 +16657,7 @@ func (x *DisconnectGitLabResponse) String() string {
 func (*DisconnectGitLabResponse) ProtoMessage() {}
 
 func (x *DisconnectGitLabResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_banda_v1_banda_proto_msgTypes[263]
+	mi := &file_banda_v1_banda_proto_msgTypes[265]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16563,14 +16670,14 @@ func (x *DisconnectGitLabResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectGitLabResponse.ProtoReflect.Descriptor instead.
 func (*DisconnectGitLabResponse) Descriptor() ([]byte, []int) {
-	return file_banda_v1_banda_proto_rawDescGZIP(), []int{263}
+	return file_banda_v1_banda_proto_rawDescGZIP(), []int{265}
 }
 
 var File_banda_v1_banda_proto protoreflect.FileDescriptor
 
 const file_banda_v1_banda_proto_rawDesc = "" +
 	"\n" +
-	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\v\n" +
+	"\x14banda/v1/banda.proto\x12\bbanda.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe3\v\n" +
 	"\x06Thread\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bowner_id\x18\x02 \x01(\tR\aownerId\x12\x14\n" +
@@ -16616,7 +16723,8 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x05forge\x18% \x01(\tR\x05forge\x12\x1f\n" +
 	"\vforge_ready\x18& \x01(\bR\n" +
 	"forgeReady\x12%\n" +
-	"\x0eteammate_turns\x18' \x01(\bR\rteammateTurns\x12\x1f\n" +
+	"\x0eteammate_turns\x18' \x01(\bR\rteammateTurns\x12#\n" +
+	"\rteam_identity\x18) \x01(\bR\fteamIdentity\x12\x1f\n" +
 	"\venv_waiting\x18( \x01(\tR\n" +
 	"envWaiting\"\x97\x01\n" +
 	"\aOverlap\x12\x1b\n" +
@@ -16849,7 +16957,11 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\fTrustRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x18\n" +
 	"\atrusted\x18\x02 \x01(\bR\atrusted\"\x0f\n" +
-	"\rTrustResponse\"d\n" +
+	"\rTrustResponse\"E\n" +
+	"\x16SetTeamIdentityRequest\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x0e\n" +
+	"\x02on\x18\x02 \x01(\bR\x02on\"\x19\n" +
+	"\x17SetTeamIdentityResponse\"d\n" +
 	"\x13HandoffOfferRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x1c\n" +
 	"\n" +
@@ -16944,10 +17056,11 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x04path\x18\x03 \x01(\tR\x04path\"'\n" +
 	"\x13PreviewOpenResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"\v\n" +
-	"\tMeRequest\"0\n" +
+	"\tMeRequest\"U\n" +
 	"\n" +
 	"MeResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.banda.v1.UserR\x04user\"\x12\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.banda.v1.UserR\x04user\x12#\n" +
+	"\rteam_identity\x18\x02 \x01(\bR\fteamIdentity\"\x12\n" +
 	"\x10ListUsersRequest\"9\n" +
 	"\x11ListUsersResponse\x12$\n" +
 	"\x05users\x18\x01 \x03(\v2\x0e.banda.v1.UserR\x05users\"\xa1\x02\n" +
@@ -17698,7 +17811,7 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x15MERGEABLE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fMERGEABLE_CLEAN\x10\x01\x12\x17\n" +
 	"\x13MERGEABLE_CONFLICTS\x10\x02\x12\x15\n" +
-	"\x11MERGEABLE_BLOCKED\x10\x032\xbf\"\n" +
+	"\x11MERGEABLE_BLOCKED\x10\x032\x97#\n" +
 	"\rThreadService\x12M\n" +
 	"\fCreateThread\x12\x1d.banda.v1.CreateThreadRequest\x1a\x1e.banda.v1.CreateThreadResponse\x12J\n" +
 	"\vListThreads\x12\x1c.banda.v1.ListThreadsRequest\x1a\x1d.banda.v1.ListThreadsResponse\x12D\n" +
@@ -17710,7 +17823,8 @@ const file_banda_v1_banda_proto_rawDesc = "" +
 	"\x05Retry\x12\x16.banda.v1.RetryRequest\x1a\x17.banda.v1.RetryResponse\x12J\n" +
 	"\vApproveTurn\x12\x1c.banda.v1.ApproveTurnRequest\x1a\x1d.banda.v1.ApproveTurnResponse\x12J\n" +
 	"\vDeclineTurn\x12\x1c.banda.v1.DeclineTurnRequest\x1a\x1d.banda.v1.DeclineTurnResponse\x128\n" +
-	"\x05Trust\x12\x16.banda.v1.TrustRequest\x1a\x17.banda.v1.TrustResponse\x12J\n" +
+	"\x05Trust\x12\x16.banda.v1.TrustRequest\x1a\x17.banda.v1.TrustResponse\x12V\n" +
+	"\x0fSetTeamIdentity\x12 .banda.v1.SetTeamIdentityRequest\x1a!.banda.v1.SetTeamIdentityResponse\x12J\n" +
 	"\vSpawnThread\x12\x1c.banda.v1.SpawnThreadRequest\x1a\x1d.banda.v1.SpawnThreadResponse\x12V\n" +
 	"\x0fLineageChildren\x12 .banda.v1.LineageChildrenRequest\x1a!.banda.v1.LineageChildrenResponse\x12L\n" +
 	"\vWatchThread\x12\x1c.banda.v1.WatchThreadRequest\x1a\x1d.banda.v1.WatchThreadResponse0\x01\x12>\n" +
@@ -17809,7 +17923,7 @@ func file_banda_v1_banda_proto_rawDescGZIP() []byte {
 }
 
 var file_banda_v1_banda_proto_enumTypes = make([]protoimpl.EnumInfo, 14)
-var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 269)
+var file_banda_v1_banda_proto_msgTypes = make([]protoimpl.MessageInfo, 271)
 var file_banda_v1_banda_proto_goTypes = []any{
 	(Status)(0),                             // 0: banda.v1.Status
 	(Mode)(0),                               // 1: banda.v1.Mode
@@ -17881,235 +17995,237 @@ var file_banda_v1_banda_proto_goTypes = []any{
 	(*DeclineTurnResponse)(nil),             // 67: banda.v1.DeclineTurnResponse
 	(*TrustRequest)(nil),                    // 68: banda.v1.TrustRequest
 	(*TrustResponse)(nil),                   // 69: banda.v1.TrustResponse
-	(*HandoffOfferRequest)(nil),             // 70: banda.v1.HandoffOfferRequest
-	(*HandoffOfferResponse)(nil),            // 71: banda.v1.HandoffOfferResponse
-	(*HandoffAcceptRequest)(nil),            // 72: banda.v1.HandoffAcceptRequest
-	(*HandoffAcceptResponse)(nil),           // 73: banda.v1.HandoffAcceptResponse
-	(*HandoffDeclineRequest)(nil),           // 74: banda.v1.HandoffDeclineRequest
-	(*HandoffDeclineResponse)(nil),          // 75: banda.v1.HandoffDeclineResponse
-	(*SpawnThreadRequest)(nil),              // 76: banda.v1.SpawnThreadRequest
-	(*SpawnThreadResponse)(nil),             // 77: banda.v1.SpawnThreadResponse
-	(*LineageChildrenRequest)(nil),          // 78: banda.v1.LineageChildrenRequest
-	(*LineageChildrenResponse)(nil),         // 79: banda.v1.LineageChildrenResponse
-	(*ListMentionedRequest)(nil),            // 80: banda.v1.ListMentionedRequest
-	(*ListMentionedResponse)(nil),           // 81: banda.v1.ListMentionedResponse
-	(*SnoozeRequest)(nil),                   // 82: banda.v1.SnoozeRequest
-	(*SnoozeResponse)(nil),                  // 83: banda.v1.SnoozeResponse
-	(*SettleRequest)(nil),                   // 84: banda.v1.SettleRequest
-	(*SettleResponse)(nil),                  // 85: banda.v1.SettleResponse
-	(*PushRequest)(nil),                     // 86: banda.v1.PushRequest
-	(*PushResponse)(nil),                    // 87: banda.v1.PushResponse
-	(*EnvironmentRecreateRequest)(nil),      // 88: banda.v1.EnvironmentRecreateRequest
-	(*EnvironmentRecreateResponse)(nil),     // 89: banda.v1.EnvironmentRecreateResponse
-	(*AutoPush)(nil),                        // 90: banda.v1.AutoPush
-	(*OpenTerminalRequest)(nil),             // 91: banda.v1.OpenTerminalRequest
-	(*OpenTerminalResponse)(nil),            // 92: banda.v1.OpenTerminalResponse
-	(*WriteTerminalRequest)(nil),            // 93: banda.v1.WriteTerminalRequest
-	(*WriteTerminalResponse)(nil),           // 94: banda.v1.WriteTerminalResponse
-	(*ResizeTerminalRequest)(nil),           // 95: banda.v1.ResizeTerminalRequest
-	(*ResizeTerminalResponse)(nil),          // 96: banda.v1.ResizeTerminalResponse
-	(*ListFilesRequest)(nil),                // 97: banda.v1.ListFilesRequest
-	(*ListFilesResponse)(nil),               // 98: banda.v1.ListFilesResponse
-	(*ReadFileRequest)(nil),                 // 99: banda.v1.ReadFileRequest
-	(*ReadFileResponse)(nil),                // 100: banda.v1.ReadFileResponse
-	(*PreviewWatchRequest)(nil),             // 101: banda.v1.PreviewWatchRequest
-	(*PreviewWatchResponse)(nil),            // 102: banda.v1.PreviewWatchResponse
-	(*PreviewPort)(nil),                     // 103: banda.v1.PreviewPort
-	(*PreviewOpenRequest)(nil),              // 104: banda.v1.PreviewOpenRequest
-	(*PreviewOpenResponse)(nil),             // 105: banda.v1.PreviewOpenResponse
-	(*MeRequest)(nil),                       // 106: banda.v1.MeRequest
-	(*MeResponse)(nil),                      // 107: banda.v1.MeResponse
-	(*ListUsersRequest)(nil),                // 108: banda.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),               // 109: banda.v1.ListUsersResponse
-	(*HarnessAccount)(nil),                  // 110: banda.v1.HarnessAccount
-	(*SecretInfo)(nil),                      // 111: banda.v1.SecretInfo
-	(*GetSettingsRequest)(nil),              // 112: banda.v1.GetSettingsRequest
-	(*GetSettingsResponse)(nil),             // 113: banda.v1.GetSettingsResponse
-	(*SetAuthMethodRequest)(nil),            // 114: banda.v1.SetAuthMethodRequest
-	(*SetAuthMethodResponse)(nil),           // 115: banda.v1.SetAuthMethodResponse
-	(*SetSecretRequest)(nil),                // 116: banda.v1.SetSecretRequest
-	(*SetSecretResponse)(nil),               // 117: banda.v1.SetSecretResponse
-	(*DeleteSecretRequest)(nil),             // 118: banda.v1.DeleteSecretRequest
-	(*DeleteSecretResponse)(nil),            // 119: banda.v1.DeleteSecretResponse
-	(*SetDefaultProfileRequest)(nil),        // 120: banda.v1.SetDefaultProfileRequest
-	(*SetDefaultProfileResponse)(nil),       // 121: banda.v1.SetDefaultProfileResponse
-	(*ListTeamSecretsRequest)(nil),          // 122: banda.v1.ListTeamSecretsRequest
-	(*ListTeamSecretsResponse)(nil),         // 123: banda.v1.ListTeamSecretsResponse
-	(*SetTeamSecretRequest)(nil),            // 124: banda.v1.SetTeamSecretRequest
-	(*SetTeamSecretResponse)(nil),           // 125: banda.v1.SetTeamSecretResponse
-	(*DeleteTeamSecretRequest)(nil),         // 126: banda.v1.DeleteTeamSecretRequest
-	(*DeleteTeamSecretResponse)(nil),        // 127: banda.v1.DeleteTeamSecretResponse
-	(*OpenLoginTerminalRequest)(nil),        // 128: banda.v1.OpenLoginTerminalRequest
-	(*WriteLoginTerminalRequest)(nil),       // 129: banda.v1.WriteLoginTerminalRequest
-	(*ResizeLoginTerminalRequest)(nil),      // 130: banda.v1.ResizeLoginTerminalRequest
-	(*TeamActivity)(nil),                    // 131: banda.v1.TeamActivity
-	(*TeamWatchRequest)(nil),                // 132: banda.v1.TeamWatchRequest
-	(*TeamWatchResponse)(nil),               // 133: banda.v1.TeamWatchResponse
-	(*BriefRequest)(nil),                    // 134: banda.v1.BriefRequest
-	(*BriefResponse)(nil),                   // 135: banda.v1.BriefResponse
-	(*BriefItem)(nil),                       // 136: banda.v1.BriefItem
-	(*BriefSeenRequest)(nil),                // 137: banda.v1.BriefSeenRequest
-	(*BriefSeenResponse)(nil),               // 138: banda.v1.BriefSeenResponse
-	(*InboxWatchRequest)(nil),               // 139: banda.v1.InboxWatchRequest
-	(*InboxWatchResponse)(nil),              // 140: banda.v1.InboxWatchResponse
-	(*Decision)(nil),                        // 141: banda.v1.Decision
-	(*InboxMarkReadRequest)(nil),            // 142: banda.v1.InboxMarkReadRequest
-	(*InboxMarkReadResponse)(nil),           // 143: banda.v1.InboxMarkReadResponse
-	(*WatchThreadRequest)(nil),              // 144: banda.v1.WatchThreadRequest
-	(*HistoryRequest)(nil),                  // 145: banda.v1.HistoryRequest
-	(*HistoryResponse)(nil),                 // 146: banda.v1.HistoryResponse
-	(*PermissionRequested)(nil),             // 147: banda.v1.PermissionRequested
-	(*PermissionResolved)(nil),              // 148: banda.v1.PermissionResolved
-	(*PermissionAnswerRequest)(nil),         // 149: banda.v1.PermissionAnswerRequest
-	(*PermissionAnswerResponse)(nil),        // 150: banda.v1.PermissionAnswerResponse
-	(*PermissionVoteRequest)(nil),           // 151: banda.v1.PermissionVoteRequest
-	(*PermissionVoteResponse)(nil),          // 152: banda.v1.PermissionVoteResponse
-	(*PermissionVoted)(nil),                 // 153: banda.v1.PermissionVoted
-	(*PermissionRevokeRequest)(nil),         // 154: banda.v1.PermissionRevokeRequest
-	(*PermissionRevokeResponse)(nil),        // 155: banda.v1.PermissionRevokeResponse
-	(*PermissionRevoked)(nil),               // 156: banda.v1.PermissionRevoked
-	(*PermissionSetModeRequest)(nil),        // 157: banda.v1.PermissionSetModeRequest
-	(*PermissionSetModeResponse)(nil),       // 158: banda.v1.PermissionSetModeResponse
-	(*PermissionModeChanged)(nil),           // 159: banda.v1.PermissionModeChanged
-	(*HandoffOffered)(nil),                  // 160: banda.v1.HandoffOffered
-	(*HandoffResolved)(nil),                 // 161: banda.v1.HandoffResolved
-	(*WatchThreadResponse)(nil),             // 162: banda.v1.WatchThreadResponse
-	(*ConnectRequest)(nil),                  // 163: banda.v1.ConnectRequest
-	(*Ping)(nil),                            // 164: banda.v1.Ping
-	(*Pong)(nil),                            // 165: banda.v1.Pong
-	(*Hello)(nil),                           // 166: banda.v1.Hello
-	(*LoginStatus)(nil),                     // 167: banda.v1.LoginStatus
-	(*Ready)(nil),                           // 168: banda.v1.Ready
-	(*TerminalOutput)(nil),                  // 169: banda.v1.TerminalOutput
-	(*Diff)(nil),                            // 170: banda.v1.Diff
-	(*FileResponse)(nil),                    // 171: banda.v1.FileResponse
-	(*ConnectResponse)(nil),                 // 172: banda.v1.ConnectResponse
-	(*PermissionCommand)(nil),               // 173: banda.v1.PermissionCommand
-	(*Prompt)(nil),                          // 174: banda.v1.Prompt
-	(*AttachmentImage)(nil),                 // 175: banda.v1.AttachmentImage
-	(*Stop)(nil),                            // 176: banda.v1.Stop
-	(*Push)(nil),                            // 177: banda.v1.Push
-	(*TerminalOpen)(nil),                    // 178: banda.v1.TerminalOpen
-	(*TerminalInput)(nil),                   // 179: banda.v1.TerminalInput
-	(*TerminalResize)(nil),                  // 180: banda.v1.TerminalResize
-	(*TerminalClose)(nil),                   // 181: banda.v1.TerminalClose
-	(*FileRequest)(nil),                     // 182: banda.v1.FileRequest
-	(*HttpTunnel)(nil),                      // 183: banda.v1.HttpTunnel
-	(*PreviewPorts)(nil),                    // 184: banda.v1.PreviewPorts
-	(*RaceTry)(nil),                         // 185: banda.v1.RaceTry
-	(*ForkRequest)(nil),                     // 186: banda.v1.ForkRequest
-	(*ForkResponse)(nil),                    // 187: banda.v1.ForkResponse
-	(*RaceRequest)(nil),                     // 188: banda.v1.RaceRequest
-	(*RaceResponse)(nil),                    // 189: banda.v1.RaceResponse
-	(*RaceCompareRequest)(nil),              // 190: banda.v1.RaceCompareRequest
-	(*RaceCompareResponse)(nil),             // 191: banda.v1.RaceCompareResponse
-	(*RaceEntry)(nil),                       // 192: banda.v1.RaceEntry
-	(*RaceListRequest)(nil),                 // 193: banda.v1.RaceListRequest
-	(*RaceListResponse)(nil),                // 194: banda.v1.RaceListResponse
-	(*RacePickRequest)(nil),                 // 195: banda.v1.RacePickRequest
-	(*RacePickResponse)(nil),                // 196: banda.v1.RacePickResponse
-	(*ForkPatchRequest)(nil),                // 197: banda.v1.ForkPatchRequest
-	(*ForkPatchResponse)(nil),               // 198: banda.v1.ForkPatchResponse
-	(*SearchRequest)(nil),                   // 199: banda.v1.SearchRequest
-	(*SearchResult)(nil),                    // 200: banda.v1.SearchResult
-	(*SearchResponse)(nil),                  // 201: banda.v1.SearchResponse
-	(*PullRequestSummary)(nil),              // 202: banda.v1.PullRequestSummary
-	(*PullRequestCheck)(nil),                // 203: banda.v1.PullRequestCheck
-	(*PullRequestReviewer)(nil),             // 204: banda.v1.PullRequestReviewer
-	(*PullRequestComment)(nil),              // 205: banda.v1.PullRequestComment
-	(*PullRequest)(nil),                     // 206: banda.v1.PullRequest
-	(*PullRequestChanged)(nil),              // 207: banda.v1.PullRequestChanged
-	(*PullRequestGetRequest)(nil),           // 208: banda.v1.PullRequestGetRequest
-	(*PullRequestGetResponse)(nil),          // 209: banda.v1.PullRequestGetResponse
-	(*PullRequestCreateRequest)(nil),        // 210: banda.v1.PullRequestCreateRequest
-	(*PullRequestCreateResponse)(nil),       // 211: banda.v1.PullRequestCreateResponse
-	(*PullRequestLinkRequest)(nil),          // 212: banda.v1.PullRequestLinkRequest
-	(*PullRequestLinkResponse)(nil),         // 213: banda.v1.PullRequestLinkResponse
-	(*PullRequestUpdateRequest)(nil),        // 214: banda.v1.PullRequestUpdateRequest
-	(*PullRequestUpdateResponse)(nil),       // 215: banda.v1.PullRequestUpdateResponse
-	(*PullRequestMergeRequest)(nil),         // 216: banda.v1.PullRequestMergeRequest
-	(*PullRequestMergeResponse)(nil),        // 217: banda.v1.PullRequestMergeResponse
-	(*PullRequestCommentRequest)(nil),       // 218: banda.v1.PullRequestCommentRequest
-	(*PullRequestCommentResponse)(nil),      // 219: banda.v1.PullRequestCommentResponse
-	(*ListForgeReposRequest)(nil),           // 220: banda.v1.ListForgeReposRequest
-	(*ListForgeReposResponse)(nil),          // 221: banda.v1.ListForgeReposResponse
-	(*ForgeRepo)(nil),                       // 222: banda.v1.ForgeRepo
-	(*PullRequestChoicesRequest)(nil),       // 223: banda.v1.PullRequestChoicesRequest
-	(*PullRequestChoicesResponse)(nil),      // 224: banda.v1.PullRequestChoicesResponse
-	(*PullRequestResolveRequest)(nil),       // 225: banda.v1.PullRequestResolveRequest
-	(*PullRequestResolveResponse)(nil),      // 226: banda.v1.PullRequestResolveResponse
-	(*GitIdentity)(nil),                     // 227: banda.v1.GitIdentity
-	(*SetGitIdentityRequest)(nil),           // 228: banda.v1.SetGitIdentityRequest
-	(*SetGitIdentityResponse)(nil),          // 229: banda.v1.SetGitIdentityResponse
-	(*ThreadDefaults)(nil),                  // 230: banda.v1.ThreadDefaults
-	(*SetThreadDefaultsRequest)(nil),        // 231: banda.v1.SetThreadDefaultsRequest
-	(*SetThreadDefaultsResponse)(nil),       // 232: banda.v1.SetThreadDefaultsResponse
-	(*RepoAdded)(nil),                       // 233: banda.v1.RepoAdded
-	(*ThreadRenamed)(nil),                   // 234: banda.v1.ThreadRenamed
-	(*RenameThreadRequest)(nil),             // 235: banda.v1.RenameThreadRequest
-	(*RenameThreadResponse)(nil),            // 236: banda.v1.RenameThreadResponse
-	(*AddRepositoryRequest)(nil),            // 237: banda.v1.AddRepositoryRequest
-	(*AddRepositoryResponse)(nil),           // 238: banda.v1.AddRepositoryResponse
-	(*IdTokensChanged)(nil),                 // 239: banda.v1.IdTokensChanged
-	(*IdTokensRequest)(nil),                 // 240: banda.v1.IdTokensRequest
-	(*IdTokensResponse)(nil),                // 241: banda.v1.IdTokensResponse
-	(*IdToken)(nil),                         // 242: banda.v1.IdToken
-	(*GetWorkloadIdentityRequest)(nil),      // 243: banda.v1.GetWorkloadIdentityRequest
-	(*GetWorkloadIdentityResponse)(nil),     // 244: banda.v1.GetWorkloadIdentityResponse
-	(*IdTokenAudience)(nil),                 // 245: banda.v1.IdTokenAudience
-	(*AddIdTokenAudienceRequest)(nil),       // 246: banda.v1.AddIdTokenAudienceRequest
-	(*AddIdTokenAudienceResponse)(nil),      // 247: banda.v1.AddIdTokenAudienceResponse
-	(*RemoveIdTokenAudienceRequest)(nil),    // 248: banda.v1.RemoveIdTokenAudienceRequest
-	(*RemoveIdTokenAudienceResponse)(nil),   // 249: banda.v1.RemoveIdTokenAudienceResponse
-	(*GetGitHubRequest)(nil),                // 250: banda.v1.GetGitHubRequest
-	(*GetGitHubResponse)(nil),               // 251: banda.v1.GetGitHubResponse
-	(*GitHubAppChange)(nil),                 // 252: banda.v1.GitHubAppChange
-	(*GitHubAppRefusal)(nil),                // 253: banda.v1.GitHubAppRefusal
-	(*GitHubApp)(nil),                       // 254: banda.v1.GitHubApp
-	(*ForgeConnection)(nil),                 // 255: banda.v1.ForgeConnection
-	(*GitHubAppManifestRequest)(nil),        // 256: banda.v1.GitHubAppManifestRequest
-	(*GitHubAppManifestResponse)(nil),       // 257: banda.v1.GitHubAppManifestResponse
-	(*ListGitHubInstallationsRequest)(nil),  // 258: banda.v1.ListGitHubInstallationsRequest
-	(*ListGitHubInstallationsResponse)(nil), // 259: banda.v1.ListGitHubInstallationsResponse
-	(*GitHubInstallation)(nil),              // 260: banda.v1.GitHubInstallation
-	(*RemoveGitHubAppRequest)(nil),          // 261: banda.v1.RemoveGitHubAppRequest
-	(*RemoveGitHubAppResponse)(nil),         // 262: banda.v1.RemoveGitHubAppResponse
-	(*DisconnectGitHubRequest)(nil),         // 263: banda.v1.DisconnectGitHubRequest
-	(*DisconnectGitHubResponse)(nil),        // 264: banda.v1.DisconnectGitHubResponse
-	(*GitCredentialRequest)(nil),            // 265: banda.v1.GitCredentialRequest
-	(*GitCredentialResponse)(nil),           // 266: banda.v1.GitCredentialResponse
-	(*GetGitLabRequest)(nil),                // 267: banda.v1.GetGitLabRequest
-	(*GetGitLabResponse)(nil),               // 268: banda.v1.GetGitLabResponse
-	(*GitLabHost)(nil),                      // 269: banda.v1.GitLabHost
-	(*GitLabAppChange)(nil),                 // 270: banda.v1.GitLabAppChange
-	(*GitLabApp)(nil),                       // 271: banda.v1.GitLabApp
-	(*SetGitLabAppRequest)(nil),             // 272: banda.v1.SetGitLabAppRequest
-	(*SetGitLabAppResponse)(nil),            // 273: banda.v1.SetGitLabAppResponse
-	(*RemoveGitLabAppRequest)(nil),          // 274: banda.v1.RemoveGitLabAppRequest
-	(*RemoveGitLabAppResponse)(nil),         // 275: banda.v1.RemoveGitLabAppResponse
-	(*DisconnectGitLabRequest)(nil),         // 276: banda.v1.DisconnectGitLabRequest
-	(*DisconnectGitLabResponse)(nil),        // 277: banda.v1.DisconnectGitLabResponse
-	nil,                                     // 278: banda.v1.PermissionResolved.AnswersEntry
-	nil,                                     // 279: banda.v1.PermissionAnswerRequest.AnswersEntry
-	nil,                                     // 280: banda.v1.PermissionVoteRequest.AnswersEntry
-	nil,                                     // 281: banda.v1.PermissionVoted.AnswersEntry
-	nil,                                     // 282: banda.v1.PermissionCommand.AnswersEntry
-	(*timestamppb.Timestamp)(nil),           // 283: google.protobuf.Timestamp
+	(*SetTeamIdentityRequest)(nil),          // 70: banda.v1.SetTeamIdentityRequest
+	(*SetTeamIdentityResponse)(nil),         // 71: banda.v1.SetTeamIdentityResponse
+	(*HandoffOfferRequest)(nil),             // 72: banda.v1.HandoffOfferRequest
+	(*HandoffOfferResponse)(nil),            // 73: banda.v1.HandoffOfferResponse
+	(*HandoffAcceptRequest)(nil),            // 74: banda.v1.HandoffAcceptRequest
+	(*HandoffAcceptResponse)(nil),           // 75: banda.v1.HandoffAcceptResponse
+	(*HandoffDeclineRequest)(nil),           // 76: banda.v1.HandoffDeclineRequest
+	(*HandoffDeclineResponse)(nil),          // 77: banda.v1.HandoffDeclineResponse
+	(*SpawnThreadRequest)(nil),              // 78: banda.v1.SpawnThreadRequest
+	(*SpawnThreadResponse)(nil),             // 79: banda.v1.SpawnThreadResponse
+	(*LineageChildrenRequest)(nil),          // 80: banda.v1.LineageChildrenRequest
+	(*LineageChildrenResponse)(nil),         // 81: banda.v1.LineageChildrenResponse
+	(*ListMentionedRequest)(nil),            // 82: banda.v1.ListMentionedRequest
+	(*ListMentionedResponse)(nil),           // 83: banda.v1.ListMentionedResponse
+	(*SnoozeRequest)(nil),                   // 84: banda.v1.SnoozeRequest
+	(*SnoozeResponse)(nil),                  // 85: banda.v1.SnoozeResponse
+	(*SettleRequest)(nil),                   // 86: banda.v1.SettleRequest
+	(*SettleResponse)(nil),                  // 87: banda.v1.SettleResponse
+	(*PushRequest)(nil),                     // 88: banda.v1.PushRequest
+	(*PushResponse)(nil),                    // 89: banda.v1.PushResponse
+	(*EnvironmentRecreateRequest)(nil),      // 90: banda.v1.EnvironmentRecreateRequest
+	(*EnvironmentRecreateResponse)(nil),     // 91: banda.v1.EnvironmentRecreateResponse
+	(*AutoPush)(nil),                        // 92: banda.v1.AutoPush
+	(*OpenTerminalRequest)(nil),             // 93: banda.v1.OpenTerminalRequest
+	(*OpenTerminalResponse)(nil),            // 94: banda.v1.OpenTerminalResponse
+	(*WriteTerminalRequest)(nil),            // 95: banda.v1.WriteTerminalRequest
+	(*WriteTerminalResponse)(nil),           // 96: banda.v1.WriteTerminalResponse
+	(*ResizeTerminalRequest)(nil),           // 97: banda.v1.ResizeTerminalRequest
+	(*ResizeTerminalResponse)(nil),          // 98: banda.v1.ResizeTerminalResponse
+	(*ListFilesRequest)(nil),                // 99: banda.v1.ListFilesRequest
+	(*ListFilesResponse)(nil),               // 100: banda.v1.ListFilesResponse
+	(*ReadFileRequest)(nil),                 // 101: banda.v1.ReadFileRequest
+	(*ReadFileResponse)(nil),                // 102: banda.v1.ReadFileResponse
+	(*PreviewWatchRequest)(nil),             // 103: banda.v1.PreviewWatchRequest
+	(*PreviewWatchResponse)(nil),            // 104: banda.v1.PreviewWatchResponse
+	(*PreviewPort)(nil),                     // 105: banda.v1.PreviewPort
+	(*PreviewOpenRequest)(nil),              // 106: banda.v1.PreviewOpenRequest
+	(*PreviewOpenResponse)(nil),             // 107: banda.v1.PreviewOpenResponse
+	(*MeRequest)(nil),                       // 108: banda.v1.MeRequest
+	(*MeResponse)(nil),                      // 109: banda.v1.MeResponse
+	(*ListUsersRequest)(nil),                // 110: banda.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),               // 111: banda.v1.ListUsersResponse
+	(*HarnessAccount)(nil),                  // 112: banda.v1.HarnessAccount
+	(*SecretInfo)(nil),                      // 113: banda.v1.SecretInfo
+	(*GetSettingsRequest)(nil),              // 114: banda.v1.GetSettingsRequest
+	(*GetSettingsResponse)(nil),             // 115: banda.v1.GetSettingsResponse
+	(*SetAuthMethodRequest)(nil),            // 116: banda.v1.SetAuthMethodRequest
+	(*SetAuthMethodResponse)(nil),           // 117: banda.v1.SetAuthMethodResponse
+	(*SetSecretRequest)(nil),                // 118: banda.v1.SetSecretRequest
+	(*SetSecretResponse)(nil),               // 119: banda.v1.SetSecretResponse
+	(*DeleteSecretRequest)(nil),             // 120: banda.v1.DeleteSecretRequest
+	(*DeleteSecretResponse)(nil),            // 121: banda.v1.DeleteSecretResponse
+	(*SetDefaultProfileRequest)(nil),        // 122: banda.v1.SetDefaultProfileRequest
+	(*SetDefaultProfileResponse)(nil),       // 123: banda.v1.SetDefaultProfileResponse
+	(*ListTeamSecretsRequest)(nil),          // 124: banda.v1.ListTeamSecretsRequest
+	(*ListTeamSecretsResponse)(nil),         // 125: banda.v1.ListTeamSecretsResponse
+	(*SetTeamSecretRequest)(nil),            // 126: banda.v1.SetTeamSecretRequest
+	(*SetTeamSecretResponse)(nil),           // 127: banda.v1.SetTeamSecretResponse
+	(*DeleteTeamSecretRequest)(nil),         // 128: banda.v1.DeleteTeamSecretRequest
+	(*DeleteTeamSecretResponse)(nil),        // 129: banda.v1.DeleteTeamSecretResponse
+	(*OpenLoginTerminalRequest)(nil),        // 130: banda.v1.OpenLoginTerminalRequest
+	(*WriteLoginTerminalRequest)(nil),       // 131: banda.v1.WriteLoginTerminalRequest
+	(*ResizeLoginTerminalRequest)(nil),      // 132: banda.v1.ResizeLoginTerminalRequest
+	(*TeamActivity)(nil),                    // 133: banda.v1.TeamActivity
+	(*TeamWatchRequest)(nil),                // 134: banda.v1.TeamWatchRequest
+	(*TeamWatchResponse)(nil),               // 135: banda.v1.TeamWatchResponse
+	(*BriefRequest)(nil),                    // 136: banda.v1.BriefRequest
+	(*BriefResponse)(nil),                   // 137: banda.v1.BriefResponse
+	(*BriefItem)(nil),                       // 138: banda.v1.BriefItem
+	(*BriefSeenRequest)(nil),                // 139: banda.v1.BriefSeenRequest
+	(*BriefSeenResponse)(nil),               // 140: banda.v1.BriefSeenResponse
+	(*InboxWatchRequest)(nil),               // 141: banda.v1.InboxWatchRequest
+	(*InboxWatchResponse)(nil),              // 142: banda.v1.InboxWatchResponse
+	(*Decision)(nil),                        // 143: banda.v1.Decision
+	(*InboxMarkReadRequest)(nil),            // 144: banda.v1.InboxMarkReadRequest
+	(*InboxMarkReadResponse)(nil),           // 145: banda.v1.InboxMarkReadResponse
+	(*WatchThreadRequest)(nil),              // 146: banda.v1.WatchThreadRequest
+	(*HistoryRequest)(nil),                  // 147: banda.v1.HistoryRequest
+	(*HistoryResponse)(nil),                 // 148: banda.v1.HistoryResponse
+	(*PermissionRequested)(nil),             // 149: banda.v1.PermissionRequested
+	(*PermissionResolved)(nil),              // 150: banda.v1.PermissionResolved
+	(*PermissionAnswerRequest)(nil),         // 151: banda.v1.PermissionAnswerRequest
+	(*PermissionAnswerResponse)(nil),        // 152: banda.v1.PermissionAnswerResponse
+	(*PermissionVoteRequest)(nil),           // 153: banda.v1.PermissionVoteRequest
+	(*PermissionVoteResponse)(nil),          // 154: banda.v1.PermissionVoteResponse
+	(*PermissionVoted)(nil),                 // 155: banda.v1.PermissionVoted
+	(*PermissionRevokeRequest)(nil),         // 156: banda.v1.PermissionRevokeRequest
+	(*PermissionRevokeResponse)(nil),        // 157: banda.v1.PermissionRevokeResponse
+	(*PermissionRevoked)(nil),               // 158: banda.v1.PermissionRevoked
+	(*PermissionSetModeRequest)(nil),        // 159: banda.v1.PermissionSetModeRequest
+	(*PermissionSetModeResponse)(nil),       // 160: banda.v1.PermissionSetModeResponse
+	(*PermissionModeChanged)(nil),           // 161: banda.v1.PermissionModeChanged
+	(*HandoffOffered)(nil),                  // 162: banda.v1.HandoffOffered
+	(*HandoffResolved)(nil),                 // 163: banda.v1.HandoffResolved
+	(*WatchThreadResponse)(nil),             // 164: banda.v1.WatchThreadResponse
+	(*ConnectRequest)(nil),                  // 165: banda.v1.ConnectRequest
+	(*Ping)(nil),                            // 166: banda.v1.Ping
+	(*Pong)(nil),                            // 167: banda.v1.Pong
+	(*Hello)(nil),                           // 168: banda.v1.Hello
+	(*LoginStatus)(nil),                     // 169: banda.v1.LoginStatus
+	(*Ready)(nil),                           // 170: banda.v1.Ready
+	(*TerminalOutput)(nil),                  // 171: banda.v1.TerminalOutput
+	(*Diff)(nil),                            // 172: banda.v1.Diff
+	(*FileResponse)(nil),                    // 173: banda.v1.FileResponse
+	(*ConnectResponse)(nil),                 // 174: banda.v1.ConnectResponse
+	(*PermissionCommand)(nil),               // 175: banda.v1.PermissionCommand
+	(*Prompt)(nil),                          // 176: banda.v1.Prompt
+	(*AttachmentImage)(nil),                 // 177: banda.v1.AttachmentImage
+	(*Stop)(nil),                            // 178: banda.v1.Stop
+	(*Push)(nil),                            // 179: banda.v1.Push
+	(*TerminalOpen)(nil),                    // 180: banda.v1.TerminalOpen
+	(*TerminalInput)(nil),                   // 181: banda.v1.TerminalInput
+	(*TerminalResize)(nil),                  // 182: banda.v1.TerminalResize
+	(*TerminalClose)(nil),                   // 183: banda.v1.TerminalClose
+	(*FileRequest)(nil),                     // 184: banda.v1.FileRequest
+	(*HttpTunnel)(nil),                      // 185: banda.v1.HttpTunnel
+	(*PreviewPorts)(nil),                    // 186: banda.v1.PreviewPorts
+	(*RaceTry)(nil),                         // 187: banda.v1.RaceTry
+	(*ForkRequest)(nil),                     // 188: banda.v1.ForkRequest
+	(*ForkResponse)(nil),                    // 189: banda.v1.ForkResponse
+	(*RaceRequest)(nil),                     // 190: banda.v1.RaceRequest
+	(*RaceResponse)(nil),                    // 191: banda.v1.RaceResponse
+	(*RaceCompareRequest)(nil),              // 192: banda.v1.RaceCompareRequest
+	(*RaceCompareResponse)(nil),             // 193: banda.v1.RaceCompareResponse
+	(*RaceEntry)(nil),                       // 194: banda.v1.RaceEntry
+	(*RaceListRequest)(nil),                 // 195: banda.v1.RaceListRequest
+	(*RaceListResponse)(nil),                // 196: banda.v1.RaceListResponse
+	(*RacePickRequest)(nil),                 // 197: banda.v1.RacePickRequest
+	(*RacePickResponse)(nil),                // 198: banda.v1.RacePickResponse
+	(*ForkPatchRequest)(nil),                // 199: banda.v1.ForkPatchRequest
+	(*ForkPatchResponse)(nil),               // 200: banda.v1.ForkPatchResponse
+	(*SearchRequest)(nil),                   // 201: banda.v1.SearchRequest
+	(*SearchResult)(nil),                    // 202: banda.v1.SearchResult
+	(*SearchResponse)(nil),                  // 203: banda.v1.SearchResponse
+	(*PullRequestSummary)(nil),              // 204: banda.v1.PullRequestSummary
+	(*PullRequestCheck)(nil),                // 205: banda.v1.PullRequestCheck
+	(*PullRequestReviewer)(nil),             // 206: banda.v1.PullRequestReviewer
+	(*PullRequestComment)(nil),              // 207: banda.v1.PullRequestComment
+	(*PullRequest)(nil),                     // 208: banda.v1.PullRequest
+	(*PullRequestChanged)(nil),              // 209: banda.v1.PullRequestChanged
+	(*PullRequestGetRequest)(nil),           // 210: banda.v1.PullRequestGetRequest
+	(*PullRequestGetResponse)(nil),          // 211: banda.v1.PullRequestGetResponse
+	(*PullRequestCreateRequest)(nil),        // 212: banda.v1.PullRequestCreateRequest
+	(*PullRequestCreateResponse)(nil),       // 213: banda.v1.PullRequestCreateResponse
+	(*PullRequestLinkRequest)(nil),          // 214: banda.v1.PullRequestLinkRequest
+	(*PullRequestLinkResponse)(nil),         // 215: banda.v1.PullRequestLinkResponse
+	(*PullRequestUpdateRequest)(nil),        // 216: banda.v1.PullRequestUpdateRequest
+	(*PullRequestUpdateResponse)(nil),       // 217: banda.v1.PullRequestUpdateResponse
+	(*PullRequestMergeRequest)(nil),         // 218: banda.v1.PullRequestMergeRequest
+	(*PullRequestMergeResponse)(nil),        // 219: banda.v1.PullRequestMergeResponse
+	(*PullRequestCommentRequest)(nil),       // 220: banda.v1.PullRequestCommentRequest
+	(*PullRequestCommentResponse)(nil),      // 221: banda.v1.PullRequestCommentResponse
+	(*ListForgeReposRequest)(nil),           // 222: banda.v1.ListForgeReposRequest
+	(*ListForgeReposResponse)(nil),          // 223: banda.v1.ListForgeReposResponse
+	(*ForgeRepo)(nil),                       // 224: banda.v1.ForgeRepo
+	(*PullRequestChoicesRequest)(nil),       // 225: banda.v1.PullRequestChoicesRequest
+	(*PullRequestChoicesResponse)(nil),      // 226: banda.v1.PullRequestChoicesResponse
+	(*PullRequestResolveRequest)(nil),       // 227: banda.v1.PullRequestResolveRequest
+	(*PullRequestResolveResponse)(nil),      // 228: banda.v1.PullRequestResolveResponse
+	(*GitIdentity)(nil),                     // 229: banda.v1.GitIdentity
+	(*SetGitIdentityRequest)(nil),           // 230: banda.v1.SetGitIdentityRequest
+	(*SetGitIdentityResponse)(nil),          // 231: banda.v1.SetGitIdentityResponse
+	(*ThreadDefaults)(nil),                  // 232: banda.v1.ThreadDefaults
+	(*SetThreadDefaultsRequest)(nil),        // 233: banda.v1.SetThreadDefaultsRequest
+	(*SetThreadDefaultsResponse)(nil),       // 234: banda.v1.SetThreadDefaultsResponse
+	(*RepoAdded)(nil),                       // 235: banda.v1.RepoAdded
+	(*ThreadRenamed)(nil),                   // 236: banda.v1.ThreadRenamed
+	(*RenameThreadRequest)(nil),             // 237: banda.v1.RenameThreadRequest
+	(*RenameThreadResponse)(nil),            // 238: banda.v1.RenameThreadResponse
+	(*AddRepositoryRequest)(nil),            // 239: banda.v1.AddRepositoryRequest
+	(*AddRepositoryResponse)(nil),           // 240: banda.v1.AddRepositoryResponse
+	(*IdTokensChanged)(nil),                 // 241: banda.v1.IdTokensChanged
+	(*IdTokensRequest)(nil),                 // 242: banda.v1.IdTokensRequest
+	(*IdTokensResponse)(nil),                // 243: banda.v1.IdTokensResponse
+	(*IdToken)(nil),                         // 244: banda.v1.IdToken
+	(*GetWorkloadIdentityRequest)(nil),      // 245: banda.v1.GetWorkloadIdentityRequest
+	(*GetWorkloadIdentityResponse)(nil),     // 246: banda.v1.GetWorkloadIdentityResponse
+	(*IdTokenAudience)(nil),                 // 247: banda.v1.IdTokenAudience
+	(*AddIdTokenAudienceRequest)(nil),       // 248: banda.v1.AddIdTokenAudienceRequest
+	(*AddIdTokenAudienceResponse)(nil),      // 249: banda.v1.AddIdTokenAudienceResponse
+	(*RemoveIdTokenAudienceRequest)(nil),    // 250: banda.v1.RemoveIdTokenAudienceRequest
+	(*RemoveIdTokenAudienceResponse)(nil),   // 251: banda.v1.RemoveIdTokenAudienceResponse
+	(*GetGitHubRequest)(nil),                // 252: banda.v1.GetGitHubRequest
+	(*GetGitHubResponse)(nil),               // 253: banda.v1.GetGitHubResponse
+	(*GitHubAppChange)(nil),                 // 254: banda.v1.GitHubAppChange
+	(*GitHubAppRefusal)(nil),                // 255: banda.v1.GitHubAppRefusal
+	(*GitHubApp)(nil),                       // 256: banda.v1.GitHubApp
+	(*ForgeConnection)(nil),                 // 257: banda.v1.ForgeConnection
+	(*GitHubAppManifestRequest)(nil),        // 258: banda.v1.GitHubAppManifestRequest
+	(*GitHubAppManifestResponse)(nil),       // 259: banda.v1.GitHubAppManifestResponse
+	(*ListGitHubInstallationsRequest)(nil),  // 260: banda.v1.ListGitHubInstallationsRequest
+	(*ListGitHubInstallationsResponse)(nil), // 261: banda.v1.ListGitHubInstallationsResponse
+	(*GitHubInstallation)(nil),              // 262: banda.v1.GitHubInstallation
+	(*RemoveGitHubAppRequest)(nil),          // 263: banda.v1.RemoveGitHubAppRequest
+	(*RemoveGitHubAppResponse)(nil),         // 264: banda.v1.RemoveGitHubAppResponse
+	(*DisconnectGitHubRequest)(nil),         // 265: banda.v1.DisconnectGitHubRequest
+	(*DisconnectGitHubResponse)(nil),        // 266: banda.v1.DisconnectGitHubResponse
+	(*GitCredentialRequest)(nil),            // 267: banda.v1.GitCredentialRequest
+	(*GitCredentialResponse)(nil),           // 268: banda.v1.GitCredentialResponse
+	(*GetGitLabRequest)(nil),                // 269: banda.v1.GetGitLabRequest
+	(*GetGitLabResponse)(nil),               // 270: banda.v1.GetGitLabResponse
+	(*GitLabHost)(nil),                      // 271: banda.v1.GitLabHost
+	(*GitLabAppChange)(nil),                 // 272: banda.v1.GitLabAppChange
+	(*GitLabApp)(nil),                       // 273: banda.v1.GitLabApp
+	(*SetGitLabAppRequest)(nil),             // 274: banda.v1.SetGitLabAppRequest
+	(*SetGitLabAppResponse)(nil),            // 275: banda.v1.SetGitLabAppResponse
+	(*RemoveGitLabAppRequest)(nil),          // 276: banda.v1.RemoveGitLabAppRequest
+	(*RemoveGitLabAppResponse)(nil),         // 277: banda.v1.RemoveGitLabAppResponse
+	(*DisconnectGitLabRequest)(nil),         // 278: banda.v1.DisconnectGitLabRequest
+	(*DisconnectGitLabResponse)(nil),        // 279: banda.v1.DisconnectGitLabResponse
+	nil,                                     // 280: banda.v1.PermissionResolved.AnswersEntry
+	nil,                                     // 281: banda.v1.PermissionAnswerRequest.AnswersEntry
+	nil,                                     // 282: banda.v1.PermissionVoteRequest.AnswersEntry
+	nil,                                     // 283: banda.v1.PermissionVoted.AnswersEntry
+	nil,                                     // 284: banda.v1.PermissionCommand.AnswersEntry
+	(*timestamppb.Timestamp)(nil),           // 285: google.protobuf.Timestamp
 }
 var file_banda_v1_banda_proto_depIdxs = []int32{
 	0,   // 0: banda.v1.Thread.status:type_name -> banda.v1.Status
 	1,   // 1: banda.v1.Thread.mode:type_name -> banda.v1.Mode
-	283, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
-	283, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
-	283, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
-	131, // 5: banda.v1.Thread.activity:type_name -> banda.v1.TeamActivity
+	285, // 2: banda.v1.Thread.created_at:type_name -> google.protobuf.Timestamp
+	285, // 3: banda.v1.Thread.updated_at:type_name -> google.protobuf.Timestamp
+	285, // 4: banda.v1.Thread.snoozed_until:type_name -> google.protobuf.Timestamp
+	133, // 5: banda.v1.Thread.activity:type_name -> banda.v1.TeamActivity
 	5,   // 6: banda.v1.Thread.auto_push:type_name -> banda.v1.AutoPushState
 	2,   // 7: banda.v1.Thread.permission_mode:type_name -> banda.v1.PermissionMode
 	16,  // 8: banda.v1.Thread.forked_from:type_name -> banda.v1.ForkOrigin
 	15,  // 9: banda.v1.Thread.overlaps:type_name -> banda.v1.Overlap
-	202, // 10: banda.v1.Thread.pull_request:type_name -> banda.v1.PullRequestSummary
+	204, // 10: banda.v1.Thread.pull_request:type_name -> banda.v1.PullRequestSummary
 	0,   // 11: banda.v1.Overlap.status:type_name -> banda.v1.Status
-	283, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
+	285, // 12: banda.v1.Event.time:type_name -> google.protobuf.Timestamp
 	26,  // 13: banda.v1.Event.message:type_name -> banda.v1.Message
 	32,  // 14: banda.v1.Event.agent_text:type_name -> banda.v1.AgentText
 	33,  // 15: banda.v1.Event.agent_text_delta:type_name -> banda.v1.AgentTextDelta
@@ -18127,21 +18243,21 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	43,  // 27: banda.v1.Event.presence_changed:type_name -> banda.v1.PresenceChanged
 	44,  // 28: banda.v1.Event.typing:type_name -> banda.v1.Typing
 	59,  // 29: banda.v1.Event.agent_settings:type_name -> banda.v1.AgentSettings
-	90,  // 30: banda.v1.Event.auto_push:type_name -> banda.v1.AutoPush
-	147, // 31: banda.v1.Event.permission_requested:type_name -> banda.v1.PermissionRequested
-	148, // 32: banda.v1.Event.permission_resolved:type_name -> banda.v1.PermissionResolved
+	92,  // 30: banda.v1.Event.auto_push:type_name -> banda.v1.AutoPush
+	149, // 31: banda.v1.Event.permission_requested:type_name -> banda.v1.PermissionRequested
+	150, // 32: banda.v1.Event.permission_resolved:type_name -> banda.v1.PermissionResolved
 	25,  // 33: banda.v1.Event.fork_note:type_name -> banda.v1.ForkNote
 	31,  // 34: banda.v1.Event.lineage_update:type_name -> banda.v1.LineageUpdate
-	159, // 35: banda.v1.Event.permission_mode_changed:type_name -> banda.v1.PermissionModeChanged
+	161, // 35: banda.v1.Event.permission_mode_changed:type_name -> banda.v1.PermissionModeChanged
 	15,  // 36: banda.v1.Event.overlap:type_name -> banda.v1.Overlap
-	153, // 37: banda.v1.Event.permission_voted:type_name -> banda.v1.PermissionVoted
-	156, // 38: banda.v1.Event.permission_revoked:type_name -> banda.v1.PermissionRevoked
-	160, // 39: banda.v1.Event.handoff_offered:type_name -> banda.v1.HandoffOffered
-	161, // 40: banda.v1.Event.handoff_resolved:type_name -> banda.v1.HandoffResolved
-	103, // 41: banda.v1.Event.port_opened:type_name -> banda.v1.PreviewPort
-	207, // 42: banda.v1.Event.pull_request_changed:type_name -> banda.v1.PullRequestChanged
-	233, // 43: banda.v1.Event.repo_added:type_name -> banda.v1.RepoAdded
-	234, // 44: banda.v1.Event.thread_renamed:type_name -> banda.v1.ThreadRenamed
+	155, // 37: banda.v1.Event.permission_voted:type_name -> banda.v1.PermissionVoted
+	158, // 38: banda.v1.Event.permission_revoked:type_name -> banda.v1.PermissionRevoked
+	162, // 39: banda.v1.Event.handoff_offered:type_name -> banda.v1.HandoffOffered
+	163, // 40: banda.v1.Event.handoff_resolved:type_name -> banda.v1.HandoffResolved
+	105, // 41: banda.v1.Event.port_opened:type_name -> banda.v1.PreviewPort
+	209, // 42: banda.v1.Event.pull_request_changed:type_name -> banda.v1.PullRequestChanged
+	235, // 43: banda.v1.Event.repo_added:type_name -> banda.v1.RepoAdded
+	236, // 44: banda.v1.Event.thread_renamed:type_name -> banda.v1.ThreadRenamed
 	23,  // 45: banda.v1.Event.plan_changed:type_name -> banda.v1.PlanChanged
 	22,  // 46: banda.v1.Event.agent_retrying:type_name -> banda.v1.AgentRetrying
 	20,  // 47: banda.v1.Event.slash_commands:type_name -> banda.v1.SlashCommands
@@ -18166,140 +18282,140 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	14,  // 66: banda.v1.SpawnThreadResponse.thread:type_name -> banda.v1.Thread
 	14,  // 67: banda.v1.LineageChildrenResponse.threads:type_name -> banda.v1.Thread
 	14,  // 68: banda.v1.ListMentionedResponse.threads:type_name -> banda.v1.Thread
-	283, // 69: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
+	285, // 69: banda.v1.SnoozeRequest.until:type_name -> google.protobuf.Timestamp
 	5,   // 70: banda.v1.AutoPush.state:type_name -> banda.v1.AutoPushState
-	103, // 71: banda.v1.PreviewWatchResponse.ports:type_name -> banda.v1.PreviewPort
+	105, // 71: banda.v1.PreviewWatchResponse.ports:type_name -> banda.v1.PreviewPort
 	17,  // 72: banda.v1.MeResponse.user:type_name -> banda.v1.User
 	17,  // 73: banda.v1.ListUsersResponse.users:type_name -> banda.v1.User
 	6,   // 74: banda.v1.HarnessAccount.auth_method:type_name -> banda.v1.AuthMethod
 	7,   // 75: banda.v1.HarnessAccount.login_state:type_name -> banda.v1.LoginState
-	283, // 76: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
-	283, // 77: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
-	110, // 78: banda.v1.GetSettingsResponse.accounts:type_name -> banda.v1.HarnessAccount
-	111, // 79: banda.v1.GetSettingsResponse.secrets:type_name -> banda.v1.SecretInfo
-	227, // 80: banda.v1.GetSettingsResponse.git_identity:type_name -> banda.v1.GitIdentity
-	230, // 81: banda.v1.GetSettingsResponse.thread_defaults:type_name -> banda.v1.ThreadDefaults
+	285, // 76: banda.v1.HarnessAccount.login_checked_at:type_name -> google.protobuf.Timestamp
+	285, // 77: banda.v1.SecretInfo.updated_at:type_name -> google.protobuf.Timestamp
+	112, // 78: banda.v1.GetSettingsResponse.accounts:type_name -> banda.v1.HarnessAccount
+	113, // 79: banda.v1.GetSettingsResponse.secrets:type_name -> banda.v1.SecretInfo
+	229, // 80: banda.v1.GetSettingsResponse.git_identity:type_name -> banda.v1.GitIdentity
+	232, // 81: banda.v1.GetSettingsResponse.thread_defaults:type_name -> banda.v1.ThreadDefaults
 	6,   // 82: banda.v1.SetAuthMethodRequest.auth_method:type_name -> banda.v1.AuthMethod
-	111, // 83: banda.v1.ListTeamSecretsResponse.secrets:type_name -> banda.v1.SecretInfo
+	113, // 83: banda.v1.ListTeamSecretsResponse.secrets:type_name -> banda.v1.SecretInfo
 	8,   // 84: banda.v1.OpenLoginTerminalRequest.action:type_name -> banda.v1.LoginAction
-	283, // 85: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
+	285, // 85: banda.v1.TeamActivity.time:type_name -> google.protobuf.Timestamp
 	14,  // 86: banda.v1.TeamWatchResponse.threads:type_name -> banda.v1.Thread
-	283, // 87: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
-	283, // 88: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
-	136, // 89: banda.v1.BriefResponse.finished:type_name -> banda.v1.BriefItem
-	136, // 90: banda.v1.BriefResponse.waiting:type_name -> banda.v1.BriefItem
-	136, // 91: banda.v1.BriefResponse.spawned:type_name -> banda.v1.BriefItem
-	136, // 92: banda.v1.BriefResponse.settled:type_name -> banda.v1.BriefItem
-	283, // 93: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
-	283, // 94: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
+	285, // 87: banda.v1.BriefResponse.since:type_name -> google.protobuf.Timestamp
+	285, // 88: banda.v1.BriefResponse.until:type_name -> google.protobuf.Timestamp
+	138, // 89: banda.v1.BriefResponse.finished:type_name -> banda.v1.BriefItem
+	138, // 90: banda.v1.BriefResponse.waiting:type_name -> banda.v1.BriefItem
+	138, // 91: banda.v1.BriefResponse.spawned:type_name -> banda.v1.BriefItem
+	138, // 92: banda.v1.BriefResponse.settled:type_name -> banda.v1.BriefItem
+	285, // 93: banda.v1.BriefItem.time:type_name -> google.protobuf.Timestamp
+	285, // 94: banda.v1.BriefSeenRequest.until:type_name -> google.protobuf.Timestamp
 	14,  // 95: banda.v1.InboxWatchResponse.threads:type_name -> banda.v1.Thread
 	14,  // 96: banda.v1.InboxWatchResponse.mentioned:type_name -> banda.v1.Thread
-	141, // 97: banda.v1.InboxWatchResponse.decisions:type_name -> banda.v1.Decision
+	143, // 97: banda.v1.InboxWatchResponse.decisions:type_name -> banda.v1.Decision
 	14,  // 98: banda.v1.Decision.thread:type_name -> banda.v1.Thread
 	18,  // 99: banda.v1.Decision.request:type_name -> banda.v1.Event
 	18,  // 100: banda.v1.HistoryResponse.events:type_name -> banda.v1.Event
 	3,   // 101: banda.v1.PermissionResolved.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 102: banda.v1.PermissionResolved.mode:type_name -> banda.v1.PermissionMode
-	278, // 103: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
+	280, // 103: banda.v1.PermissionResolved.answers:type_name -> banda.v1.PermissionResolved.AnswersEntry
 	3,   // 104: banda.v1.PermissionAnswerRequest.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 105: banda.v1.PermissionAnswerRequest.mode:type_name -> banda.v1.PermissionMode
-	279, // 106: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
-	280, // 107: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
-	281, // 108: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
+	281, // 106: banda.v1.PermissionAnswerRequest.answers:type_name -> banda.v1.PermissionAnswerRequest.AnswersEntry
+	282, // 107: banda.v1.PermissionVoteRequest.answers:type_name -> banda.v1.PermissionVoteRequest.AnswersEntry
+	283, // 108: banda.v1.PermissionVoted.answers:type_name -> banda.v1.PermissionVoted.AnswersEntry
 	2,   // 109: banda.v1.PermissionSetModeRequest.mode:type_name -> banda.v1.PermissionMode
 	2,   // 110: banda.v1.PermissionModeChanged.mode:type_name -> banda.v1.PermissionMode
 	18,  // 111: banda.v1.WatchThreadResponse.event:type_name -> banda.v1.Event
-	166, // 112: banda.v1.ConnectRequest.hello:type_name -> banda.v1.Hello
-	168, // 113: banda.v1.ConnectRequest.ready:type_name -> banda.v1.Ready
+	168, // 112: banda.v1.ConnectRequest.hello:type_name -> banda.v1.Hello
+	170, // 113: banda.v1.ConnectRequest.ready:type_name -> banda.v1.Ready
 	18,  // 114: banda.v1.ConnectRequest.event:type_name -> banda.v1.Event
-	170, // 115: banda.v1.ConnectRequest.diff:type_name -> banda.v1.Diff
-	169, // 116: banda.v1.ConnectRequest.terminal_output:type_name -> banda.v1.TerminalOutput
-	171, // 117: banda.v1.ConnectRequest.file_response:type_name -> banda.v1.FileResponse
-	167, // 118: banda.v1.ConnectRequest.login_status:type_name -> banda.v1.LoginStatus
-	183, // 119: banda.v1.ConnectRequest.http_tunnel:type_name -> banda.v1.HttpTunnel
-	184, // 120: banda.v1.ConnectRequest.preview_ports:type_name -> banda.v1.PreviewPorts
-	165, // 121: banda.v1.ConnectRequest.pong:type_name -> banda.v1.Pong
-	90,  // 122: banda.v1.ConnectRequest.pushed:type_name -> banda.v1.AutoPush
-	174, // 123: banda.v1.ConnectResponse.prompt:type_name -> banda.v1.Prompt
-	176, // 124: banda.v1.ConnectResponse.stop:type_name -> banda.v1.Stop
-	177, // 125: banda.v1.ConnectResponse.push:type_name -> banda.v1.Push
-	178, // 126: banda.v1.ConnectResponse.terminal_open:type_name -> banda.v1.TerminalOpen
-	179, // 127: banda.v1.ConnectResponse.terminal_input:type_name -> banda.v1.TerminalInput
-	180, // 128: banda.v1.ConnectResponse.terminal_resize:type_name -> banda.v1.TerminalResize
-	181, // 129: banda.v1.ConnectResponse.terminal_close:type_name -> banda.v1.TerminalClose
-	182, // 130: banda.v1.ConnectResponse.file_request:type_name -> banda.v1.FileRequest
+	172, // 115: banda.v1.ConnectRequest.diff:type_name -> banda.v1.Diff
+	171, // 116: banda.v1.ConnectRequest.terminal_output:type_name -> banda.v1.TerminalOutput
+	173, // 117: banda.v1.ConnectRequest.file_response:type_name -> banda.v1.FileResponse
+	169, // 118: banda.v1.ConnectRequest.login_status:type_name -> banda.v1.LoginStatus
+	185, // 119: banda.v1.ConnectRequest.http_tunnel:type_name -> banda.v1.HttpTunnel
+	186, // 120: banda.v1.ConnectRequest.preview_ports:type_name -> banda.v1.PreviewPorts
+	167, // 121: banda.v1.ConnectRequest.pong:type_name -> banda.v1.Pong
+	92,  // 122: banda.v1.ConnectRequest.pushed:type_name -> banda.v1.AutoPush
+	176, // 123: banda.v1.ConnectResponse.prompt:type_name -> banda.v1.Prompt
+	178, // 124: banda.v1.ConnectResponse.stop:type_name -> banda.v1.Stop
+	179, // 125: banda.v1.ConnectResponse.push:type_name -> banda.v1.Push
+	180, // 126: banda.v1.ConnectResponse.terminal_open:type_name -> banda.v1.TerminalOpen
+	181, // 127: banda.v1.ConnectResponse.terminal_input:type_name -> banda.v1.TerminalInput
+	182, // 128: banda.v1.ConnectResponse.terminal_resize:type_name -> banda.v1.TerminalResize
+	183, // 129: banda.v1.ConnectResponse.terminal_close:type_name -> banda.v1.TerminalClose
+	184, // 130: banda.v1.ConnectResponse.file_request:type_name -> banda.v1.FileRequest
 	59,  // 131: banda.v1.ConnectResponse.agent_settings:type_name -> banda.v1.AgentSettings
-	183, // 132: banda.v1.ConnectResponse.http_tunnel:type_name -> banda.v1.HttpTunnel
-	173, // 133: banda.v1.ConnectResponse.permission:type_name -> banda.v1.PermissionCommand
-	164, // 134: banda.v1.ConnectResponse.ping:type_name -> banda.v1.Ping
-	239, // 135: banda.v1.ConnectResponse.id_tokens_changed:type_name -> banda.v1.IdTokensChanged
+	185, // 132: banda.v1.ConnectResponse.http_tunnel:type_name -> banda.v1.HttpTunnel
+	175, // 133: banda.v1.ConnectResponse.permission:type_name -> banda.v1.PermissionCommand
+	166, // 134: banda.v1.ConnectResponse.ping:type_name -> banda.v1.Ping
+	241, // 135: banda.v1.ConnectResponse.id_tokens_changed:type_name -> banda.v1.IdTokensChanged
 	3,   // 136: banda.v1.PermissionCommand.decision:type_name -> banda.v1.PermissionDecision
 	2,   // 137: banda.v1.PermissionCommand.mode:type_name -> banda.v1.PermissionMode
-	282, // 138: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
-	175, // 139: banda.v1.Prompt.images:type_name -> banda.v1.AttachmentImage
-	103, // 140: banda.v1.PreviewPorts.ports:type_name -> banda.v1.PreviewPort
-	185, // 141: banda.v1.ForkRequest.tries:type_name -> banda.v1.RaceTry
+	284, // 138: banda.v1.PermissionCommand.answers:type_name -> banda.v1.PermissionCommand.AnswersEntry
+	177, // 139: banda.v1.Prompt.images:type_name -> banda.v1.AttachmentImage
+	105, // 140: banda.v1.PreviewPorts.ports:type_name -> banda.v1.PreviewPort
+	187, // 141: banda.v1.ForkRequest.tries:type_name -> banda.v1.RaceTry
 	14,  // 142: banda.v1.ForkResponse.threads:type_name -> banda.v1.Thread
-	185, // 143: banda.v1.RaceRequest.tries:type_name -> banda.v1.RaceTry
+	187, // 143: banda.v1.RaceRequest.tries:type_name -> banda.v1.RaceTry
 	2,   // 144: banda.v1.RaceRequest.permission_mode:type_name -> banda.v1.PermissionMode
 	28,  // 145: banda.v1.RaceRequest.attachments:type_name -> banda.v1.Attachment
 	14,  // 146: banda.v1.RaceResponse.threads:type_name -> banda.v1.Thread
-	192, // 147: banda.v1.RaceCompareResponse.entries:type_name -> banda.v1.RaceEntry
+	194, // 147: banda.v1.RaceCompareResponse.entries:type_name -> banda.v1.RaceEntry
 	14,  // 148: banda.v1.RaceEntry.thread:type_name -> banda.v1.Thread
 	14,  // 149: banda.v1.RaceListResponse.threads:type_name -> banda.v1.Thread
 	9,   // 150: banda.v1.SearchRequest.kind:type_name -> banda.v1.SearchKind
-	283, // 151: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
-	283, // 152: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
-	283, // 153: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
+	285, // 151: banda.v1.SearchRequest.after:type_name -> google.protobuf.Timestamp
+	285, // 152: banda.v1.SearchRequest.before:type_name -> google.protobuf.Timestamp
+	285, // 153: banda.v1.SearchResult.time:type_name -> google.protobuf.Timestamp
 	9,   // 154: banda.v1.SearchResult.kind:type_name -> banda.v1.SearchKind
-	200, // 155: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
+	202, // 155: banda.v1.SearchResponse.results:type_name -> banda.v1.SearchResult
 	10,  // 156: banda.v1.PullRequestSummary.state:type_name -> banda.v1.PullState
 	11,  // 157: banda.v1.PullRequestSummary.checks:type_name -> banda.v1.ChecksState
 	12,  // 158: banda.v1.PullRequestSummary.review:type_name -> banda.v1.ReviewState
 	13,  // 159: banda.v1.PullRequestSummary.mergeable:type_name -> banda.v1.Mergeable
 	11,  // 160: banda.v1.PullRequestCheck.state:type_name -> banda.v1.ChecksState
-	283, // 161: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
-	283, // 162: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
+	285, // 161: banda.v1.PullRequestCheck.started_at:type_name -> google.protobuf.Timestamp
+	285, // 162: banda.v1.PullRequestCheck.completed_at:type_name -> google.protobuf.Timestamp
 	12,  // 163: banda.v1.PullRequestReviewer.state:type_name -> banda.v1.ReviewState
-	283, // 164: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
+	285, // 164: banda.v1.PullRequestComment.created_at:type_name -> google.protobuf.Timestamp
 	12,  // 165: banda.v1.PullRequestComment.review:type_name -> banda.v1.ReviewState
-	202, // 166: banda.v1.PullRequest.summary:type_name -> banda.v1.PullRequestSummary
-	204, // 167: banda.v1.PullRequest.reviewers:type_name -> banda.v1.PullRequestReviewer
-	203, // 168: banda.v1.PullRequest.checks:type_name -> banda.v1.PullRequestCheck
-	205, // 169: banda.v1.PullRequest.comments:type_name -> banda.v1.PullRequestComment
-	283, // 170: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
-	283, // 171: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
-	283, // 172: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
-	202, // 173: banda.v1.PullRequestChanged.pull_request:type_name -> banda.v1.PullRequestSummary
-	206, // 174: banda.v1.PullRequestGetResponse.pull_request:type_name -> banda.v1.PullRequest
-	206, // 175: banda.v1.PullRequestCreateResponse.pull_request:type_name -> banda.v1.PullRequest
-	206, // 176: banda.v1.PullRequestLinkResponse.pull_request:type_name -> banda.v1.PullRequest
-	206, // 177: banda.v1.PullRequestUpdateResponse.pull_request:type_name -> banda.v1.PullRequest
-	206, // 178: banda.v1.PullRequestMergeResponse.pull_request:type_name -> banda.v1.PullRequest
-	206, // 179: banda.v1.PullRequestCommentResponse.pull_request:type_name -> banda.v1.PullRequest
-	222, // 180: banda.v1.ListForgeReposResponse.repos:type_name -> banda.v1.ForgeRepo
-	206, // 181: banda.v1.PullRequestResolveResponse.pull_request:type_name -> banda.v1.PullRequest
+	204, // 166: banda.v1.PullRequest.summary:type_name -> banda.v1.PullRequestSummary
+	206, // 167: banda.v1.PullRequest.reviewers:type_name -> banda.v1.PullRequestReviewer
+	205, // 168: banda.v1.PullRequest.checks:type_name -> banda.v1.PullRequestCheck
+	207, // 169: banda.v1.PullRequest.comments:type_name -> banda.v1.PullRequestComment
+	285, // 170: banda.v1.PullRequest.created_at:type_name -> google.protobuf.Timestamp
+	285, // 171: banda.v1.PullRequest.merged_at:type_name -> google.protobuf.Timestamp
+	285, // 172: banda.v1.PullRequest.fetched_at:type_name -> google.protobuf.Timestamp
+	204, // 173: banda.v1.PullRequestChanged.pull_request:type_name -> banda.v1.PullRequestSummary
+	208, // 174: banda.v1.PullRequestGetResponse.pull_request:type_name -> banda.v1.PullRequest
+	208, // 175: banda.v1.PullRequestCreateResponse.pull_request:type_name -> banda.v1.PullRequest
+	208, // 176: banda.v1.PullRequestLinkResponse.pull_request:type_name -> banda.v1.PullRequest
+	208, // 177: banda.v1.PullRequestUpdateResponse.pull_request:type_name -> banda.v1.PullRequest
+	208, // 178: banda.v1.PullRequestMergeResponse.pull_request:type_name -> banda.v1.PullRequest
+	208, // 179: banda.v1.PullRequestCommentResponse.pull_request:type_name -> banda.v1.PullRequest
+	224, // 180: banda.v1.ListForgeReposResponse.repos:type_name -> banda.v1.ForgeRepo
+	208, // 181: banda.v1.PullRequestResolveResponse.pull_request:type_name -> banda.v1.PullRequest
 	2,   // 182: banda.v1.ThreadDefaults.permission_mode:type_name -> banda.v1.PermissionMode
-	230, // 183: banda.v1.SetThreadDefaultsRequest.defaults:type_name -> banda.v1.ThreadDefaults
-	242, // 184: banda.v1.IdTokensResponse.tokens:type_name -> banda.v1.IdToken
-	283, // 185: banda.v1.IdToken.expires_at:type_name -> google.protobuf.Timestamp
-	245, // 186: banda.v1.GetWorkloadIdentityResponse.audiences:type_name -> banda.v1.IdTokenAudience
-	283, // 187: banda.v1.IdTokenAudience.added_at:type_name -> google.protobuf.Timestamp
-	254, // 188: banda.v1.GetGitHubResponse.app:type_name -> banda.v1.GitHubApp
-	255, // 189: banda.v1.GetGitHubResponse.connection:type_name -> banda.v1.ForgeConnection
-	252, // 190: banda.v1.GetGitHubResponse.last_change:type_name -> banda.v1.GitHubAppChange
-	253, // 191: banda.v1.GetGitHubResponse.refusal:type_name -> banda.v1.GitHubAppRefusal
-	283, // 192: banda.v1.GitHubAppChange.at:type_name -> google.protobuf.Timestamp
-	283, // 193: banda.v1.GitHubApp.created_at:type_name -> google.protobuf.Timestamp
-	283, // 194: banda.v1.ForgeConnection.connected_at:type_name -> google.protobuf.Timestamp
-	260, // 195: banda.v1.ListGitHubInstallationsResponse.installations:type_name -> banda.v1.GitHubInstallation
-	283, // 196: banda.v1.GitCredentialResponse.expires_at:type_name -> google.protobuf.Timestamp
-	269, // 197: banda.v1.GetGitLabResponse.hosts:type_name -> banda.v1.GitLabHost
-	271, // 198: banda.v1.GitLabHost.app:type_name -> banda.v1.GitLabApp
-	255, // 199: banda.v1.GitLabHost.connection:type_name -> banda.v1.ForgeConnection
-	270, // 200: banda.v1.GitLabHost.last_change:type_name -> banda.v1.GitLabAppChange
-	283, // 201: banda.v1.GitLabAppChange.at:type_name -> google.protobuf.Timestamp
-	283, // 202: banda.v1.GitLabApp.created_at:type_name -> google.protobuf.Timestamp
+	232, // 183: banda.v1.SetThreadDefaultsRequest.defaults:type_name -> banda.v1.ThreadDefaults
+	244, // 184: banda.v1.IdTokensResponse.tokens:type_name -> banda.v1.IdToken
+	285, // 185: banda.v1.IdToken.expires_at:type_name -> google.protobuf.Timestamp
+	247, // 186: banda.v1.GetWorkloadIdentityResponse.audiences:type_name -> banda.v1.IdTokenAudience
+	285, // 187: banda.v1.IdTokenAudience.added_at:type_name -> google.protobuf.Timestamp
+	256, // 188: banda.v1.GetGitHubResponse.app:type_name -> banda.v1.GitHubApp
+	257, // 189: banda.v1.GetGitHubResponse.connection:type_name -> banda.v1.ForgeConnection
+	254, // 190: banda.v1.GetGitHubResponse.last_change:type_name -> banda.v1.GitHubAppChange
+	255, // 191: banda.v1.GetGitHubResponse.refusal:type_name -> banda.v1.GitHubAppRefusal
+	285, // 192: banda.v1.GitHubAppChange.at:type_name -> google.protobuf.Timestamp
+	285, // 193: banda.v1.GitHubApp.created_at:type_name -> google.protobuf.Timestamp
+	285, // 194: banda.v1.ForgeConnection.connected_at:type_name -> google.protobuf.Timestamp
+	262, // 195: banda.v1.ListGitHubInstallationsResponse.installations:type_name -> banda.v1.GitHubInstallation
+	285, // 196: banda.v1.GitCredentialResponse.expires_at:type_name -> google.protobuf.Timestamp
+	271, // 197: banda.v1.GetGitLabResponse.hosts:type_name -> banda.v1.GitLabHost
+	273, // 198: banda.v1.GitLabHost.app:type_name -> banda.v1.GitLabApp
+	257, // 199: banda.v1.GitLabHost.connection:type_name -> banda.v1.ForgeConnection
+	272, // 200: banda.v1.GitLabHost.last_change:type_name -> banda.v1.GitLabAppChange
+	285, // 201: banda.v1.GitLabAppChange.at:type_name -> google.protobuf.Timestamp
+	285, // 202: banda.v1.GitLabApp.created_at:type_name -> google.protobuf.Timestamp
 	47,  // 203: banda.v1.ThreadService.CreateThread:input_type -> banda.v1.CreateThreadRequest
 	49,  // 204: banda.v1.ThreadService.ListThreads:input_type -> banda.v1.ListThreadsRequest
 	51,  // 205: banda.v1.ThreadService.GetThread:input_type -> banda.v1.GetThreadRequest
@@ -18311,173 +18427,175 @@ var file_banda_v1_banda_proto_depIdxs = []int32{
 	64,  // 211: banda.v1.ThreadService.ApproveTurn:input_type -> banda.v1.ApproveTurnRequest
 	66,  // 212: banda.v1.ThreadService.DeclineTurn:input_type -> banda.v1.DeclineTurnRequest
 	68,  // 213: banda.v1.ThreadService.Trust:input_type -> banda.v1.TrustRequest
-	76,  // 214: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
-	78,  // 215: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
-	144, // 216: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
-	145, // 217: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
-	80,  // 218: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
-	82,  // 219: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
-	84,  // 220: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
-	86,  // 221: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
-	88,  // 222: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
-	91,  // 223: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
-	93,  // 224: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
-	95,  // 225: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
-	97,  // 226: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
-	99,  // 227: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
-	101, // 228: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
-	104, // 229: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
-	139, // 230: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
-	142, // 231: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
-	45,  // 232: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
-	132, // 233: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
-	134, // 234: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
-	137, // 235: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
-	149, // 236: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
-	157, // 237: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
-	151, // 238: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
-	154, // 239: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
-	186, // 240: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
-	188, // 241: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
-	190, // 242: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
-	193, // 243: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
-	195, // 244: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
-	199, // 245: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
-	70,  // 246: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
-	72,  // 247: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
-	74,  // 248: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
-	208, // 249: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
-	210, // 250: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
-	212, // 251: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
-	214, // 252: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
-	216, // 253: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
-	218, // 254: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
-	220, // 255: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
-	223, // 256: banda.v1.ThreadService.PullRequestChoices:input_type -> banda.v1.PullRequestChoicesRequest
-	225, // 257: banda.v1.ThreadService.PullRequestResolve:input_type -> banda.v1.PullRequestResolveRequest
-	237, // 258: banda.v1.ThreadService.AddRepository:input_type -> banda.v1.AddRepositoryRequest
-	235, // 259: banda.v1.ThreadService.RenameThread:input_type -> banda.v1.RenameThreadRequest
-	106, // 260: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
-	108, // 261: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
-	112, // 262: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
-	114, // 263: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
-	116, // 264: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
-	118, // 265: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
-	120, // 266: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
-	122, // 267: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
-	124, // 268: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
-	126, // 269: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
-	128, // 270: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
-	129, // 271: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
-	130, // 272: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
-	228, // 273: banda.v1.SettingsService.SetGitIdentity:input_type -> banda.v1.SetGitIdentityRequest
-	231, // 274: banda.v1.SettingsService.SetThreadDefaults:input_type -> banda.v1.SetThreadDefaultsRequest
-	243, // 275: banda.v1.SettingsService.GetWorkloadIdentity:input_type -> banda.v1.GetWorkloadIdentityRequest
-	246, // 276: banda.v1.SettingsService.AddIdTokenAudience:input_type -> banda.v1.AddIdTokenAudienceRequest
-	248, // 277: banda.v1.SettingsService.RemoveIdTokenAudience:input_type -> banda.v1.RemoveIdTokenAudienceRequest
-	250, // 278: banda.v1.SettingsService.GetGitHub:input_type -> banda.v1.GetGitHubRequest
-	256, // 279: banda.v1.SettingsService.GitHubAppManifest:input_type -> banda.v1.GitHubAppManifestRequest
-	258, // 280: banda.v1.SettingsService.ListGitHubInstallations:input_type -> banda.v1.ListGitHubInstallationsRequest
-	261, // 281: banda.v1.SettingsService.RemoveGitHubApp:input_type -> banda.v1.RemoveGitHubAppRequest
-	263, // 282: banda.v1.SettingsService.DisconnectGitHub:input_type -> banda.v1.DisconnectGitHubRequest
-	267, // 283: banda.v1.SettingsService.GetGitLab:input_type -> banda.v1.GetGitLabRequest
-	272, // 284: banda.v1.SettingsService.SetGitLabApp:input_type -> banda.v1.SetGitLabAppRequest
-	274, // 285: banda.v1.SettingsService.RemoveGitLabApp:input_type -> banda.v1.RemoveGitLabAppRequest
-	276, // 286: banda.v1.SettingsService.DisconnectGitLab:input_type -> banda.v1.DisconnectGitLabRequest
-	163, // 287: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
-	197, // 288: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
-	240, // 289: banda.v1.RunnerService.IdTokens:input_type -> banda.v1.IdTokensRequest
-	265, // 290: banda.v1.RunnerService.GitCredential:input_type -> banda.v1.GitCredentialRequest
-	48,  // 291: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
-	50,  // 292: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
-	52,  // 293: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
-	54,  // 294: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
-	56,  // 295: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
-	58,  // 296: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
-	61,  // 297: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
-	63,  // 298: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
-	65,  // 299: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
-	67,  // 300: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
-	69,  // 301: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
-	77,  // 302: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
-	79,  // 303: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
-	162, // 304: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
-	146, // 305: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
-	81,  // 306: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
-	83,  // 307: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
-	85,  // 308: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
-	87,  // 309: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
-	89,  // 310: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
-	92,  // 311: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
-	94,  // 312: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
-	96,  // 313: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	98,  // 314: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
-	100, // 315: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
-	102, // 316: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
-	105, // 317: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
-	140, // 318: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
-	143, // 319: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
-	46,  // 320: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
-	133, // 321: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
-	135, // 322: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
-	138, // 323: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
-	150, // 324: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
-	158, // 325: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
-	152, // 326: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
-	155, // 327: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
-	187, // 328: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
-	189, // 329: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
-	191, // 330: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
-	194, // 331: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
-	196, // 332: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
-	201, // 333: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
-	71,  // 334: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
-	73,  // 335: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
-	75,  // 336: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
-	209, // 337: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
-	211, // 338: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
-	213, // 339: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
-	215, // 340: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
-	217, // 341: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
-	219, // 342: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
-	221, // 343: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
-	224, // 344: banda.v1.ThreadService.PullRequestChoices:output_type -> banda.v1.PullRequestChoicesResponse
-	226, // 345: banda.v1.ThreadService.PullRequestResolve:output_type -> banda.v1.PullRequestResolveResponse
-	238, // 346: banda.v1.ThreadService.AddRepository:output_type -> banda.v1.AddRepositoryResponse
-	236, // 347: banda.v1.ThreadService.RenameThread:output_type -> banda.v1.RenameThreadResponse
-	107, // 348: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
-	109, // 349: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
-	113, // 350: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
-	115, // 351: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
-	117, // 352: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
-	119, // 353: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
-	121, // 354: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
-	123, // 355: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
-	125, // 356: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
-	127, // 357: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
-	92,  // 358: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
-	94,  // 359: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
-	96,  // 360: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
-	229, // 361: banda.v1.SettingsService.SetGitIdentity:output_type -> banda.v1.SetGitIdentityResponse
-	232, // 362: banda.v1.SettingsService.SetThreadDefaults:output_type -> banda.v1.SetThreadDefaultsResponse
-	244, // 363: banda.v1.SettingsService.GetWorkloadIdentity:output_type -> banda.v1.GetWorkloadIdentityResponse
-	247, // 364: banda.v1.SettingsService.AddIdTokenAudience:output_type -> banda.v1.AddIdTokenAudienceResponse
-	249, // 365: banda.v1.SettingsService.RemoveIdTokenAudience:output_type -> banda.v1.RemoveIdTokenAudienceResponse
-	251, // 366: banda.v1.SettingsService.GetGitHub:output_type -> banda.v1.GetGitHubResponse
-	257, // 367: banda.v1.SettingsService.GitHubAppManifest:output_type -> banda.v1.GitHubAppManifestResponse
-	259, // 368: banda.v1.SettingsService.ListGitHubInstallations:output_type -> banda.v1.ListGitHubInstallationsResponse
-	262, // 369: banda.v1.SettingsService.RemoveGitHubApp:output_type -> banda.v1.RemoveGitHubAppResponse
-	264, // 370: banda.v1.SettingsService.DisconnectGitHub:output_type -> banda.v1.DisconnectGitHubResponse
-	268, // 371: banda.v1.SettingsService.GetGitLab:output_type -> banda.v1.GetGitLabResponse
-	273, // 372: banda.v1.SettingsService.SetGitLabApp:output_type -> banda.v1.SetGitLabAppResponse
-	275, // 373: banda.v1.SettingsService.RemoveGitLabApp:output_type -> banda.v1.RemoveGitLabAppResponse
-	277, // 374: banda.v1.SettingsService.DisconnectGitLab:output_type -> banda.v1.DisconnectGitLabResponse
-	172, // 375: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
-	198, // 376: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
-	241, // 377: banda.v1.RunnerService.IdTokens:output_type -> banda.v1.IdTokensResponse
-	266, // 378: banda.v1.RunnerService.GitCredential:output_type -> banda.v1.GitCredentialResponse
-	291, // [291:379] is the sub-list for method output_type
-	203, // [203:291] is the sub-list for method input_type
+	70,  // 214: banda.v1.ThreadService.SetTeamIdentity:input_type -> banda.v1.SetTeamIdentityRequest
+	78,  // 215: banda.v1.ThreadService.SpawnThread:input_type -> banda.v1.SpawnThreadRequest
+	80,  // 216: banda.v1.ThreadService.LineageChildren:input_type -> banda.v1.LineageChildrenRequest
+	146, // 217: banda.v1.ThreadService.WatchThread:input_type -> banda.v1.WatchThreadRequest
+	147, // 218: banda.v1.ThreadService.History:input_type -> banda.v1.HistoryRequest
+	82,  // 219: banda.v1.ThreadService.ListMentioned:input_type -> banda.v1.ListMentionedRequest
+	84,  // 220: banda.v1.ThreadService.Snooze:input_type -> banda.v1.SnoozeRequest
+	86,  // 221: banda.v1.ThreadService.Settle:input_type -> banda.v1.SettleRequest
+	88,  // 222: banda.v1.ThreadService.Push:input_type -> banda.v1.PushRequest
+	90,  // 223: banda.v1.ThreadService.EnvironmentRecreate:input_type -> banda.v1.EnvironmentRecreateRequest
+	93,  // 224: banda.v1.ThreadService.OpenTerminal:input_type -> banda.v1.OpenTerminalRequest
+	95,  // 225: banda.v1.ThreadService.WriteTerminal:input_type -> banda.v1.WriteTerminalRequest
+	97,  // 226: banda.v1.ThreadService.ResizeTerminal:input_type -> banda.v1.ResizeTerminalRequest
+	99,  // 227: banda.v1.ThreadService.ListFiles:input_type -> banda.v1.ListFilesRequest
+	101, // 228: banda.v1.ThreadService.ReadFile:input_type -> banda.v1.ReadFileRequest
+	103, // 229: banda.v1.ThreadService.PreviewWatch:input_type -> banda.v1.PreviewWatchRequest
+	106, // 230: banda.v1.ThreadService.PreviewOpen:input_type -> banda.v1.PreviewOpenRequest
+	141, // 231: banda.v1.ThreadService.InboxWatch:input_type -> banda.v1.InboxWatchRequest
+	144, // 232: banda.v1.ThreadService.InboxMarkRead:input_type -> banda.v1.InboxMarkReadRequest
+	45,  // 233: banda.v1.ThreadService.SendTyping:input_type -> banda.v1.TypingRequest
+	134, // 234: banda.v1.ThreadService.TeamWatch:input_type -> banda.v1.TeamWatchRequest
+	136, // 235: banda.v1.ThreadService.Brief:input_type -> banda.v1.BriefRequest
+	139, // 236: banda.v1.ThreadService.BriefSeen:input_type -> banda.v1.BriefSeenRequest
+	151, // 237: banda.v1.ThreadService.PermissionAnswer:input_type -> banda.v1.PermissionAnswerRequest
+	159, // 238: banda.v1.ThreadService.PermissionSetMode:input_type -> banda.v1.PermissionSetModeRequest
+	153, // 239: banda.v1.ThreadService.PermissionVote:input_type -> banda.v1.PermissionVoteRequest
+	156, // 240: banda.v1.ThreadService.PermissionRevoke:input_type -> banda.v1.PermissionRevokeRequest
+	188, // 241: banda.v1.ThreadService.Fork:input_type -> banda.v1.ForkRequest
+	190, // 242: banda.v1.ThreadService.Race:input_type -> banda.v1.RaceRequest
+	192, // 243: banda.v1.ThreadService.RaceCompare:input_type -> banda.v1.RaceCompareRequest
+	195, // 244: banda.v1.ThreadService.RaceList:input_type -> banda.v1.RaceListRequest
+	197, // 245: banda.v1.ThreadService.RacePick:input_type -> banda.v1.RacePickRequest
+	201, // 246: banda.v1.ThreadService.Search:input_type -> banda.v1.SearchRequest
+	72,  // 247: banda.v1.ThreadService.HandoffOffer:input_type -> banda.v1.HandoffOfferRequest
+	74,  // 248: banda.v1.ThreadService.HandoffAccept:input_type -> banda.v1.HandoffAcceptRequest
+	76,  // 249: banda.v1.ThreadService.HandoffDecline:input_type -> banda.v1.HandoffDeclineRequest
+	210, // 250: banda.v1.ThreadService.PullRequestGet:input_type -> banda.v1.PullRequestGetRequest
+	212, // 251: banda.v1.ThreadService.PullRequestCreate:input_type -> banda.v1.PullRequestCreateRequest
+	214, // 252: banda.v1.ThreadService.PullRequestLink:input_type -> banda.v1.PullRequestLinkRequest
+	216, // 253: banda.v1.ThreadService.PullRequestUpdate:input_type -> banda.v1.PullRequestUpdateRequest
+	218, // 254: banda.v1.ThreadService.PullRequestMerge:input_type -> banda.v1.PullRequestMergeRequest
+	220, // 255: banda.v1.ThreadService.PullRequestComment:input_type -> banda.v1.PullRequestCommentRequest
+	222, // 256: banda.v1.ThreadService.ListForgeRepos:input_type -> banda.v1.ListForgeReposRequest
+	225, // 257: banda.v1.ThreadService.PullRequestChoices:input_type -> banda.v1.PullRequestChoicesRequest
+	227, // 258: banda.v1.ThreadService.PullRequestResolve:input_type -> banda.v1.PullRequestResolveRequest
+	239, // 259: banda.v1.ThreadService.AddRepository:input_type -> banda.v1.AddRepositoryRequest
+	237, // 260: banda.v1.ThreadService.RenameThread:input_type -> banda.v1.RenameThreadRequest
+	108, // 261: banda.v1.UserService.Me:input_type -> banda.v1.MeRequest
+	110, // 262: banda.v1.UserService.ListUsers:input_type -> banda.v1.ListUsersRequest
+	114, // 263: banda.v1.SettingsService.GetSettings:input_type -> banda.v1.GetSettingsRequest
+	116, // 264: banda.v1.SettingsService.SetAuthMethod:input_type -> banda.v1.SetAuthMethodRequest
+	118, // 265: banda.v1.SettingsService.SetSecret:input_type -> banda.v1.SetSecretRequest
+	120, // 266: banda.v1.SettingsService.DeleteSecret:input_type -> banda.v1.DeleteSecretRequest
+	122, // 267: banda.v1.SettingsService.SetDefaultProfile:input_type -> banda.v1.SetDefaultProfileRequest
+	124, // 268: banda.v1.SettingsService.ListTeamSecrets:input_type -> banda.v1.ListTeamSecretsRequest
+	126, // 269: banda.v1.SettingsService.SetTeamSecret:input_type -> banda.v1.SetTeamSecretRequest
+	128, // 270: banda.v1.SettingsService.DeleteTeamSecret:input_type -> banda.v1.DeleteTeamSecretRequest
+	130, // 271: banda.v1.SettingsService.OpenLoginTerminal:input_type -> banda.v1.OpenLoginTerminalRequest
+	131, // 272: banda.v1.SettingsService.WriteLoginTerminal:input_type -> banda.v1.WriteLoginTerminalRequest
+	132, // 273: banda.v1.SettingsService.ResizeLoginTerminal:input_type -> banda.v1.ResizeLoginTerminalRequest
+	230, // 274: banda.v1.SettingsService.SetGitIdentity:input_type -> banda.v1.SetGitIdentityRequest
+	233, // 275: banda.v1.SettingsService.SetThreadDefaults:input_type -> banda.v1.SetThreadDefaultsRequest
+	245, // 276: banda.v1.SettingsService.GetWorkloadIdentity:input_type -> banda.v1.GetWorkloadIdentityRequest
+	248, // 277: banda.v1.SettingsService.AddIdTokenAudience:input_type -> banda.v1.AddIdTokenAudienceRequest
+	250, // 278: banda.v1.SettingsService.RemoveIdTokenAudience:input_type -> banda.v1.RemoveIdTokenAudienceRequest
+	252, // 279: banda.v1.SettingsService.GetGitHub:input_type -> banda.v1.GetGitHubRequest
+	258, // 280: banda.v1.SettingsService.GitHubAppManifest:input_type -> banda.v1.GitHubAppManifestRequest
+	260, // 281: banda.v1.SettingsService.ListGitHubInstallations:input_type -> banda.v1.ListGitHubInstallationsRequest
+	263, // 282: banda.v1.SettingsService.RemoveGitHubApp:input_type -> banda.v1.RemoveGitHubAppRequest
+	265, // 283: banda.v1.SettingsService.DisconnectGitHub:input_type -> banda.v1.DisconnectGitHubRequest
+	269, // 284: banda.v1.SettingsService.GetGitLab:input_type -> banda.v1.GetGitLabRequest
+	274, // 285: banda.v1.SettingsService.SetGitLabApp:input_type -> banda.v1.SetGitLabAppRequest
+	276, // 286: banda.v1.SettingsService.RemoveGitLabApp:input_type -> banda.v1.RemoveGitLabAppRequest
+	278, // 287: banda.v1.SettingsService.DisconnectGitLab:input_type -> banda.v1.DisconnectGitLabRequest
+	165, // 288: banda.v1.RunnerService.Connect:input_type -> banda.v1.ConnectRequest
+	199, // 289: banda.v1.RunnerService.ForkPatch:input_type -> banda.v1.ForkPatchRequest
+	242, // 290: banda.v1.RunnerService.IdTokens:input_type -> banda.v1.IdTokensRequest
+	267, // 291: banda.v1.RunnerService.GitCredential:input_type -> banda.v1.GitCredentialRequest
+	48,  // 292: banda.v1.ThreadService.CreateThread:output_type -> banda.v1.CreateThreadResponse
+	50,  // 293: banda.v1.ThreadService.ListThreads:output_type -> banda.v1.ListThreadsResponse
+	52,  // 294: banda.v1.ThreadService.GetThread:output_type -> banda.v1.GetThreadResponse
+	54,  // 295: banda.v1.ThreadService.SendMessage:output_type -> banda.v1.SendMessageResponse
+	56,  // 296: banda.v1.ThreadService.Interrupt:output_type -> banda.v1.InterruptResponse
+	58,  // 297: banda.v1.ThreadService.SetMode:output_type -> banda.v1.SetModeResponse
+	61,  // 298: banda.v1.ThreadService.SetAgentSettings:output_type -> banda.v1.SetAgentSettingsResponse
+	63,  // 299: banda.v1.ThreadService.Retry:output_type -> banda.v1.RetryResponse
+	65,  // 300: banda.v1.ThreadService.ApproveTurn:output_type -> banda.v1.ApproveTurnResponse
+	67,  // 301: banda.v1.ThreadService.DeclineTurn:output_type -> banda.v1.DeclineTurnResponse
+	69,  // 302: banda.v1.ThreadService.Trust:output_type -> banda.v1.TrustResponse
+	71,  // 303: banda.v1.ThreadService.SetTeamIdentity:output_type -> banda.v1.SetTeamIdentityResponse
+	79,  // 304: banda.v1.ThreadService.SpawnThread:output_type -> banda.v1.SpawnThreadResponse
+	81,  // 305: banda.v1.ThreadService.LineageChildren:output_type -> banda.v1.LineageChildrenResponse
+	164, // 306: banda.v1.ThreadService.WatchThread:output_type -> banda.v1.WatchThreadResponse
+	148, // 307: banda.v1.ThreadService.History:output_type -> banda.v1.HistoryResponse
+	83,  // 308: banda.v1.ThreadService.ListMentioned:output_type -> banda.v1.ListMentionedResponse
+	85,  // 309: banda.v1.ThreadService.Snooze:output_type -> banda.v1.SnoozeResponse
+	87,  // 310: banda.v1.ThreadService.Settle:output_type -> banda.v1.SettleResponse
+	89,  // 311: banda.v1.ThreadService.Push:output_type -> banda.v1.PushResponse
+	91,  // 312: banda.v1.ThreadService.EnvironmentRecreate:output_type -> banda.v1.EnvironmentRecreateResponse
+	94,  // 313: banda.v1.ThreadService.OpenTerminal:output_type -> banda.v1.OpenTerminalResponse
+	96,  // 314: banda.v1.ThreadService.WriteTerminal:output_type -> banda.v1.WriteTerminalResponse
+	98,  // 315: banda.v1.ThreadService.ResizeTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	100, // 316: banda.v1.ThreadService.ListFiles:output_type -> banda.v1.ListFilesResponse
+	102, // 317: banda.v1.ThreadService.ReadFile:output_type -> banda.v1.ReadFileResponse
+	104, // 318: banda.v1.ThreadService.PreviewWatch:output_type -> banda.v1.PreviewWatchResponse
+	107, // 319: banda.v1.ThreadService.PreviewOpen:output_type -> banda.v1.PreviewOpenResponse
+	142, // 320: banda.v1.ThreadService.InboxWatch:output_type -> banda.v1.InboxWatchResponse
+	145, // 321: banda.v1.ThreadService.InboxMarkRead:output_type -> banda.v1.InboxMarkReadResponse
+	46,  // 322: banda.v1.ThreadService.SendTyping:output_type -> banda.v1.TypingResponse
+	135, // 323: banda.v1.ThreadService.TeamWatch:output_type -> banda.v1.TeamWatchResponse
+	137, // 324: banda.v1.ThreadService.Brief:output_type -> banda.v1.BriefResponse
+	140, // 325: banda.v1.ThreadService.BriefSeen:output_type -> banda.v1.BriefSeenResponse
+	152, // 326: banda.v1.ThreadService.PermissionAnswer:output_type -> banda.v1.PermissionAnswerResponse
+	160, // 327: banda.v1.ThreadService.PermissionSetMode:output_type -> banda.v1.PermissionSetModeResponse
+	154, // 328: banda.v1.ThreadService.PermissionVote:output_type -> banda.v1.PermissionVoteResponse
+	157, // 329: banda.v1.ThreadService.PermissionRevoke:output_type -> banda.v1.PermissionRevokeResponse
+	189, // 330: banda.v1.ThreadService.Fork:output_type -> banda.v1.ForkResponse
+	191, // 331: banda.v1.ThreadService.Race:output_type -> banda.v1.RaceResponse
+	193, // 332: banda.v1.ThreadService.RaceCompare:output_type -> banda.v1.RaceCompareResponse
+	196, // 333: banda.v1.ThreadService.RaceList:output_type -> banda.v1.RaceListResponse
+	198, // 334: banda.v1.ThreadService.RacePick:output_type -> banda.v1.RacePickResponse
+	203, // 335: banda.v1.ThreadService.Search:output_type -> banda.v1.SearchResponse
+	73,  // 336: banda.v1.ThreadService.HandoffOffer:output_type -> banda.v1.HandoffOfferResponse
+	75,  // 337: banda.v1.ThreadService.HandoffAccept:output_type -> banda.v1.HandoffAcceptResponse
+	77,  // 338: banda.v1.ThreadService.HandoffDecline:output_type -> banda.v1.HandoffDeclineResponse
+	211, // 339: banda.v1.ThreadService.PullRequestGet:output_type -> banda.v1.PullRequestGetResponse
+	213, // 340: banda.v1.ThreadService.PullRequestCreate:output_type -> banda.v1.PullRequestCreateResponse
+	215, // 341: banda.v1.ThreadService.PullRequestLink:output_type -> banda.v1.PullRequestLinkResponse
+	217, // 342: banda.v1.ThreadService.PullRequestUpdate:output_type -> banda.v1.PullRequestUpdateResponse
+	219, // 343: banda.v1.ThreadService.PullRequestMerge:output_type -> banda.v1.PullRequestMergeResponse
+	221, // 344: banda.v1.ThreadService.PullRequestComment:output_type -> banda.v1.PullRequestCommentResponse
+	223, // 345: banda.v1.ThreadService.ListForgeRepos:output_type -> banda.v1.ListForgeReposResponse
+	226, // 346: banda.v1.ThreadService.PullRequestChoices:output_type -> banda.v1.PullRequestChoicesResponse
+	228, // 347: banda.v1.ThreadService.PullRequestResolve:output_type -> banda.v1.PullRequestResolveResponse
+	240, // 348: banda.v1.ThreadService.AddRepository:output_type -> banda.v1.AddRepositoryResponse
+	238, // 349: banda.v1.ThreadService.RenameThread:output_type -> banda.v1.RenameThreadResponse
+	109, // 350: banda.v1.UserService.Me:output_type -> banda.v1.MeResponse
+	111, // 351: banda.v1.UserService.ListUsers:output_type -> banda.v1.ListUsersResponse
+	115, // 352: banda.v1.SettingsService.GetSettings:output_type -> banda.v1.GetSettingsResponse
+	117, // 353: banda.v1.SettingsService.SetAuthMethod:output_type -> banda.v1.SetAuthMethodResponse
+	119, // 354: banda.v1.SettingsService.SetSecret:output_type -> banda.v1.SetSecretResponse
+	121, // 355: banda.v1.SettingsService.DeleteSecret:output_type -> banda.v1.DeleteSecretResponse
+	123, // 356: banda.v1.SettingsService.SetDefaultProfile:output_type -> banda.v1.SetDefaultProfileResponse
+	125, // 357: banda.v1.SettingsService.ListTeamSecrets:output_type -> banda.v1.ListTeamSecretsResponse
+	127, // 358: banda.v1.SettingsService.SetTeamSecret:output_type -> banda.v1.SetTeamSecretResponse
+	129, // 359: banda.v1.SettingsService.DeleteTeamSecret:output_type -> banda.v1.DeleteTeamSecretResponse
+	94,  // 360: banda.v1.SettingsService.OpenLoginTerminal:output_type -> banda.v1.OpenTerminalResponse
+	96,  // 361: banda.v1.SettingsService.WriteLoginTerminal:output_type -> banda.v1.WriteTerminalResponse
+	98,  // 362: banda.v1.SettingsService.ResizeLoginTerminal:output_type -> banda.v1.ResizeTerminalResponse
+	231, // 363: banda.v1.SettingsService.SetGitIdentity:output_type -> banda.v1.SetGitIdentityResponse
+	234, // 364: banda.v1.SettingsService.SetThreadDefaults:output_type -> banda.v1.SetThreadDefaultsResponse
+	246, // 365: banda.v1.SettingsService.GetWorkloadIdentity:output_type -> banda.v1.GetWorkloadIdentityResponse
+	249, // 366: banda.v1.SettingsService.AddIdTokenAudience:output_type -> banda.v1.AddIdTokenAudienceResponse
+	251, // 367: banda.v1.SettingsService.RemoveIdTokenAudience:output_type -> banda.v1.RemoveIdTokenAudienceResponse
+	253, // 368: banda.v1.SettingsService.GetGitHub:output_type -> banda.v1.GetGitHubResponse
+	259, // 369: banda.v1.SettingsService.GitHubAppManifest:output_type -> banda.v1.GitHubAppManifestResponse
+	261, // 370: banda.v1.SettingsService.ListGitHubInstallations:output_type -> banda.v1.ListGitHubInstallationsResponse
+	264, // 371: banda.v1.SettingsService.RemoveGitHubApp:output_type -> banda.v1.RemoveGitHubAppResponse
+	266, // 372: banda.v1.SettingsService.DisconnectGitHub:output_type -> banda.v1.DisconnectGitHubResponse
+	270, // 373: banda.v1.SettingsService.GetGitLab:output_type -> banda.v1.GetGitLabResponse
+	275, // 374: banda.v1.SettingsService.SetGitLabApp:output_type -> banda.v1.SetGitLabAppResponse
+	277, // 375: banda.v1.SettingsService.RemoveGitLabApp:output_type -> banda.v1.RemoveGitLabAppResponse
+	279, // 376: banda.v1.SettingsService.DisconnectGitLab:output_type -> banda.v1.DisconnectGitLabResponse
+	174, // 377: banda.v1.RunnerService.Connect:output_type -> banda.v1.ConnectResponse
+	200, // 378: banda.v1.RunnerService.ForkPatch:output_type -> banda.v1.ForkPatchResponse
+	243, // 379: banda.v1.RunnerService.IdTokens:output_type -> banda.v1.IdTokensResponse
+	268, // 380: banda.v1.RunnerService.GitCredential:output_type -> banda.v1.GitCredentialResponse
+	292, // [292:381] is the sub-list for method output_type
+	203, // [203:292] is the sub-list for method input_type
 	203, // [203:203] is the sub-list for extension type_name
 	203, // [203:203] is the sub-list for extension extendee
 	0,   // [0:203] is the sub-list for field type_name
@@ -18526,7 +18644,7 @@ func file_banda_v1_banda_proto_init() {
 		(*Event_SlashCommands)(nil),
 		(*Event_EnvWaiting)(nil),
 	}
-	file_banda_v1_banda_proto_msgTypes[149].OneofWrappers = []any{
+	file_banda_v1_banda_proto_msgTypes[151].OneofWrappers = []any{
 		(*ConnectRequest_Hello)(nil),
 		(*ConnectRequest_Ready)(nil),
 		(*ConnectRequest_Event)(nil),
@@ -18539,7 +18657,7 @@ func file_banda_v1_banda_proto_init() {
 		(*ConnectRequest_Pong)(nil),
 		(*ConnectRequest_Pushed)(nil),
 	}
-	file_banda_v1_banda_proto_msgTypes[158].OneofWrappers = []any{
+	file_banda_v1_banda_proto_msgTypes[160].OneofWrappers = []any{
 		(*ConnectResponse_Prompt)(nil),
 		(*ConnectResponse_Stop)(nil),
 		(*ConnectResponse_Push)(nil),
@@ -18554,15 +18672,15 @@ func file_banda_v1_banda_proto_init() {
 		(*ConnectResponse_Ping)(nil),
 		(*ConnectResponse_IdTokensChanged)(nil),
 	}
-	file_banda_v1_banda_proto_msgTypes[185].OneofWrappers = []any{}
-	file_banda_v1_banda_proto_msgTypes[200].OneofWrappers = []any{}
+	file_banda_v1_banda_proto_msgTypes[187].OneofWrappers = []any{}
+	file_banda_v1_banda_proto_msgTypes[202].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_banda_v1_banda_proto_rawDesc), len(file_banda_v1_banda_proto_rawDesc)),
 			NumEnums:      14,
-			NumMessages:   269,
+			NumMessages:   271,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

@@ -118,6 +118,7 @@ func (s *Service) HandoffAccept(ctx context.Context, req *bandav1.HandoffAcceptR
 			return nil, err
 		}
 		t.State = next
+		t.TeamIdentity = false // the new owner's choice, as trust is
 		if t.APIKey = st.AuthMethod == "api_key"; !t.APIKey {
 			withdrawn, err := withdrawTurns(ctx, tx, t, or(names[by], by))
 			return append(out, withdrawn...), err

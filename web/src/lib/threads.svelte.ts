@@ -14,6 +14,8 @@ export const threads = $state({
 	loginNeeded: false,
 	users: [] as User[],
 	me: undefined as User | undefined,
+	// This Banda has a team Console identity threads can run on.
+	teamIdentity: false,
 	search: '',
 	project: '',
 	// Sidebar families the user unfolded, by parent id.
@@ -25,13 +27,13 @@ export const threads = $state({
 });
 
 export async function loadThreads() {
-	const [mine, mentioned, { users }, { user }] = await Promise.all([
+	const [mine, mentioned, { users }, { user, teamIdentity }] = await Promise.all([
 		api.listThreads({ ownerId: '' }),
 		api.listMentioned({}),
 		userApi.listUsers({}),
 		userApi.me({})
 	]);
-	Object.assign(threads, { list: mine.threads, mentioned: mentioned.threads, users, me: user });
+	Object.assign(threads, { list: mine.threads, mentioned: mentioned.threads, users, me: user, teamIdentity });
 }
 
 // The thread on screen counts as read: the page marks it read as events arrive.

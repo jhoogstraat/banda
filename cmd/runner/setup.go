@@ -90,8 +90,24 @@ func prepare(ctx context.Context, send func(*bandav1.Event) error, notice func(s
 	return s.login(ctx, notice, loginStatus)
 }
 
-// login waits for the subscription login, or checks for the API key.
+// login waits for the subscription login, or checks for the API key or the
+// team's identity token, which comes with the runner's first fetch.
 func (s setup) login(ctx context.Context, notice func(string) error, loginStatus func(bool) error) error {
+	if teamToken != "" {
+		for range 60 {
+			if b, err := os.ReadFile(teamToken); err == nil && len(b) > 0 {
+				s.report("login", "Use the team's Console identity", bandav1.SetupState_SETUP_STATE_SKIPPED, "Using the team's Console identity instead of a Claude login.")
+				return nil
+			}
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		s.report("login", "Use the team's Console identity", bandav1.SetupState_SETUP_STATE_FAILED, "No identity token arrived for the team's Console identity. The chat says why if Banda refused one.")
+		return errors.New("no team identity token")
+	}
 	if !apiKey {
 		return s.waitForLogin(ctx, notice, loginStatus)
 	}

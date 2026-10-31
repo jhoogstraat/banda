@@ -53,10 +53,17 @@ func (s *Service) spawn(ctx context.Context, parent store.Thread, owner, actor s
 		}
 	}
 	by := actor
+	team := false
 	if actor == "agent" { // the parent's agent wrote the prompt
 		by = "agent:" + parent.ID
+		// Its turn may be a teammate's, so its sub-thread can't run on the
+		// owner's subscription.
+		team = parent.TeamIdentity
+		if parent.EnvAPIKey && !parent.APIKey {
+			return store.Thread{}, connect.NewError(connect.CodeFailedPrecondition, "this thread's owner runs on their Claude subscription now, so only they can start sub-threads: do the work here")
+		}
 	}
-	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, ParentID: parent.ID, RepoURL: repo,
+	child, err := s.create(ctx, store.Thread{State: thread.State{OwnerID: owner}, TeamIdentity: team, ParentID: parent.ID, RepoURL: repo,
 		BaseBranch: base, Model: or(model, parent.Model), Effort: or(effort, parent.Effort), Profile: or(profile, parent.Profile),
 		PermissionMode: parent.PermissionMode, WakeParent: wake}, by, first) // an agent's sub-thread asks no less than it does
 	if err != nil {

@@ -197,11 +197,21 @@ func (s *Store) DropRunnerToken(ctx context.Context, id string) error {
 
 // NewRunnerToken gives the thread a new runner token, for a pod started
 // with the API key or not. Only its hash is kept; with it, whether that pod,
-// the only one whose runner can connect, has the key (State.EnvAPIKey).
+// the only one whose runner can connect, has the key (State.EnvAPIKey), and
+// whether it moved off the previous pod's Claude volume, which holds the
+// session (a thread with no runner token yet, or after a handoff, has none).
 func (s *Store) NewRunnerToken(ctx context.Context, id string, apiKey bool) (string, error) {
 	token := rand.Text()
-	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = $2, env_api_key = $3 WHERE id = $1`, id, TokenHash(token), apiKey)
+	_, err := s.db.Exec(ctx, `UPDATE threads SET runner_hash = $2, env_api_key = $3,
+		session_moved = session_moved OR (runner_hash <> '' AND env_api_key <> $3) WHERE id = $1`, id, TokenHash(token), apiKey)
 	return token, err
+}
+
+// TakeSessionMoved reports whether the thread's environment moved to another
+// Claude volume since the last call.
+func (s *Store) TakeSessionMoved(ctx context.Context, id string) (bool, error) {
+	tag, err := s.db.Exec(ctx, `UPDATE threads SET session_moved = false WHERE id = $1 AND session_moved`, id)
+	return tag.RowsAffected() > 0, err
 }
 
 // TokenHash is what the database keeps of a runner token.

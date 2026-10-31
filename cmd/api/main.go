@@ -36,12 +36,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	team := sandbox.TeamIdentity{RuleID: os.Getenv("CLAUDE_TEAM_RULE_ID"), OrganizationID: os.Getenv("CLAUDE_TEAM_ORGANIZATION_ID"),
+		ServiceAccountID: os.Getenv("CLAUDE_TEAM_SERVICE_ACCOUNT_ID"), WorkspaceID: os.Getenv("CLAUDE_TEAM_WORKSPACE_ID")}
 	sb, err := sandbox.New(sandbox.Config{
 		Context:   os.Getenv("KUBE_CONTEXT"),
 		Namespace: env("SANDBOX_NAMESPACE", "banda"),
 		Image:     env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
 		APIURL:    env("RUNNER_API_URL", "http://host.containers.internal:8787"),
 		Sizes:     sizes,
+		Team:      team,
 	})
 	if err != nil {
 		log.Fatalf("sandbox client: %v", err)
@@ -149,6 +152,7 @@ func main() {
 	// TEST_FORGE_URL: tests only, a fake forge API in place of every forge's.
 	api.Forges = forge.Config{Hosts: hosts, TestURL: os.Getenv("TEST_FORGE_URL"), Refused: svc.TokenRefused}
 	svc.PublicURL = env("PUBLIC_URL", "http://localhost:5173")
+	svc.TeamIdentity = team.Set()
 	// Tests only: the GitHub App's Secret, for APIs side by side in one namespace.
 	api.GitHubAppSecret = env("TEST_GITHUB_APP_SECRET", api.GitHubAppSecret)
 	// Tests only: the prefix of the GitLab applications' Secrets, likewise.

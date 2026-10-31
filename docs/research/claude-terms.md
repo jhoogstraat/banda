@@ -221,6 +221,23 @@ Inference: only the team-key row makes teammate turns plainly allowed by the tex
 
 ---
 
+## Re-check (2026-10-31)
+
+After [Amp's post](https://ampcode.com/news/use-your-claude-plan) of 2026-10-10, every page above was read again.
+
+Changes in the text:
+- The legal page's OAuth and routing sentences now read "Free, Pro, Max, Ultra, Team, and Enterprise" and "Free, Pro, Max, or Ultra plan credentials"; "ordinary, individual usage" covers Ultra too. Ultra is a consumer plan, so what holds for Pro and Max holds for it.
+- Credits: Max $100 and Ultra $200 a month, Team $20 per Standard and $100 per Premium seat, pooled and "capped at $500". "Everyone with an API key in the linked organization draws from the same balance." Credits don't cover interactive Claude Code, "Extra usage", or Bedrock, Vertex and Foundry. Pro and Enterprise aren't eligible.
+- The Usage Policy of Nov 12, 2026 is unchanged, and not in force yet. The Agent SDK note still says "Unless previously approved".
+
+Amp: its Claude Code mode "uses the Claude Agent SDK", and you link a plan that "orbs and runners use". Its pages don't say how the link works, whether a credential reaches its servers, whose plan a teammate's multiplayer prompt draws on, or whether it has an agreement with Anthropic.
+
+Inference: Amp shows nothing about what Banda may do. The SDK permission depends on an approval only Anthropic can give, and the hosting permission names the binary. The June note on the Agent SDK page still names "third-party app usage", the October note no longer does.
+
+New alternative: [Workload Identity Federation](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation) takes "any standards-compliant OIDC issuer", and "Claude Code and the Claude Agent SDK honor this same resolution order". The usage is billed to the rule's workspace, "the same as an API key". Tokens last at most twice the identity token's remaining life, so 30 minutes with Banda's. It is Q4's team key without a long-lived key in a pod. `TestContractFederation` runs it against the pinned CLI on a fake API. Neither page gives a plan requirement or GA status, and whether credits cover federated tokens isn't stated.
+
+Found in Banda and fixed: key pods mounted the volume with the owner's login, so a teammate's turn could read it or run `claude` without the key; `conversation` passed proposals on to forks and handoffs.
+
 ## Decision (2026-10-24)
 
 No message goes to Anthropic. Banda complies with the text as written, and takes the strict reading where it is unclear:
@@ -228,8 +245,8 @@ No message goes to Anthropic. Banda complies with the text as written, and takes
 | Point | Strict reading | How Banda meets it |
 |---|---|---|
 | Hosting (1a) | Whoever runs Banda has agreed to Anthropic's Commercial Terms | A prerequisite on the install page (docs/deployment.md) and in the README; Banda can't check it |
-| Work use of Pro/Max in the EEA (added 2026-10-25) | The EEA Consumer Terms, §11: "you will not use our Services for any commercial or business purposes" | Banda is a work tool, so in the EEA and Switzerland each person runs Claude Code on a Team or Enterprise seat or an API key, not Pro/Max: a prerequisite on the install page and in the README; Banda can't check it |
-| Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription | Teammate turns and trust only when the owner runs Claude Code on an API key (PLAN.md, Teammate turns). Only a key of the team's own Console account fits "the customer's own authorized users"; the README says so (Q4, added 2026-10-30) |
+| Work use of Pro/Max/Ultra in the EEA (added 2026-10-25) | The EEA Consumer Terms, §11: "you will not use our Services for any commercial or business purposes" | Banda is a work tool, so in the EEA and Switzerland each person runs Claude Code on a Team or Enterprise seat or an API key, not Pro/Max/Ultra: a prerequisite on the install page and in the README; Banda can't check it |
+| Teammate turns (2) | Nobody but the subscriber starts a turn on a subscription, and a turn that may be a teammate's can't reach that login (added 2026-10-31) | Teammate turns and trust only on an API key or the team's Console identity (PLAN.md, Teammate turns, Team identity), on a Claude volume without the login; such a thread's agent starts no turn on a subscription. Only the team's own Console account fits "the customer's own authorized users"; the README says so (Q4, added 2026-10-30) |
 | The login code (1c) | Banda never collects, stores or reads a Claude credential, and sign-in completes in Anthropic's flow | The user runs the binary's own `claude auth login` and signs in on claude.ai in their own browser. The code they paste passes through the terminal stream as through an SSH session; Banda neither logs nor stores it, and learns the login state from `claude auth status`, not the credentials file |
 | Offering login (3) | No Claude login form of Banda's own | Banda's buttons open a terminal running the binary's login, named as Claude Code's |
 | The login volume (1d) | Only the mechanism Anthropic documents for dev containers, for one user | Each user's volume is mounted only by their own pods, never by the API |
