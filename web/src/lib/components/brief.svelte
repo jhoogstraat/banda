@@ -55,7 +55,7 @@
 						{/each}
 					</ul>
 					{#if list.length > 5 && !more[name]}
-						<button class="px-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => (more[name] = true)}>
+						<button class="hit px-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => (more[name] = true)}>
 							{list.length - 5} more
 						</button>
 					{/if}

@@ -35,4 +35,5 @@ When you notice an inefficiency or make a mistake that a clearer instruction wou
 
 ## Git
 
+- Once a goal is defined and its result approved, the work ends when it is merged on `main` and tested: land it and see CI pass, don't stop at an uncommitted or unmerged result.
 - The remote is `github.com/jhoogstraat/banda` (private for now). Pushing to `main` is fine once your changes are squashed into a single commit with a message that says what changed and why, or squash-merge a pull request. Test locally first (`mise run test`, and `mise run e2e` with the specs the change touches, the whole suite for a change that reaches every thread); CI then runs on `main`, and a failure there is fixed forward. Never force-push `main`, and don't create tags: a `v*` tag publishes a release.

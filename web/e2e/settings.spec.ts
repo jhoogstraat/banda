@@ -93,6 +93,7 @@ test('defaults for new threads: set in Settings, the composer starts with them a
 		.toMatchObject({ model: 'claude-sonnet-5-5', effort: 'low', permissionMode: PermissionMode.PLAN });
 
 	await page.goto('/');
+	await page.getByRole('button', { name: 'Options' }).click();
 	for (const name of ['Model: claude-sonnet-5-5', 'Effort: low', 'Permissions: Plan']) await expect(page.getByRole('button', { name })).toBeVisible();
 
 	const t = await alice.create({ prompt: 'e2e' });

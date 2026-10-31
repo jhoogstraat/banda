@@ -18,7 +18,7 @@
 		let { isStreaming, duration } = reasoningContext;
 
 		if (isStreaming || duration === 0) {
-			return "Thinking...";
+			return "Thinking…";
 		}
 		if (duration === undefined) {
 			return "Thought for a few seconds";

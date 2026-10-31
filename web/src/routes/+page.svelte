@@ -2,10 +2,12 @@
 	import ForgeAction from '#lib/components/forge-action.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { Popover } from 'bits-ui';
 	import BrainIcon from '@lucide/svelte/icons/brain';
 	import ContactRoundIcon from '@lucide/svelte/icons/contact-round';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import PlugIcon from '@lucide/svelte/icons/plug';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import SplitIcon from '@lucide/svelte/icons/split';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
 	import type { PromptInputMessage } from '#lib/components/ai-elements/prompt-input/index.js';
@@ -34,6 +36,22 @@
 	let profile = $state('');
 	// Not remembered: every try runs (and bills) its own agent.
 	let tries = $state(tryOptions[0]);
+	// The Options chip names only what differs from these.
+	const defaults = $state({ model: models[0], effort: 'high', permissions: permissionLabel(PermissionMode.BYPASS), profile: '' });
+	const changed = $derived(
+		[
+			model !== defaults.model && model,
+			effort !== defaults.effort && effort,
+			profile !== defaults.profile && profileLabel(profile),
+			permissions !== defaults.permissions && permissions,
+			tries !== tryOptions[0] && tries
+		]
+			.filter(Boolean)
+			.join(', ')
+	);
+	// What was being typed survives a reload, like the last choices.
+	let prompt = $state(saved('prompt', ''));
+	$effect(() => localStorage.setItem('banda.prompt', prompt));
 	// Without a remembered choice, default to the most recently active repository once the sidebar has loaded.
 	$effect(() => {
 		if (!repoUrl) repoUrl = projects()[0] ?? '';
@@ -57,13 +75,14 @@
 					model = d?.model || model;
 					effort = d?.effort || effort;
 					if (d?.permissionMode) permissions = permissionLabel(d.permissionMode);
+					Object.assign(defaults, { model, effort, permissions, profile });
 				}
 				const a = accounts.find((a) => a.harness === 'claude');
 				if (!a) connect = '';
 				else if (a.authMethod === AuthMethod.API_KEY) connect = a.apiKeySet ? '' : 'key';
 				else connect = a.loginState === LoginState.LOGGED_IN ? '' : 'login';
 			})
-			.catch(() => {});
+			.catch((e) => (error = `Couldn't load your defaults, so these are Banda's: ${e.message}`));
 	$effect(() => {
 		checkAccount();
 	});
@@ -86,9 +105,11 @@
 			const permissionMode = permissionModes[permissions] ?? PermissionMode.BYPASS;
 			if (race.length > 1) {
 				const { threads } = await api.race({ repoUrl: repo, baseBranch, prompt: text, tries: race, permissionMode, profile, attachments });
+				prompt = '';
 				await goto(`/compare?race=${threads[0].raceId}`);
 			} else {
 				const { thread } = await api.createThread({ repoUrl: repo, baseBranch, model, effort, prompt: text, permissionMode, profile, attachments });
+				prompt = '';
 				await goto(`/t/${thread!.id}`);
 			}
 		} catch (err) {
@@ -134,17 +155,31 @@
 					{#snippet children(a)}<PromptInput.Attachment data={a} />{/snippet}
 				</PromptInput.Attachments>
 				<PromptInput.Body>
-					<PromptInput.Textarea placeholder="Describe the task. Enter sends, Shift+Enter adds a line." />
+					<PromptInput.Textarea bind:value={prompt} placeholder="Describe the task. Enter sends, Shift+Enter adds a line." />
 				</PromptInput.Body>
 				<PromptInput.Toolbar class="items-end">
-					<PromptInput.Tools class="min-w-0 flex-wrap">
+					<PromptInput.Tools class="min-w-0 py-0.5 max-sm:overflow-x-auto max-sm:[scrollbar-width:none] sm:flex-wrap">
 						<AttachButton />
 						<RepoPicker bind:repoUrl bind:baseBranch />
-						<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
-						<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
-						<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
-						<OptionMenu label="Permissions" icon={ShieldIcon} bind:value={permissions} options={Object.keys(permissionModes)} />
-						<OptionMenu label="Try N ways" icon={SplitIcon} bind:value={tries} options={tryOptions} />
+						<Popover.Root>
+							<Popover.Trigger>
+								{#snippet child({ props })}
+									<PromptInput.Button {...props} size="sm" class="min-w-0" aria-label={changed ? `Options: ${changed}` : 'Options'}>
+										<SlidersHorizontalIcon />
+										<span class="max-w-56 truncate">Options{changed ? ` · ${changed}` : ''}</span>
+									</PromptInput.Button>
+								{/snippet}
+							</Popover.Trigger>
+							<Popover.Portal>
+								<Popover.Content align="start" sideOffset={4} class="z-50 flex flex-col items-start gap-1 rounded-md border bg-popover p-1.5 text-popover-foreground shadow-md">
+									<OptionMenu label="Model" icon={CpuIcon} bind:value={model} options={models} />
+									<OptionMenu label="Effort" icon={BrainIcon} bind:value={effort} options={efforts} />
+									<OptionMenu label="Profile" icon={ContactRoundIcon} bind:value={() => profileLabel(profile), (v) => (profile = profileName(v))} options={profileLabels} />
+									<OptionMenu label="Permissions" icon={ShieldIcon} bind:value={permissions} options={Object.keys(permissionModes)} />
+									<OptionMenu label="Try N ways" icon={SplitIcon} bind:value={tries} options={tryOptions} />
+								</Popover.Content>
+							</Popover.Portal>
+						</Popover.Root>
 					</PromptInput.Tools>
 					<PromptInput.Submit status={busy ? 'submitted' : undefined} />
 				</PromptInput.Toolbar>

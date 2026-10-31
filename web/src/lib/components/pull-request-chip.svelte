@@ -17,7 +17,7 @@
 	<look.icon class="{icon} shrink-0 {look.class}" />
 	<span class="tabular-nums">{ref(pr)}</span>
 	{#if checks}<checks.icon class="{icon} shrink-0 {checks.class}" />{/if}
-	{#if live(pr) && pr.review === ReviewState.APPROVED}<UserCheckIcon class="{icon} shrink-0 text-emerald-700 dark:text-emerald-400" />{/if}
+	{#if live(pr) && pr.review === ReviewState.APPROVED}<UserCheckIcon class="{icon} shrink-0 text-success-foreground" />{/if}
 	{#if live(pr) && pr.review === ReviewState.CHANGES_REQUESTED}<UserXIcon class="{icon} shrink-0 text-destructive" />{/if}
 	{#if live(pr) && pr.mergeable === Mergeable.CONFLICTS}<TriangleAlertIcon class="{icon} shrink-0 text-destructive" />{/if}
 {/snippet}

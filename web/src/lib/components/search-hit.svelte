@@ -30,6 +30,6 @@
 		<span class="ml-auto shrink-0">{ago(hit.time)}</span>
 	</div>
 	<p class="text-sm {compact ? 'line-clamp-1' : 'line-clamp-3'} break-words">
-		{#each hit.snippet as part, i}{#if i % 2}<mark class="rounded-sm bg-amber-400/30 px-0.5 text-foreground">{part}</mark>{:else}{part}{/if}{/each}
+		{#each hit.snippet as part, i}{#if i % 2}<mark class="rounded-sm bg-warning/30 px-0.5 text-foreground">{part}</mark>{:else}{part}{/if}{/each}
 	</p>
 </div>

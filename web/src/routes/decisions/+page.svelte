@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import ChatItem from '#lib/components/chat-item.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
 	import { api } from '#lib/api.js';
 	import { apply, newChat } from '#lib/events.js';
@@ -88,7 +89,7 @@
 		<h1 class="text-sm font-medium">Decisions</h1>
 		{#if list.length}<span class="text-xs text-muted-foreground tabular-nums">{list.length} pending</span>{/if}
 		{#if list.length}
-			<span class="ml-auto hidden pr-2 text-xs text-muted-foreground md:block">
+			<span class="ml-auto hidden pr-2 text-xs text-muted-foreground md:block [&_kbd]:rounded [&_kbd]:border [&_kbd]:bg-muted [&_kbd]:px-1 [&_kbd]:font-sans">
 				<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>Y</kbd> allow · <kbd>N</kbd> deny · <kbd>A</kbd> always · <kbd>O</kbd> open
 			</span>
 		{/if}
@@ -120,6 +121,7 @@
 				<div class="py-16 text-center text-sm text-muted-foreground">
 					<p class="font-medium text-foreground">Nothing to decide</p>
 					<p class="mt-1">Permission requests, plans and teammates’ turn requests show up here as they come.</p>
+					<Button size="sm" variant="outline" href="/" class="mt-4">Go to your threads</Button>
 				</div>
 			{/each}
 		</div>

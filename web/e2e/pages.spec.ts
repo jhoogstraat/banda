@@ -17,8 +17,11 @@ test('home: a prompt raced two ways opens compare; picking one settles the other
 	await page.getByRole('button', { name: 'Choose repository' }).click();
 	await page.getByLabel('Repository URL').fill(repo());
 	await page.getByRole('button', { name: 'Use' }).click();
+	await page.getByRole('button', { name: 'Options' }).click();
 	await page.getByRole('button', { name: 'Try N ways: 1 try' }).click();
 	await page.getByRole('menuitemradio', { name: '2 tries' }).click();
+	await page.keyboard.press('Escape');
+	await expect(page.getByRole('button', { name: 'Options: 2 tries' })).toBeVisible();
 	await page.getByPlaceholder('Describe the task.').fill('e2e: race me');
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/\/compare\?race=/);
@@ -188,7 +191,6 @@ test('search finds a teammate’s words and opens the thread at them; the palett
 test('settings: secrets are added, replaced and deleted, never shown; the account switches to an API key and back', { tag: '@key' }, async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/settings');
-	page.on('dialog', (d) => d.accept());
 
 	await test.step('secrets', async () => {
 		const secrets = page.getByRole('region', { name: 'Secrets & variables' }); // not the team's
@@ -205,6 +207,10 @@ test('settings: secrets are added, replaced and deleted, never shown; the accoun
 		await secrets.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(secrets.getByLabel('New value of E2E_TOKEN')).toBeHidden();
 		await secrets.getByRole('button', { name: 'Delete' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+		await expect(secrets.getByText('E2E_TOKEN')).toBeVisible();
+		await secrets.getByRole('button', { name: 'Delete' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete secret' }).click();
 		await expect(secrets.getByText('E2E_TOKEN', { exact: true })).toBeHidden();
 	});
 	await test.step('the account’s sign-in method', async () => {

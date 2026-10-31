@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { page } from '$app/state';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import LoadState from '#lib/components/load-state.svelte';
@@ -30,12 +31,13 @@
 	});
 
 	let all = $state<Thread[]>([]);
+	let olderFailed = $state(false);
 	$effect(() => {
 		const owner = id;
 		all = [];
 		api.listThreads({ ownerId: owner })
-			.then((r) => owner === id && (all = r.threads))
-			.catch(() => {});
+			.then((r) => owner === id && ([all, olderFailed] = [r.threads, false]))
+			.catch(() => owner === id && (olderFailed = true));
 	});
 
 	const groups = $derived.by(() => {
@@ -68,7 +70,7 @@
 						<p class="truncate text-sm text-muted-foreground">{user?.email}</p>
 						{#if here}
 							<p class="truncate text-xs text-muted-foreground">
-								<span class="mr-1 inline-block size-1.5 rounded-full bg-emerald-500 align-middle"></span>Here now in
+								<span class="mr-1 inline-block size-1.5 rounded-full bg-success align-middle"></span>Here now in
 								<a href="/t/{here.id}" class="text-foreground hover:underline">{here.title || 'Untitled thread'}</a>
 							</p>
 						{/if}
@@ -97,9 +99,15 @@
 							</button>
 						{/if}
 					{/if}
-					{#if !Object.values(groups).some((l) => l.length) && !rest.length}
+					{#if olderFailed}
+						<p role="alert" class="px-1 text-sm text-destructive">Couldn't load the older threads.</p>
+					{:else if !Object.values(groups).some((l) => l.length) && !rest.length}
 						<p class="px-1 text-sm text-muted-foreground">No threads yet.</p>
 					{/if}
+				{:else}
+					<div class="space-y-2" aria-hidden="true" data-testid="board-skeleton">
+						{#each [0, 1, 2] as i (i)}<Skeleton class="h-16" />{/each}
+					</div>
 				{/if}
 			</div>
 		</div>

@@ -42,7 +42,7 @@
 				</div>
 				<pre class="overflow-x-auto p-3 font-mono text-xs leading-relaxed"><code
 						>{#each marked(s.code, filled) as m, i (i)}{#if m.filled}<span
-								class="rounded-[3px] bg-sky-500/10 text-sky-800 ring-1 ring-sky-500/20 dark:text-sky-300">{m.text}</span
+								class="rounded-[3px] bg-info/10 text-info-foreground ring-1 ring-info/20">{m.text}</span
 							>{:else}{m.text}{/if}{/each}</code
 					></pre>
 			</div>
@@ -82,7 +82,7 @@
 	<Tabs.Content value={r.id} class="min-w-0 space-y-5 p-4">
 		<p class="max-w-prose text-muted-foreground">{r.intro}</p>
 		{#if !wi.email}
-			<p class="text-amber-700 dark:text-amber-400">You signed in without an email, so tokens can’t name you: the recipes show you@example.com.</p>
+			<p class="text-warning-foreground">You signed in without an email, so tokens can’t name you: the recipes show you@example.com.</p>
 		{/if}
 		{#each r.steps as s (s.title)}
 			{#if s.optional}
@@ -99,7 +99,7 @@
 			{/if}
 		{/each}
 		<p class="text-xs text-muted-foreground">
-			<span class="rounded-[3px] bg-sky-500/10 px-1 text-sky-800 ring-1 ring-sky-500/20 dark:text-sky-300">Highlighted</span> values are this Banda’s
+			<span class="rounded-[3px] bg-info/10 px-1 text-info-foreground ring-1 ring-info/20">Highlighted</span> values are this Banda’s
 			own; the rest is yours to adjust.
 		</p>
 	</Tabs.Content>

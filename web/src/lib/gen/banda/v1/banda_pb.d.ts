@@ -637,6 +637,14 @@ export declare type Event = Message$1<"banda.v1.Event"> & {
     case: "repoAdded";
   } | {
     /**
+     * The owner (actor) renamed the thread.
+     *
+     * @generated from field: banda.v1.ThreadRenamed thread_renamed = 43;
+     */
+    value: ThreadRenamed;
+    case: "threadRenamed";
+  } | {
+    /**
      * The agent's task list changed (TaskCreate, TaskUpdate): the whole list.
      * Not part of the chat; the latest is the plan pinned above the composer.
      *
@@ -5965,6 +5973,55 @@ export declare type RepoAdded = Message$1<"banda.v1.RepoAdded"> & {
 export declare const RepoAddedSchema: GenMessage<RepoAdded>;
 
 /**
+ * @generated from message banda.v1.ThreadRenamed
+ */
+export declare type ThreadRenamed = Message$1<"banda.v1.ThreadRenamed"> & {
+  /**
+   * @generated from field: string title = 1;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message banda.v1.ThreadRenamed.
+ * Use `create(ThreadRenamedSchema)` to create a new message.
+ */
+export declare const ThreadRenamedSchema: GenMessage<ThreadRenamed>;
+
+/**
+ * @generated from message banda.v1.RenameThreadRequest
+ */
+export declare type RenameThreadRequest = Message$1<"banda.v1.RenameThreadRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message banda.v1.RenameThreadRequest.
+ * Use `create(RenameThreadRequestSchema)` to create a new message.
+ */
+export declare const RenameThreadRequestSchema: GenMessage<RenameThreadRequest>;
+
+/**
+ * @generated from message banda.v1.RenameThreadResponse
+ */
+export declare type RenameThreadResponse = Message$1<"banda.v1.RenameThreadResponse"> & {
+};
+
+/**
+ * Describes the message banda.v1.RenameThreadResponse.
+ * Use `create(RenameThreadResponseSchema)` to create a new message.
+ */
+export declare const RenameThreadResponseSchema: GenMessage<RenameThreadResponse>;
+
+/**
  * @generated from message banda.v1.AddRepositoryRequest
  */
 export declare type AddRepositoryRequest = Message$1<"banda.v1.AddRepositoryRequest"> & {
@@ -8119,6 +8176,16 @@ export declare const ThreadService: GenService<{
     methodKind: "unary";
     input: typeof AddRepositoryRequestSchema;
     output: typeof AddRepositoryResponseSchema;
+  },
+  /**
+   * Gives the thread a title of the owner's choosing.
+   *
+   * @generated from rpc banda.v1.ThreadService.RenameThread
+   */
+  renameThread: {
+    methodKind: "unary";
+    input: typeof RenameThreadRequestSchema;
+    output: typeof RenameThreadResponseSchema;
   },
 }>;
 

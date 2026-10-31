@@ -155,6 +155,8 @@ service ThreadService {
   // thread branch, its files kept as uncommitted changes. Until a checkout of
   // it succeeded, the repository can be changed, or removed (empty repo_url).
   rpc AddRepository(AddRepositoryRequest) returns (AddRepositoryResponse);
+  // Gives the thread a title of the owner's choosing.
+  rpc RenameThread(RenameThreadRequest) returns (RenameThreadResponse);
 }
 
 service UserService {
@@ -449,6 +451,8 @@ message Event {
     // The owner (actor) gave the thread without a repository one, changed it
     // before its first checkout, or removed it (repo_url empty).
     RepoAdded repo_added = 42;
+    // The owner (actor) renamed the thread.
+    ThreadRenamed thread_renamed = 43;
     // The agent's task list changed (TaskCreate, TaskUpdate): the whole list.
     // Not part of the chat; the latest is the plan pinned above the composer.
     PlanChanged plan_changed = 50;
@@ -1885,6 +1889,17 @@ message RepoAdded {
   string repo_url = 1;
   string base_branch = 2;
 }
+
+message ThreadRenamed {
+  string title = 1;
+}
+
+message RenameThreadRequest {
+  string thread_id = 1;
+  string title = 2;
+}
+
+message RenameThreadResponse {}
 
 message AddRepositoryRequest {
   string thread_id = 1;

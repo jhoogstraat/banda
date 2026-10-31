@@ -59,6 +59,7 @@ export type Item = { key: number } & (
 	| { kind: 'settings'; actor: string; settings: AgentSettings }
 	// The owner (`actor`) gave the thread a repository.
 	| { kind: 'repo'; actor: string; repo: RepoAdded }
+	| { kind: 'renamed'; actor: string; title: string }
 	| { kind: 'permissionMode'; actor: string; mode: PermissionMode }
 	| { kind: 'revoked'; actor: string; rule: string }
 	// `unavailable`: origin can't be pushed to; shown once per thread, a runner says it again on every start.
@@ -314,6 +315,9 @@ export function apply(chat: Chat, e: Event) {
 			break;
 		case 'repoAdded':
 			chat.items.push({ key, kind: 'repo', actor: e.actor, repo: k.value });
+			break;
+		case 'threadRenamed':
+			chat.items.push({ key, kind: 'renamed', actor: e.actor, title: k.value.title });
 			break;
 		case 'permissionModeChanged':
 			chat.items.push({ key, kind: 'permissionMode', actor: e.actor, mode: k.value.mode });

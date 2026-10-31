@@ -35,6 +35,7 @@
 
 	// From 3 characters on, the best few messages matching the query follow the threads.
 	let hits = $state<SearchResult[]>([]);
+	let searchFailed = $state(false);
 	let asked = 0;
 	$effect(() => {
 		const q = query.trim();
@@ -44,8 +45,8 @@
 			() =>
 				api
 					.search({ query: q, limit: 5 })
-					.then((r) => n === asked && (hits = r.results))
-					.catch(() => {}),
+					.then((r) => n === asked && ([hits, searchFailed] = [r.results, false]))
+					.catch(() => n === asked && (searchFailed = true)),
 			150
 		);
 		return () => clearTimeout(timer);
@@ -134,6 +135,7 @@
 		{#if query.trim().length >= 3}
 			<!-- The query itself is in each value, so the client-side filter keeps the server's results. -->
 			<Command.Group heading="Messages">
+				{#if searchFailed}<p role="alert" class="px-2 py-1 text-xs text-destructive">Couldn't search messages.</p>{/if}
 				{#each hits as hit (`${hit.threadId}#${hit.seq}`)}
 					<Command.Item value="{query} {hit.threadId} {hit.seq}" onSelect={() => run({ label: '', run: () => goto(`/t/${hit.threadId}#${hit.seq}`) })}>
 						<SearchHit {hit} compact />

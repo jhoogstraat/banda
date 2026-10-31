@@ -385,6 +385,28 @@ func (s *Service) SetAgentSettings(ctx context.Context, req *bandav1.SetAgentSet
 	return &bandav1.SetAgentSettingsResponse{}, nil
 }
 
+func (s *Service) RenameThread(ctx context.Context, req *bandav1.RenameThreadRequest) (*bandav1.RenameThreadResponse, error) {
+	name := title(req.Title)
+	if name == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "a title is required")
+	}
+	_, events, err := s.store.Update(ctx, req.ThreadId, func(_ *store.Store, t *store.Thread) ([]*bandav1.Event, error) {
+		if err := t.CheckOwner(user(ctx)); err != nil {
+			return nil, err
+		}
+		if name == t.Title {
+			return nil, nil
+		}
+		t.Title = name
+		return []*bandav1.Event{{Actor: t.OwnerID, Kind: &bandav1.Event_ThreadRenamed{ThreadRenamed: &bandav1.ThreadRenamed{Title: name}}}}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.broadcast(req.ThreadId, events)
+	return &bandav1.RenameThreadResponse{}, nil
+}
+
 func agentSettings(t store.Thread) *bandav1.AgentSettings {
 	return &bandav1.AgentSettings{Model: t.Model, Effort: t.Effort, Profile: t.Profile}
 }

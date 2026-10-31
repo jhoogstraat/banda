@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	// Workload identity in Settings: Banda's issuer, the team's audiences
 	// (none: off) and, on request, recipes for the secret managers and clouds
 	// that trust it (workload-recipes.svelte, loaded only then).
@@ -57,8 +58,8 @@
 		}
 	}
 
-	function remove(aud: string) {
-		if (confirm(`Remove the audience ${aud}? Running threads lose its token within seconds.`))
+	async function remove(aud: string) {
+		if (await confirmAction({ title: `Remove the audience ${aud}?`, body: 'Running threads lose its token within seconds.', action: 'Remove audience' }))
 			act(settingsApi.removeIdTokenAudience({ audience: aud }));
 	}
 
@@ -71,7 +72,7 @@
 	{#if wi}
 		<div class="space-y-4">
 			{#if !https}
-				<p class="flex gap-2 text-sm text-amber-700 dark:text-amber-400">
+				<p class="flex gap-2 text-sm text-warning-foreground">
 					<CircleAlertIcon class="mt-0.5 size-4 shrink-0" />
 					<span>
 						The issuer isn’t https: cloud providers require https and a valid certificate. Set <code class="font-mono text-xs">PUBLIC_URL</code> to

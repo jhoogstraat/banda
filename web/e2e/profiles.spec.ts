@@ -103,12 +103,16 @@ test('browser: the new-thread composer’s Profile chip starts at the default fr
 	await expect.poll(async () => (await alice.settings.getSettings({})).defaultProfile).toBe('spec');
 
 	await page.goto('/');
+	await page.getByRole('button', { name: 'Options' }).click();
 	await expect(chip(page, 'Specification')).toBeVisible();
+	await page.keyboard.press('Escape');
 	await page.getByRole('button', { name: 'Choose repository' }).click();
 	await page.getByLabel('Repository URL').fill(repo());
 	await page.getByRole('button', { name: 'Use' }).click();
+	await page.getByRole('button', { name: 'Options' }).click();
 	await chip(page, 'Specification').click();
 	await page.getByRole('menuitemradio', { name: 'Business' }).click();
+	await page.keyboard.press('Escape');
 	await page.getByPlaceholder('Describe the task.').fill('e2e: a business thread');
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/\/t\//);

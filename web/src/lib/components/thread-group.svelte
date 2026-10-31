@@ -30,7 +30,7 @@
 		</h3>
 		{#each more > 0 ? list.slice(0, max) : list as t (t.id)}{@render card(t)}{/each}
 		{#if more > 0}
-			<button class="px-1 text-left text-xs text-muted-foreground hover:text-foreground" onclick={() => (all = true)}>
+			<button class="hit px-1 text-left text-xs text-muted-foreground hover:text-foreground" onclick={() => (all = true)}>
 				{more} more
 			</button>
 		{/if}
@@ -40,12 +40,12 @@
 {#snippet card(t: Thread)}
 	<a
 		href="/t/{t.id}"
-		class="block rounded-lg border bg-card p-3 text-sm transition-colors hover:border-foreground/25 {t.status === Status.SUSPENDED ? 'opacity-60' : ''}"
+		class="block rounded-lg border bg-card p-3 text-sm transition-colors hover:border-foreground/25 {t.status === Status.SUSPENDED ? 'text-muted-foreground' : ''}"
 	>
 		<div class="flex items-center gap-2">
 			<StatusDot status={t.status} waiting={waiting(t)} />
 			<span class="truncate {unread(t) ? 'font-semibold' : ''}">{t.title || 'Untitled thread'}</span>
-			{#if unread(t)}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
+			{#if unread(t)}<span class="sr-only">Unread</span>{/if}
 		</div>
 		<p class="mt-1 text-xs {t.envWaiting ? 'break-words' : 'truncate'} {t.status === Status.ERRORED ? 'text-destructive' : 'text-muted-foreground'}" title={doing(t)}>
 			{doing(t) || ' '}
@@ -56,7 +56,7 @@
 			{#if t.pullRequest}<PullRequestChip pr={t.pullRequest} small />{/if}
 			{#if t.overlaps.length}
 				{@const label = `Overlaps with ${t.overlaps.map((o) => o.title || 'Untitled thread').join(', ')}`}
-				<span role="img" class="flex shrink-0 items-center gap-0.5 text-amber-700 dark:text-amber-400" aria-label={label} title={label}>
+				<span role="img" class="flex shrink-0 items-center gap-0.5 text-warning-foreground" aria-label={label} title={label}>
 					<GitMergeConflictIcon class="size-3" />{t.overlaps.length}
 				</span>
 			{/if}

@@ -46,17 +46,17 @@
 	}
 	const tone = (l: string) =>
 		l === '@@'
-			? 'text-muted-foreground/60'
+			? 'text-muted-foreground'
 			: l[0] === '+'
-				? 'bg-green-500/15 text-green-700 dark:text-green-300'
+				? 'bg-diff-add/15 text-diff-add-foreground'
 				: l[0] === '-'
-					? 'bg-red-500/15 text-red-700 dark:text-red-300'
+					? 'bg-diff-del/15 text-diff-del-foreground'
 					: 'text-muted-foreground';
 </script>
 
 {#snippet more(n: number)}
 	{#if n > FOLD && !full}
-		<button class="w-full px-3 py-1 text-left text-xs text-muted-foreground hover:text-foreground" onclick={() => (full = true)}>
+		<button class="w-full px-3 py-1 text-left text-xs pointer-coarse:py-2.5 text-muted-foreground hover:text-foreground" onclick={() => (full = true)}>
 			Show {n - FOLD} more lines
 		</button>
 	{/if}
@@ -71,7 +71,7 @@
 {/snippet}
 
 <Collapsible class="group/tool">
-	<CollapsibleTrigger class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted/50">
+	<CollapsibleTrigger class="flex w-full items-center gap-2 rounded-md px-2 py-1 pointer-coarse:py-2 text-left text-xs hover:bg-muted/50">
 		<Icon class="size-3.5 shrink-0 text-muted-foreground" />
 		{#if head.label}<span class="max-w-1/2 shrink-0 truncate font-medium">{head.label}</span>{/if}
 		<span class="min-w-0 flex-1 truncate font-mono text-muted-foreground" title={head.detail}>{head.detail}</span>
@@ -95,7 +95,7 @@
 		{#if name === 'Bash'}
 			{@const out = lines(result?.output)}
 			<div class="my-1 overflow-hidden rounded-md bg-zinc-950 font-mono text-xs text-zinc-200">
-				<pre class="overflow-x-auto p-3 whitespace-pre-wrap"><span class="text-emerald-400">$</span> {input(tool).command}{#if out.length}{'\n'}{(full ? out : out.slice(0, FOLD)).join('\n')}{/if}</pre>
+				<pre class="overflow-x-auto p-3 whitespace-pre-wrap"><span class="text-success-foreground">$</span> {input(tool).command}{#if out.length}{'\n'}{(full ? out : out.slice(0, FOLD)).join('\n')}{/if}</pre>
 				{@render more(out.length)}
 				{#if code !== undefined}
 					<div class="border-t border-zinc-800 px-3 py-1 {code ? 'text-red-400' : 'text-zinc-500'}">exit {code}</div>

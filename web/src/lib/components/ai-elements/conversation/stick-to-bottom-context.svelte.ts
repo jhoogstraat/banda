@@ -6,6 +6,7 @@ const STICK_TO_BOTTOM_CONTEXT_KEY = Symbol("stick-to-bottom-context");
 class StickToBottomContext {
 	#element: HTMLElement | null = $state(null);
 	#isAtBottom = $state(true);
+	#lastTop = 0;
 	#resizeObserver: ResizeObserver | null = null;
 	#mutationObserver: MutationObserver | null = null;
 	#intersectionObserver: IntersectionObserver | null = null;
@@ -62,16 +63,15 @@ class StickToBottomContext {
 		const { scrollTop, scrollHeight, clientHeight } = this.#element;
 		const threshold = 200; // Increased threshold for better UX
 		const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+		// Only scrolling up means the reader left: following content that keeps growing also scrolls, and stays short of the end.
+		const up = scrollTop < this.#lastTop;
+		this.#lastTop = scrollTop;
 
 		// Update the isAtBottom state based on scroll position
 		this.#isAtBottom = isAtBottom;
 
-		if (!isAtBottom) {
-			this.#userHasScrolled = true;
-		} else if (isAtBottom && this.#userHasScrolled) {
-			// User scrolled back to bottom, reset flag
-			this.#userHasScrolled = false;
-		}
+		if (isAtBottom) this.#userHasScrolled = false;
+		else if (up) this.#userHasScrolled = true;
 	};
 
 	#setupObservers() {
@@ -109,7 +109,7 @@ class StickToBottomContext {
 		this.#resizeObserver = new ResizeObserver(() => {
 			// Check position after resize
 			this.#checkScrollPosition();
-			if (this.#isAtBottom && !this.#userHasScrolled) {
+			if (!this.#userHasScrolled) {
 				this.scrollToBottom("auto");
 			}
 		});
@@ -122,14 +122,14 @@ class StickToBottomContext {
 			requestAnimationFrame(() => {
 				// Check if we should auto-scroll BEFORE updating the position
 				// Only auto-scroll if user was at bottom and hasn't manually scrolled
-				const shouldAutoScroll = this.#isAtBottom && !this.#userHasScrolled;
+				const shouldAutoScroll = !this.#userHasScrolled;
 
 				// Now update the scroll position after content changes
 				this.#checkScrollPosition();
 
 				// Auto-scroll if conditions were met
 				if (shouldAutoScroll) {
-					this.scrollToBottom("smooth");
+					this.scrollToBottom("auto");
 				}
 			});
 		});

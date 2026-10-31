@@ -55,7 +55,6 @@ test('settings: a teammate replaces the team’s secret and shows as the last to
 	await alice.settings.setTeamSecret({ name, value: 'e2e-alice' });
 	const page = await bob.page();
 	await page.goto('/settings');
-	page.on('dialog', (d) => d.accept());
 	const team = page.getByRole('region', { name: 'Team secrets' });
 	await expect(team.getByText(`set by ${alice.id} · `)).toBeVisible();
 	await expect(page.getByRole('region', { name: 'Secrets & variables' }).getByText(name)).toBeHidden(); // not one of Bob's own
@@ -67,6 +66,7 @@ test('settings: a teammate replaces the team’s secret and shows as the last to
 	expect((await alice.settings.listTeamSecrets({})).secrets.find((s) => s.name === name)?.updatedBy).toBe(bob.id);
 
 	await team.getByRole('button', { name: `Delete ${name}` }).click();
+	await page.getByRole('dialog').getByRole('button', { name: 'Delete secret' }).click();
 	await expect(team.getByText(name, { exact: true })).toBeHidden();
 
 	const added = unique('E2E_ADDED');

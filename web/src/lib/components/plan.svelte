@@ -34,7 +34,7 @@
 								: ''}"
 					>
 						{#if t.status === 'completed'}
-							<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
+							<CheckIcon class="size-3.5 shrink-0 text-success-foreground" />
 						{:else}
 							<CircleIcon class="size-3.5 shrink-0 {t.status === 'in_progress' ? 'animate-pulse fill-primary text-primary' : 'text-muted-foreground'}" />
 						{/if}

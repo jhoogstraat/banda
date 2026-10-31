@@ -31,7 +31,7 @@ test('a turn streams in: the working agent, its running tool call, then the fold
 
 	await t.release('stream');
 	await expect(page.getByText('Created hello1.txt with claude-opus-5-5 · high')).toBeVisible();
-	await expect(page.getByText(/Turn finished in \d+\.\ds · \$0\.0100/)).toBeVisible();
+	await expect(page.getByText(/Turn finished in \d+\.\ds · \$0\.01/)).toBeVisible();
 	await expect(page.getByText('Agent is working…')).toBeHidden();
 	const tools = page.getByRole('button', { name: /^Used 9 tools/ });
 	await tools.click();
@@ -492,7 +492,7 @@ test('on a subscription the teammate’s composer says only the owner runs the a
 	const t = await alice.create();
 	await t.waitForStatus(Status.AWAITING_INPUT);
 	const [page, bobPage] = [await open(alice, t), await open(bob, t)];
-	await expect(bobPage.getByPlaceholder(`Only ${alice.id} runs the agent (their Claude subscription). Suggest a prompt with @agent, and ${alice.id} decides; for your own task, Fork.`)).toBeVisible();
+	await expect(bobPage.getByPlaceholder(`Only ${alice.id} runs the agent. Suggest a prompt with @agent, or Fork for your own task.`)).toBeVisible();
 	await page.getByRole('button', { name: 'More actions' }).click();
 	await expect(page.getByRole('menuitem', { name: /^Switch to chat mode/ })).toBeVisible();
 	await expect(page.getByRole('menuitemcheckbox', { name: /^Teammates can run the agent/ })).toHaveCount(0);

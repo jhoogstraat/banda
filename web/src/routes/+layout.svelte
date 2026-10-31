@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ConfirmDialog from '#lib/components/confirm-dialog.svelte';
 	import './layout.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
@@ -58,5 +59,6 @@
 			</Sidebar.Inset>
 		</Sidebar.Provider>
 		<CommandPalette />
+		<ConfirmDialog />
 	</TooltipProvider>
 {/if}

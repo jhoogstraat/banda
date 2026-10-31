@@ -252,8 +252,8 @@ test('disconnect revokes the grant on GitHub and forgets the tokens', async ({ a
 	const page = await open(alice, '/settings#github');
 	const github = section(page, 'GitHub');
 	await expect(github).toContainText('@alice');
-	page.once('dialog', (d) => d.accept());
 	await github.getByRole('button', { name: 'Disconnect' }).click();
+	await page.getByRole('dialog').getByRole('button', { name: 'Disconnect' }).click();
 	await expect(github.getByRole('link', { name: 'Connect GitHub' })).toBeVisible();
 	await expect(github).toContainText('Not connected');
 	expect(forge.revoked).toEqual([token]);
@@ -327,8 +327,8 @@ test('with an app in place, another needs asking for; replacing it revokes every
 
 	// A replace started before the app changed again isn't taken.
 	const stale = await alice.settings.gitHubAppManifest({ organization: 'e2e', replace: true });
-	alicePage.once('dialog', (d) => d.accept());
 	await section(alicePage, 'GitHub App').getByRole('button', { name: 'Remove from Banda' }).click();
+	await alicePage.getByRole('dialog').getByRole('button', { name: 'Remove app' }).click();
 	await expect(section(alicePage, 'GitHub App')).toContainText(`Removed by ${alice.id} · just now, was banda-e2e-2 owned by e2e`);
 	await expect(github).toContainText(`${alice.id} removed the team’s GitHub App just now (banda-e2e-2)`);
 	const landed = await follow(api, alice, stale.url, { method: 'POST', body: new URLSearchParams({ manifest: stale.manifest }) });

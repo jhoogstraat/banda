@@ -4,15 +4,23 @@
 	import type { Attachment } from '#lib/gen/banda/v1/banda_pb.js';
 
 	// The composer's text and files per thread: they survive switching threads (files picked here don't, see onDestroy), and "Use as draft" fills them.
+	// The text also survives a reload, in this browser.
 	const drafts = $state<Record<string, string>>({});
+	const draftKey = (id: string) => `banda-draft-${id}`;
+	const draft = (id: string) => drafts[id] ?? localStorage.getItem(draftKey(id)) ?? '';
+	function setDraft(id: string, text: string) {
+		drafts[id] = text;
+		if (text) localStorage.setItem(draftKey(id), text);
+		else localStorage.removeItem(draftKey(id));
+	}
 	const files = $state<Record<string, PromptInputAttachmentData[]>>({});
 	let input: HTMLTextAreaElement | null = null;
 
 	/** Puts a teammate's proposal into the owner's composer, after what they typed, and focuses it: they edit it and send it as their own.
 	 *  Its files stay the uploads they are (`remoteUrl`, the id its upload's): the API lets the owner post a proposal's files. */
 	export async function useAsDraft(threadId: string, text: string, attachments: Attachment[]) {
-		const typed = drafts[threadId]?.trimEnd();
-		if (text) drafts[threadId] = typed ? `${typed}\n${text}` : text;
+		const typed = draft(threadId).trimEnd();
+		if (text) setDraft(threadId, typed ? `${typed}\n${text}` : text);
 		const have = files[threadId] ?? [];
 		const added = attachments.filter((a) => !have.some((f) => f.id === a.id));
 		files[threadId] = [
@@ -33,6 +41,7 @@
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import SquareIcon from '@lucide/svelte/icons/square';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Loader } from '#lib/components/ai-elements/loader/index.js';
 	import * as PromptInput from '#lib/components/ai-elements/prompt-input/index.js';
@@ -44,6 +53,7 @@
 	import Plan from '#lib/components/plan.svelte';
 	import ThreadBanners from '#lib/components/thread-banners.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { api } from '#lib/api.js';
@@ -68,6 +78,7 @@
 		typed,
 		setAgent,
 		toggleMode,
+		interrupt,
 		pending = $bindable(),
 		ask = $bindable()
 	}: {
@@ -81,6 +92,7 @@
 		typed: () => void;
 		setAgent: (change: { model?: string; effort?: string; profile?: string }) => void;
 		toggleMode: () => void;
+		interrupt: () => void;
 		pending: Comment[];
 		ask: boolean;
 	} = $props();
@@ -105,7 +117,7 @@
 	async function submit(m: PromptInputMessage) {
 		const id = thread?.id ?? '';
 		await send(m);
-		drafts[id] = '';
+		setDraft(id, '');
 		files[id] = [];
 	}
 	// A file picked here has a preview that dies with this page, so it goes too; a proposal's is an upload and stays.
@@ -117,7 +129,7 @@
 		!thread
 			? 'Message…'
 			: !owner && !thread.teammateTurns
-				? `Only ${userName(thread.ownerId)} runs the agent (their Claude subscription). Suggest a prompt with @agent, and ${userName(thread.ownerId)} decides; for your own task, Fork.`
+				? `Only ${userName(thread.ownerId)} runs the agent. Suggest a prompt with @agent, or Fork for your own task.`
 				: !owner
 				? `Reply to ${userName(thread.ownerId)} — @agent to ${thread.trusted ? 'ask the agent' : 'request a turn'}`
 				: chatMode
@@ -132,7 +144,7 @@
 	<div class="flex h-7 items-center gap-2 text-xs text-muted-foreground">
 		<div class="flex min-w-0 flex-1 items-center gap-2" aria-live="polite">
 			{#if thread?.permissionPending}
-				<ShieldIcon class="size-3 text-amber-500" /><span>Agent is waiting for an answer</span>
+				<ShieldIcon class="size-3 text-warning-foreground" /><span>Agent is waiting for an answer</span>
 			{:else if thread?.status === Status.WORKING && retrying}
 				<Loader size={12} /><span>{retrying}</span>
 			{:else if thread?.status === Status.WORKING}
@@ -148,7 +160,7 @@
 			{@const label = chatMode ? 'Chat · @agent to ask' : 'Agent'}
 			<!-- The owner switches the mode here; for everyone else it only says what a post does. -->
 			<button
-				class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 enabled:hover:bg-muted enabled:hover:text-foreground {chatMode ? 'border-sky-500/40 text-sky-700 dark:text-sky-400' : ''}"
+				class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 pointer-coarse:py-1.5 enabled:hover:bg-muted enabled:hover:text-foreground {chatMode ? 'border-info/40 text-info-foreground' : ''}"
 				disabled={!owner}
 				aria-label={owner ? `${chatMode ? 'Chat mode' : 'Agent mode'}: switch to ${chatMode ? 'agent' : 'chat'} mode` : `${chatMode ? 'Chat mode' : 'Agent mode'}`}
 				title={owner ? `Switch to ${chatMode ? 'agent mode: your posts go to the agent' : 'chat mode: only @agent starts a turn'}` : undefined}
@@ -189,13 +201,13 @@
 				<MentionInput
 					{placeholder}
 					commands={owner ? chat.commands : []}
-					bind:value={() => drafts[thread?.id ?? ''] ?? '', (v) => (drafts[thread?.id ?? ''] = v)}
+					bind:value={() => draft(thread?.id ?? ''), (v) => setDraft(thread?.id ?? '', v)}
 					bind:ta={() => input, (r) => (input = r)}
 				/>
 			</PromptInput.Body>
 			<PromptInput.Toolbar class="items-end">
-				<!-- The chips wrap on a phone, as on the new thread page, so the send button stays in reach. -->
-				<div class="flex min-w-0 flex-wrap items-center gap-1.5 pl-1">
+				<!-- The chips scroll sideways on a phone, as on the new thread page, so the box stays small. -->
+				<div class="flex min-w-0 items-center gap-1.5 py-0.5 pl-1 max-sm:overflow-x-auto max-sm:[scrollbar-width:none] sm:flex-wrap">
 					<AttachButton />
 					{#if thread && owner}
 						<!-- A running agent switches model, effort and profile once its turns have ended, permissions at once. -->
@@ -244,6 +256,9 @@
 						</DropdownMenu.Root>
 					{/if}
 				</div>
+				{#if owner && thread?.status === Status.WORKING}
+					<Button type="button" variant="destructive" size="sm" class="shrink-0" onclick={interrupt}><SquareIcon class="fill-current" /> Stop</Button>
+				{/if}
 				<PromptInput.Submit class="shrink-0" />
 			</PromptInput.Toolbar>
 		</fieldset>

@@ -33,6 +33,7 @@
 	import GitForkIcon from '@lucide/svelte/icons/git-fork';
 	import HandshakeIcon from '@lucide/svelte/icons/handshake';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import IconButton from '#lib/components/icon-button.svelte';
@@ -53,7 +54,8 @@
 		onfork,
 		onspawn,
 		onhandoff,
-		onrepo
+		onrepo,
+		onrename
 	}: {
 		thread: Thread;
 		owner: boolean;
@@ -65,6 +67,7 @@
 		onspawn: () => void;
 		onhandoff: () => void;
 		onrepo: () => void;
+		onrename: () => void;
 	} = $props();
 
 	const when = (d: Date) => d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
@@ -88,6 +91,7 @@
 	<Menu.Content align="end" class="w-64">
 		<Menu.Item onclick={onfork}><GitForkIcon /> Fork: try another way<Menu.Shortcut>{threadKeys.fork}</Menu.Shortcut></Menu.Item>
 		<Menu.Item onclick={onspawn}><GitBranchPlusIcon /> Spawn a sub-thread<Menu.Shortcut>{threadKeys.spawn}</Menu.Shortcut></Menu.Item>
+		{#if owner}<Menu.Item onclick={onrename}><PencilIcon /> Rename</Menu.Item>{/if}
 		{#if owner && !thread.handoffTo}<Menu.Item onclick={onhandoff}><HandshakeIcon /> Hand off to a teammate</Menu.Item>{/if}
 		{#if owner && (!thread.repoUrl || repoFixable)}<Menu.Item onclick={onrepo}><FolderGit2Icon /> {thread.repoUrl ? 'Change the repository' : 'Add a repository'}</Menu.Item>{/if}
 		<Menu.Separator />

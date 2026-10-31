@@ -14,7 +14,7 @@
 		<li class="flex gap-3 p-4" aria-current={n === current ? 'step' : undefined}>
 			<span
 				class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-medium {done
-					? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+					? 'bg-success/15 text-success-foreground'
 					: n === current
 						? 'bg-primary text-primary-foreground'
 						: 'border text-muted-foreground'}"

@@ -19,6 +19,7 @@
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import PauseIcon from '@lucide/svelte/icons/pause';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
@@ -35,6 +36,7 @@
 	import Composer, { useAsDraft } from '#lib/components/composer.svelte';
 	import ForkDialog from '#lib/components/fork-dialog.svelte';
 	import HandoffDialog from '#lib/components/handoff-dialog.svelte';
+	import RenameDialog from '#lib/components/rename-dialog.svelte';
 	import RepoDialog from '#lib/components/repo-dialog.svelte';
 	import LoadState from '#lib/components/load-state.svelte';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
@@ -48,6 +50,7 @@
 	import ThreadHeader from '#lib/components/thread-header.svelte';
 	import ThreadPane from '#lib/components/thread-pane.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { api, upload } from '#lib/api.js';
 	import type { Comment } from '#lib/diff.js';
 	import { apply, itemAt, newChat, prepend, typingNow, type Chat, type Item } from '#lib/events.js';
@@ -82,6 +85,7 @@
 	let spawnOpen = $state(false);
 	let handoffOpen = $state(false);
 	let repoOpen = $state(false);
+	let renameOpen = $state(false);
 	let prOpen = $state(false);
 	// Bumped when the thread hears its pull request changed, so the Pull request tab reloads it.
 	let prVersion = $state(0);
@@ -162,8 +166,25 @@
 	let readTimer: ReturnType<typeof setTimeout>;
 	const markRead = () => {
 		clearTimeout(readTimer);
-		readTimer = setTimeout(() => !document.hidden && api.inboxMarkRead({ threadId: id }).catch(() => {}), 500);
+		readTimer = setTimeout(() => {
+			if (document.hidden) return;
+			api.inboxMarkRead({ threadId: id }).catch(() => {});
+			localStorage.setItem(seenKey, String(chat.seq));
+		}, 500);
 	};
+
+	// Where the reader left off, in this browser: opening the thread again marks and shows the first item since, if it's loaded.
+	const seenKey = `banda-seen-${id}`;
+	const seen = Number(localStorage.getItem(seenKey));
+	let newFrom = $state<number>();
+	let marked = false;
+	$effect(() => {
+		if (!live || marked) return;
+		marked = true;
+		if (!seen || seen < oldest || page.url.hash) return;
+		newFrom = chat.items.find((i) => i.key > seen)?.key;
+		if (newFrom) setTimeout(() => document.querySelector(`[data-key="${newFrom}"]`)?.scrollIntoView({ block: 'start' }));
+	});
 
 	// /t/<id>#<seq> (from search) scrolls to that event's item and flashes it once it is loaded:
 	// older history loads down to it, newer events arrive with the stream.
@@ -227,7 +248,7 @@
 						refresh();
 					}
 					if (event.kind.case === 'statusChanged') reason = event.kind.value.reason;
-					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved', 'repoAdded'].includes(event.kind.case!)) refresh();
+					if (['diffChanged', 'statusChanged', 'modeChanged', 'turnRequest', 'turnRequestResolved', 'notice', 'agentSettings', 'permissionModeChanged', 'permissionRequested', 'permissionResolved', 'forkNote', 'permissionRevoked', 'autoPush', 'overlap', 'handoffOffered', 'handoffResolved', 'repoAdded', 'threadRenamed'].includes(event.kind.case!)) refresh();
 				}
 			} catch {
 				if (signal.aborted) return;
@@ -297,7 +318,7 @@
 		Object.assign(thread!, change); // the chip shows the choice right away
 		act(api.setAgentSettings({ threadId: id, ...change }));
 	}
-	// Shared by the header buttons and the command palette.
+	// Shared by the buttons and the command palette.
 	const interrupt = () => act(api.interrupt({ threadId: id }));
 	const toggleMode = () => act(api.setMode({ threadId: id, mode: thread!.mode === Mode.AGENT ? Mode.CHAT : Mode.AGENT }));
 	const push = () => act(api.push({ threadId: id }));
@@ -347,6 +368,7 @@
 		else if (pr && owner && t.forgeReady) c.push({ label: `Create a ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => (prOpen = true) });
 		else if (pr) c.push({ label: `Open a ${noun(t.forge)}`, icon: GitPullRequestIcon, run: () => open(pr) });
 		if (owner && t.environmentDeleted) c.push({ label: 'Recreate environment', icon: RotateCcwIcon, run: recreate });
+		if (owner) c.push({ label: 'Rename', icon: PencilIcon, run: () => (renameOpen = true) });
 		if (owner && !t.handoffTo) c.push({ label: 'Hand off to…', icon: HandshakeIcon, run: () => (handoffOpen = true) });
 		if (owner && (!t.repoUrl || repoFixable)) c.push({ label: t.repoUrl ? 'Change the repository' : 'Add a repository', icon: FolderGit2Icon, run: () => (repoOpen = true) });
 		if (owner) {
@@ -423,19 +445,39 @@
 		<PageHeader />
 		<LoadState title="Couldn't load this thread" description={loadError} retry={load} />
 	{:else}
-		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {interrupt} {toggleMode} {retry} {push} {repoFixable} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:repoOpen bind:paneOpen={diffOpen} />
+		<ThreadHeader {thread} {owner} offline={offline && !missing} {here} {act} {toggleMode} {retry} {push} {repoFixable} onpull={() => show('pull')} oncreate={() => (prOpen = true)} bind:forkOpen bind:spawnOpen bind:handoffOpen bind:repoOpen bind:renameOpen bind:paneOpen={diffOpen} />
 		<SubThreads threadId={id} version={lineage} />
 		<Overlaps overlaps={thread?.overlaps ?? []} />
 
 		<Conversation class="min-h-0 flex-1">
-			<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto">
+			<ConversationContent bind:ref={scroller} onscroll={onScroll} class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
 				<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 					{#if oldest > 1n}
 						<Button variant="ghost" size="sm" class="self-center text-muted-foreground" disabled={loadingOlder} onclick={() => loadOlder()}>
 							{#if loadingOlder}<Loader /> Loading earlier messages…{:else}Load earlier messages{/if}
 						</Button>
 					{/if}
+					{#if !live && !chat.items.length}
+						<div class="space-y-6" aria-hidden="true" data-testid="chat-skeleton">
+							{#each [70, 100, 45] as width (width)}
+								<div class="flex gap-3">
+									<Skeleton class="size-7 shrink-0 rounded-full" />
+									<div class="min-w-0 flex-1 space-y-2">
+										<Skeleton class="h-4 w-24" />
+										<Skeleton class="h-4" style="width: {width}%" />
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
 					{#each chat.items as item (item.key)}
+						{#if item.key === newFrom}
+							<div role="separator" class="flex items-center gap-3 text-xs font-medium text-info-foreground">
+								<div class="h-px flex-1 bg-info/40"></div>
+								New since you last looked
+								<div class="h-px flex-1 bg-info/40"></div>
+							</div>
+						{/if}
 						<!-- Off-screen items skip layout and paint; long threads stay smooth. -->
 						<div
 							data-key={item.key}
@@ -474,7 +516,7 @@
 			<ConversationScrollButton />
 		</Conversation>
 
-		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} {toggleMode} bind:pending bind:ask />
+		<Composer {thread} {owner} {chat} {typing} bind:error {act} {send} {typed} {setAgent} {toggleMode} {interrupt} bind:pending bind:ask />
 	{/if}
 </div>
 
@@ -487,4 +529,5 @@
 {#if thread}<SpawnDialog bind:open={spawnOpen} {thread} />{/if}
 {#if thread}<HandoffDialog bind:open={handoffOpen} {thread} />{/if}
 {#if thread}<RepoDialog bind:open={repoOpen} {thread} />{/if}
+{#if thread}<RenameDialog bind:open={renameOpen} {thread} />{/if}
 {#if thread}<PullRequestDialog bind:open={prOpen} {thread} summary={lastReply} ondone={refresh} />{/if}

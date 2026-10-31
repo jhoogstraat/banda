@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	import { page } from '$app/state';
 	import { timestampDate } from '@bufbuild/protobuf/wkt';
 	import LoginDialog from '#lib/components/login-dialog.svelte';
@@ -81,9 +82,9 @@
 
 	// [dot colour, label] of an account.
 	function status(a: HarnessAccount): [string, string] {
-		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-emerald-500', 'Connected (API key)'] : ['bg-amber-400', 'No API key'];
-		if (a.loginState === LoginState.LOGGED_IN) return ['bg-emerald-500', 'Connected (subscription)'];
-		if (a.loginState === LoginState.LOGGED_OUT) return ['bg-amber-400', 'Not logged in'];
+		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-success', 'Connected (API key)'] : ['bg-warning', 'No API key'];
+		if (a.loginState === LoginState.LOGGED_IN) return ['bg-success', 'Connected (subscription)'];
+		if (a.loginState === LoginState.LOGGED_OUT) return ['bg-warning', 'Not logged in'];
 		return ['border border-muted-foreground', 'Not checked yet'];
 	}
 
@@ -231,8 +232,8 @@
 		if (await act('secrets', settingsApi.setSecret({ name: replacing, value: newValue }))) replacing = newValue = '';
 	}
 
-	function remove(n: string) {
-		if (confirm(`Delete the secret ${n}? Environments started afterwards won't have it.`)) act('secrets', settingsApi.deleteSecret({ name: n }));
+	async function remove(n: string) {
+		if (await confirmAction({ title: `Delete the secret ${n}?`, body: "Environments started afterwards won't have it.", action: 'Delete secret' })) act('secrets', settingsApi.deleteSecret({ name: n }));
 	}
 </script>
 
@@ -265,7 +266,7 @@
 									class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
 								>
 									{label}
-									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
+									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
 								</a>
 							</li>
 						{/each}

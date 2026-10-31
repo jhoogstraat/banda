@@ -40,7 +40,7 @@
 
 {#snippet title(text: string, n: number)}
 	{text}
-	<span class="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[10px] tabular-nums">{n}</span>
+	<span class="ml-auto rounded-full px-1.5 text-[10px] tabular-nums {text === 'Needs input' ? 'bg-warning/20 text-warning-foreground' : 'bg-sidebar-accent'}">{n}</span>
 {/snippet}
 
 <!-- An account menu entry; sign-out leaves the SPA with a full reload. -->
@@ -76,12 +76,12 @@
 			{#if t.envWaiting && !race}<span class="block truncate text-xs font-normal text-muted-foreground" title={t.envWaiting}>{t.envWaiting}</span>{/if}
 		</span>
 		{#if wait && !byline}
-			<span class="shrink-0 rounded-full bg-amber-400/20 px-1.5 text-[10px] text-amber-700 dark:text-amber-500" title={wait}>{asking(asks(t))}</span>
+			<span class="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning-foreground" title={wait}>{asking(asks(t))}</span>
 		{:else if t.pullRequest && !race}
 			<PullRequestChip pr={t.pullRequest} small />
 		{/if}
-		{#if fresh}<span class="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>{/if}
-		<span class="shrink-0 text-xs font-normal text-muted-foreground tabular-nums {fresh ? '' : 'ml-auto'}">{ago(t.updatedAt, threads.now)}</span>
+		{#if fresh}<span class="sr-only">Unread</span>{/if}
+		<span class="ml-auto shrink-0 text-xs font-normal text-muted-foreground tabular-nums">{ago(t.updatedAt, threads.now)}</span>
 	</a>
 {/snippet}
 
@@ -114,7 +114,7 @@
 		<section class="space-y-0.5" aria-label={text}>
 			<h2 class="flex items-center px-2 py-1 text-xs font-medium text-muted-foreground">{@render title(text, n + 1)}</h2>
 			<a href="/settings" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-sidebar-accent/50">
-				<KeyRoundIcon class="size-3.5 text-amber-500" /> Log in to Claude
+				<KeyRoundIcon class="size-3.5 text-warning-foreground" /> Log in to Claude
 			</a>
 			{#each list as f (f.race ?? f.thread.id)}{@render family(f, byline)}{/each}
 		</section>
@@ -166,7 +166,7 @@
 			<IconButton icon={SquarePenIcon} label="New thread" keys="C" onclick={() => (newOpen = true)} />
 		</div>
 	</Sidebar.Header>
-	<Sidebar.Content class="space-y-3 px-2 pb-3">
+	<Sidebar.Content class="space-y-3 overscroll-contain px-2 pb-3">
 		<a
 			href="/decisions"
 			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent/50 {page.url.pathname === '/decisions'
@@ -175,7 +175,7 @@
 		>
 			<InboxIcon class="size-4 text-muted-foreground" /> Decisions
 			{#if threads.decisions.length}
-				<span class="ml-auto rounded-full bg-amber-400 px-1.5 text-[10px] font-semibold text-black tabular-nums" aria-label="{threads.decisions.length} pending">
+				<span class="ml-auto rounded-full bg-warning px-1.5 text-[10px] font-semibold text-black tabular-nums" aria-label="{threads.decisions.length} pending">
 					{threads.decisions.length}
 				</span>
 			{/if}

@@ -48,6 +48,9 @@ if (switched?.kind !== 'settings' || switched.actor !== 'alice' || switched.sett
 	throw new Error('agentSettings should become a divider naming who switched');
 apply(chat, { seq: 9n, actor: 'alice', kind: { case: 'repoAdded', value: { repoUrl: 'https://x/y.git', baseBranch: 'main' } } } as Event);
 const added = chat.items.at(-1);
+apply(chat, { seq: 10n, actor: 'alice', kind: { case: 'threadRenamed', value: { title: 'New name' } } } as Event);
+const renamed = chat.items.at(-1);
+if (renamed?.kind !== 'renamed' || renamed.title !== 'New name') throw new Error('threadRenamed should become a divider naming the title');
 if (added?.kind !== 'repo' || added.actor !== 'alice' || added.repo.repoUrl !== 'https://x/y.git') throw new Error('repoAdded should become a divider naming who added it');
 
 apply(chat, ev({ case: 'turnEnded', value: { durationMs: 1n } }));

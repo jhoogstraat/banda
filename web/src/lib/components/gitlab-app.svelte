@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	// Settings: the team's GitLab application, one per GitLab host, set up by anyone once. GitLab has no way to
 	// create one for Banda, so this walks through making it by hand: where, with which values, then its ID and
 	// secret pasted here, checked with GitLab and kept in the API. Then each teammate connects under Accounts.
@@ -84,7 +85,7 @@
 	}
 
 	async function remove(host: string) {
-		if (!confirm(`Remove the GitLab application on ${host} from Banda? Everyone’s GitLab connections there end and are revoked on GitLab, and pushes fall back to GIT_TOKEN secrets. The application stays on GitLab, where its owner can delete it. Settings shows everyone that you removed it.`)) return;
+		if (!(await confirmAction({ title: `Remove the GitLab application on ${host} from Banda?`, body: 'Everyone’s GitLab connections there end and are revoked on GitLab, and pushes fall back to GIT_TOKEN secrets. The application stays on GitLab, where its owner can delete it. Settings shows everyone that you removed it.', action: 'Remove application' }))) return;
 		try {
 			await settingsApi.removeGitLabApp({ host });
 			error = '';
@@ -152,7 +153,7 @@
 									</p>
 								{/if}
 								{#if x.app?.needsAttention}
-									<p class="flex gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+									<p class="flex gap-1.5 text-xs text-warning-foreground">
 										<TriangleAlertIcon class="mt-px size-3.5 shrink-0" />
 										<span>
 											GitLab refused this application’s ID or secret when renewing a connection: someone renewed the secret or deleted the
@@ -277,7 +278,7 @@
 								</div>
 								{#if saveError}<p class="text-sm text-destructive" role="alert">{saveError}</p>{/if}
 								{#if replacing && replacingApp}
-									<p class="max-w-prose text-xs text-amber-700 dark:text-amber-400" role="group" aria-label="Replace the application">
+									<p class="max-w-prose text-xs text-warning-foreground" role="group" aria-label="Replace the application">
 										Replacing application {short(replacingApp.applicationId)} ends everyone’s GitLab connection on {h.host}: Banda revokes them and
 										each teammate connects again. A new secret of the same application keeps them. Settings shows everyone that you replaced it.
 									</p>

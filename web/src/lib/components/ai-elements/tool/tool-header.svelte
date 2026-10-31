@@ -65,16 +65,16 @@
         class={cn(
           "size-4",
           state === "input-available" && "animate-pulse",
-          state === "output-available" && "text-green-600",
-          state === "output-error" && "text-red-600"
+          state === "output-available" && "text-success-foreground",
+          state === "output-error" && "text-destructive"
         )}
       /> -->
 			<IconComponent
 				class={cn(
 					"size-4",
 					state === "input-available" && "animate-pulse",
-					state === "output-available" && "text-green-600",
-					state === "output-error" && "text-red-600"
+					state === "output-available" && "text-success-foreground",
+					state === "output-error" && "text-destructive"
 				)}
 			/>
 

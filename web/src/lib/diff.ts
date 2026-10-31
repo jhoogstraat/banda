@@ -45,9 +45,9 @@ export const where = (c: Comment) =>
 
 export const tone = (l: string) =>
 	l.startsWith('@@')
-		? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+		? 'bg-info/10 text-info-foreground'
 		: l[0] === '+'
-			? 'bg-green-500/15 text-green-700 dark:text-green-300'
+			? 'bg-diff-add/15 text-diff-add-foreground'
 			: l[0] === '-'
-				? 'bg-red-500/15 text-red-700 dark:text-red-300'
+				? 'bg-diff-del/15 text-diff-del-foreground'
 				: 'text-muted-foreground';

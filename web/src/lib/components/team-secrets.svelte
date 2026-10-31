@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	// The team's secrets in Settings: like the user's own, in every thread of
 	// every teammate, and anyone may replace or delete them.
 	import { timestampDate } from '@bufbuild/protobuf/wkt';
@@ -60,8 +61,8 @@
 		if (await act(settingsApi.setTeamSecret({ name: replacing, value: newValue }))) replacing = newValue = '';
 	}
 
-	function remove(n: string) {
-		if (confirm(`Delete the team secret ${n}? Everyone's environments started afterwards won't have it.`))
+	async function remove(n: string) {
+		if (await confirmAction({ title: `Delete the team secret ${n}?`, body: "Everyone's environments started afterwards won't have it.", action: 'Delete secret' }))
 			act(settingsApi.deleteTeamSecret({ name: n }));
 	}
 </script>

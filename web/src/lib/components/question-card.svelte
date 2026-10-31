@@ -84,28 +84,28 @@
 	};
 </script>
 
-<div role="group" aria-label="Question" class="space-y-3 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-sky-500/40 bg-sky-500/5'}">
+<div role="group" aria-label="Question" class="space-y-3 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-info/40 bg-info/5'}">
 	<div class="flex items-center gap-2">
-		<MessageCircleQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-sky-500'}" />
+		<MessageCircleQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-info-foreground'}" />
 		<span class="min-w-0 flex-1">The agent asks {questions.length > 1 ? `${questions.length} questions` : 'a question'}</span>
 	</div>
 
 	{#each questions as q (q.question)}
 		<fieldset class="space-y-1.5" disabled={!!item.resolved || busy}>
 			<legend class="mb-1.5 flex items-baseline gap-2">
-				{#if q.header}<span class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground uppercase">{q.header}</span>{/if}
+				{#if q.header}<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{q.header}</span>{/if}
 				<span class="font-medium">{q.question}</span>
 			</legend>
 			{#if item.resolved}
-				{#if item.resolved.answers[q.question]}<p class="flex items-center gap-1.5 pl-1"><CheckIcon class="size-3.5 text-emerald-500" /> {item.resolved.answers[q.question]}</p>{/if}
+				{#if item.resolved.answers[q.question]}<p class="flex items-center gap-1.5 pl-1"><CheckIcon class="size-3.5 text-success-foreground" /> {item.resolved.answers[q.question]}</p>{/if}
 			{:else}
 				{#each q.options as o (o.label)}
 					{@const who = voters(q, o.label)}
-					<label class="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 transition-colors hover:bg-muted/40 has-[:checked]:border-sky-500/60 has-[:checked]:bg-sky-500/10">
+					<label class="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 transition-colors hover:bg-muted/40 has-[:checked]:border-info/60 has-[:checked]:bg-info/10">
 						<input
 							type={q.multiSelect ? 'checkbox' : 'radio'}
 							name="{item.req.id}:{q.question}"
-							class="mt-0.5 accent-sky-600"
+							class="mt-0.5 accent-info"
 							checked={picks[q.question]?.includes(o.label) ?? false}
 							onchange={(e) => pick(q, o.label, e.currentTarget.checked)}
 						/>
@@ -133,7 +133,7 @@
 
 	{#if item.resolved}
 		<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
-			{#if item.resolved.decision === PermissionDecision.ALLOW}<CheckIcon class="size-3.5 text-emerald-500" />{:else}<XIcon class="size-3.5" />{/if}
+			{#if item.resolved.decision === PermissionDecision.ALLOW}<CheckIcon class="size-3.5 text-success-foreground" />{:else}<XIcon class="size-3.5" />{/if}
 			{outcome(item.resolved)}
 		</p>
 	{:else if can}

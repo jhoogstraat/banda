@@ -83,6 +83,8 @@ Team (`#github-app`, `#gitlab-app`, `#team-secrets`, `#workload-identity`):
 
 For work without code, pick **No repository** in the composer's repository chip. The agent starts in an empty folder in the thread's environment; the Files tab and the terminal work on it, but there is no diff, push or pull request. The folder lives only in that environment, so settling the thread never deletes it. A fork gets the conversation but not the files, and sub-threads have no repository either. The Files tab follows the `.gitignore` files in the folder, as git would.
 
+The owner can rename a thread from its **…** menu or the command palette; a line in the chat says so. Opening a thread again in the same browser takes you to a **New since you last looked** line, if it is among the latest 500 events. What you typed but didn't send survives a reload there too.
+
 The owner can add a repository later (**Add a repository** in the thread's **…** menu, or click **No repository** in the header), between turns. The environment restarts with the folder as a checkout of the thread's own branch: the files already there are kept as uncommitted changes on top of the base branch (the diff shows them; where the base has the same file, the folder's version stays), and from then on it is a thread like any other. If the checkout fails (a wrong URL or base branch), the folder is left as it was and the thread shows the error: **Change the repository** there (or in the **…** menu) corrects the URL or base branch, or removes the repository to go on without one. Once a checkout succeeded, the repository can't be changed.
 
 ## When an environment doesn't start

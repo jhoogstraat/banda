@@ -35,7 +35,7 @@
 	{@render step(steps[0])}
 {:else}
 	<Collapsible class="group/steps">
-		<CollapsibleTrigger class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/50">
+		<CollapsibleTrigger class="flex w-full items-center gap-2 rounded-md px-2 py-1 pointer-coarse:py-2 text-left text-xs text-muted-foreground hover:bg-muted/50">
 			<ChevronRightIcon class="size-3.5 shrink-0 transition-transform group-data-[state=open]/steps:rotate-90" />
 			<span class="shrink-0 font-medium text-foreground">{tools.length ? `Used ${plural(tools.length, 'tool')}` : 'Thought'}</span>
 			{#if errors}<span class="flex shrink-0 items-center gap-1 text-destructive"><XCircleIcon class="size-3.5" />{errors}</span>{/if}

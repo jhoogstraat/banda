@@ -130,9 +130,9 @@
 	});
 	const methodLabels: Record<string, string> = { merge: 'Merge commit', squash: 'Squash and merge', rebase: 'Rebase and merge' };
 	const reviewTone: Record<number, string> = {
-		[ReviewState.APPROVED]: 'text-emerald-700 dark:text-emerald-400',
+		[ReviewState.APPROVED]: 'text-success-foreground',
 		[ReviewState.CHANGES_REQUESTED]: 'text-destructive',
-		[ReviewState.REQUESTED]: 'text-amber-700 dark:text-amber-400'
+		[ReviewState.REQUESTED]: 'text-warning-foreground'
 	};
 	// "just now", "5m ago".
 	const since = (ts?: Timestamp) => (ago(ts, threads.now) === 'now' ? 'just now' : `${ago(ts, threads.now)} ago`);
@@ -191,15 +191,15 @@
 				<span>·</span>
 				<code>{pr.headBranch}</code> → <code>{pr.baseBranch}</code>
 				{#if pr.additions || pr.deletions}
-					<span>·</span><span class="text-emerald-700 dark:text-emerald-400">+{pr.additions}</span><span class="text-red-600 dark:text-red-400">−{pr.deletions}</span>
+					<span>·</span><span class="text-success-foreground">+{pr.additions}</span><span class="text-destructive">−{pr.deletions}</span>
 				{/if}
 				{#if pr.changedFiles}<span>· {pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}</span>{/if}
 				<button class="flex items-center gap-1 hover:text-foreground hover:underline" onclick={ondiff}><FileDiffIcon class="size-3" />View diff</button>
 			</p>
 			<p class="flex items-center gap-1 text-xs text-muted-foreground">
 				{#if pr.error}
-					<TriangleAlertIcon class="size-3.5 shrink-0 text-amber-500" />
-					<span class="text-amber-700 dark:text-amber-400">As of {since(pr.fetchedAt)}: {pr.error}</span>
+					<TriangleAlertIcon class="size-3.5 shrink-0 text-warning-foreground" />
+					<span class="text-warning-foreground">As of {since(pr.fetchedAt)}: {pr.error}</span>
 					{#if owner}<ForgeAction message={pr.error} {thread} />{/if}
 				{:else}
 					Updated {since(pr.fetchedAt)}

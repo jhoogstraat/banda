@@ -7,20 +7,18 @@
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import PullRequestChip from '#lib/components/pull-request-chip.svelte';
 	import { noun } from '#lib/pullrequests.js';
-	import SquareIcon from '@lucide/svelte/icons/square';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
 	import StatusDot from '#lib/components/status-dot.svelte';
 	import ThreadActions, { isSnoozed } from '#lib/components/thread-actions.svelte';
 	import UserAvatar from '#lib/components/user-avatar.svelte';
-	import { Button } from '#lib/components/ui/button/index.js';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
-	import { Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
+	import type { Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { threadKeys } from '#lib/shortcuts.svelte.js';
 	import { userName, waiting } from '#lib/threads.svelte.js';
 
-	// The title gets the room; at a glance: status, Stop, Push or the pull request, presence, the pane. The rest is in
+	// The title gets the room; at a glance: status, Push or the pull request, presence, the pane. The rest is in
 	// the "…" menu (ThreadActions). here: the others with the thread open. The actions are the command palette's too.
 	// It sits in the thread page's @container, so it adapts to the column's width, phones included.
 	let {
@@ -29,7 +27,6 @@
 		offline,
 		here,
 		act,
-		interrupt,
 		toggleMode,
 		retry,
 		push,
@@ -40,6 +37,7 @@
 		spawnOpen = $bindable(),
 		handoffOpen = $bindable(),
 		repoOpen = $bindable(),
+		renameOpen = $bindable(),
 		paneOpen = $bindable()
 	}: {
 		thread?: Thread;
@@ -47,7 +45,6 @@
 		offline: boolean;
 		here: string[];
 		act: (call: Promise<unknown>) => Promise<boolean>;
-		interrupt: () => void;
 		toggleMode: () => void;
 		retry: () => void;
 		push: () => void;
@@ -60,6 +57,7 @@
 		spawnOpen: boolean;
 		handoffOpen: boolean;
 		repoOpen: boolean;
+		renameOpen: boolean;
 		paneOpen?: boolean;
 	} = $props();
 
@@ -126,9 +124,6 @@
 				{/if}
 			</div>
 		{/if}
-		{#if owner && thread?.status === Status.WORKING}
-			<Button variant="destructive" size="sm" class="mr-1 h-7" onclick={interrupt}><SquareIcon class="fill-current" /> Stop</Button>
-		{/if}
 		{#if thread?.pullRequest}
 			<PullRequestChip pr={thread.pullRequest} onclick={onpull} />
 		{:else if pr && owner && thread?.forgeReady}
@@ -140,7 +135,7 @@
 		{/if}
 		<IconButton icon={PanelRightIcon} label="Toggle right pane" keys={threadKeys.pane} variant={paneOpen ? 'secondary' : 'ghost'} onclick={() => (paneOpen = !paneOpen)} />
 		{#if thread}
-			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} {repoFixable} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} onrepo={() => (repoOpen = true)} />
+			<ThreadActions {thread} {owner} {act} {toggleMode} {retry} {repoFixable} onfork={() => (forkOpen = true)} onspawn={() => (spawnOpen = true)} onhandoff={() => (handoffOpen = true)} onrepo={() => (repoOpen = true)} onrename={() => (renameOpen = true)} />
 		{/if}
 	</div>
 </PageHeader>

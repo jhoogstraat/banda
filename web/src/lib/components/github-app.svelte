@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	// Settings: the team's GitHub App, set up by anyone once: create it on GitHub from a manifest, install it on
 	// the accounts whose repositories threads use, and each teammate connects under Accounts. Its keys stay in the
 	// API. Until it exists this is a guided list of steps; then a summary of the app and where it's installed.
@@ -92,7 +93,7 @@
 
 	async function remove() {
 		const what = app ? `${app.slug} on ${app.host}` : 'the app';
-		if (!confirm(`Remove ${what} from Banda? Everyone’s GitHub connections end, and pushes fall back to GIT_TOKEN secrets. The app stays on GitHub, where its owner can delete it. Settings shows everyone that you removed it.`)) return;
+		if (!(await confirmAction({ title: `Remove ${what} from Banda?`, body: 'Everyone’s GitHub connections end, and pushes fall back to GIT_TOKEN secrets. The app stays on GitHub, where its owner can delete it. Settings shows everyone that you removed it.', action: 'Remove app' }))) return;
 		try {
 			await settingsApi.removeGitHubApp({});
 			error = '';
@@ -107,7 +108,7 @@
 </script>
 
 {#snippet warning(text: string)}
-	<p class="flex gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+	<p class="flex gap-1.5 text-xs text-warning-foreground">
 		<TriangleAlertIcon class="mt-px size-3.5 shrink-0" />
 		<span>{text}</span>
 	</p>
@@ -259,7 +260,7 @@
 						<a href={app.installUrl} class="inline-block rounded-sm text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">Install on another account</a>
 					{:else}
 						<p class="flex items-center gap-1.5 text-sm font-medium">
-							<span class="size-2 shrink-0 rounded-full bg-amber-400"></span>
+							<span class="size-2 shrink-0 rounded-full bg-warning"></span>
 							Not installed yet
 						</p>
 						<p class="max-w-prose text-sm text-muted-foreground">
@@ -282,7 +283,7 @@
 			{/if}
 
 			{#if replacing && app}
-				<div class="space-y-3 bg-amber-500/5 p-4" role="group" aria-label="Replace the app">
+				<div class="space-y-3 bg-warning/5 p-4" role="group" aria-label="Replace the app">
 					<p class="max-w-prose text-sm">
 						<span class="font-medium">Replacing {app.slug} ends everyone’s GitHub connection.</span>
 						Banda revokes them, each teammate connects again, and an owner of

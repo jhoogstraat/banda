@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import ListFilterIcon from '@lucide/svelte/icons/list-filter';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import PageHeader from '#lib/components/page-header.svelte';
@@ -13,11 +14,12 @@
 	// Everyone's recent, unsettled threads, live from TeamWatch.
 	let board = $state<Thread[]>([]);
 	let offline = $state(false);
+	let loaded = $state(false);
 
 	$effect(() => {
 		const ctrl = new AbortController();
 		watchTeam(ctrl.signal, (list) => {
-			if (list) board = list;
+			if (list) [board, loaded] = [list, true];
 			offline = !list;
 		});
 		return () => ctrl.abort();
@@ -115,7 +117,11 @@
 							onclick={() => (open[p.id] = !unfolded)}
 						></button>
 					</h2>
-					{#if unfolded}
+					{#if !loaded}
+						<div class="space-y-2" aria-hidden="true" data-testid="board-skeleton">
+							{#each [0, 1] as i (i)}<Skeleton class="h-16" />{/each}
+						</div>
+					{:else if unfolded}
 						<ThreadGroup name={p.id === me ? 'Needs you' : 'Needs them'} list={p.needs} />
 						<ThreadGroup name="Working" list={p.working} />
 						<ThreadGroup name="Done recently" list={p.done} max={3} />
@@ -128,7 +134,7 @@
 								</button>
 							{/if}
 						{/if}
-						{#if !p.needs.length && !p.working.length && !p.done.length && !p.older.length}
+						{#if loaded && !p.needs.length && !p.working.length && !p.done.length && !p.older.length}
 							<p class="px-1 text-xs text-muted-foreground">Nothing this week.</p>
 						{/if}
 					{/if}

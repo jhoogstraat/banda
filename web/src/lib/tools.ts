@@ -113,6 +113,10 @@ export function describe(tool: Tool): { label: string; detail: string; meta: str
 				detail: (i.pattern ?? '') + (i.path ? ` in ${rel(i.path)}` : ''),
 				meta: r && !r.isError ? plural(matches(tool), tool.call.name === 'Glob' || !i.output_mode || i.output_mode === 'files_with_matches' ? 'file' : 'match') : ''
 			};
+		case 'ExitPlanMode':
+			return { label: 'Plan', detail: '', meta: '' };
+		case 'AskUserQuestion':
+			return { label: 'Question', detail: '', meta: '' };
 		case 'WebFetch':
 			return { label: 'Fetch', detail: i.url ?? '', meta: '' };
 		case 'WebSearch':

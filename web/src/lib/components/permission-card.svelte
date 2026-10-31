@@ -77,9 +77,9 @@
 	};
 </script>
 
-<div role="group" aria-label={plan ? 'Plan' : `Permission for ${name}`} class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-amber-500/40 bg-amber-500/5'}">
+<div role="group" aria-label={plan ? 'Plan' : `Permission for ${name}`} class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-warning/40 bg-warning/5'}">
 	<div class="flex items-center gap-2">
-		<ShieldQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-amber-500'}" />
+		<ShieldQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-warning-foreground'}" />
 		<span class="min-w-0 flex-1">
 			{#if plan}The agent has a plan and asks to start working{:else}The agent asks to use <span class="font-medium">{name}</span>{/if}
 		</span>
@@ -98,14 +98,14 @@
 	{:else if edits}
 		<p class="font-mono text-xs text-muted-foreground">{rel(args.file_path)}</p>
 		<pre class="max-h-72 overflow-auto rounded-md bg-muted/30 py-1 font-mono text-xs leading-5">{#each edits as line, i (i)}<div
-					class="px-3 {line[0] === '+' ? 'bg-green-500/15 text-green-700 dark:text-green-300' : line[0] === '-' ? 'bg-red-500/15 text-red-700 dark:text-red-300' : 'text-muted-foreground'}">{line === '@@' ? '⋯' : line || ' '}</div>{/each}</pre>
+					class="px-3 {line[0] === '+' ? 'bg-diff-add/15 text-diff-add-foreground' : line[0] === '-' ? 'bg-diff-del/15 text-diff-del-foreground' : 'text-muted-foreground'}">{line === '@@' ? '⋯' : line || ' '}</div>{/each}</pre>
 	{:else}
 		<ToolInput input={args} />
 	{/if}
 
 	{#if item.resolved}
 		<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
-			{#if item.resolved.decision === PermissionDecision.ALLOW || item.resolved.decision === PermissionDecision.ALLOW_ALWAYS}<CheckIcon class="size-3.5 text-emerald-500" />{:else}<XIcon class="size-3.5" />{/if}
+			{#if item.resolved.decision === PermissionDecision.ALLOW || item.resolved.decision === PermissionDecision.ALLOW_ALWAYS}<CheckIcon class="size-3.5 text-success-foreground" />{:else}<XIcon class="size-3.5" />{/if}
 			{outcome(item.resolved)}
 		</p>
 	{:else if can}

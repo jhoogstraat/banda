@@ -139,8 +139,8 @@ test('an audience added in Settings puts a signed token in running threads, refr
 	});
 
 	await test.step('removing the audience in Settings deletes the file', async () => {
-		page.once('dialog', (d) => d.accept());
 		await page.getByRole('button', { name: 'Remove vault' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Remove audience' }).click();
 		await expect(page.getByText(/^Off: threads get no tokens/)).toBeVisible();
 		await expect.poll(() => kexec(t.pod, `ls -A ${dir}`), { timeout: 30_000 }).toBe('');
 	});

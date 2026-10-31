@@ -499,10 +499,10 @@ func (s *Store) Update(ctx context.Context, id string, fn func(tx *Store, t *Thr
 	err = tx.QueryRow(ctx, `UPDATE threads SET status=$2, mode=$3, pending_prompt=$4, diff=$5, delivered_seq=$7,
 		turns=$8, requests=$9, trusted=$10, model=$11, effort=$12, permission_mode=$13, permissions=$14, allowed_tools=$15,
 		last_seq=last_seq+$6, activity=coalesce($16, activity), pending_images=coalesce($17, '{}'::text[]), env_pushed=$18,
-		owner_id=$19, handoff_to=$20, handoffs=$21, profile=$22, summary=coalesce($23, summary), pending_teammate=$25,
+		owner_id=$19, handoff_to=$20, handoffs=$21, profile=$22, summary=coalesce($23, summary), pending_teammate=$25, title=$26,
 		finished_at=CASE WHEN $24 THEN now() ELSE finished_at END, updated_at=now() WHERE id=$1 RETURNING last_seq-$6, updated_at`,
 		t.ID, t.Status, t.Mode, t.PendingPrompt, t.Diff, len(events), t.DeliveredSeq, t.Turns, t.Requests, t.Trusted, t.Model, t.Effort,
-		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, t.Profile, summary, finished, t.PendingTeammate).Scan(&seq, &t.UpdatedAt)
+		t.PermissionMode, perms, tools, activity, t.PendingImages, t.EnvPushed, t.OwnerID, t.HandoffTo, t.Handoffs, t.Profile, summary, finished, t.PendingTeammate, t.Title).Scan(&seq, &t.UpdatedAt)
 	if err != nil {
 		return t, nil, err
 	}

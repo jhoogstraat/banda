@@ -54,10 +54,10 @@
 		</p>
 		<p class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 			{#if conn?.broken}
-				<span class="size-2 shrink-0 rounded-full bg-amber-400"></span>
-				<span class="text-amber-700 dark:text-amber-400">{name} no longer accepts your connection as @{conn.login}</span>
+				<span class="size-2 shrink-0 rounded-full bg-warning"></span>
+				<span class="text-warning-foreground">{name} no longer accepts your connection as @{conn.login}</span>
 			{:else if conn}
-				<span class="size-2 shrink-0 rounded-full bg-emerald-500"></span>
+				<span class="size-2 shrink-0 rounded-full bg-success"></span>
 				<span class="truncate">
 					Connected as <span class="text-foreground">@{conn.login}</span>
 					<span title={conn.connectedAt && timestampDate(conn.connectedAt).toLocaleString()}>· {since(conn.connectedAt)}</span>

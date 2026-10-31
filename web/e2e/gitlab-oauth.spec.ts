@@ -360,8 +360,8 @@ test('disconnect revokes both grants on GitLab and forgets the tokens', async ({
 	const page = await open(alice, '/settings#gitlab');
 	const gitlab = section(page, 'GitLab');
 	await expect(gitlab).toContainText('@alice');
-	page.once('dialog', (d) => d.accept());
 	await gitlab.getByRole('button', { name: 'Disconnect' }).click();
+	await page.getByRole('dialog').getByRole('button', { name: 'Disconnect' }).click();
 	await expect(gitlab.getByRole('link', { name: 'Connect GitLab' })).toBeVisible();
 	await expect(gitlab).toContainText('Not connected');
 	expect(forge.grants.map((g) => [g.scope, !!g.revoked])).toEqual([['api', true], ['write_repository', true]]);
@@ -438,12 +438,10 @@ test('replacing the application is asked for, ends every connection through the 
 	await expect(section(bobPage, 'GitLab')).not.toContainText('replaced the team’s GitLab application');
 
 	// Removing asks first, ends the connections through it and is recorded too.
-	page.once('dialog', (d) => {
-		expect(d.message()).toContain('Settings shows everyone that you removed it');
-		d.accept();
-	});
 	await page.reload();
 	await app.getByRole('button', { name: 'Remove the application on gitlab.com from Banda' }).click();
+	await expect(page.getByRole('dialog')).toContainText('Settings shows everyone that you removed it');
+	await page.getByRole('dialog').getByRole('button', { name: 'Remove application' }).click();
 	await expect(app).toContainText(`${carol.id} removed the application on gitlab.com · just now, was ${next.clientId.slice(0, 12)}…`);
 	expect(await kube('get', 'secret', secret, '--ignore-not-found')).toBe('');
 	expect(forge.grants.filter((g) => g.clientId === next.clientId).map((g) => [g.login, !!g.revoked])).toEqual([['bob', true], ['bob', true]]);

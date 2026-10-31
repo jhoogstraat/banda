@@ -26,12 +26,13 @@
 	// A host whose repositories show once I connect it, and its forge.
 	let connectHost = $state('');
 	let connectForge = $state('');
+	let listFailed = $state(false);
 	let asked = false;
 	$effect(() => {
 		if (!open || asked) return;
 		asked = true;
 		// Without them the field still takes a URL.
-		api.listForgeRepos({}).then((r) => ((mine = r.repos), (connectHost = r.connectHost), (connectForge = r.connectForge))).catch(() => {});
+		api.listForgeRepos({}).then((r) => ((mine = r.repos), (connectHost = r.connectHost), (connectForge = r.connectForge))).catch(() => (listFailed = true));
 	});
 	$effect(() => {
 		const query = custom.trim();
@@ -61,7 +62,7 @@
 <DropdownMenu.Root bind:open>
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<PromptInput.Button {...props} size="sm" class="min-w-0" title={repoUrl === noRepo ? 'The agent works in an empty folder' : repoUrl}>
+			<PromptInput.Button {...props} size="sm" class="min-w-0 max-sm:max-w-56" title={repoUrl === noRepo ? 'The agent works in an empty folder' : repoUrl}>
 				<Icon />
 				<span class="truncate">{repoUrl ? projectName(repoUrl) : 'Choose repository'}</span>
 				{#if repoUrl !== noRepo}
@@ -96,6 +97,7 @@
 				{/if}
 			</DropdownMenu.Item>
 		{/if}
+		{#if listFailed}<p class="px-2 py-1 text-xs text-destructive">Couldn't list your repositories. A URL still works.</p>{/if}
 		<form class="flex gap-1 p-1" onsubmit={useCustom}>
 			<Input bind:value={custom} onkeydown={keepKeys} placeholder="Search yours, or a URL" aria-label="Repository URL" class="h-7 min-w-0 text-xs" />
 			<Button type="submit" size="sm" disabled={!custom.trim()}>Use</Button>

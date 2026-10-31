@@ -29,6 +29,7 @@
 	import { Response } from '#lib/components/ai-elements/response/index.js';
 	import Tool from '#lib/components/ai-elements/tool/tool.svelte';
 	import ToolContent from '#lib/components/ai-elements/tool/tool-content.svelte';
+	import CopyText from '#lib/components/copy-text.svelte';
 	import IconButton from '#lib/components/icon-button.svelte';
 	import MentionText from '#lib/components/mention-text.svelte';
 	import MessageAttachments from '#lib/components/message-attachments.svelte';
@@ -48,7 +49,8 @@
 	import type { Item } from '#lib/events.js';
 	import { Mode, SetupState, Status, type Thread } from '#lib/gen/banda/v1/banda_pb.js';
 	import { projectName, threads, userName } from '#lib/threads.svelte.js';
-	import { changeText, checkStates, pullStates } from '#lib/pullrequests.js';
+	import { changeText, checkStates, duration, pullStates } from '#lib/pullrequests.js';
+	import { usd } from '#lib/utils.js';
 
 	let {
 		item,
@@ -86,6 +88,7 @@
 	}
 	const loginNeeded = (text: string) => /not logged in|rejected the login/.test(text);
 	const lineageVerb = { [Status.STARTING]: 'was spawned', [Status.AWAITING_INPUT]: 'finished', [Status.ERRORED]: 'failed' } as Partial<Record<Status, string>>;
+	const took = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : duration(new Date(0), new Date(ms)));
 	// The time, with the day once it isn't today.
 	function clock(t?: Timestamp) {
 		if (!t) return '';
@@ -115,7 +118,7 @@
 {#snippet divider(text: string, tone = 'text-muted-foreground', link?: [string, () => void])}
 	<div class="flex items-center gap-3 text-xs {tone}">
 		<div class="h-px min-w-4 flex-1 bg-border"></div>
-		<span class="text-center">{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={link[1]}>{link[0]}</button>{/if}</span>
+		<span class="text-center tabular-nums">{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline pointer-coarse:py-2.5" onclick={link[1]}>{link[0]}</button>{/if}</span>
 		<div class="h-px min-w-4 flex-1 bg-border"></div>
 	</div>
 {/snippet}
@@ -141,7 +144,7 @@
 					<a href="/u/{item.actor}" class="text-sm font-medium hover:underline">{name}</a>
 				{/if}
 				{#if proposal}<span class="text-xs text-muted-foreground">suggests a prompt</span>{/if}
-				<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+				<time class="shrink-0 text-xs whitespace-nowrap text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			</div>
 			{#if item.text || proposal}
 				{@const draftable = proposal && owner && ondraft}
@@ -180,7 +183,7 @@
 			<UserAvatar {name} class="size-5" />
 			<span class="font-medium">{name}</span>
 			<span class="text-muted-foreground">asks the agent</span>
-			<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+			<time class="shrink-0 text-xs whitespace-nowrap text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 			{#if item.resolved}
 				<span class="ml-auto text-xs text-muted-foreground">
 					{item.resolved.by === 'system' ? 'Withdrawn' : `${item.resolved.approved ? 'Approved' : 'Declined'} by ${userName(item.resolved.by)}`}{item.resolved.note ? `: ${item.resolved.note}` : ''}
@@ -190,7 +193,7 @@
 					<Tooltip>
 						<TooltipTrigger>
 							{#snippet child({ props })}
-								<button {...props} type="button" aria-label="Runs on your API key" class="rounded p-1 text-muted-foreground hover:text-foreground"><InfoIcon class="size-3.5" /></button>
+								<button {...props} type="button" aria-label="Runs on your API key" class="rounded p-1 text-muted-foreground hover:text-foreground pointer-coarse:p-2.5"><InfoIcon class="size-3.5" /></button>
 							{/snippet}
 						</TooltipTrigger>
 						<TooltipContent>Runs on your API key, in this thread's environment.</TooltipContent>
@@ -226,7 +229,7 @@
 		<div class="flex items-center gap-2">
 			<HandshakeIcon class="size-4 shrink-0 text-muted-foreground" />
 			<span><span class="font-medium">{from}</span> handed this thread to <span class="font-medium">{to}</span></span>
-			<time class="text-xs text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
+			<time class="shrink-0 text-xs whitespace-nowrap text-muted-foreground" title={item.time && timestampDate(item.time).toLocaleString()}>{clock(item.time)}</time>
 		</div>
 		{#if item.offer.note}<p class="whitespace-pre-wrap"><MentionText text={item.offer.note} /></p>{/if}
 		{#if item.offer.noBriefing}<p class="text-xs text-muted-foreground">No briefing: {item.offer.noBriefing}.</p>{/if}
@@ -257,14 +260,17 @@
 {:else if item.kind === 'permission'}
 	<PermissionCard {item} {threadId} {owner} trusted={!!thread?.trusted} ownerName={userName(thread?.ownerId ?? '')} {act} />
 {:else if item.kind === 'text'}
-	{@render agentText(item.text)}
+	<div class="group/reply">
+		{@render agentText(item.text)}
+		<CopyText text={item.text} label="Copy this reply" class="opacity-0 group-hover/reply:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" />
+	</div>
 {:else if item.kind === 'steps'}
 	<ToolSteps steps={item.steps} />
 {:else if item.kind === 'turn'}
 	{#if item.turn.isError}
 		{@render divider(`Turn failed: ${item.turn.error}`, 'text-destructive')}
 	{:else}
-		{@render divider(`Turn finished in ${(Number(item.turn.durationMs) / 1000).toFixed(1)}s · $${item.turn.costUsd.toFixed(4)}`, undefined, item.diff && onshow ? ['View diff', () => onshow('diff')] : undefined)}
+		{@render divider(`Turn finished in ${took(Number(item.turn.durationMs))} · ${usd(item.turn.costUsd)}`, undefined, item.diff && onshow ? ['View diff', () => onshow('diff')] : undefined)}
 	{/if}
 {:else if item.kind === 'lineage'}
 	{@const u = item.update}
@@ -276,7 +282,7 @@
 {:else if item.kind === 'overlap'}
 	{@const o = item.overlap}
 	<a href="/t/{o.threadId}" class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
-		<GitMergeConflictIcon class="size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
+		<GitMergeConflictIcon class="size-3.5 shrink-0 text-warning-foreground" />
 		<span class="truncate">Now overlaps with <span class="font-medium text-foreground">{o.title || 'Untitled thread'}</span> by {userName(o.ownerId)}: <span class="font-mono">{o.paths.join(', ')}</span></span>
 	</a>
 {:else if item.kind === 'pullRequest'}
@@ -287,11 +293,11 @@
 		<span class="truncate"
 			>{changeText(item.changed, item.actor === 'system' ? '' : userName(item.actor))}: <span class="font-medium text-foreground">{p.title}</span></span
 		>
-		{#if onshow}<button class="shrink-0 underline-offset-2 hover:text-foreground hover:underline" onclick={() => onshow('pull')}>View</button>{/if}
+		{#if onshow}<button class="shrink-0 underline-offset-2 hover:text-foreground hover:underline pointer-coarse:py-2.5" onclick={() => onshow('pull')}>View</button>{/if}
 	</div>
 {:else if item.kind === 'notice' && item.text.startsWith('No identity tokens:')}
 	<!-- Workload identity refused for the owner (internal/api/identity.go): a calm line, as for a push that can't happen. -->
-	<div class="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+	<div class="flex items-start gap-2 text-xs text-warning-foreground">
 		<KeyRoundIcon class="mt-px size-3.5 shrink-0" />
 		<span class="min-w-0 flex-1">{item.text}</span>
 	</div>
@@ -302,7 +308,7 @@
 		<span class="min-w-0 flex-1">{item.text}</span>
 	</div>
 {:else if item.kind === 'notice'}
-	<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+	<div class="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
 		<Response content={item.text} class="h-auto" />
 		{#if owner && loginNeeded(item.text)}
 			<Button size="sm" class="mt-2" onclick={onlogin}>Log in to Claude Code</Button>
@@ -312,13 +318,13 @@
 	<div>
 		{#each item.steps as step (step.id)}
 			{@const failed = step.state === SetupState.FAILED}
-			<Tool class="group/tool mb-0 border-0" open={failed}>
+			<Tool class="group/tool mb-0 border-0">
 				<CollapsibleTrigger
 					disabled={!step.output}
-					class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-muted/50 {failed ? '' : 'text-muted-foreground'}"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1 pointer-coarse:py-2 text-left text-xs enabled:hover:bg-muted/50 {failed ? '' : 'text-muted-foreground'}"
 				>
 					{#if step.state === SetupState.DONE}
-						<CheckIcon class="size-3.5 shrink-0 text-emerald-500" />
+						<CheckIcon class="size-3.5 shrink-0 text-success-foreground" />
 					{:else if failed}
 						<XCircleIcon class="size-3.5 shrink-0 text-destructive" />
 					{:else if step.state === SetupState.SKIPPED}
@@ -343,7 +349,7 @@
 {:else if item.kind === 'push' && item.unavailable}
 	<!-- Only the owner can fix it, so only the owner is told, once (see events.ts). -->
 	{#if owner}
-		<div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+		<div class="flex items-center gap-2 text-xs text-warning-foreground">
 			<CloudOffIcon class="size-3.5 shrink-0" />
 			{#if forgeAction(item.text)}
 				<!-- The button names the action, so the line needn't say where. -->
@@ -358,7 +364,7 @@
 		</div>
 	{/if}
 {:else if item.kind === 'push'}
-	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}
+	{@render divider(item.text.replaceAll('`', ''), item.pushed ? 'text-muted-foreground' : 'text-warning-foreground')}
 {:else if item.kind === 'mode'}
 	{@const name = userName(item.actor)}
 	{#if item.reason}
@@ -373,7 +379,7 @@
 	<div class="flex items-center gap-2 text-xs text-muted-foreground">
 		<AppWindowIcon class="size-3.5 shrink-0" />
 		<span>{p.process || 'Something'} is listening on :{p.port}</span>
-		{#if onshow}<button class="font-medium text-foreground underline-offset-4 hover:underline" onclick={() => onshow('browser', p.port)}>Open preview</button>{/if}
+		{#if onshow}<button class="font-medium text-foreground underline-offset-4 hover:underline pointer-coarse:py-2.5" onclick={() => onshow('browser', p.port)}>Open preview</button>{/if}
 	</div>
 {:else if item.kind === 'settings'}
 	{@const s = item.settings}
@@ -381,6 +387,8 @@
 	{@render divider(`${userName(item.actor)} switched to ${[s.model && `${s.model} · ${s.effort}`, s.profile && profileLabel(s.profile)].filter(Boolean).join(' · ')}`)}
 {:else if item.kind === 'repo'}
 	{@render divider(item.repo.repoUrl ? `${userName(item.actor)} added ${projectName(item.repo.repoUrl)} · ${item.repo.baseBranch}` : `${userName(item.actor)} removed the repository`)}
+{:else if item.kind === 'renamed'}
+	{@render divider(`${userName(item.actor)} renamed this thread to ${item.title}`)}
 {:else if item.kind === 'permissionMode'}
 	{@render divider(`${item.actor === 'agent' ? 'The agent' : userName(item.actor)} switched to ${permissionLabel(item.mode)}`)}
 {:else if item.kind === 'revoked'}

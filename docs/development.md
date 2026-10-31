@@ -40,10 +40,13 @@ kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 
 The web app is a tool people work in: familiar controls, dense, quiet. Reuse `web/src/lib/components/ui` and the theme tokens in `routes/layout.css`.
 
-- Text sits at 4.5:1 or better in both themes: `-700` shades of amber, emerald, green and sky on light, not `-600`.
+- Colors come from the theme tokens: `success`, `warning`, `info`, `diff-add`, `diff-del` for dots, tints and borders, their `-foreground` for text and icons. Raw Tailwind hues stay in the always-dark terminal block and the forges' own merged violet.
+- Text sits at 4.5:1 or better in both themes (`e2e/ui.spec.ts` measures it).
 - Status shows as a `StatusDot` and a word. No colored bars on a card's edge.
 - Labels are sentence case at `text-xs`, never tiny tracked capitals.
 - Motion says something changed, under 300ms, on named properties (no `transition-all`). `layout.css` handles `prefers-reduced-motion`.
 - A truncated string gets a `title`. Long unbroken text wraps by itself (`overflow-wrap` on `html`).
 - A destructive action asks with the browser's `confirm()`.
+- Controls are 36px tall on touch screens (`pointer-coarse:`), and composer chips scroll sideways on a phone. A small inline control takes the `hit` utility; in the chat, where each item clips at its box, `pointer-coarse:` padding.
+- Destructive actions ask through `confirmAction` (`confirm-dialog.svelte`), whose button names the action, not the browser's `confirm()`.
 - Check a change on a phone and in the light theme: the dev default is dark.

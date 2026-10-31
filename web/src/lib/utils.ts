@@ -18,6 +18,10 @@ export function ago(ts?: Timestamp, now = Date.now()) {
 	return unit ? Math.floor(s / size) + unit : "now";
 }
 
+/** Dollars to the cent; below a cent, the digits that say how little. */
+export const usd = (n: number) =>
+	new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: n > 0 && n < 0.01 ? 4 : 2 }).format(n);
+
 /** ago as words: "just now", "2h ago". */
 export function since(ts?: Timestamp) {
 	const a = ago(ts);

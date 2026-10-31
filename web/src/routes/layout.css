@@ -17,10 +17,10 @@
 	--secondary: oklch(0.97 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
 	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
+	--muted-foreground: oklch(0.5 0 0);
 	--accent: oklch(0.97 0 0);
 	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
+	--destructive: oklch(0.505 0.213 27.518);
 	--border: oklch(0.922 0 0);
 	--input: oklch(0.922 0 0);
 	--ring: oklch(0.708 0 0);
@@ -29,6 +29,17 @@
 	--chart-3: oklch(0.439 0 0);
 	--chart-4: oklch(0.371 0 0);
 	--chart-5: oklch(0.269 0 0);
+	/* Status colors. The plain name is for dots, tints and borders, -foreground for text and icons on them. */
+	--success: oklch(0.696 0.17 162.48);
+	--success-foreground: oklch(0.432 0.095 166.913);
+	--warning: oklch(0.828 0.189 84.429);
+	--warning-foreground: oklch(0.473 0.137 46.201);
+	--info: oklch(0.746 0.16 232.661);
+	--info-foreground: oklch(0.443 0.11 240.79);
+	--diff-add: oklch(0.723 0.219 149.579);
+	--diff-add-foreground: oklch(0.448 0.119 151.328);
+	--diff-del: oklch(0.637 0.237 25.331);
+	--diff-del-foreground: oklch(0.444 0.177 26.899);
 	--radius: 0.625rem;
 	color-scheme: light;
 	--sidebar: oklch(0.985 0 0);
@@ -43,6 +54,11 @@
 
 .dark {
 	color-scheme: dark;
+	--success-foreground: oklch(0.765 0.177 163.223);
+	--warning-foreground: oklch(0.828 0.189 84.429);
+	--info-foreground: oklch(0.746 0.16 232.661);
+	--diff-add-foreground: oklch(0.871 0.15 154.449);
+	--diff-del-foreground: oklch(0.808 0.114 19.571);
 	--background: oklch(0.145 0 0);
 	--foreground: oklch(0.985 0 0);
 	--card: oklch(0.205 0 0);
@@ -95,6 +111,16 @@
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+	--color-diff-add: var(--diff-add);
+	--color-diff-add-foreground: var(--diff-add-foreground);
+	--color-diff-del: var(--diff-del);
+	--color-diff-del-foreground: var(--diff-del-foreground);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
 	--color-muted-foreground: var(--muted-foreground);
@@ -118,6 +144,19 @@
 	--radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* A small inline control keeps its look, with a thumb-sized target around it on touch screens.
+   Not in the chat: each item clips at its box (content-visibility), so there use padding. */
+@utility hit {
+	position: relative;
+	@media (pointer: coarse) {
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -0.75rem -0.25rem;
+		}
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
@@ -135,6 +174,12 @@
 	h3 {
 		text-wrap: balance;
 	}
+	p {
+		text-wrap-style: pretty;
+	}
+	::selection {
+		background-color: color-mix(in oklch, var(--ring) 40%, transparent);
+	}
 }
 
 /* iOS zooms into inputs with text under 16px on focus. Unlayered, so it wins over text-sm utilities. */
@@ -143,6 +188,13 @@
 	textarea,
 	select {
 		font-size: 16px;
+	}
+}
+
+/* The app scrolls inside its panes: the page itself doesn't rubber-band. Touch keeps its pull to refresh. */
+@media (pointer: fine) {
+	html {
+		overscroll-behavior: none;
 	}
 }
 

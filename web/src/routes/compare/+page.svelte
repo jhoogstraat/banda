@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { usd } from '#lib/utils.js';
 	import { page } from '$app/state';
 	import { Code, ConnectError } from '@connectrpc/connect';
 	import GavelIcon from '@lucide/svelte/icons/gavel';
@@ -241,8 +243,9 @@
 	{:else}
 		<div bind:this={scroller} {onscroll} class="min-h-0 flex-1 overflow-y-auto md:flex md:flex-col md:overflow-hidden">
 			{#if differs.length}
-				<details open aria-label="What differs" class="shrink-0 border-b">
-					<summary class="cursor-pointer px-3 py-2 text-xs font-medium">
+				<details open aria-label="What differs" class="group/diffs shrink-0 border-b">
+					<summary class="flex cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-medium">
+						<ChevronRightIcon class="size-3.5 text-muted-foreground transition-transform group-open/diffs:rotate-90" />
 						What differs: {differs.length} {differs.length === 1 ? 'file' : 'files'}
 					</summary>
 					<div class="grid max-h-48 overflow-y-auto pb-2 text-xs" style="grid-template-columns: minmax(0, 1fr) repeat({entries.length}, auto) auto">
@@ -254,10 +257,10 @@
 								<span class="truncate font-mono" title={d.path}>{d.path}</span>
 								{#each d.per as f, i}
 									<span class="font-mono" title={labels[i]}>
-										{#if f}<span class="text-green-700 dark:text-green-400">+{f.add}</span> <span class="text-red-600 dark:text-red-400">−{f.del}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
+										{#if f}<span class="text-diff-add-foreground">+{f.add}</span> <span class="text-diff-del-foreground">−{f.del}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
 									</span>
 								{/each}
-								<span class={d.kind === 'Same' ? 'text-muted-foreground' : 'font-medium text-amber-700 dark:text-amber-500'}>{d.kind}</span>
+								<span class={d.kind === 'Same' ? 'text-muted-foreground' : 'font-medium text-warning-foreground'}>{d.kind}</span>
 							</button>
 						{/each}
 					</div>
@@ -295,15 +298,15 @@
 									{/if}
 								{/if}
 							</div>
-							<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+							<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
 								<span>{e.turns} {e.turns === 1 ? 'turn' : 'turns'}</span>
-								<span>${e.costUsd.toFixed(2)}</span>
+								<span>{usd(e.costUsd)}</span>
 								<span>{seconds(e.durationMs)}</span>
 								{#if t.repoUrl}
 									<span>
 										{s.files} {s.files === 1 ? 'file' : 'files'}
-										<span class="text-emerald-700 dark:text-emerald-400">+{s.add}</span>
-										<span class="text-red-600 dark:text-red-600 dark:text-red-400">−{s.del}</span>
+										<span class="text-success-foreground">+{s.add}</span>
+										<span class="text-diff-del-foreground">−{s.del}</span>
 									</span>
 								{/if}
 							</div>

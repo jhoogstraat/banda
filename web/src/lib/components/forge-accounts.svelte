@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { confirmAction } from '#lib/components/confirm-dialog.svelte';
 	// Settings: the signed-in person's own forge accounts, a row per forge and host the team has set up (GitHub
 	// through the team's GitHub App, GitLab through its application per host). Pull requests, comments and pushes
 	// from their threads then go out as them; the tokens stay in the API. A forge the team doesn't use isn't shown.
@@ -79,9 +80,9 @@
 	async function disconnect(forge: 'github' | 'gitlab', on: string, login = '') {
 		const ask =
 			forge === 'github'
-				? `Disconnect GitHub? Banda revokes its access to @${login}. Pull requests and pushes from your threads stop until you connect again.`
-				: `Disconnect GitLab on ${on}? Banda revokes both of its tokens for @${login}. Merge requests and pushes from your threads stop until you connect again.`;
-		if (!confirm(ask)) return;
+				? { title: 'Disconnect GitHub?', body: `Banda revokes its access to @${login}. Pull requests and pushes from your threads stop until you connect again.` }
+				: { title: `Disconnect GitLab on ${on}?`, body: `Banda revokes both of its tokens for @${login}. Merge requests and pushes from your threads stop until you connect again.` };
+		if (!(await confirmAction({ ...ask, action: 'Disconnect' }))) return;
 		busy = `${forge} ${on}`;
 		notice = '';
 		try {
@@ -101,7 +102,7 @@
 		</span>
 		<div class="min-w-0 flex-1 basis-48">
 			<p class="font-medium">{forge}</p>
-			<p class="text-xs {broken ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}">
+			<p class="text-xs {broken ? 'text-warning-foreground' : 'text-muted-foreground'}">
 				{#if broken}
 					The team’s {forge === 'GitHub' ? 'GitHub App' : 'GitLab application'} needs attention before you can connect.
 				{:else}
@@ -117,7 +118,7 @@
 
 <section id="accounts" aria-label="Accounts">
 	<SettingsHeading title="Accounts" note="connect once, so your threads open pull requests and push as you" error={github.error || gitlab.error} />
-	{#if notice}<p class="mb-3 text-sm text-amber-700 dark:text-amber-400" role="status">{notice}</p>{/if}
+	{#if notice}<p class="mb-3 text-sm text-warning-foreground" role="status">{notice}</p>{/if}
 	<div class="divide-y rounded-lg border">
 		{#if loading}
 			<p class="p-4 text-sm text-muted-foreground">Loading…</p>
@@ -164,7 +165,7 @@
 							{#snippet note()}GitLab asks you to approve twice: once for Banda, once for git in your threads.{/snippet}
 						</ForgeAccount>
 						{#if h.app?.needsAttention}
-							<p class="px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+							<p class="px-4 py-3 text-xs text-warning-foreground">
 								The team’s GitLab application for {h.host} needs attention: GitLab refused its ID or secret, so Banda can’t renew connections
 								there. Your tokens are kept; <a href="#gitlab-app" class="underline underline-offset-2">see the application</a>.
 							</p>

@@ -165,6 +165,8 @@ const (
 	// ThreadServiceAddRepositoryProcedure is the procedure name of the ThreadService's AddRepository
 	// RPC.
 	ThreadServiceAddRepositoryProcedure = "/banda.v1.ThreadService/AddRepository"
+	// ThreadServiceRenameThreadProcedure is the procedure name of the ThreadService's RenameThread RPC.
+	ThreadServiceRenameThreadProcedure = "/banda.v1.ThreadService/RenameThread"
 	// UserServiceMeProcedure is the procedure name of the UserService's Me RPC.
 	UserServiceMeProcedure = "/banda.v1.UserService/Me"
 	// UserServiceListUsersProcedure is the procedure name of the UserService's ListUsers RPC.
@@ -645,6 +647,13 @@ var (
 			Procedure:  ThreadServiceAddRepositoryProcedure,
 		}
 	})
+	threadServiceRenameThreadSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_banda_v1_banda_proto.Services().ByName("ThreadService").Methods().ByName("RenameThread"),
+			Procedure:  ThreadServiceRenameThreadProcedure,
+		}
+	})
 )
 
 // ThreadServiceClient is a client for the banda.v1.ThreadService service.
@@ -795,6 +804,8 @@ type ThreadServiceClient interface {
 	// thread branch, its files kept as uncommitted changes. Until a checkout of
 	// it succeeded, the repository can be changed, or removed (empty repo_url).
 	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
+	// Gives the thread a title of the owner's choosing.
+	RenameThread(context.Context, *v1.RenameThreadRequest) (*v1.RenameThreadResponse, error)
 }
 
 // NewThreadServiceClient constructs a client for the banda.v1.ThreadService service. Multiple
@@ -1054,6 +1065,8 @@ type ThreadServiceHandler interface {
 	// thread branch, its files kept as uncommitted changes. Until a checkout of
 	// it succeeded, the repository can be changed, or removed (empty repo_url).
 	AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error)
+	// Gives the thread a title of the owner's choosing.
+	RenameThread(context.Context, *v1.RenameThreadRequest) (*v1.RenameThreadResponse, error)
 }
 
 // RegisterThreadServiceHandler registers svc as the banda.v1.ThreadService implementation on
@@ -1117,6 +1130,7 @@ func RegisterThreadServiceHandler(server *connect.Server, svc ThreadServiceHandl
 		connect.Method{Spec: threadServicePullRequestChoicesSpec(), Handler: adapter.pullRequestChoices},
 		connect.Method{Spec: threadServicePullRequestResolveSpec(), Handler: adapter.pullRequestResolve},
 		connect.Method{Spec: threadServiceAddRepositorySpec(), Handler: adapter.addRepository},
+		connect.Method{Spec: threadServiceRenameThreadSpec(), Handler: adapter.renameThread},
 	)
 }
 
@@ -1423,6 +1437,10 @@ func (UnimplementedThreadServiceHandler) PullRequestResolve(context.Context, *v1
 
 func (UnimplementedThreadServiceHandler) AddRepository(context.Context, *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.AddRepository is not implemented")
+}
+
+func (UnimplementedThreadServiceHandler) RenameThread(context.Context, *v1.RenameThreadRequest) (*v1.RenameThreadResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "banda.v1.ThreadService.RenameThread is not implemented")
 }
 
 type threadServiceClient struct {
@@ -1872,6 +1890,14 @@ func (c *threadServiceClient) PullRequestResolve(ctx context.Context, req *v1.Pu
 func (c *threadServiceClient) AddRepository(ctx context.Context, req *v1.AddRepositoryRequest) (*v1.AddRepositoryResponse, error) {
 	var res v1.AddRepositoryResponse
 	if err := c.client.CallUnary(ctx, threadServiceAddRepositorySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *threadServiceClient) RenameThread(ctx context.Context, req *v1.RenameThreadRequest) (*v1.RenameThreadResponse, error) {
+	var res v1.RenameThreadResponse
+	if err := c.client.CallUnary(ctx, threadServiceRenameThreadSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -2525,6 +2551,18 @@ func (h threadServiceHandler) addRepository(ctx context.Context, _ connect.Spec,
 		return err
 	}
 	res, err := h.svc.AddRepository(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h threadServiceHandler) renameThread(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RenameThreadRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RenameThread(ctx, &req)
 	if err != nil {
 		return err
 	}
