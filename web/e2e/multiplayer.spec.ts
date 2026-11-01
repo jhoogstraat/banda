@@ -136,7 +136,7 @@ test('on a subscription a teammate’s @agent post is a proposal: only the owner
 	await t.turn(async () => {
 		await box.press('Enter');
 		await page.locator(`a[href="/t/${other.id}"]`).first().click();
-		await expect(page).toHaveURL(`/t/${other.id}`);
+		await expect(page.getByRole('heading', { name: (await other.get()).title })).toBeVisible(); // the box follows the thread once it has loaded
 		await box.fill('e2e: other draft');
 		const sentNow = page.waitForResponse('**/banda.v1.ThreadService/SendMessage');
 		release();
