@@ -226,6 +226,19 @@ test('appearance: the browser bar follows the theme and the mode, with no reload
 	await expect(bar).toHaveAttribute('content', themes.at(-1)!.colors.light);
 });
 
+test('appearance: a dot that waits for a person is outlined on a light page, where Highlighter\'s yellow barely shows', async ({ as }) => {
+	const page = await as('alice').page({ colorScheme: 'light' });
+	await page.addInitScript(() => localStorage.setItem('mode-watcher-mode', 'light'));
+	await page.goto('/settings#appearance');
+	const ring = await page.evaluate(() => {
+		const dot = document.body.appendChild(document.createElement('span'));
+		dot.className = 'attention-dot';
+		return getComputedStyle(dot).boxShadow;
+	});
+	expect(ring).toMatch(/1px/); // Tailwind's ring: a shadow with 1px of spread
+	expect(ring).not.toMatch(/\/ 0\.3/); // in the foreground, not the faint yellow of the dark page
+});
+
 test('appearance: dark by default; Light and System persist in this browser', async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/settings#appearance');

@@ -83,9 +83,9 @@
 
 	// [dot colour, label] of an account.
 	function status(a: HarnessAccount): [string, string] {
-		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-success', 'Connected (API key)'] : ['bg-attention', 'No API key'];
+		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-success', 'Connected (API key)'] : ['attention-dot', 'No API key'];
 		if (a.loginState === LoginState.LOGGED_IN) return ['bg-success', 'Connected (subscription)'];
-		if (a.loginState === LoginState.LOGGED_OUT) return ['bg-attention', 'Not logged in'];
+		if (a.loginState === LoginState.LOGGED_OUT) return ['attention-dot', 'Not logged in'];
 		return ['border border-muted-foreground', 'Not checked yet'];
 	}
 
@@ -267,7 +267,7 @@
 									class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
 								>
 									{label}
-									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-attention" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
+									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full attention-dot" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
 								</a>
 							</li>
 						{/each}

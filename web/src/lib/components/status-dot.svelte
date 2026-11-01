@@ -12,7 +12,7 @@
 		[Status.ERRORED]: ['bg-destructive', 'Error'],
 		[Status.SUSPENDED]: ['border border-muted-foreground', 'Paused']
 	} as Partial<Record<Status, [string, string]>>;
-	const [dot, text] = $derived(waiting ? ['bg-attention ring-2 ring-attention/30 highlighter:ring-1 highlighter:ring-foreground highlighter:dark:ring-2 highlighter:dark:ring-attention/30', waiting] : (look[status] ?? ['', '']));
+	const [dot, text] = $derived(waiting ? ['attention-dot', waiting] : (look[status] ?? ['', '']));
 </script>
 
 <span class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">

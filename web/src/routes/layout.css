@@ -318,6 +318,11 @@
 	}
 }
 
+/* The dot of what waits for a person. Highlighter's yellow barely shows on a light page, so there it has a dark outline. */
+@utility attention-dot {
+	@apply bg-attention ring-2 ring-attention/30 highlighter:ring-1 highlighter:ring-foreground highlighter:dark:ring-2 highlighter:dark:ring-attention/30;
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

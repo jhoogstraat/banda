@@ -41,7 +41,7 @@ kubectl create secret generic banda-git -n banda --from-literal=GIT_TOKEN=...
 The web app is a tool people work in: familiar controls, dense, quiet. Reuse `web/src/lib/components/ui` and the theme tokens in `routes/layout.css`.
 
 - Colors come from the theme tokens: `success`, `warning`, `info`, `diff-add`, `diff-del` for dots, tints and borders, their `-foreground` for text and icons. Raw Tailwind hues stay in the always-dark terminal block and the forges' own merged violet.
-- `attention` marks what blocks a person, and only that; `warning` is caution. `attention` is for dots, `attention-surface` with `attention-foreground` for marks and counts, `attention-text` for text and icons on the page.
+- `attention` marks what blocks a person, and only that; `warning` is caution. the `attention-dot` utility is for dots, which Highlighter outlines on a light page, `attention-surface` with `attention-foreground` for marks and counts, `attention-text` for text and icons on the page.
 - There are three themes in `routes/layout.css`: Highlighter, the default, in `:root` and `.dark`, and Logbook and Common room under `data-theme`. A new token is set in every theme, fonts are `--theme-*` tokens, and `lib/themes.ts` lists the themes.
 - A theme's structure uses the `highlighter:`, `logbook:` and `common-room:` variants, not branches in a script. The `marker` is a solid fill because `e2e/ui.spec.ts` reads `background-color`.
 - Text sits at 4.5:1 or better in every theme and mode (`e2e/ui.spec.ts` measures it).
