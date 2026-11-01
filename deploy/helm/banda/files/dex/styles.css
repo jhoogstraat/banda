@@ -1,4 +1,4 @@
-/* Banda's look for its bundled Dex: the tokens of web/src/routes/layout.css and the layout of the web app's
+/* Banda's look for its bundled Dex: tokens of its own, from before the app's themes, and the layout of the web app's
  * sign-in page (web/src/routes/signin). Dark, or light when header.html finds the app's theme is light. */
 
 @font-face {

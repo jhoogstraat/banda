@@ -8,7 +8,7 @@ import { kexec } from './fixtures';
 
 export type Check = { name: string; status: 'queued' | 'in_progress' | 'completed'; conclusion?: 'success' | 'failure' | 'skipped' };
 /** thread: a GitLab discussion without a file, which is resolvable like one on a line (a plain note isn't). */
-export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string; resolved?: boolean; thread?: boolean };
+export type Comment = { id: number; login: string; body: string; at: string; path?: string; line?: number; inReplyTo?: number; review?: string; resolved?: boolean; thread?: boolean; hunk?: string };
 
 export type Pull = {
 	number: number;
@@ -28,6 +28,8 @@ export type Pull = {
 	mergeMethod?: string;
 	/** GitLab: the detailed_merge_status that blocks merging, which then answers a bare 405. */
 	blocked?: string;
+	/** Additions, deletions and files changed, if not the usual one line. */
+	stats?: [number, number, number];
 };
 
 type GitLabApp = { clientId: string; clientSecret: string; redirect: string; scopes: string[] };
@@ -176,7 +178,7 @@ export class FakeForge {
 			number: p.number, node_id: `PR_${p.number}`, title: p.title, body: p.body, draft: p.draft, state: p.state === 'open' ? 'open' : 'closed',
 			merged: p.state === 'merged', merged_at: p.state === 'merged' ? new Date().toISOString() : null, merged_by: p.mergedBy ? { login: p.mergedBy } : null,
 			html_url: `${web}/${p.number}`, user: { login: p.author }, head: { ref: p.head, sha: p.sha }, base: { ref: p.base },
-			mergeable_state: p.draft ? 'draft' : 'clean', additions: 1, deletions: 0, changed_files: 1,
+			mergeable_state: p.draft ? 'draft' : 'clean', additions: p.stats?.[0] ?? 1, deletions: p.stats?.[1] ?? 0, changed_files: p.stats?.[2] ?? 1,
 			labels: p.labels.map((name) => ({ name })), requested_reviewers: p.reviewers.map((login) => ({ login }))
 		});
 		if (path === '/api/graphql') {
@@ -271,7 +273,7 @@ export class FakeForge {
 		if (method === 'GET' && sub === '/reviews')
 			return send(res, 200, p.comments.filter((c) => c.review).map((c) => ({ ...card(c), state: c.review, submitted_at: c.at })));
 		if (method === 'GET' && sub === '/comments')
-			return send(res, 200, p.comments.filter((c) => c.path).map((c) => ({ ...card(c), path: c.path, line: c.line, in_reply_to_id: c.inReplyTo, diff_hunk: '@@ -0,0 +1 @@\n+hello' })));
+			return send(res, 200, p.comments.filter((c) => c.path).map((c) => ({ ...card(c), path: c.path, line: c.line, in_reply_to_id: c.inReplyTo, diff_hunk: c.hunk ?? '@@ -0,0 +1 @@\n+hello' })));
 		if (method === 'POST' && sub === '/comments') {
 			const parent = p.comments.find((c) => c.id === body.in_reply_to);
 			if (!parent) return send(res, 404, { message: 'Not Found' });

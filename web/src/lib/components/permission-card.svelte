@@ -77,11 +77,11 @@
 	};
 </script>
 
-<div role="group" aria-label={plan ? 'Plan' : `Permission for ${name}`} class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-warning/40 bg-warning/5'}">
+<div role="group" aria-label={plan ? 'Plan' : `Permission for ${name}`} class="space-y-2 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-attention/40 bg-attention/5 highlighter:border-border highlighter:bg-card'}">
 	<div class="flex items-center gap-2">
-		<ShieldQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-warning-foreground'}" />
+		<ShieldQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-attention-text'}" />
 		<span class="min-w-0 flex-1">
-			{#if plan}The agent has a plan and asks to start working{:else}The agent asks to use <span class="font-medium">{name}</span>{/if}
+			<span class={item.resolved ? '' : 'marker'}>{#if plan}The agent has a plan and asks to start working{:else}The agent asks to use <span class="font-medium highlighter:font-bold">{name}</span>{/if}</span>
 		</span>
 	</div>
 	{#if item.req.reason && !plan}<p class="text-xs text-muted-foreground">{item.req.reason}</p>{/if}
@@ -111,10 +111,10 @@
 	{:else if can}
 		<div class="flex flex-wrap items-center gap-2">
 			{#if plan}
-				<Button size="sm" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW, PermissionMode.ACCEPT_EDITS)}><CheckIcon /> Approve, accept edits</Button>
+				<Button size="sm" class="highlighter:bg-attention-surface highlighter:text-attention-foreground highlighter:hover:bg-attention-surface/80" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW, PermissionMode.ACCEPT_EDITS)}><CheckIcon /> Approve, accept edits</Button>
 				<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW, PermissionMode.ASK)}>Approve, ask before each edit</Button>
 			{:else}
-				<Button size="sm" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> {editing ? 'Allow with changes' : 'Allow once'}</Button>
+				<Button size="sm" class="highlighter:bg-attention-surface highlighter:text-attention-foreground highlighter:hover:bg-attention-surface/80" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> {editing ? 'Allow with changes' : 'Allow once'}</Button>
 				{#if rule}<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW_ALWAYS, undefined, rule)}>Always allow {ruleLabel(rule)}</Button>{/if}
 				<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.ALLOW_ALWAYS)}>Always allow {name} in this thread</Button>
 				{#if owner && field && !editing}

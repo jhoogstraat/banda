@@ -102,7 +102,7 @@
 		</span>
 		<div class="min-w-0 flex-1 basis-48">
 			<p class="font-medium">{forge}</p>
-			<p class="text-xs {broken ? 'text-warning-foreground' : 'text-muted-foreground'}">
+			<p class="text-xs {broken ? 'text-attention-text' : 'text-muted-foreground'}">
 				{#if broken}
 					The team’s {forge === 'GitHub' ? 'GitHub App' : 'GitLab application'} needs attention before you can connect.
 				{:else}

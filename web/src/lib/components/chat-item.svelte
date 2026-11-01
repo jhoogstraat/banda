@@ -118,14 +118,14 @@
 {#snippet divider(text: string, tone = 'text-muted-foreground', link?: [string, () => void])}
 	<div class="flex items-center gap-3 text-xs {tone}">
 		<div class="h-px min-w-4 flex-1 bg-border"></div>
-		<span class="text-center tabular-nums">{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline pointer-coarse:py-2.5" onclick={link[1]}>{link[0]}</button>{/if}</span>
+		<span class="text-center">{text}{#if link}{' · '}<button class="font-medium text-foreground underline-offset-4 hover:underline pointer-coarse:py-2.5" onclick={link[1]}>{link[0]}</button>{/if}</span>
 		<div class="h-px min-w-4 flex-1 bg-border"></div>
 	</div>
 {/snippet}
 
 {#snippet agentText(text: string)}
 	<Message from="assistant" class="max-w-full">
-		<MessageContent class="w-full"><MessageResponse content={text} /></MessageContent>
+		<MessageContent class="w-full"><MessageResponse content={text} class="font-prose" /></MessageContent>
 	</Message>
 {/snippet}
 
@@ -155,7 +155,7 @@
 					<!-- The chip straddles the bubble's bottom border at its right edge, so it belongs to this message; pb-7 keeps the
 					     bubble's last line clear of the 14px it reaches inside. -->
 					<div class="relative w-fit max-w-full">
-						<MessageContent class="group-[.is-user]:ml-0 {proposal ? pending : ''} {draftable ? 'min-w-36 group-[.is-user]:pb-7' : ''}"
+						<MessageContent class="group-[.is-user]:ml-0 {proposal ? pending : 'logbook:group-[.is-user]:bg-transparent logbook:group-[.is-user]:px-0'} {draftable ? 'min-w-36 group-[.is-user]:pb-7' : ''}"
 							><p class="whitespace-pre-wrap">{#if item.text}<MentionText text={item.text} />{:else}<span class="text-muted-foreground">The {item.review.length ? 'comments' : 'files'} below</span>{/if}</p></MessageContent>
 						{#if draftable}
 							<Button
@@ -308,7 +308,7 @@
 		<span class="min-w-0 flex-1">{item.text}</span>
 	</div>
 {:else if item.kind === 'notice'}
-	<div class="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+	<div class="rounded-lg border px-4 py-3 text-sm {loginNeeded(item.text) ? 'border-attention/40 bg-attention/5 highlighter:border-border highlighter:bg-card' : 'border-warning/40 bg-warning/10'}">
 		<Response content={item.text} class="h-auto" />
 		{#if owner && loginNeeded(item.text)}
 			<Button size="sm" class="mt-2" onclick={onlogin}>Log in to Claude Code</Button>

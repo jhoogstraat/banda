@@ -1,7 +1,7 @@
 // The thread page in a browser: the chat, its cards, the right pane and the header's actions, as each user sees them.
 import { devices, type Page } from '@playwright/test';
 import { AutoPushState, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { expect, repo, Status, test, type Thread, type User } from './fixtures.ts';
+import { expect, repo, sql, Status, test, type Thread, type User } from './fixtures.ts';
 
 // Its placeholder (the accessible name) says what a post does, for the owner or a teammate.
 const composer = (page: Page) => page.getByRole('textbox', { name: /^(Ask the agent…|Message the team|Reply to |Only )/ });
@@ -558,4 +558,29 @@ test('the right pane stays closed until asked for, resizes by its divider (remem
 		await page.getByRole('button', { name: 'Open preview' }).click();
 		await expect(tab('Browser')).toHaveAttribute('aria-selected', 'true');
 	});
+});
+
+// E2E_SCREENSHOTS=1 refreshes the README's picture of this: a day with a teammate, something waiting, and the diff open.
+test('the README: a finished thread with its diff, a teammate in it and a thread waiting in the sidebar', async ({ as }) => {
+	test.setTimeout(180_000);
+	const [maya, jonas] = [as('alice'), as('bob')];
+	const done = await maya.create({ prompt: 'Document the upload limits' });
+	await done.waitForStatus(Status.AWAITING_INPUT);
+	const waiting = await maya.create({ prompt: 'Rotate API keys', permissionMode: PermissionMode.ASK });
+	await waiting.waitForStatus(Status.AWAITING_INPUT);
+	waiting.send('e2e-ask please').catch(() => {});
+	await waiting.waitFor('its question', (i) => !!i.permissionPending);
+	const t = await maya.create({ prompt: 'Retry failed uploads with backoff\n\nThe nightly sync gives up on the first flaky connection and someone has to restart it by hand.', permissionMode: PermissionMode.BYPASS });
+	await t.waitForStatus(Status.AWAITING_INPUT);
+	await jonas.thread(t.id).send('Nice. Can the sync report how many tries it took?');
+	for (const [u, name] of [[maya, 'Maya Lindqvist'], [jonas, 'Jonas Adeyemi']] as const) await sql(`INSERT INTO users (id, name) VALUES ('${u.id}', '${name}') ON CONFLICT (id) DO UPDATE SET name = excluded.name`);
+
+	const page = await open(maya, t, { viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+	await page.getByRole('button', { name: 'View diff' }).click();
+	await expect(page.getByRole('tabpanel', { name: 'Diff' }).locator('[data-file="src/upload.ts"]')).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Needs input' }).getByText('Rotate API keys')).toBeVisible();
+	await expect(page.getByText('All 9 tests pass')).toHaveCSS('margin-top', '12px'); // paragraphs of a reply stay apart
+	await page.mouse.move(0, 0);
+	await page.evaluate(() => document.fonts.ready);
+	if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: '../docs/screenshots/thread.png' });
 });

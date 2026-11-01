@@ -144,7 +144,7 @@
 	<div class="flex h-7 items-center gap-2 text-xs text-muted-foreground">
 		<div class="flex min-w-0 flex-1 items-center gap-2" aria-live="polite">
 			{#if thread?.permissionPending}
-				<ShieldIcon class="size-3 text-warning-foreground" /><span>Agent is waiting for an answer</span>
+				<ShieldIcon class="size-3 text-attention-text" /><span>Agent is waiting for an answer</span>
 			{:else if thread?.status === Status.WORKING && retrying}
 				<Loader size={12} /><span>{retrying}</span>
 			{:else if thread?.status === Status.WORKING}

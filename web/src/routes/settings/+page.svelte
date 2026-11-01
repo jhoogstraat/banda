@@ -34,7 +34,8 @@
 	import { askNotify, notifyKinds, setNotifyKind, threads } from '#lib/threads.svelte.js';
 	import type { AlertKind } from '#lib/inbox.js';
 	import { since } from '#lib/utils.js';
-	import { setMode, userPrefersMode } from 'mode-watcher';
+	import { setMode, setTheme, theme, userPrefersMode } from 'mode-watcher';
+	import { themeOf, themes } from '#lib/themes.js';
 
 	let accounts = $state<HarnessAccount[]>([]);
 	let secrets = $state<SecretInfo[]>([]);
@@ -82,9 +83,9 @@
 
 	// [dot colour, label] of an account.
 	function status(a: HarnessAccount): [string, string] {
-		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-success', 'Connected (API key)'] : ['bg-warning', 'No API key'];
+		if (a.authMethod === AuthMethod.API_KEY) return a.apiKeySet ? ['bg-success', 'Connected (API key)'] : ['bg-attention', 'No API key'];
 		if (a.loginState === LoginState.LOGGED_IN) return ['bg-success', 'Connected (subscription)'];
-		if (a.loginState === LoginState.LOGGED_OUT) return ['bg-warning', 'Not logged in'];
+		if (a.loginState === LoginState.LOGGED_OUT) return ['bg-attention', 'Not logged in'];
 		return ['border border-muted-foreground', 'Not checked yet'];
 	}
 
@@ -266,7 +267,7 @@
 									class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-foreground"
 								>
 									{label}
-									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
+									{#if attention[id]}<span class="size-1.5 shrink-0 rounded-full bg-attention" aria-hidden="true"></span><span class="sr-only">(needs you)</span>{/if}
 								</a>
 							</li>
 						{/each}
@@ -423,11 +424,20 @@
 			<section id="appearance" aria-label="Appearance">
 				{@render heading('', 'Appearance', 'in this browser')}
 				<fieldset class="flex flex-wrap gap-x-6 gap-y-2 rounded-lg border px-4 py-3 text-sm">
-					<legend class="sr-only">Theme</legend>
+					<legend class="sr-only">Mode</legend>
 					{#each [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']] as const as [m, text] (m)}
 						<label class="flex items-center gap-1.5">
-							<input type="radio" name="theme" class="accent-primary" checked={userPrefersMode.current === m} onchange={() => setMode(m)} />
+							<input type="radio" name="mode" class="accent-primary" checked={userPrefersMode.current === m} onchange={() => setMode(m)} />
 							{text}
+						</label>
+					{/each}
+				</fieldset>
+				<fieldset class="mt-2 flex flex-wrap gap-x-6 gap-y-2 rounded-lg border px-4 py-3 text-sm">
+					<legend class="sr-only">Theme</legend>
+					{#each themes as t (t.id)}
+						<label class="flex items-center gap-1.5">
+							<input type="radio" name="theme" class="accent-primary" checked={themeOf(theme.current) === t} onchange={() => setTheme(t.id)} />
+							{t.label}
 						</label>
 					{/each}
 				</fieldset>

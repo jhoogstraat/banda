@@ -40,7 +40,7 @@
 
 {#snippet title(text: string, n: number)}
 	{text}
-	<span class="ml-auto rounded-full px-1.5 text-[10px] tabular-nums {text === 'Needs input' ? 'bg-warning/20 text-warning-foreground' : 'bg-sidebar-accent'}">{n}</span>
+	<span class="ml-auto rounded-full px-1.5 text-[10px] tabular-nums {text === 'Needs input' ? 'bg-attention-surface text-attention-foreground' : 'bg-sidebar-accent'}">{n}</span>
 {/snippet}
 
 <!-- An account menu entry; sign-out leaves the SPA with a full reload. -->
@@ -65,18 +65,18 @@
 			? 'bg-sidebar-accent font-medium hover:bg-sidebar-accent'
 			: ''}"
 	>
-		{#if byline}
-			<span class="relative shrink-0">
-				<UserAvatar name={userName(t.ownerId)} class="size-5" />
-				<span class="absolute -right-0.5 -bottom-0.5 flex rounded-full bg-sidebar p-px"><StatusDot status={t.status} waiting={wait} /></span>
-			</span>
-		{:else}<StatusDot status={t.status} waiting={wait} />{/if}
+		<!-- Common room leads every row with the owner's face; the others only where the owner isn't you. -->
+		<span class="relative shrink-0 {byline ? '' : 'hidden common-room:inline-flex'}">
+			<UserAvatar name={userName(t.ownerId)} class="size-5" />
+			<span class="absolute -right-0.5 -bottom-0.5 flex rounded-full bg-sidebar p-px"><StatusDot status={t.status} waiting={wait} /></span>
+		</span>
+		{#if !byline}<span class="contents common-room:hidden"><StatusDot status={t.status} waiting={wait} /></span>{/if}
 		<span class="truncate {fresh ? 'font-semibold text-sidebar-foreground' : ''}">
-			{race ? `${raceTitle(t)} · ${race.children.length} tries` : t.title || t.repoUrl.split('/').pop() || t.id}
+			<span class={wait ? 'marker' : ''}>{race ? `${raceTitle(t)} · ${race.children.length} tries` : t.title || t.repoUrl.split('/').pop() || t.id}</span>
 			{#if t.envWaiting && !race}<span class="block truncate text-xs font-normal text-muted-foreground" title={t.envWaiting}>{t.envWaiting}</span>{/if}
 		</span>
 		{#if wait && !byline}
-			<span class="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning-foreground" title={wait}>{asking(asks(t))}</span>
+			<span class="shrink-0 rounded-full bg-attention-surface px-1.5 text-[10px] text-attention-foreground" title={wait}>{asking(asks(t))}</span>
 		{:else if t.pullRequest && !race}
 			<PullRequestChip pr={t.pullRequest} small />
 		{/if}
@@ -114,7 +114,7 @@
 		<section class="space-y-0.5" aria-label={text}>
 			<h2 class="flex items-center px-2 py-1 text-xs font-medium text-muted-foreground">{@render title(text, n + 1)}</h2>
 			<a href="/settings" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-sidebar-accent/50">
-				<KeyRoundIcon class="size-3.5 text-warning-foreground" /> Log in to Claude
+				<KeyRoundIcon class="size-3.5 text-attention-text" /> Log in to Claude
 			</a>
 			{#each list as f (f.race ?? f.thread.id)}{@render family(f, byline)}{/each}
 		</section>
@@ -136,7 +136,7 @@
 
 <Sidebar.Root>
 	<Sidebar.Header class="gap-3 p-3">
-		<span class="px-1 text-lg font-semibold tracking-tight">Banda</span>
+		<span class="px-1 font-heading text-lg font-semibold tracking-tight highlighter:font-extrabold highlighter:tracking-tighter logbook:text-xl common-room:text-2xl common-room:font-extrabold common-room:tracking-tighter common-room:text-primary">Banda</span>
 		<div class="flex items-center gap-1">
 			<InputGroup.Root class="h-8">
 				<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
@@ -175,7 +175,7 @@
 		>
 			<InboxIcon class="size-4 text-muted-foreground" /> Decisions
 			{#if threads.decisions.length}
-				<span class="ml-auto rounded-full bg-warning px-1.5 text-[10px] font-semibold text-black tabular-nums" aria-label="{threads.decisions.length} pending">
+				<span class="ml-auto rounded-full bg-attention-surface px-1.5 text-[10px] font-semibold text-attention-foreground tabular-nums" aria-label="{threads.decisions.length} pending">
 					{threads.decisions.length}
 				</span>
 			{/if}

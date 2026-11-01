@@ -84,9 +84,9 @@
 	};
 </script>
 
-<div role="group" aria-label="Question" class="space-y-3 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-info/40 bg-info/5'}">
+<div role="group" aria-label="Question" class="space-y-3 rounded-lg border px-4 py-3 text-sm {item.resolved ? 'bg-muted/20' : 'border-attention/40 bg-attention/5 highlighter:border-border highlighter:bg-card'}">
 	<div class="flex items-center gap-2">
-		<MessageCircleQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-info-foreground'}" />
+		<MessageCircleQuestionIcon class="size-4 shrink-0 {item.resolved ? 'text-muted-foreground' : 'text-attention-text'}" />
 		<span class="min-w-0 flex-1">The agent asks {questions.length > 1 ? `${questions.length} questions` : 'a question'}</span>
 	</div>
 
@@ -94,7 +94,7 @@
 		<fieldset class="space-y-1.5" disabled={!!item.resolved || busy}>
 			<legend class="mb-1.5 flex items-baseline gap-2">
 				{#if q.header}<span class="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{q.header}</span>{/if}
-				<span class="font-medium">{q.question}</span>
+				<span class="font-medium {item.resolved ? '' : 'marker'}">{q.question}</span>
 			</legend>
 			{#if item.resolved}
 				{#if item.resolved.answers[q.question]}<p class="flex items-center gap-1.5 pl-1"><CheckIcon class="size-3.5 text-success-foreground" /> {item.resolved.answers[q.question]}</p>{/if}
@@ -138,7 +138,7 @@
 		</p>
 	{:else if can}
 		<div class="flex flex-wrap items-center gap-2">
-			<Button size="sm" disabled={busy || !complete} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> Send answers</Button>
+			<Button size="sm" class="highlighter:bg-attention-surface highlighter:text-attention-foreground highlighter:hover:bg-attention-surface/80" disabled={busy || !complete} onclick={() => answer(PermissionDecision.ALLOW)}><CheckIcon /> Send answers</Button>
 			<Input bind:value={reason} placeholder="Why not (optional)" class="h-8 min-w-0 flex-1 text-xs" aria-label="Reason" />
 			<Button size="sm" variant="outline" disabled={busy} onclick={() => answer(PermissionDecision.DENY)}><XIcon /> Decline</Button>
 		</div>

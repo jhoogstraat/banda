@@ -54,8 +54,8 @@
 		</p>
 		<p class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 			{#if conn?.broken}
-				<span class="size-2 shrink-0 rounded-full bg-warning"></span>
-				<span class="text-warning-foreground">{name} no longer accepts your connection as @{conn.login}</span>
+				<span class="size-2 shrink-0 rounded-full bg-attention"></span>
+				<span class="text-attention-text">{name} no longer accepts your connection as @{conn.login}</span>
 			{:else if conn}
 				<span class="size-2 shrink-0 rounded-full bg-success"></span>
 				<span class="truncate">

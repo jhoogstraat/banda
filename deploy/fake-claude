@@ -5,7 +5,8 @@
 # differs), creating one file per prompt (holding the prompt's stream-json line). Replies name the --model and --effort it was
 # started with, and the first line of the profile text in --append-system-prompt
 # (what follows Banda's own paragraph), if there is one. A prompt that mentions "preview" starts a web server on :5173
-# instead (the Browser tab). One that says "commit" also commits. "e2e-ask"
+# instead (the Browser tab). One that says "commit" also commits. "Retry failed uploads with backoff" is the
+# README screenshot's thread: a real change, tool steps and a natural reply. "e2e-ask"
 # runs a Bash command (its description holds $E2E_SECRET, for redaction) that
 # asks for permission first (unless the mode bypasses), "e2e-ask-first" asks
 # before it streams the call, "e2e-plan" proposes a plan in plan mode
@@ -242,6 +243,41 @@ while next; do
     *set_permission_mode*) setmode "$line" ;;
     *control_re*) ;;
     *e2e-noop*'"type":"user"'*) text "Nothing to do"; result ;;
+    *'Retry failed uploads with backoff'*'"type":"user"'*)
+      # The thread in the README's screenshots: work that looks like work, on one natural prompt.
+      mkdir -p src
+      cat > src/upload.ts <<'TS'
+const MAX_TRIES = 5;
+
+/** Puts the file, retrying what a flaky connection fails. A 4xx won't get better, so it stops there. */
+export async function upload(url: string, file: Blob, fetchImpl = fetch) {
+	for (let attempt = 1; ; attempt++) {
+		const res = await fetchImpl(url, { method: 'PUT', body: file }).catch(() => undefined);
+		if (res?.ok) return res;
+		if ((res && res.status < 500) || attempt === MAX_TRIES) throw new Error(`upload failed: ${res?.status ?? 'no response'}`);
+		await delay(backoff(attempt));
+	}
+}
+
+/** 1s, 2s, 4s, 8s, with jitter so clients that failed together don't retry together. */
+export const backoff = (attempt: number) => 1000 * 2 ** (attempt - 1) * (0.5 + Math.random() / 2);
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+TS
+      printf 'Uploads retry up to five times with exponential backoff.\n' > README
+      { git add -A && git commit -qm 'Retry failed uploads with backoff'; } >&2
+      sleep 1; queued
+      echo "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s\",\"model\":\"$model\"}"
+      tool toolu_grep Grep '{"pattern":"fetch\\(","path":"src"}' 'src/upload.ts:6'
+      tool toolu_write Write '{"file_path":"src/upload.ts","content":"export async function upload(...)"}' ok
+      tool toolu_readme Edit '{"file_path":"README","old_string":"Hello World!","new_string":"Uploads retry up to five times with exponential backoff."}' ok
+      tool toolu_test Bash '{"command":"pnpm test src/upload.test.ts","description":"Run the upload tests"}' '9 passed'
+      text 'Uploads now retry instead of giving up on the first flaky connection. `upload` tries up to five times, waiting 1s, 2s, 4s and 8s with jitter, so clients that failed together do not all come back at once. A 4xx stops at once, as a retry would not change it.
+
+All 9 tests pass. I left the cap as a constant: `MAX_TRIES` is at the top of the file if five turns out to be too many.'
+      queued
+      echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"duration_ms\":52300,\"total_cost_usd\":0.42,\"user_message_uuids\":[$uuids]}"
+      ;;
     *'"content":"/compact'*'"type":"user"'*)
       echo '{"type":"system","subtype":"status","status":"compacting","session_id":"s"}'
       echo '{"type":"system","subtype":"status","status":null,"compact_result":"success","session_id":"s"}'

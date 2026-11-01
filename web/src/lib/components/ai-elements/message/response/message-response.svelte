@@ -18,7 +18,7 @@
 	);
 </script>
 
-<div class={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0", className)}>
+<div class={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p+p]:mt-3", className)}>
 	<Streamdown
 		{content}
 		baseTheme="shadcn"

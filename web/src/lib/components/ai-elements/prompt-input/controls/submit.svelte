@@ -85,7 +85,7 @@
 <button
 	bind:this={ref}
 	aria-label={ariaLabel}
-	class={cn(buttonVariants({ variant, size }), "gap-1.5 rounded-lg", className)}
+	class={cn(buttonVariants({ variant, size }), "gap-1.5 rounded-lg common-room:rounded-full", className)}
 	data-slot="button"
 	type={buttonType}
 	onclick={handleClick}

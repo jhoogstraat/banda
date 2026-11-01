@@ -3,13 +3,14 @@
 	import './layout.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
-	import { ModeWatcher } from 'mode-watcher';
+	import { ModeWatcher, mode, theme } from 'mode-watcher';
 	import CommandPalette from '#lib/components/command-palette.svelte';
 	import AppSidebar from '#lib/components/sidebar.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
 	import { onkeydown, ui } from '#lib/shortcuts.svelte.js';
 	import { attention, loadThreads, threads, watchInbox } from '#lib/threads.svelte.js';
+	import { themeOf } from '#lib/themes.js';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -37,13 +38,15 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<!-- Here, not through ModeWatcher's themeColors: its meta tag doesn't follow a change of theme in light mode. -->
+	<meta name="theme-color" content={themeOf(theme.current).colors[mode.current ?? 'dark']} />
 	<title>{count ? `(${count}) ` : ''}{ui.title ? `${ui.title} · ` : ''}Banda</title>
 </svelte:head>
 
 <svelte:window {onkeydown} />
 
-<!-- The theme is chosen in Settings (System, Light or Dark), per browser; app.html applies it before the app loads. -->
-<ModeWatcher themeColors={{ dark: '#0a0a0a', light: '#ffffff' }} />
+<!-- The mode (System, Light or Dark) and the theme are chosen in Settings, per browser; app.html applies them before the app loads. -->
+<ModeWatcher />
 
 {#if bare}
 	{@render children()}

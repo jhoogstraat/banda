@@ -126,7 +126,7 @@
 	<!-- The question sits on the box that answers it: centered on a desktop, at the thumb on a phone. -->
 	<div class="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col justify-end overflow-y-auto px-4 pb-4 md:justify-center md:pb-[12dvh]">
 		<div class="mb-6 space-y-1 text-center">
-			<h2 class="text-2xl font-semibold tracking-tight">What should the agent work on?</h2>
+			<h2 class="font-heading text-2xl font-semibold tracking-tight highlighter:font-bold logbook:text-3xl logbook:font-medium common-room:text-3xl common-room:font-bold">What should the agent work on?</h2>
 			<p class="text-sm text-pretty text-muted-foreground">
 				It works in its own sandbox, {repoUrl === noRepo ? 'in an empty folder' : 'on its own branch'}. Teammates can follow along and join in.
 			</p>

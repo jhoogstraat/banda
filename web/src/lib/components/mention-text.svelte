@@ -22,4 +22,4 @@
 	);
 </script>
 
-{#each parts as p, i}{#if i % 2}<span class="rounded bg-primary/15 px-0.5 font-medium text-primary">{p}</span>{:else}{p}{/if}{/each}
+{#each parts as p, i}{#if i % 2}<span class="rounded bg-primary/15 px-0.5 font-medium text-primary highlighter:bg-foreground/10 highlighter:font-semibold highlighter:text-foreground">{p}</span>{:else}{p}{/if}{/each}

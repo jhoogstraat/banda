@@ -1,6 +1,7 @@
 // The interface's floor: what holds on every screen (contrast, touch targets, theme, motion) and the layouts that broke.
 import { devices, type Page } from '@playwright/test';
 import { PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
+import { themes } from '../src/lib/themes.ts';
 import { expect, repo, Status, test } from './fixtures.ts';
 
 /** Text under 4.5:1 (3:1 when large) against what is painted behind it, as "ratio size text". */
@@ -49,8 +50,8 @@ const lowContrast = (page: Page) =>
 		return [...low];
 	});
 
-test('all text reads at 4.5:1 in both themes, on the cards, lists and diffs of a busy day', async ({ as }) => {
-	test.setTimeout(240_000);
+test('all text reads at 4.5:1 in every theme and mode, on the cards, lists and diffs of a busy day', async ({ as }) => {
+	test.setTimeout(480_000);
 	const alice = as('alice');
 	const asking = await alice.create({ prompt: 'Run the check', permissionMode: PermissionMode.ASK });
 	await asking.waitForStatus(Status.AWAITING_INPUT);
@@ -60,16 +61,23 @@ test('all text reads at 4.5:1 in both themes, on the cards, lists and diffs of a
 	await asking.waitFor('its question', (t) => !!t.permissionPending);
 	await question.waitFor('its question', (t) => !!t.permissionPending);
 	for (const r of race) await alice.thread(r.id).waitForStatus(Status.AWAITING_INPUT);
-	for (const colorScheme of ['dark', 'light'] as const) {
-		const page = await alice.page({ colorScheme });
-		await page.addInitScript((s) => localStorage.setItem('mode-watcher-mode', s), colorScheme);
-		for (const url of [`/t/${asking.id}`, `/t/${question.id}`, '/decisions', `/compare?race=${race[0].raceId}`, '/team', '/settings', '/search']) {
-			await page.goto(url);
-			await page.waitForTimeout(1500);
-			expect(await lowContrast(page), `${colorScheme} ${url}`).toEqual([]);
+	for (const theme of themes)
+		for (const colorScheme of ['dark', 'light'] as const) {
+			const page = await alice.page({ colorScheme });
+			await page.addInitScript(
+				([mode, id]) => {
+					localStorage.setItem('mode-watcher-mode', mode);
+					localStorage.setItem('mode-watcher-theme', id);
+				},
+				[colorScheme, theme.id]
+			);
+			for (const url of ['/', `/t/${asking.id}`, `/t/${question.id}`, '/decisions', `/compare?race=${race[0].raceId}`, '/team', '/settings', '/search']) {
+				await page.goto(url);
+				await page.waitForTimeout(1500);
+				expect(await lowContrast(page), `${theme.label} ${colorScheme} ${url}`).toEqual([]);
+			}
+			await page.close();
 		}
-		await page.close();
-	}
 });
 
 test('buttons and selects are at least 36px tall on a touch screen', async ({ as }) => {
@@ -230,7 +238,7 @@ test('the theme reaches the browser, and reduced motion stops what repeats but n
 	await page.goto(`/t/${t.id}`);
 	await expect(page.getByText('Agent is working…')).toBeVisible();
 	const root = await page.evaluate(() => ({ scheme: getComputedStyle(document.documentElement).colorScheme, bar: document.querySelector('meta[name=theme-color]')?.getAttribute('content') }));
-	expect(root).toEqual({ scheme: 'dark', bar: '#0a0a0a' });
+	expect(root).toEqual({ scheme: 'dark', bar: '#161616' });
 	const iterations = (selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationIterationCount);
 	expect(await iterations('.animate-spin')).toBe('infinite');
 	expect(await iterations('.animate-pulse')).toBe('1');

@@ -1,7 +1,7 @@
 // Pull requests through the forges' APIs: each test runs an API of its own against a fake forge (./forge.ts)
 // that knows the run's git server, so a pull request needs the thread's branch really pushed.
 import type { Page } from '@playwright/test';
-import { test as base, expect, refused, type Api, type User } from './fixtures';
+import { test as base, expect, refused, sql, type Api, type User } from './fixtures';
 import { FakeForge } from './forge';
 import { AutoPushState } from '../src/lib/gen/banda/v1/banda_pb.js';
 
@@ -16,13 +16,13 @@ const test = base.extend<{ forge: FakeForge }>({
 const repoUrl = 'https://github.com/e2e/plain.git'; // the run's git server, for git (deploy/sandbox.Dockerfile)
 
 /** alice's thread whose agent committed and pushed, on an API that talks to the fake forge; bob is a teammate. */
-async function world(as: (name: string, api?: Api) => User, startApi: (env?: Record<string, string>) => Promise<Api>, forge: FakeForge, env: Record<string, string> = {}) {
+async function world(as: (name: string, api?: Api) => User, startApi: (env?: Record<string, string>) => Promise<Api>, forge: FakeForge, env: Record<string, string> = {}, prompt = 'e2e: commit') {
 	const api = await startApi({ TEST_FORGE_URL: forge.url, PULL_REQUEST_POLL: '1s', ...env });
 	const alice = as('alice', api);
 	const bob = as('bob', api);
 	forge.tokens = { 'alice-token': 'alice', 'bob-token': 'bob' };
 	await alice.settings.setSecret({ name: 'GIT_TOKEN', value: 'alice-token' }); // pushes over https need it too
-	const t = await alice.create({ repoUrl, prompt: 'e2e: commit' });
+	const t = await alice.create({ repoUrl, prompt });
 	await t.waitFor('its work to be pushed', (i) => i.autoPush === AutoPushState.PUSHED);
 	return { api, alice, bob, t };
 }
@@ -65,11 +65,35 @@ test('the owner opens a pull request from the dialog; the header chip, the tab a
 	await expect(page.getByRole('button', { name: 'PR #1 · Open · checks failed' })).toBeVisible();
 	await expect(pane(page).getByText('Checks · 1 of 2 failing')).toBeVisible();
 	await expect(pane(page).getByRole('article', { name: 'Comment by carol' })).toContainText('hello1.txt:1');
-	if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: '../docs/screenshots/pull-request.png' });
 
 	// Like other quiet lines, it reaches the agent with its next prompt.
 	await t.turn(() => t.send('e2e-echo e2e-noop'));
 	expect((await t.prompts()).at(-1)).toContain(`[Pull request #1 "${title}" has failing checks: ${forge.url}/e2e/plain/pull/1]`);
+});
+
+// E2E_SCREENSHOTS=1 refreshes the README's picture of this: a pull request with a failing check and a review comment.
+test('the README: a pull request with its checks and a comment on its diff', async ({ as, startApi, forge }) => {
+	const { api, alice, t } = await world(as, startApi, forge, {}, 'Retry failed uploads with backoff');
+	await sql(`INSERT INTO users (id, name) VALUES ('${alice.id}', 'Maya Lindqvist') ON CONFLICT (id) DO UPDATE SET name = excluded.name`, api.db);
+	forge.tokens['alice-token'] = 'maya';
+	const { title } = await t.get();
+	await alice.threads.pullRequestCreate({ threadId: t.id, title, body: 'Uploads retry up to five times with exponential backoff, so a flaky connection no longer stops the nightly sync.' });
+	Object.assign(forge.pull(1), { labels: ['bug'], stats: [17, 1, 2] });
+	forge.comment(1, { login: 'jonas', body: 'Should `MAX_TRIES` be a setting?', path: 'src/upload.ts', line: 1, hunk: '@@ -0,0 +1,16 @@\n+const MAX_TRIES = 5;' });
+	forge.pull(1).checks = [
+		{ name: 'lint', status: 'completed', conclusion: 'success' },
+		{ name: 'test', status: 'completed', conclusion: 'failure' }
+	];
+
+	const page = await alice.page({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+	await page.goto(`/t/${t.id}`);
+	await page.getByRole('button', { name: /^PR #1/ }).click();
+	await expect(pane(page).getByText('Checks · 1 of 2 failing')).toBeVisible({ timeout: 15_000 });
+	await expect(pane(page).getByRole('article', { name: 'Comment by jonas' })).toContainText('src/upload.ts:1');
+	await expect(page.getByRole('button', { name: 'PR #1 · Open · checks failed' })).toBeVisible();
+	await page.mouse.move(0, 0);
+	await page.evaluate(() => document.fonts.ready);
+	if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: '../docs/screenshots/pull-request.png' });
 });
 
 test('anyone comments with their own token: a teammate without one is told how, with one comments and replies as themselves', async ({ as, startApi, forge }) => {

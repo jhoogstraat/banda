@@ -71,7 +71,7 @@ You (`/settings#claude`, `#accounts`, `#git`, `#defaults`, `#notifications`, `#a
 - **Accounts**: your GitHub and GitLab accounts, a row for each forge and host the team has set up (`#github`, `#gitlab`), to connect, reconnect or disconnect.
 - **Git identity**: the name and email of commits in your threads, by default your sign-in's. A thread handed to you uses yours. Like secrets, it applies when an environment next starts.
 - **New threads**: the model, effort, permission mode and profile the new-thread composer (and a race) starts with, and what threads created through the API without them get (sub-threads keep their parent's).
-- **Notifications** and **Appearance** (System, Light or Dark; dark by default) are per browser.
+- **Notifications** and **Appearance** are per browser. Appearance sets the theme (Highlighter, Logbook or Common room) and the mode (System, Light or Dark; dark by default).
 - **Secrets**: environment variables in all your threads, applied when a thread's environment next starts and redacted from everything the agent reports. A personal secret beats a team one of the same name.
 - **Keyboard shortcuts**.
 

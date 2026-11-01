@@ -5,12 +5,14 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<script>
-			// The theme from Settings (mode-watcher's key), before the app loads so light doesn't flash dark. Dark by
+			// The mode and theme from Settings (mode-watcher's keys), before the app loads so light doesn't flash dark. Dark by
 			// default: stored here, as mode-watcher stores "system" on load and its defaultMode needs server rendering.
 			const mode = localStorage.getItem('mode-watcher-mode') ?? 'dark';
 			localStorage.setItem('mode-watcher-mode', mode);
 			if (mode === 'light' || (mode === 'system' && matchMedia('(prefers-color-scheme: light)').matches))
 				document.documentElement.classList.remove('dark');
+			const theme = localStorage.getItem('mode-watcher-theme');
+			if (theme) document.documentElement.dataset.theme = theme;
 		</script>
 		%sveltekit.head%
 	</head>

@@ -1,99 +1,241 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn-svelte/tailwind.css";
-@import "@fontsource-variable/inter";
+/* Every theme's fonts. A browser fetches a font file only once text uses it, so a person pays for their own theme. */
+@import "@fontsource-variable/schibsted-grotesk";
+@import "@fontsource-variable/spline-sans-mono";
+@import "@fontsource-variable/source-serif-4";
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/figtree";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
+/* A theme's structure, for what a token can't say. Highlighter is everything that isn't another theme, so a stored
+   name from an older version falls back to it, as its tokens do. A new theme joins lib/themes.ts and this list. */
+@custom-variant highlighter (&:is(:root:not([data-theme='logbook'], [data-theme='common-room']) *));
+@custom-variant logbook (&:is([data-theme='logbook'] *));
+@custom-variant common-room (&:is([data-theme='common-room'] *));
 
+/* What every theme derives from its base tokens. */
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.5 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.505 0.213 27.518);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
+	--card-foreground: var(--foreground);
+	--popover: var(--card);
+	--popover-foreground: var(--foreground);
+	--secondary: var(--muted);
+	--secondary-foreground: var(--foreground);
+	--accent: var(--muted);
+	--accent-foreground: var(--foreground);
+	--sidebar-foreground: var(--foreground);
+	--sidebar-primary: var(--primary);
+	--sidebar-primary-foreground: var(--primary-foreground);
+	--sidebar-accent-foreground: var(--foreground);
+	--sidebar-border: var(--border);
+	--sidebar-ring: var(--ring);
 	--chart-1: oklch(0.87 0 0);
 	--chart-2: oklch(0.556 0 0);
 	--chart-3: oklch(0.439 0 0);
 	--chart-4: oklch(0.371 0 0);
 	--chart-5: oklch(0.269 0 0);
+}
+
+/* Highlighter, the default: black and white, and yellow only on what blocks a person. */
+:root {
+	color-scheme: light;
+	--theme-sans: 'Schibsted Grotesk Variable', sans-serif;
+	--theme-heading: 'Schibsted Grotesk Variable', sans-serif;
+	--theme-prose: 'Schibsted Grotesk Variable', sans-serif;
+	--theme-mono: 'Spline Sans Mono Variable', ui-monospace, monospace;
+	--radius: 0.4375rem;
+	--background: oklch(0.995 0 0);
+	--foreground: oklch(0.17 0 0);
+	--card: oklch(1 0 0);
+	--primary: oklch(0.17 0 0);
+	--primary-foreground: oklch(0.985 0 0);
+	--secondary: oklch(0.945 0 0);
+	--muted: oklch(0.955 0 0);
+	--muted-foreground: oklch(0.47 0 0);
+	--destructive: oklch(0.485 0.2 27);
+	--border: oklch(0.9 0 0);
+	--input: oklch(0.9 0 0);
+	--ring: oklch(0.708 0 0);
+	--sidebar: oklch(0.968 0 0);
+	--sidebar-accent: oklch(0.925 0 0);
 	/* Status colors. The plain name is for dots, tints and borders, -foreground for text and icons on them. */
 	--success: oklch(0.696 0.17 162.48);
 	--success-foreground: oklch(0.432 0.095 166.913);
-	--warning: oklch(0.828 0.189 84.429);
-	--warning-foreground: oklch(0.473 0.137 46.201);
+	--warning: oklch(0.8 0.15 80);
+	--warning-foreground: oklch(0.46 0.11 60);
 	--info: oklch(0.746 0.16 232.661);
 	--info-foreground: oklch(0.443 0.11 240.79);
 	--diff-add: oklch(0.723 0.219 149.579);
 	--diff-add-foreground: oklch(0.448 0.119 151.328);
 	--diff-del: oklch(0.637 0.237 25.331);
 	--diff-del-foreground: oklch(0.444 0.177 26.899);
-	--radius: 0.625rem;
-	color-scheme: light;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
+	/* What blocks a person: attention for dots, -surface behind counts and marks, -foreground on that surface,
+	   -text for text and icons on the page itself. */
+	--attention: oklch(0.905 0.188 106);
+	--attention-surface: oklch(0.905 0.188 106);
+	--attention-foreground: oklch(0.17 0 0);
+	--attention-text: oklch(0.41 0.09 100);
 }
 
 .dark {
 	color-scheme: dark;
+	--background: oklch(0.2 0 0);
+	--foreground: oklch(0.96 0 0);
+	--card: oklch(0.24 0 0);
+	--primary: oklch(0.96 0 0);
+	--primary-foreground: oklch(0.17 0 0);
+	--secondary: oklch(0.29 0 0);
+	--muted: oklch(0.28 0 0);
+	--muted-foreground: oklch(0.72 0 0);
+	--destructive: oklch(0.72 0.16 22);
+	--border: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 16%);
+	--ring: oklch(0.556 0 0);
+	--sidebar: oklch(0.17 0 0);
+	--sidebar-accent: oklch(0.285 0 0);
 	--success-foreground: oklch(0.765 0.177 163.223);
-	--warning-foreground: oklch(0.828 0.189 84.429);
+	--warning: oklch(0.82 0.14 80);
+	--warning-foreground: oklch(0.87 0.12 82);
+	--attention-text: oklch(0.905 0.188 106);
 	--info-foreground: oklch(0.746 0.16 232.661);
 	--diff-add-foreground: oklch(0.871 0.15 154.449);
 	--diff-del-foreground: oklch(0.808 0.114 19.571);
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
+}
+
+/* Logbook: the thread reads like a record. Serif for titles and the agent, sans for people and controls, ink for action. */
+:root[data-theme='logbook'] {
+	--theme-sans: 'Instrument Sans Variable', sans-serif;
+	--theme-heading: 'Source Serif 4 Variable', serif;
+	--theme-prose: 'Source Serif 4 Variable', serif;
+	--theme-mono: 'IBM Plex Mono', ui-monospace, monospace;
+	--radius: 0.375rem;
+	--background: oklch(0.985 0.004 250);
+	--foreground: oklch(0.25 0.035 262);
+	--card: oklch(1 0 0);
+	--primary: oklch(0.43 0.17 268);
+	--primary-foreground: oklch(0.985 0.004 250);
+	--secondary: var(--muted);
+	--muted: oklch(0.945 0.009 255);
+	--muted-foreground: oklch(0.47 0.022 260);
+	--destructive: oklch(0.485 0.19 25);
+	--border: oklch(0.885 0.014 255);
+	--input: oklch(0.885 0.014 255);
+	--ring: var(--primary);
+	--sidebar: oklch(0.955 0.009 252);
+	--sidebar-accent: oklch(0.915 0.014 258);
+	--success: oklch(0.62 0.13 170);
+	--success-foreground: oklch(0.42 0.09 170);
+	--warning: oklch(0.8 0.15 80);
+	--warning-foreground: oklch(0.46 0.11 60);
+	--info: oklch(0.62 0.11 225);
+	--info-foreground: oklch(0.44 0.1 235);
+	--diff-add: oklch(0.68 0.17 150);
+	--diff-add-foreground: oklch(0.43 0.11 150);
+	--diff-del: oklch(0.63 0.2 25);
+	--diff-del-foreground: oklch(0.46 0.16 25);
+	--attention: var(--warning);
+	--attention-surface: color-mix(in oklch, var(--warning) 20%, transparent);
+	--attention-foreground: var(--warning-foreground);
+	--attention-text: var(--warning-foreground);
+}
+
+.dark[data-theme='logbook'] {
+	--background: oklch(0.195 0.022 262);
+	--foreground: oklch(0.935 0.01 250);
+	--card: oklch(0.235 0.024 262);
+	--primary: oklch(0.77 0.115 270);
+	--primary-foreground: oklch(0.2 0.04 265);
+	--muted: oklch(0.27 0.024 262);
+	--muted-foreground: oklch(0.73 0.02 255);
+	--destructive: oklch(0.72 0.16 22);
+	--border: oklch(1 0 0 / 11%);
 	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+	--sidebar: oklch(0.17 0.022 262);
+	--sidebar-accent: oklch(0.27 0.026 262);
+	--success: oklch(0.72 0.13 170);
+	--success-foreground: oklch(0.8 0.12 170);
+	--warning: oklch(0.82 0.14 80);
+	--warning-foreground: oklch(0.84 0.13 82);
+	--info: oklch(0.74 0.11 225);
+	--info-foreground: oklch(0.8 0.1 228);
+	--diff-add: oklch(0.72 0.17 150);
+	--diff-add-foreground: oklch(0.85 0.13 152);
+	--diff-del: oklch(0.68 0.19 25);
+	--diff-del-foreground: oklch(0.82 0.1 20);
+}
+
+/* Common room: people working in the same place. Faces lead each row; aubergine with raspberry. */
+:root[data-theme='common-room'] {
+	--theme-sans: 'Figtree Variable', sans-serif;
+	--theme-heading: 'Bricolage Grotesque Variable', sans-serif;
+	--theme-prose: 'Figtree Variable', sans-serif;
+	--theme-mono: 'Geist Mono Variable', ui-monospace, monospace;
+	--radius: 0.75rem;
+	--background: oklch(0.985 0.005 340);
+	--foreground: oklch(0.26 0.045 335);
+	--card: oklch(1 0 0);
+	--primary: oklch(0.49 0.19 358);
+	--primary-foreground: oklch(0.985 0.005 340);
+	--secondary: var(--muted);
+	--muted: oklch(0.945 0.014 335);
+	--muted-foreground: oklch(0.48 0.035 335);
+	--destructive: oklch(0.485 0.19 27);
+	--border: oklch(0.895 0.024 335);
+	--input: oklch(0.895 0.024 335);
+	--ring: var(--primary);
+	--sidebar: oklch(0.945 0.02 335);
+	--sidebar-accent: oklch(0.905 0.03 335);
+	--success: oklch(0.62 0.13 170);
+	--success-foreground: oklch(0.42 0.09 170);
+	--warning: oklch(0.8 0.15 80);
+	--warning-foreground: oklch(0.46 0.11 60);
+	--info: oklch(0.62 0.11 235);
+	--info-foreground: oklch(0.44 0.1 245);
+	--diff-add: oklch(0.68 0.17 150);
+	--diff-add-foreground: oklch(0.43 0.11 150);
+	--diff-del: oklch(0.63 0.2 25);
+	--diff-del-foreground: oklch(0.46 0.16 25);
+	--attention: var(--warning);
+	--attention-surface: color-mix(in oklch, var(--warning) 20%, transparent);
+	--attention-foreground: var(--warning-foreground);
+	--attention-text: var(--warning-foreground);
+}
+
+.dark[data-theme='common-room'] {
+	--background: oklch(0.215 0.032 335);
+	--foreground: oklch(0.95 0.012 340);
+	--card: oklch(0.255 0.035 335);
+	--primary: oklch(0.77 0.14 358);
+	--primary-foreground: oklch(0.2 0.045 340);
+	--muted: oklch(0.295 0.036 335);
+	--muted-foreground: oklch(0.76 0.03 335);
+	--destructive: oklch(0.72 0.16 22);
+	--border: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 16%);
+	--sidebar: oklch(0.185 0.032 335);
+	--sidebar-accent: oklch(0.3 0.04 335);
+	--success: oklch(0.72 0.13 170);
+	--success-foreground: oklch(0.81 0.12 170);
+	--warning: oklch(0.82 0.14 80);
+	--warning-foreground: oklch(0.85 0.13 82);
+	--info: oklch(0.74 0.11 235);
+	--info-foreground: oklch(0.82 0.09 238);
+	--diff-add: oklch(0.72 0.17 150);
+	--diff-add-foreground: oklch(0.86 0.13 152);
+	--diff-del: oklch(0.68 0.19 25);
+	--diff-del-foreground: oklch(0.83 0.1 20);
 }
 
 @theme inline {
-	--font-sans: 'Inter Variable', sans-serif;
+	--font-sans: var(--theme-sans);
+	--font-heading: var(--theme-heading);
+	--font-prose: var(--theme-prose);
+	--font-mono: var(--theme-mono);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -117,6 +259,10 @@
 	--color-warning-foreground: var(--warning-foreground);
 	--color-info: var(--info);
 	--color-info-foreground: var(--info-foreground);
+	--color-attention: var(--attention);
+	--color-attention-surface: var(--attention-surface);
+	--color-attention-foreground: var(--attention-foreground);
+	--color-attention-text: var(--attention-text);
 	--color-diff-add: var(--diff-add);
 	--color-diff-add-foreground: var(--diff-add-foreground);
 	--color-diff-del: var(--diff-del);
@@ -154,6 +300,21 @@
 			position: absolute;
 			inset: -0.75rem -0.25rem;
 		}
+	}
+}
+
+/* A marker stroke over text that waits for a person. A solid fill: e2e/ui.spec.ts measures contrast on background-color.
+   Only Highlighter strokes; the other themes say the same with attention's text color. */
+@utility marker {
+	@variant highlighter {
+		border-radius: 2px;
+		background-color: var(--attention-surface);
+		padding-inline: 0.25rem;
+		margin-inline: -0.125rem;
+		color: var(--attention-foreground);
+		font-weight: 600;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
 	}
 }
 

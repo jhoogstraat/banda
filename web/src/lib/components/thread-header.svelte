@@ -65,7 +65,7 @@
 </script>
 
 <PageHeader>
-	<h1 class="min-w-0 flex-1 truncate text-sm font-medium" title={thread?.title}>{thread ? thread.title || 'Untitled thread' : ''}</h1>
+	<h1 class="min-w-0 flex-1 truncate font-heading text-sm font-medium highlighter:font-semibold logbook:text-lg logbook:font-semibold" title={thread?.title}>{thread ? thread.title || 'Untitled thread' : ''}</h1>
 	{#if thread}
 		<span class="@lg:hidden"><StatusDot status={thread.status} waiting={waiting(thread)} /></span>
 		<span class="hidden @lg:contents"><StatusDot status={thread.status} label waiting={waiting(thread)} /></span>

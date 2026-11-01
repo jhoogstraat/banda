@@ -2,6 +2,7 @@
 // notifications, the theme and the section nav.
 import { AuthMethod, AutoPushState, LoginAction, LoginState, PermissionMode, SetupState } from '../src/lib/gen/banda/v1/banda_pb.js';
 import type { Page } from '@playwright/test';
+import { themes } from '../src/lib/themes.ts';
 import { expect, kube, refused, Status, test, userHash, type User } from './fixtures.ts';
 
 const loginState = async (u: User) => (await u.settings.getSettings({})).accounts[0]?.loginState;
@@ -164,6 +165,67 @@ test('notifications: the section enables them and turns a kind off in this brows
 	expect((await shown()).filter((s) => s === 'Your agent finished')).toHaveLength(1);
 });
 
+test('appearance: the theme persists in this browser, is on <html> before the app loads, and fetches only its own fonts', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/settings#appearance');
+	const html = page.locator('html');
+	const section = page.getByRole('region', { name: 'Appearance' });
+	const radio = (name: string) => section.getByRole('radio', { name, exact: true });
+	const font = () => page.evaluate(() => getComputedStyle(document.body).fontFamily);
+	await expect(radio('Highlighter')).toBeChecked();
+	await expect(html).toHaveAttribute('data-theme', '');
+	expect(await font()).toContain('Schibsted');
+
+	await radio('Logbook').check();
+	await expect(html).toHaveAttribute('data-theme', 'logbook');
+	expect(await font()).toContain('Instrument Sans');
+	await expect(radio('Dark')).toBeChecked(); // the mode is its own choice
+	await expect(html).toHaveClass(/dark/);
+	await page.reload();
+	await expect(radio('Logbook')).toBeChecked();
+	await expect(html).toHaveAttribute('data-theme', 'logbook');
+
+	// Without the app's code only app.html can have set it.
+	await page.route('**/_app/**', (route) => route.abort());
+	await page.reload();
+	await expect(html).toHaveAttribute('data-theme', 'logbook');
+	await page.unroute('**/_app/**');
+
+	await page.reload();
+	const loaded = () => page.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family).join());
+	await expect.poll(loaded).toContain('Instrument Sans');
+	expect(await loaded()).not.toMatch(/Schibsted|Figtree/);
+
+	await radio('Common room').check();
+	await expect(html).toHaveAttribute('data-theme', 'common-room');
+	expect(await font()).toContain('Figtree');
+	await radio('Highlighter').check();
+	await expect(html).toHaveAttribute('data-theme', '');
+	expect(await font()).toContain('Schibsted');
+
+	// A name a later version dropped looks like the default.
+	await page.evaluate(() => localStorage.setItem('mode-watcher-theme', 'an-old-theme'));
+	await page.reload();
+	await expect(radio('Highlighter')).toBeChecked();
+	expect(await font()).toContain('Schibsted');
+});
+
+test('appearance: the browser bar follows the theme and the mode, with no reload', async ({ as }) => {
+	const page = await as('alice').page();
+	await page.goto('/settings#appearance');
+	const section = page.getByRole('region', { name: 'Appearance' });
+	const bar = page.locator('meta[name=theme-color]');
+	for (const [name, mode] of [['Dark', 'dark'], ['Light', 'light']] as const) {
+		await section.getByRole('radio', { name, exact: true }).check();
+		for (const t of [...themes, ...themes]) {
+			await section.getByRole('radio', { name: t.label, exact: true }).check();
+			await expect(bar).toHaveAttribute('content', t.colors[mode]);
+		}
+	}
+	await page.reload();
+	await expect(bar).toHaveAttribute('content', themes.at(-1)!.colors.light);
+});
+
 test('appearance: dark by default; Light and System persist in this browser', async ({ as }) => {
 	const page = await as('alice').page();
 	await page.goto('/settings#appearance');
@@ -171,10 +233,10 @@ test('appearance: dark by default; Light and System persist in this browser', as
 	const section = page.getByRole('region', { name: 'Appearance' });
 	await expect(section.getByRole('radio', { name: 'Dark' })).toBeChecked();
 	await expect(html).toHaveClass(/dark/);
-	await section.getByRole('radio', { name: 'Light' }).check();
+	await section.getByRole('radio', { name: 'Light', exact: true }).check();
 	await expect(html).not.toHaveClass(/dark/);
 	await page.reload();
-	await expect(section.getByRole('radio', { name: 'Light' })).toBeChecked();
+	await expect(section.getByRole('radio', { name: 'Light', exact: true })).toBeChecked();
 	await expect(html).not.toHaveClass(/dark/);
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await section.getByRole('radio', { name: 'System' }).check();
