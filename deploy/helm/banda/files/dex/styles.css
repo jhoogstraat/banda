@@ -1,28 +1,29 @@
-/* Banda's look for its bundled Dex: tokens of its own, from before the app's themes, and the layout of the web app's
- * sign-in page (web/src/routes/signin). Dark, or light when header.html finds the app's theme is light. */
+/* Banda's look for its bundled Dex: the Highlighter theme's tokens and font (web/src/routes/layout.css), whatever theme
+ * a person picked, and the layout of the web app's sign-in page (web/src/routes/signin). Dark, or light when header.html
+ * finds the app's mode is light. */
 
 @font-face {
-  font-family: 'Inter Variable';
+  font-family: 'Schibsted Grotesk Variable';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400 900;
   font-display: swap;
-  src: url(inter.woff2) format('woff2');
+  src: url(schibsted-grotesk.woff2) format('woff2');
 }
 
 .theme-body {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --accent: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --background: oklch(0.2 0 0);
+  --foreground: oklch(0.96 0 0);
+  --primary: oklch(0.96 0 0);
+  --primary-foreground: oklch(0.17 0 0);
+  --accent: oklch(0.28 0 0);
+  --muted-foreground: oklch(0.72 0 0);
+  --destructive: oklch(0.72 0.16 22);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.556 0 0);
   --input-background: oklch(1 0 0 / 4.5%);
-  --primary-hover: oklch(0.922 0 0 / 80%);
-  --radius: 0.625rem;
+  --primary-hover: oklch(0.96 0 0 / 80%);
+  --radius: 0.4375rem;
   /* What main.css reads for the home page. */
   --dex-fg: var(--foreground);
   --dex-fg-muted: var(--muted-foreground);
@@ -33,7 +34,7 @@
   color: var(--foreground);
   color-scheme: dark;
   display: grid;
-  font-family: 'Inter Variable', sans-serif;
+  font-family: 'Schibsted Grotesk Variable', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   min-height: 100dvh;
@@ -42,18 +43,18 @@
 }
 
 .light .theme-body {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --background: oklch(0.995 0 0);
+  --foreground: oklch(0.17 0 0);
+  --primary: oklch(0.17 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --accent: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --accent: oklch(0.955 0 0);
+  --muted-foreground: oklch(0.47 0 0);
+  --destructive: oklch(0.485 0.2 27);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
   --ring: oklch(0.708 0 0);
   --input-background: transparent;
-  --primary-hover: oklch(0.205 0 0 / 90%);
+  --primary-hover: oklch(0.17 0 0 / 90%);
   color-scheme: light;
 }
 

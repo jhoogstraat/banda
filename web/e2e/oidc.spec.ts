@@ -19,7 +19,7 @@ async function signIn(browser: Browser, user: string, path = '/') {
 	// Dex, in Banda's look: the password form is its only step.
 	await expect(page).toHaveTitle('Banda');
 	await expect(page.getByText('Sign in with your email address and password.')).toBeVisible();
-	await expect(page.locator('body')).toHaveCSS('font-family', /Inter Variable/);
+	await expect(page.locator('body')).toHaveCSS('font-family', /Schibsted Grotesk Variable/);
 	await page.getByLabel(/email/i).fill(`${user}@example.com`);
 	await page.getByLabel(/password/i).fill('password');
 	await shot(page, 'dex');

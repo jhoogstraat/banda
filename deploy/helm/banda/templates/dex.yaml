@@ -36,7 +36,7 @@ metadata:
   labels: {{- include "banda.labels" . | nindent 4 }}
 data: {{- (.Files.Glob "files/dex/*.{html,css}").AsConfig | nindent 2 }}
 binaryData:
-  inter.woff2: {{ .Files.Get "files/dex/inter.woff2" | b64enc }}
+  schibsted-grotesk.woff2: {{ .Files.Get "files/dex/schibsted-grotesk.woff2" | b64enc }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -76,7 +76,7 @@ spec:
         - name: web
           configMap: {name: dex-web}
         - name: theme
-          configMap: {name: dex-web, items: [{key: styles.css, path: styles.css}, {key: inter.woff2, path: inter.woff2}]}
+          configMap: {name: dex-web, items: [{key: styles.css, path: styles.css}, {key: schibsted-grotesk.woff2, path: schibsted-grotesk.woff2}]}
 ---
 apiVersion: v1
 kind: Service
