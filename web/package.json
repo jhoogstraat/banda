@@ -47,7 +47,7 @@
 		"@connectrpc/connect": "^2.2.0",
 		"@connectrpc/connect-web": "^2.2.0",
 		"@shikijs/langs": "^4.5.0",
-		"@shikijs/themes": "^4.5.0",
+		"@shikijs/themes": "^4.6.0",
 		"@xterm/addon-fit": "^0.11.0",
 		"@xterm/xterm": "^6.0.0",
 		"ai": "^7.0.154",
