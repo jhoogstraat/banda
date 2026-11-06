@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	sbv1 "sigs.k8s.io/agent-sandbox/api/v1beta1"
@@ -47,6 +48,9 @@ type Config struct {
 	APIURL    string // where runners dial the API
 	Sizes     Sizes
 	Team      TeamIdentity
+	// NodeSelector is the labels a node needs to run environments
+	// (SANDBOX_NODE_SELECTOR); empty, any node.
+	NodeSelector map[string]string
 }
 
 // AuthTeam is the auth method of a thread on the team's Console identity.
@@ -294,6 +298,32 @@ func ParseCIDRs(s string) ([]netip.Prefix, error) {
 		cidrs = append(cidrs, p)
 	}
 	return cidrs, nil
+}
+
+// ParseNodeSelector reads SANDBOX_NODE_SELECTOR: comma-separated label=value
+// pairs a node needs to run environments, such as
+// kubernetes.io/hostname=node-1. Empty, any node.
+func ParseNodeSelector(s string) (map[string]string, error) {
+	sel := map[string]string{}
+	for f := range strings.SplitSeq(s, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(f, "=")
+		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
+		if !ok || len(validation.IsQualifiedName(k)) > 0 || len(validation.IsValidLabelValue(v)) > 0 {
+			return nil, fmt.Errorf("%q is not a label=value pair such as kubernetes.io/hostname=node-1", f)
+		}
+		if _, dup := sel[k]; dup {
+			return nil, fmt.Errorf("label %q is named twice", k)
+		}
+		sel[k] = v
+	}
+	if len(sel) == 0 {
+		return nil, nil
+	}
+	return sel, nil
 }
 
 // AllowEgress lets the namespace's sandboxes reach cidrs (production, say) on
@@ -564,6 +594,7 @@ func (c *Client) sandbox(name, claudeClaim string, t store.Thread, authMethod st
 						TerminationGracePeriodSeconds: &grace,
 						AutomountServiceAccountToken:  &no,
 						Affinity:                      sameNode(t.OwnerID),
+						NodeSelector:                  c.cfg.NodeSelector,
 						Volumes:                       []corev1.Volume{claudeVolume(claudeClaim), idTokenVolume},
 						Containers: []corev1.Container{{
 							Name:            "runner",
@@ -606,6 +637,7 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 						TerminationGracePeriodSeconds: &grace,
 						AutomountServiceAccountToken:  &no,
 						Affinity:                      sameNode(owner),
+						NodeSelector:                  c.cfg.NodeSelector,
 						Volumes: []corev1.Volume{claudeVolume(claudeClaim),
 							{Name: "home", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
 						Containers: []corev1.Container{{

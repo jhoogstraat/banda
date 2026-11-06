@@ -222,7 +222,7 @@ What the numbers say about the chart's `sandboxes:` values:
 - **`cpu: 4`** is the limit that bites: compiles ran at it and were throttled, nothing failed. Raise it for faster builds.
 - **`memory: 8Gi`** left room: the peak was 4.1 GiB, no OOM kill, and about half of that is page cache the kernel gives back under pressure. A repo with heavier builds needs its own measurement.
 - **`homeSize: 10Gi`** held 2.2 GiB after all of it (tools 550 MiB, caches 940 MiB, checkout 430 MiB, Go modules 280 MiB). `scratch: 10Gi` was barely touched: `/tmp` held 8 MiB.
-- **Requests are 50m and 128 MiB**, far below a build, so the scheduler doesn't keep busy threads apart: nodes fill up by pod count, and one person's threads all share one node ("Volumes"). The rule above is yours to apply, by node size or `SANDBOX_CPU` and `SANDBOX_MEMORY`.
+- **Requests are 50m and 128 MiB**, far below a build, so the scheduler doesn't keep busy threads apart: nodes fill up by pod count, and one person's threads all share one node ("Volumes"). The rule above is yours to apply, by node size or `SANDBOX_CPU` and `SANDBOX_MEMORY`. On nodes of different sizes the scheduler prefers the one with the fewest requests, which may be the smallest: `sandboxes.nodeSelector` keeps environments on the nodes you name ([configuration](configuration.md)).
 - **The rest of Banda is small:** with 5 running threads, the API took 53 MiB, Postgres 49 MiB, Dex 24 MiB.
 
 Set the kubelet's `podPidsLimit` (`deploy/kind.yaml` uses 4096; the rehearsal peaked at 103): the chart can't, and without it one sandbox's fork bomb can take all of a node's PIDs.

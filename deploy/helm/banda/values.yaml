@@ -67,6 +67,9 @@ sandboxes:
   homeSize: 10Gi # each thread's volume: the checkout and its home directory
   claudeVolumeSize: 1Gi # each user's Claude Code config, shared by their environments
   login: {cpu: "1", memory: 1Gi, scratch: 1Gi} # each user's login environment
+  # Labels a node needs to run environments (SANDBOX_NODE_SELECTOR), e.g.
+  # {kubernetes.io/hostname: node-1}. Empty: any node.
+  nodeSelector: {}
 
 ingress:
   enabled: false

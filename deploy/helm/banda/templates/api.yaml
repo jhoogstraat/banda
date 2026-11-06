@@ -144,6 +144,10 @@ spec:
             - {name: LOGIN_CPU, value: {{ .login.cpu | toString | quote }}}
             - {name: LOGIN_MEMORY, value: {{ .login.memory | quote }}}
             - {name: LOGIN_SCRATCH, value: {{ .login.scratch | quote }}}
+            {{- with .nodeSelector }}
+            - name: SANDBOX_NODE_SELECTOR
+              value: {{ $pairs := list }}{{ range $k, $v := . }}{{ $pairs = append $pairs (printf "%s=%s" $k $v) }}{{ end }}{{ join "," $pairs | quote }}
+            {{- end }}
             {{- end }}
             {{- range $k, $v := .Values.api.env }}
             - {name: {{ $k }}, value: {{ $v | toString | quote }}}

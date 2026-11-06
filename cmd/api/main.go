@@ -36,15 +36,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	nodes, err := sandbox.ParseNodeSelector(os.Getenv("SANDBOX_NODE_SELECTOR"))
+	if err != nil {
+		log.Fatalf("SANDBOX_NODE_SELECTOR: %v", err)
+	}
 	team := sandbox.TeamIdentity{RuleID: os.Getenv("CLAUDE_TEAM_RULE_ID"), OrganizationID: os.Getenv("CLAUDE_TEAM_ORGANIZATION_ID"),
 		ServiceAccountID: os.Getenv("CLAUDE_TEAM_SERVICE_ACCOUNT_ID"), WorkspaceID: os.Getenv("CLAUDE_TEAM_WORKSPACE_ID")}
 	sb, err := sandbox.New(sandbox.Config{
-		Context:   os.Getenv("KUBE_CONTEXT"),
-		Namespace: env("SANDBOX_NAMESPACE", "banda"),
-		Image:     env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
-		APIURL:    env("RUNNER_API_URL", "http://host.containers.internal:8787"),
-		Sizes:     sizes,
-		Team:      team,
+		Context:      os.Getenv("KUBE_CONTEXT"),
+		Namespace:    env("SANDBOX_NAMESPACE", "banda"),
+		Image:        env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
+		APIURL:       env("RUNNER_API_URL", "http://host.containers.internal:8787"),
+		Sizes:        sizes,
+		Team:         team,
+		NodeSelector: nodes,
 	})
 	if err != nil {
 		log.Fatalf("sandbox client: %v", err)

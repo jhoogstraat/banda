@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
 	"strings"
@@ -251,6 +252,49 @@ func TestPodsDontMountForgeSecrets(t *testing.T) {
 
 // All of a user's pods, threads and login, ask for the node of each other,
 // where their ReadWriteOnce Claude volume is; another user's don't.
+func TestParseNodeSelector(t *testing.T) {
+	for in, want := range map[string]map[string]string{
+		"":                              nil,
+		" , ":                           nil,
+		"kubernetes.io/hostname=node-1": {"kubernetes.io/hostname": "node-1"},
+		" pool = banda , node-role.kubernetes.io/control-plane=": {"pool": "banda", "node-role.kubernetes.io/control-plane": ""},
+	} {
+		got, err := ParseNodeSelector(in)
+		if err != nil {
+			t.Errorf("%q: %v", in, err)
+			continue
+		}
+		if !maps.Equal(got, want) || (got == nil) != (want == nil) {
+			t.Errorf("%q = %v, want %v", in, got, want)
+		}
+	}
+	for in, want := range map[string]string{
+		"node-1":         `"node-1" is not a label=value pair`,
+		"=node-1":        `"=node-1" is not a label=value pair`,
+		"pool=bad value": `"pool=bad value" is not a label=value pair`,
+		"pool=a,pool=b":  `label "pool" is named twice`,
+		"not a key=v":    `"not a key=v" is not a label=value pair`,
+	} {
+		if _, err := ParseNodeSelector(in); err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Errorf("%q: error %v, want %s", in, err, want)
+		}
+	}
+}
+
+// Thread and login environments both run only on the nodes the selector names.
+func TestPodsKeepToTheNodeSelector(t *testing.T) {
+	sel := map[string]string{"kubernetes.io/hostname": "node-1"}
+	c := &Client{cfg: Config{NodeSelector: sel}}
+	for name, p := range map[string]sbv1.PodTemplate{
+		"thread": c.sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "subscription", nil, store.GitIdentity{}).Spec.PodTemplate,
+		"login":  c.loginSandbox("alice", "claude").Spec.PodTemplate,
+	} {
+		if !maps.Equal(p.Spec.NodeSelector, sel) {
+			t.Errorf("%s: nodeSelector %v, want %v", name, p.Spec.NodeSelector, sel)
+		}
+	}
+}
+
 func TestUsersPodsShareANode(t *testing.T) {
 	c := &Client{}
 	pods := []sbv1.PodTemplate{
