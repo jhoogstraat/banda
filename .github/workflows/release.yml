@@ -1,4 +1,4 @@
-# On a tag v1.2.3: images ghcr.io/<owner>/banda-api and banda-sandbox (amd64 and arm64, tags 1.2.3,
+# On a tag v1.2.3: images ghcr.io/<owner>/banda-api, banda-sandbox and banda-login (amd64 and arm64, tags 1.2.3,
 # 1.2 and latest), the chart at oci://ghcr.io/<owner>/charts/banda, and a GitHub release with the
 # rendered manifest banda.yaml.
 name: release
@@ -14,7 +14,7 @@ jobs:
   image:
     strategy:
       matrix:
-        image: [api, sandbox]
+        image: [api, sandbox, login]
         platform:
           - {arch: amd64, runner: ubuntu-24.04}
           - {arch: arm64, runner: ubuntu-24.04-arm}
@@ -34,8 +34,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: deploy/${{ matrix.image }}.Dockerfile
-          target: ${{ matrix.image == 'sandbox' && 'sandbox' || '' }}
+          file: deploy/${{ matrix.image == 'api' && 'api' || 'sandbox' }}.Dockerfile
+          target: ${{ matrix.image != 'api' && matrix.image || '' }}
           platforms: linux/${{ matrix.platform.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/banda-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform.arch }}
@@ -53,7 +53,7 @@ jobs:
     needs: image
     strategy:
       matrix:
-        image: [api, sandbox]
+        image: [api, sandbox, login]
     runs-on: ubuntu-24.04
     permissions:
       packages: write

@@ -9,6 +9,7 @@
 package sandbox
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -45,9 +46,12 @@ type Config struct {
 	Context   string // of the kubeconfig; empty is its current one
 	Namespace string
 	Image     string
-	APIURL    string // where runners dial the API
-	Sizes     Sizes
-	Team      TeamIdentity
+	// LoginImage runs login environments (SANDBOX_LOGIN_IMAGE): the runner
+	// and claude are all they need. Empty, Image.
+	LoginImage string
+	APIURL     string // where runners dial the API
+	Sizes      Sizes
+	Team       TeamIdentity
 	// NodeSelector is the labels a node needs to run environments
 	// (SANDBOX_NODE_SELECTOR); empty, any node.
 	NodeSelector map[string]string
@@ -642,7 +646,7 @@ func (c *Client) loginSandbox(owner, claudeClaim string) *sbv1.Sandbox {
 							{Name: "home", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
 						Containers: []corev1.Container{{
 							Name:            "runner",
-							Image:           c.cfg.Image,
+							Image:           cmp.Or(c.cfg.LoginImage, c.cfg.Image),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{Name: "HOME", Value: home},
@@ -724,15 +728,18 @@ func claudeVolume(claim string) corev1.Volume {
 // Banda's words with Kubernetes' message, and whether it can't start by
 // itself (failed). Empty when Kubernetes reports nothing in the way: no pod
 // yet, pulling the image, creating the container, the runner connecting.
-func (c *Client) Waiting(ctx context.Context, threadID string) (why string, failed bool, err error) {
-	return c.waiting(ctx, "t-"+threadID)
+// With steps, those say which of them it is at (podStep), for a terminal
+// someone waits in; the thread lists show only what's in the way.
+func (c *Client) Waiting(ctx context.Context, threadID string, steps bool) (why string, failed bool, err error) {
+	return c.waiting(ctx, "t-"+threadID, steps)
 }
 
+// WaitingLogin is Waiting for the owner's login environment, with steps.
 func (c *Client) WaitingLogin(ctx context.Context, owner string) (string, bool, error) {
-	return c.waiting(ctx, "login-"+hash(owner))
+	return c.waiting(ctx, "login-"+hash(owner), true)
 }
 
-func (c *Client) waiting(ctx context.Context, name string) (string, bool, error) {
+func (c *Client) waiting(ctx context.Context, name string, steps bool) (string, bool, error) {
 	pod, err := c.kube.CoreV1().Pods(c.cfg.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return "", false, nil
@@ -743,7 +750,53 @@ func (c *Client) waiting(ctx context.Context, name string) (string, bool, error)
 		return "", false, nil
 	}
 	why, failed := podWaiting(pod)
-	return why, failed, nil
+	if why != "" || !steps {
+		return why, failed, nil
+	}
+	return podStep(pod, func() []corev1.Event {
+		// Only the pull shows in events, not in the pod's status. Without
+		// them (RBAC), the step is unnamed rather than the start failing.
+		evs, err := c.kube.CoreV1().Events(c.cfg.Namespace).List(ctx, metav1.ListOptions{FieldSelector: "involvedObject.uid=" + string(pod.UID)})
+		if err != nil {
+			return nil
+		}
+		return evs.Items
+	}), false, nil
+}
+
+// podStep names the step of a start with nothing in the way: the scheduler
+// placing the pod (with node-local storage, after its new volumes are made
+// there), the kubelet mounting its volumes, pulling its image, the runner
+// connecting. Empty for the moments in between: creating the container.
+func podStep(p *corev1.Pod, events func() []corev1.Event) string {
+	cond := func(t corev1.PodConditionType) *corev1.PodCondition {
+		for i := range p.Status.Conditions {
+			if p.Status.Conditions[i].Type == t {
+				return &p.Status.Conditions[i]
+			}
+		}
+		return nil
+	}
+	if c := cond(corev1.PodScheduled); c == nil || c.Status != corev1.ConditionTrue {
+		return "Waiting for a node and the environment's volumes"
+	}
+	for _, s := range p.Status.ContainerStatuses {
+		if s.State.Running != nil {
+			return "The runner started and is connecting to Banda"
+		}
+	}
+	var pulling, pulled bool
+	for _, e := range events() {
+		pulling = pulling || e.Reason == "Pulling"
+		pulled = pulled || e.Reason == "Pulled"
+	}
+	if pulling && !pulled {
+		return fmt.Sprintf("Pulling the image onto node %s: once per node and release, the first start there takes longest", p.Spec.NodeName)
+	}
+	if c := cond(corev1.PodReadyToStartContainers); c != nil && c.Status != corev1.ConditionTrue {
+		return fmt.Sprintf("Mounting the environment's volumes on node %s", p.Spec.NodeName)
+	}
+	return ""
 }
 
 // podWaiting reads a pod's status. Only what can't change without someone

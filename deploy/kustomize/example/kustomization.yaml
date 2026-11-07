@@ -10,6 +10,8 @@ resources:
   - ingress.yaml
 images:
   - {name: ghcr.io/jhoogstraat/banda-api, newTag: 1.0.0}
+  - {name: ghcr.io/jhoogstraat/banda-sandbox, newTag: 1.0.0} # banda-prepull's
+  - {name: ghcr.io/jhoogstraat/banda-login, newTag: 1.0.0}
 # The settings Secret the base expects. Keep the real values out of git (a
 # sealed or external secret, or a file you don't commit). Its name stays
 # fixed: Kustomize doesn't rename references in what a chart inflated, so
@@ -40,6 +42,7 @@ patches:
                   - {name: PREVIEW_URL, value: https://preview.banda.example.com}
                   # Not an image field, so images: above doesn't reach it.
                   - {name: SANDBOX_IMAGE, value: ghcr.io/jhoogstraat/banda-sandbox:1.0.0}
+                  - {name: SANDBOX_LOGIN_IMAGE, value: ghcr.io/jhoogstraat/banda-login:1.0.0}
   # The ingress policies tell sandboxes from browsers by the pod network: your cluster's instead of kind's.
   - target: {kind: NetworkPolicy, name: banda-api}
     patch: |

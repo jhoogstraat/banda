@@ -5,6 +5,9 @@
 image:
   api: {repository: localhost/banda-api, tag: dev}
   sandbox: {repository: localhost/banda-sandbox, tag: dev}
+  login: {repository: localhost/banda-sandbox, tag: dev} # the sandbox image runs login environments too
+sandboxes:
+  prepull: false # images are loaded into the node, not pulled
 sessionSecret: banda-local-dev-session-secret
 oidc:
   clientSecret: banda-dev-secret

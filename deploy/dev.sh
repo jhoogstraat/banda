@@ -121,10 +121,11 @@ servers() {
 
 # mise run e2e [-- <Playwright args>]: the Playwright suite in web/e2e against a world of its own, so
 # runs from several checkouts go side by side: namespace banda-e2e-<run> (sandboxes, volumes, secrets,
-# a git server and Dex), database banda_e2e_<run>, image localhost/banda-sandbox:fake-<run> and two APIs
+# a git server and Dex), database banda_e2e_<run>, images localhost/banda-sandbox:fake-<run> and
+# localhost/banda-login:fake-<run> (the login environments') and two APIs
 # on free ports (dev auth, and OIDC for the sign-in tests), serving the web build. <run> comes from the
 # checkout path; a rerun wipes its world first. E2E_KEEP=1 keeps the namespace and database.
-# E2E_IMAGE names a fake image built already (CI builds it from the images job's layer cache).
+# E2E_IMAGE and E2E_LOGIN_IMAGE name fake images built already (CI builds them from the images job's layer cache).
 e2e() {
 	run=$(printf %s "$PWD" | shasum | cut -c1-8)
 	LOG=/tmp/banda-e2e-$run ns=banda-e2e-$run db=banda_e2e_$run
@@ -136,7 +137,9 @@ e2e() {
 	PIDS=()
 	trap e2e_down EXIT
 	export SANDBOX_IMAGE=${E2E_IMAGE:-localhost/banda-sandbox:fake-$run}
-	TARGET=fake mise run image >"$LOG/image.log" 2>&1 & local image=$!
+	export SANDBOX_LOGIN_IMAGE=${E2E_LOGIN_IMAGE:-localhost/banda-login:fake-$run}
+	{ TARGET=fake mise run image &&
+		SANDBOX_IMAGE=$SANDBOX_LOGIN_IMAGE E2E_IMAGE=${E2E_LOGIN_IMAGE:-} TARGET=login-fake mise run image; } >"$LOG/image.log" 2>&1 & local image=$!
 	go build -o "$LOG/api" ./cmd/api & local api=$!
 	pnpm -C web build >"$LOG/web.log" 2>&1 & local web=$!
 	pnpm -C web exec playwright install chromium >/dev/null & local chromium=$!

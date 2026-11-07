@@ -140,7 +140,7 @@ func (s *Service) waitRunner(ctx context.Context, key string, waiting func(strin
 			if u, login := strings.CutPrefix(key, loginPrefix); login {
 				why, failed, err = s.sandboxes.WaitingLogin(ctx, u)
 			} else {
-				why, failed, err = s.sandboxes.Waiting(ctx, key)
+				why, failed, err = s.sandboxes.Waiting(ctx, key, true)
 			}
 			if err != nil {
 				return err

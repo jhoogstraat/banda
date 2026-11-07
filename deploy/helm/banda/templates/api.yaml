@@ -22,6 +22,9 @@ rules:
     resources: [persistentvolumeclaims]
     verbs: [create]
   - apiGroups: [""]
+    resources: [events] # a starting environment's: whether it pulls its image
+    verbs: [list]
+  - apiGroups: [""]
     resources: [secrets] # users' banda-env-*, banda-auth-* and banda-forge-* (forge tokens, no pod mounts them), the team's banda-env-team, banda-github-app (its key, likewise) and banda-gitlab-app-<host> (GitLab applications' secrets, likewise), banda-git, runner tokens (<sandbox>-token, owned by their Sandbox), banda-identity (workload identity signing keys, made on first start, in no pod)
     verbs: [get, create, patch, delete] # delete: disconnecting GitHub or GitLab, removing an app
   - apiGroups: [networking.k8s.io]
@@ -111,6 +114,7 @@ spec:
             {{- end }}
             - {name: SANDBOX_NAMESPACE, value: {{ .Release.Namespace }}}
             - {name: SANDBOX_IMAGE, value: {{ include "banda.image" (dict "image" .Values.image.sandbox "root" .) | quote }}}
+            - {name: SANDBOX_LOGIN_IMAGE, value: {{ include "banda.image" (dict "image" .Values.image.login "root" .) | quote }}}
             - {name: RUNNER_API_URL, value: "http://banda-api.{{ .Release.Namespace }}.svc:8787"}
             - {name: PUBLIC_URL, value: {{ include "banda.publicUrl" . | quote }}}
             {{- with .Values.api.metricsPort }}

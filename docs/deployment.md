@@ -46,7 +46,7 @@ From an empty cluster to a signed-in team. You need:
        - {email: ann@example.com, username: ann, userID: 1f0c2a52-..., hash: "$2y$10$..."}
    ```
 
-3. The chart, released to `oci://ghcr.io/jhoogstraat/charts/banda` with the images `ghcr.io/jhoogstraat/banda-api` and `banda-sandbox` (amd64 and arm64) of the same version. The session secret, both Postgres passwords and Dex's client secret are generated on install and kept on upgrades.
+3. The chart, released to `oci://ghcr.io/jhoogstraat/charts/banda` with the images `ghcr.io/jhoogstraat/banda-api`, `banda-sandbox` and `banda-login` (amd64 and arm64) of the same version. The session secret, both Postgres passwords and Dex's client secret are generated on install and kept on upgrades.
 
    ```sh
    helm install banda oci://ghcr.io/jhoogstraat/charts/banda -n banda --create-namespace -f banda.values.yaml
@@ -82,7 +82,8 @@ The Secret's settings apply where the manifest sets none: it sets `PUBLIC_URL` t
 | Postgres | The chart (`postgres.enabled`, default), or your own database through `DATABASE_URL` | The API connects as `banda_api`, not a superuser; nightly dumps to a volume. See "Postgres" below. |
 | OIDC provider | Your provider (`oidc.*`), or the chart's Dex (`dex.enabled`) with static users for demos and dev | |
 | agent-sandbox controller | Upstream `sandbox.yaml` v1.0.8, applied once by hand | A third-party operator Banda depends on; not in the chart. |
-| Sandbox image | `ghcr.io/<owner>/banda-sandbox`, released for amd64 and arm64; in kind `mise run image` | Must be pullable by every node. |
+| Sandbox image | `ghcr.io/<owner>/banda-sandbox`, released for amd64 and arm64; in kind `mise run image` | Must be pullable by every node. The chart's DaemonSet `banda-prepull` pulls it and the login image onto every node that runs environments (`sandboxes.nodeSelector`) as soon as it names them, so no one's start waits for the pull after an install, an upgrade or on a new node; `sandboxes.prepull: false` turns it off. |
+| Login image | `ghcr.io/<owner>/banda-login` (`SANDBOX_LOGIN_IMAGE`, the `login` stage of `deploy/sandbox.Dockerfile`): only the runner and `claude`, which login environments need, 388 MB to the sandbox image's 901 MB; empty, login environments run the sandbox image (kind) | Same as the sandbox image. A private certificate authority goes into both. |
 | NetworkPolicies | The chart, plus `sandboxes-allow` written by the API | Need a CNI that enforces them. |
 
 The important fact: **Banda is Kubernetes-native by design.** The API's main job is to create and suspend pods; sandboxes, volumes, secrets and isolation are Kubernetes objects. Any strategy that removes Kubernetes removes the product.
@@ -199,7 +200,7 @@ Deleting the Secret makes the API create a new key on its next start, which sign
 
 ## Releases
 
-A tag `v1.2.3` (`.github/workflows/release.yml`) builds both images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api` and `banda-sandbox` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and both image builds on every pull request and push to `main`, and the `@key` e2e tests on kind with Docker on `main` only.
+A tag `v1.2.3` (`.github/workflows/release.yml`) builds the three images on native amd64 and arm64 runners and pushes them as `ghcr.io/<owner>/banda-api`, `banda-sandbox` and `banda-login` with tags `1.2.3`, `1.2` and `latest`, packages the chart with version and appVersion `1.2.3` to `oci://ghcr.io/<owner>/charts/banda`, and creates a GitHub release with generated notes, the chart and `banda.yaml`. CI (`.github/workflows/ci.yml`) runs the Go, web and chart checks, the code generation drift check and the image builds on every pull request and push to `main`, and the `@key` e2e tests on kind with Docker on `main` only.
 
 ## Sizing
 

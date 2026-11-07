@@ -21,6 +21,10 @@ image:
   sandbox:
     repository: ghcr.io/jhoogstraat/banda-sandbox
     tag: ""
+  # Login environments': only the runner and claude, a third of the sandbox image.
+  login:
+    repository: ghcr.io/jhoogstraat/banda-login
+    tag: ""
 
 api:
   enabled: true
@@ -70,6 +74,11 @@ sandboxes:
   # Labels a node needs to run environments (SANDBOX_NODE_SELECTOR), e.g.
   # {kubernetes.io/hostname: node-1}. Empty: any node.
   nodeSelector: {}
+  # A DaemonSet that pulls the sandbox and login images onto every node that runs
+  # environments (nodeSelector) as soon as the chart names them, so an install,
+  # an upgrade or a new node doesn't make someone's first start wait for the pull.
+  # It runs nothing but `sleep` and takes next to nothing.
+  prepull: true
 
 ingress:
   enabled: false

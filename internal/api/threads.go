@@ -219,7 +219,7 @@ func (s *Service) watchStarting(ctx context.Context, id string) {
 		if time.Since(since) < s.StartPoll {
 			continue
 		}
-		why, failed, err := s.sandboxes.Waiting(ctx, id)
+		why, failed, err := s.sandboxes.Waiting(ctx, id, false)
 		if err != nil {
 			slog.Error("look at starting environment", "thread", id, "err", err)
 		}

@@ -9,7 +9,7 @@ const loginState = async (u: User) => (await u.settings.getSettings({})).account
 const loginTerminal = (u: User, action: LoginAction) =>
 	u.terminal((signal) => u.settings.openLoginTerminal({ harness: 'claude', action, cols: 80, rows: 24 }, { signal }));
 
-test('login environment: logout and login in its terminal update the login state; it mounts only the Claude volume', async ({ as }) => {
+test('login environment: logout and login in its terminal update the login state; it runs the login image and mounts only the Claude volume', async ({ as }) => {
 	const alice = as('alice');
 	expect(await loginTerminal(alice, LoginAction.LOGOUT)).toContain('logged out');
 	await expect.poll(() => loginState(alice)).toBe(LoginState.LOGGED_OUT);
@@ -18,6 +18,7 @@ test('login environment: logout and login in its terminal update the login state
 	const pod = JSON.parse(await kube('get', 'pod', `login-${userHash(alice.id)}`, '-o', 'json'));
 	expect(pod.spec.containers[0].envFrom).toBeUndefined();
 	expect(pod.spec.volumes.filter((v: object) => 'secret' in v || 'persistentVolumeClaim' in v)).toHaveLength(1);
+	expect(pod.spec.containers[0].image).toBe(process.env.SANDBOX_LOGIN_IMAGE); // the small one: runner and claude
 });
 
 test('secrets: set, reserved and invalid names and subscription tokens refused, values never returned', { tag: '@key' }, async ({ as }) => {

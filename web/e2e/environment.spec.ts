@@ -1,6 +1,7 @@
 // A thread's environment over time: push, suspend and resume, settle, delete and recreate.
+import net from 'node:net';
 import { AutoPushState, LoginAction, PermissionDecision, PermissionMode } from '../src/lib/gen/banda/v1/banda_pb.js';
-import { exists, expect, freePort, kexec, kube, png, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
+import { exists, expect, freePort, HOST, kexec, kube, png, refused, repo, sql, Status, test, until, type Thread } from './fixtures.ts';
 
 test('push reports its result as a notice', async ({ as }) => {
 	const t = await as('alice').create();
@@ -31,7 +32,7 @@ test('snoozing suspends the environment; a prompt resumes it with the checkout i
 });
 
 test('a start that can’t succeed (an image that can’t be pulled) ends as errored with the reason and Retry; the login environment says the same', { tag: '@key' }, async ({ as, startApi }) => {
-	const api = await startApi({ SANDBOX_IMAGE: 'localhost/banda-sandbox:e2e-missing' }); // its own database: its threads only
+	const api = await startApi({ SANDBOX_IMAGE: 'localhost/banda-sandbox:e2e-missing', SANDBOX_LOGIN_IMAGE: 'localhost/banda-login:e2e-missing' }); // its own database: its threads only
 	const alice = as('alice', api);
 	const t = await alice.create({ prompt: 'e2e: never runs' });
 	const page = await alice.page();
@@ -42,6 +43,25 @@ test('a start that can’t succeed (an image that can’t be pulled) ends as err
 	await expect(card.getByRole('button', { name: 'Retry' })).toBeVisible();
 	const login = alice.terminal((signal) => alice.settings.openLoginTerminal({ harness: 'claude', action: LoginAction.LOGIN, cols: 80, rows: 24 }, { signal }), 90_000);
 	expect(await refused(login)).toContain("Can't pull the sandbox image");
+});
+
+test('a login terminal says which step its environment is at: the runner it waits for has started and is connecting', async ({ as, startApi }) => {
+	// Takes the runners' connections and never answers, so the runner stays up, connecting.
+	const port = await freePort();
+	const held = new Set<net.Socket>();
+	const server = net.createServer((c) => held.add(c)).listen(port, '0.0.0.0');
+	try {
+		const alice = as('alice', await startApi({ RUNNER_API_URL: `http://${HOST}:${port}` }));
+		const seen: string[] = [];
+		for await (const r of alice.settings.openLoginTerminal({ harness: 'claude', action: LoginAction.LOGIN, cols: 80, rows: 24 }, { signal: AbortSignal.timeout(90_000) })) {
+			if (r.waiting) seen.push(r.waiting);
+			if (r.waiting.startsWith('The runner started')) break;
+		}
+		expect(seen.at(-1)).toBe('The runner started and is connecting to Banda');
+	} finally {
+		held.forEach((c) => c.destroy());
+		server.close();
+	}
 });
 
 // Parks t and makes its next start wait for a node that never comes.

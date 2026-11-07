@@ -1,0 +1,37 @@
+{{- if .Values.sandboxes.prepull }}
+# Pulls the sandbox and login images onto every node that runs environments, so
+# no start waits for a pull: the sandbox image in an init container that exits at
+# once, the login image in one that sleeps. A new image (an upgrade) rolls it out
+# node by node. Labelled as a sandbox: the sandbox network policy applies.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: banda-prepull
+  labels: {{- include "banda.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {app: banda-prepull}
+  template:
+    metadata:
+      labels: {app: banda-prepull, banda.dev/sandbox: prepull}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 0
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, runAsNonRoot: true}
+      {{- with .Values.sandboxes.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: sandbox
+          image: {{ include "banda.image" (dict "image" .Values.image.sandbox "root" .) | quote }}
+          command: ["true"]
+          resources: {requests: {cpu: 1m, memory: 8Mi}, limits: {cpu: 10m, memory: 16Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+      containers:
+        - name: login
+          image: {{ include "banda.image" (dict "image" .Values.image.login "root" .) | quote }}
+          command: [sleep, infinity]
+          resources: {requests: {cpu: 1m, memory: 8Mi}, limits: {cpu: 10m, memory: 16Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+{{- end }}

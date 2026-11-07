@@ -72,7 +72,7 @@ run = 'deploy/dev.sh chart --set api.enabled=false --set publicUrl=http://${PUBL
 
 
 [tasks.image]
-description = "Build the sandbox image and load it into kind (after changing cmd/runner or deploy/sandbox.Dockerfile)"
+description = "Build the sandbox image (or another stage of deploy/sandbox.Dockerfile: TARGET) and load it into kind (after changing cmd/runner or deploy/sandbox.Dockerfile)"
 run = """
 i=${SANDBOX_IMAGE:-localhost/banda-sandbox:dev}
 c=${CONTAINER:-podman}

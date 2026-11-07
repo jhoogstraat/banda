@@ -37,15 +37,15 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        image: [api, sandbox]
+        image: [api, sandbox, login] # login: a stage of deploy/sandbox.Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
       - uses: docker/build-push-action@v7
         with:
           context: .
-          file: deploy/${{ matrix.image }}.Dockerfile
-          target: ${{ matrix.image == 'sandbox' && 'sandbox' || '' }}
+          file: deploy/${{ matrix.image == 'api' && 'api' || 'sandbox' }}.Dockerfile
+          target: ${{ matrix.image != 'api' && matrix.image || '' }}
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
@@ -121,6 +121,17 @@ jobs:
           tags: localhost/banda-sandbox:e2e
           load: true
           cache-from: type=gha,scope=sandbox
+      # And the fake login image (E2E_LOGIN_IMAGE).
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/sandbox.Dockerfile
+          target: login-fake
+          tags: localhost/banda-login:e2e
+          load: true
+          cache-from: |
+            type=gha,scope=login
+            type=gha,scope=sandbox
       # The runner's memory and biggest processes every 15 s, into the artifact: the 8 GB runner swapped once
       # (leaked browser tabs) and stalled the kind API server for minutes.
       - run: |
@@ -131,6 +142,7 @@ jobs:
         env:
           E2E_WORKERS: "2"
           E2E_IMAGE: localhost/banda-sandbox:e2e
+          E2E_LOGIN_IMAGE: localhost/banda-login:e2e
       - if: always()
         run: df -h /
       - if: failure() || cancelled()

@@ -282,6 +282,22 @@ func TestParseNodeSelector(t *testing.T) {
 }
 
 // Thread and login environments both run only on the nodes the selector names.
+// Login environments run the login image, or the sandbox image without one.
+func TestLoginImage(t *testing.T) {
+	image := func(c Config) string {
+		return (&Client{cfg: c}).loginSandbox("alice", "claude").Spec.PodTemplate.Spec.Containers[0].Image
+	}
+	if got := image(Config{Image: "sandbox:1", LoginImage: "login:1"}); got != "login:1" {
+		t.Errorf("with a login image: %s", got)
+	}
+	if got := image(Config{Image: "sandbox:1"}); got != "sandbox:1" {
+		t.Errorf("without one: %s", got)
+	}
+	if got := (&Client{cfg: Config{Image: "sandbox:1", LoginImage: "login:1"}}).sandbox("t-1", "claude", store.Thread{ID: "1", OwnerID: "alice"}, "subscription", nil, store.GitIdentity{}).Spec.PodTemplate.Spec.Containers[0].Image; got != "sandbox:1" {
+		t.Errorf("a thread's: %s", got)
+	}
+}
+
 func TestPodsKeepToTheNodeSelector(t *testing.T) {
 	sel := map[string]string{"kubernetes.io/hostname": "node-1"}
 	c := &Client{cfg: Config{NodeSelector: sel}}
@@ -356,6 +372,52 @@ func TestPodWaiting(t *testing.T) {
 		why, failed := podWaiting(c.pod)
 		if !strings.Contains(why, c.why) || (c.why == "" && why != "") || failed != c.failed {
 			t.Errorf("podWaiting = %q, %v; want %q, %v", why, failed, c.why, c.failed)
+		}
+	}
+}
+
+// A start with nothing in the way says which step it is at.
+func TestPodStep(t *testing.T) {
+	cond := func(t corev1.PodConditionType, s corev1.ConditionStatus) corev1.PodCondition {
+		return corev1.PodCondition{Type: t, Status: s}
+	}
+	pod := func(running bool, conds ...corev1.PodCondition) *corev1.Pod {
+		state := corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerCreating"}}
+		if running {
+			state = corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+		}
+		return &corev1.Pod{Spec: corev1.PodSpec{NodeName: "node-1"},
+			Status: corev1.PodStatus{Conditions: conds, ContainerStatuses: []corev1.ContainerStatus{{State: state}}}}
+	}
+	scheduled := cond(corev1.PodScheduled, corev1.ConditionTrue)
+	mounting := cond(corev1.PodReadyToStartContainers, corev1.ConditionFalse)
+	ready := cond(corev1.PodReadyToStartContainers, corev1.ConditionTrue)
+	events := func(reasons ...string) func() []corev1.Event {
+		return func() []corev1.Event {
+			var evs []corev1.Event
+			for _, r := range reasons {
+				evs = append(evs, corev1.Event{Reason: r})
+			}
+			return evs
+		}
+	}
+	for _, c := range []struct {
+		pod    *corev1.Pod
+		events func() []corev1.Event
+		want   string
+	}{
+		{&corev1.Pod{}, events(), "Waiting for a node and the environment's volumes"},
+		{pod(false, cond(corev1.PodScheduled, corev1.ConditionFalse)), events(), "Waiting for a node"},
+		{pod(false, scheduled, mounting), events("Scheduled"), "Mounting the environment's volumes on node node-1"},
+		{pod(false, scheduled, ready), events("Scheduled", "Pulling"), "Pulling the image onto node node-1"},
+		{pod(false, scheduled), events("Scheduled", "Pulling"), "Pulling the image onto node node-1"}, // no such condition before Kubernetes 1.29
+		{pod(false, scheduled, ready), events("Pulling", "Pulled", "Created"), ""},
+		{pod(false, scheduled, ready), events(), ""}, // no events to read: the step goes unnamed
+		{pod(true, scheduled, ready), events("Pulled", "Started"), "The runner started and is connecting to Banda"},
+	} {
+		got := podStep(c.pod, c.events)
+		if !strings.HasPrefix(got, c.want) || (c.want == "" && got != "") {
+			t.Errorf("podStep = %q; want %q", got, c.want)
 		}
 	}
 }

@@ -46,6 +46,7 @@ func main() {
 		Context:      os.Getenv("KUBE_CONTEXT"),
 		Namespace:    env("SANDBOX_NAMESPACE", "banda"),
 		Image:        env("SANDBOX_IMAGE", "localhost/banda-sandbox:dev"),
+		LoginImage:   os.Getenv("SANDBOX_LOGIN_IMAGE"),
 		APIURL:       env("RUNNER_API_URL", "http://host.containers.internal:8787"),
 		Sizes:        sizes,
 		Team:         team,
